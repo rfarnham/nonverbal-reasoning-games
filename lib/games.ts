@@ -11,10 +11,10 @@ export type GameDefinition = {
 export const games: readonly GameDefinition[] = [
   {
     slug: "rotation-match",
-    title: "Rotation Match",
+    title: "Transformation Match",
     description:
-      "Find the option that keeps its identity when turned—not mirrored or changed.",
-    skills: ["Mental rotation", "Reflection control"],
+      "Apply a rotation or reflection and find the exact transformed pattern.",
+    skills: ["Mental transformation", "Visual comparison"],
     status: "live",
   },
   {

@@ -15,7 +15,7 @@ There is no account, download, backend, or analytics.
 
 | Game | Trains | Status |
 | --- | --- | --- |
-| [Rotation Match](https://rfarnham.github.io/nonverbal-reasoning-games/games/rotation-match/) | Mental rotation and reflection control | Playable |
+| [Transformation Match](https://rfarnham.github.io/nonverbal-reasoning-games/games/rotation-match/) | Mental rotation and reflection control | Playable |
 | Pattern Matrix | Rule finding and pattern completion | Planned |
 | Shape Fold | Spatial folding and working memory | Planned |
 

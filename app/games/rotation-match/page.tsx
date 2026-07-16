@@ -12,21 +12,38 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-import { rotationMatchGame } from "./game-info";
+import { rotationMatchGame as transformationMatchGame } from "./game-info";
 import {
   ROUNDS,
   TUTORIAL,
   describePattern,
+  differingTileIndexes,
+  generateInfiniteRound,
   patternKey,
+  roundFingerprint,
   type MirrorAxis,
   type Pattern,
   type PuzzleTransform,
   type RotationTransform,
+  type Round,
+  type Difficulty,
 } from "./game-engine";
 import styles from "./rotation-match.module.css";
 
-type PatternSize = "tutorialPattern" | "clue" | "option" | "ghost";
-type GamePhase = "idle" | "animating" | "answered";
+type PatternSize = "tutorialPattern" | "clue" | "option" | "review" | "ghost";
+type GamePhase = "idle" | "animating" | "wrong-review" | "answered";
+type SessionMode = "curated" | "infinite" | "redemption";
+
+type SessionRound = {
+  id: string;
+  ordinal: number;
+  round: Round;
+};
+
+type MistakeRecord = {
+  sessionRound: SessionRound;
+  chosenIndex: number;
+};
 
 type GhostState = {
   pattern: Pattern;
@@ -43,19 +60,29 @@ type GhostState = {
 
 type CustomProperties = CSSProperties & Record<`--${string}`, string>;
 
+const GHOST_ANIMATION_MS = 900;
+const GHOST_SETTLE_MS = 930;
+const REDUCED_GHOST_MS = 140;
+const WRONG_REVIEW_MS = 2200;
+const REDUCED_WRONG_REVIEW_MS = 1300;
+
 function PatternGrid({
   pattern,
   size,
   label,
   hidden = false,
   gridRef,
+  differenceIndexes = [],
 }: {
   pattern: Pattern;
   size: PatternSize;
   label?: string;
   hidden?: boolean;
   gridRef?: Ref<HTMLDivElement>;
+  differenceIndexes?: readonly number[];
 }) {
+  const differenceSet = new Set(differenceIndexes);
+
   return (
     <div
       className={`${styles.pattern} ${styles[size]}`}
@@ -71,7 +98,9 @@ function PatternGrid({
 
         return (
           <span
-            className={`${styles.tile} ${styles[tile.color]}`}
+            className={`${styles.tile} ${styles[tile.color]} ${
+              differenceSet.has(index) ? styles.differenceTile : ""
+            }`}
             aria-hidden="true"
             key={`${index}-${tile.color}-${tile.motif}-${tile.orientation}`}
           >
@@ -195,6 +224,38 @@ function ghostTransformCss(transform: PuzzleTransform) {
   }
 }
 
+function infiniteDifficulty(ordinal: number): Difficulty {
+  const positionInCycle = (ordinal - 1) % 12;
+  if (positionInCycle < 4) return "Easy";
+  if (positionInCycle < 8) return "Medium";
+  return "Hard";
+}
+
+function buildInfiniteSessionRound(
+  ordinal: number,
+  seenFingerprints: Set<string>,
+): SessionRound {
+  const difficulty = infiniteDifficulty(ordinal);
+  let round = generateInfiniteRound(difficulty);
+  let fingerprint = roundFingerprint(round);
+
+  for (
+    let attempt = 0;
+    attempt < 24 && seenFingerprints.has(fingerprint);
+    attempt += 1
+  ) {
+    round = generateInfiniteRound(difficulty);
+    fingerprint = roundFingerprint(round);
+  }
+
+  seenFingerprints.add(fingerprint);
+  return {
+    id: `infinite-${ordinal}-${fingerprint}`,
+    ordinal,
+    round,
+  };
+}
+
 function scheduleTone(
   context: AudioContext,
   frequency: number,
@@ -236,30 +297,77 @@ function playTones(context: AudioContext, correct: boolean) {
   scheduleTone(context, 174.61, now + 0.055, 0.12, 0.044);
 }
 
-export default function RotationMatchPage() {
+export default function TransformationMatchPage() {
   const [started, setStarted] = useState(false);
-  const [roundIndex, setRoundIndex] = useState(0);
+  const [sessionMode, setSessionMode] = useState<SessionMode>("curated");
+  const [roundQueue, setRoundQueue] = useState<readonly SessionRound[]>(() =>
+    ROUNDS.map((round, index) => ({
+      id: `curated-${index}`,
+      ordinal: index + 1,
+      round,
+    })),
+  );
+  const [roundCursor, setRoundCursor] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [score, setScore] = useState(0);
+  const [completedCount, setCompletedCount] = useState(0);
   const [complete, setComplete] = useState(false);
   const [phase, setPhase] = useState<GamePhase>("idle");
   const [ghost, setGhost] = useState<GhostState | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [mistakes, setMistakes] = useState<readonly MistakeRecord[]>([]);
+  const [retryReady, setRetryReady] = useState(false);
+  const [redemptionTotal, setRedemptionTotal] = useState(0);
 
   const clueGridRef = useRef<HTMLDivElement>(null);
   const optionGridRefs = useRef<Array<HTMLDivElement | null>>([]);
-  const firstOptionRef = useRef<HTMLButtonElement>(null);
+  const optionButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const nextButtonRef = useRef<HTMLButtonElement>(null);
   const resultHeadingRef = useRef<HTMLHeadingElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const animationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const animationTokenRef = useRef(0);
   const inputLockedRef = useRef(false);
   const shouldFocusFirstOption = useRef(false);
+  const retryFocusIndexRef = useRef<number | null>(null);
+  const infiniteFingerprintsRef = useRef(new Set<string>());
 
-  const round = ROUNDS[roundIndex];
+  const activeSessionRound = roundQueue[roundCursor] ?? roundQueue[0];
+  const round = activeSessionRound?.round ?? ROUNDS[0];
+  const sessionLength = roundQueue.length;
   const selectedCorrect = selectedIndex === round.correctIndex;
-  const progress = roundIndex + (phase === "answered" ? 1 : 0);
+  const selectedDifferenceCount =
+    selectedIndex !== null && !selectedCorrect
+      ? differingTileIndexes(round.options[selectedIndex], round.correctPattern)
+          .length
+      : 0;
+  const progress = roundCursor + (phase === "answered" ? 1 : 0);
+  const isInfinite = sessionMode === "infinite";
+  const isRedemption = sessionMode === "redemption";
+  const isLastFiniteRound = !isInfinite && roundCursor === sessionLength - 1;
+
+  const clearAttemptTimers = useCallback(() => {
+    if (flightTimerRef.current) {
+      clearTimeout(flightTimerRef.current);
+      flightTimerRef.current = null;
+    }
+    if (reviewTimerRef.current) {
+      clearTimeout(reviewTimerRef.current);
+      reviewTimerRef.current = null;
+    }
+  }, []);
+
+  const resetAttemptState = useCallback(() => {
+    animationTokenRef.current += 1;
+    clearAttemptTimers();
+    inputLockedRef.current = false;
+    retryFocusIndexRef.current = null;
+    setSelectedIndex(null);
+    setGhost(null);
+    setRetryReady(false);
+    setPhase("idle");
+  }, [clearAttemptTimers]);
 
   const ensureAudioContext = useCallback(() => {
     if (typeof window === "undefined") return null;
@@ -319,24 +427,42 @@ export default function RotationMatchPage() {
         inputLockedRef.current ||
         phase !== "idle" ||
         complete ||
-        !started
+        !started ||
+        !activeSessionRound
       ) {
         return;
       }
 
       inputLockedRef.current = true;
+      setRetryReady(false);
       const isCorrect = optionIndex === round.correctIndex;
       const sourceRect = clueGridRef.current?.getBoundingClientRect();
-      const targetRect =
-        optionGridRefs.current[round.correctIndex]?.getBoundingClientRect();
+      const targetRect = optionGridRefs.current[optionIndex]?.getBoundingClientRect();
       const reducedMotion = window.matchMedia(
         "(prefers-reduced-motion: reduce)",
       ).matches;
 
       playFeedbackSound(isCorrect);
       setSelectedIndex(optionIndex);
-      if (isCorrect) setScore((current) => current + 1);
       setPhase("animating");
+
+      if (isCorrect) {
+        const wasMissed = mistakes.some(
+          ({ sessionRound }) => sessionRound.id === activeSessionRound.id,
+        );
+        if (!isRedemption && !wasMissed) {
+          setScore((current) => current + 1);
+        }
+        setCompletedCount((current) => current + 1);
+      } else if (!isRedemption) {
+        setMistakes((current) =>
+          current.some(
+            ({ sessionRound }) => sessionRound.id === activeSessionRound.id,
+          )
+            ? current
+            : [...current, { sessionRound: activeSessionRound, chosenIndex: optionIndex }],
+        );
+      }
 
       if (sourceRect && targetRect) {
         setGhost({
@@ -355,63 +481,152 @@ export default function RotationMatchPage() {
 
       const animationToken = animationTokenRef.current + 1;
       animationTokenRef.current = animationToken;
-      if (animationTimerRef.current) clearTimeout(animationTimerRef.current);
-      animationTimerRef.current = setTimeout(
+      clearAttemptTimers();
+      flightTimerRef.current = setTimeout(
         () => {
           if (animationTokenRef.current !== animationToken) return;
-          setGhost(null);
-          setPhase("answered");
+
+          if (isCorrect) {
+            setGhost(null);
+            setPhase("answered");
+            return;
+          }
+
+          setPhase("wrong-review");
+          reviewTimerRef.current = setTimeout(
+            () => {
+              if (animationTokenRef.current !== animationToken) return;
+              retryFocusIndexRef.current = optionIndex;
+              inputLockedRef.current = false;
+              setGhost(null);
+              setSelectedIndex(null);
+              setRetryReady(true);
+              setPhase("idle");
+            },
+            reducedMotion ? REDUCED_WRONG_REVIEW_MS : WRONG_REVIEW_MS,
+          );
         },
-        reducedMotion ? 140 : 680,
+        reducedMotion ? REDUCED_GHOST_MS : GHOST_SETTLE_MS,
       );
     },
-    [complete, phase, playFeedbackSound, round, started],
+    [
+      activeSessionRound,
+      clearAttemptTimers,
+      complete,
+      isRedemption,
+      mistakes,
+      phase,
+      playFeedbackSound,
+      round,
+      started,
+    ],
   );
 
-  const resetRoundState = useCallback(() => {
-    animationTokenRef.current += 1;
-    if (animationTimerRef.current) {
-      clearTimeout(animationTimerRef.current);
-      animationTimerRef.current = null;
-    }
-    inputLockedRef.current = false;
-    setSelectedIndex(null);
-    setGhost(null);
-    setPhase("idle");
-  }, []);
-
-  const startGame = useCallback(() => {
+  const startCurated = useCallback(() => {
     resumeAudio();
+    infiniteFingerprintsRef.current.clear();
+    setSessionMode("curated");
+    setRoundQueue(
+      ROUNDS.map((roundItem, index) => ({
+        id: `curated-${index}`,
+        ordinal: index + 1,
+        round: roundItem,
+      })),
+    );
+    setRoundCursor(0);
+    setScore(0);
+    setCompletedCount(0);
+    setMistakes([]);
+    setRedemptionTotal(0);
     setStarted(true);
     setComplete(false);
-    setRoundIndex(0);
-    setScore(0);
-    resetRoundState();
+    resetAttemptState();
     shouldFocusFirstOption.current = true;
-  }, [resetRoundState, resumeAudio]);
+  }, [resetAttemptState, resumeAudio]);
+
+  const startInfinite = useCallback(() => {
+    resumeAudio();
+    infiniteFingerprintsRef.current.clear();
+    const firstRound = buildInfiniteSessionRound(
+      1,
+      infiniteFingerprintsRef.current,
+    );
+    setSessionMode("infinite");
+    setRoundQueue([firstRound]);
+    setRoundCursor(0);
+    setScore(0);
+    setCompletedCount(0);
+    setMistakes([]);
+    setRedemptionTotal(0);
+    setStarted(true);
+    setComplete(false);
+    resetAttemptState();
+    shouldFocusFirstOption.current = true;
+  }, [resetAttemptState, resumeAudio]);
+
+  const startRedemption = useCallback(() => {
+    if (mistakes.length === 0) return;
+    const redemptionQueue = mistakes.map(({ sessionRound }, index) => ({
+      ...sessionRound,
+      id: `redemption-${index}-${sessionRound.id}`,
+      ordinal: index + 1,
+    }));
+    setSessionMode("redemption");
+    setRoundQueue(redemptionQueue);
+    setRoundCursor(0);
+    setCompletedCount(0);
+    setRedemptionTotal(redemptionQueue.length);
+    setComplete(false);
+    resetAttemptState();
+    shouldFocusFirstOption.current = true;
+  }, [mistakes, resetAttemptState]);
 
   const goNext = useCallback(() => {
     if (phase !== "answered") return;
 
-    if (roundIndex === ROUNDS.length - 1) {
-      resetRoundState();
+    if (isInfinite) {
+      const nextOrdinal = (activeSessionRound?.ordinal ?? roundCursor + 1) + 1;
+      const nextRound = buildInfiniteSessionRound(
+        nextOrdinal,
+        infiniteFingerprintsRef.current,
+      );
+      shouldFocusFirstOption.current = true;
+      resetAttemptState();
+      setRoundQueue((current) => [...current, nextRound]);
+      setRoundCursor((current) => current + 1);
+      return;
+    }
+
+    if (isLastFiniteRound) {
+      resetAttemptState();
       setComplete(true);
       return;
     }
 
     shouldFocusFirstOption.current = true;
-    resetRoundState();
-    setRoundIndex((current) => current + 1);
-  }, [phase, resetRoundState, roundIndex]);
+    resetAttemptState();
+    setRoundCursor((current) => current + 1);
+  }, [
+    activeSessionRound?.ordinal,
+    isInfinite,
+    isLastFiniteRound,
+    phase,
+    resetAttemptState,
+    roundCursor,
+  ]);
 
-  const restart = useCallback(() => {
-    setComplete(false);
-    setStarted(true);
-    setRoundIndex(0);
-    setScore(0);
-    resetRoundState();
-    shouldFocusFirstOption.current = true;
-  }, [resetRoundState]);
+  const endInfinite = useCallback(() => {
+    if (
+      !isInfinite ||
+      completedCount === 0 ||
+      phase === "animating" ||
+      phase === "wrong-review"
+    ) {
+      return;
+    }
+    resetAttemptState();
+    setComplete(true);
+  }, [completedCount, isInfinite, phase, resetAttemptState]);
 
   const toggleSound = useCallback(() => {
     const next = !soundEnabled;
@@ -466,46 +681,85 @@ export default function RotationMatchPage() {
 
   useEffect(() => {
     if (shouldFocusFirstOption.current && started && !complete) {
-      firstOptionRef.current?.focus();
+      optionButtonRefs.current[0]?.focus();
       shouldFocusFirstOption.current = false;
     }
-  }, [complete, roundIndex, started]);
+  }, [complete, roundCursor, sessionMode, started]);
+
+  useEffect(() => {
+    if (phase === "idle" && retryReady && retryFocusIndexRef.current !== null) {
+      optionButtonRefs.current[retryFocusIndexRef.current]?.focus();
+      retryFocusIndexRef.current = null;
+    }
+  }, [phase, retryReady]);
 
   useEffect(() => {
     if (complete) resultHeadingRef.current?.focus();
   }, [complete]);
 
   useEffect(() => {
-    function finishAnimationOnResize() {
-      if (inputLockedRef.current && phase === "animating") {
+    function finishMovingGhost() {
+      if (!inputLockedRef.current) return;
+
+      if (phase === "animating") {
         animationTokenRef.current += 1;
-        if (animationTimerRef.current) clearTimeout(animationTimerRef.current);
+        clearAttemptTimers();
         setGhost(null);
-        setPhase("answered");
+        if (selectedCorrect) {
+          setPhase("answered");
+        } else {
+          retryFocusIndexRef.current = selectedIndex;
+          inputLockedRef.current = false;
+          setSelectedIndex(null);
+          setRetryReady(true);
+          setPhase("idle");
+        }
+      } else if (phase === "wrong-review") {
+        animationTokenRef.current += 1;
+        clearAttemptTimers();
+        retryFocusIndexRef.current = selectedIndex;
+        inputLockedRef.current = false;
+        setGhost(null);
+        setSelectedIndex(null);
+        setRetryReady(true);
+        setPhase("idle");
       }
     }
 
-    window.addEventListener("resize", finishAnimationOnResize);
-    return () => window.removeEventListener("resize", finishAnimationOnResize);
-  }, [phase]);
+    window.addEventListener("resize", finishMovingGhost);
+    window.addEventListener("scroll", finishMovingGhost, true);
+    return () => {
+      window.removeEventListener("resize", finishMovingGhost);
+      window.removeEventListener("scroll", finishMovingGhost, true);
+    };
+  }, [clearAttemptTimers, phase, selectedCorrect, selectedIndex]);
 
   useEffect(() => {
     return () => {
       animationTokenRef.current += 1;
-      if (animationTimerRef.current) clearTimeout(animationTimerRef.current);
+      clearAttemptTimers();
       const context = audioContextRef.current;
       if (context && context.state !== "closed") {
         void context.close().catch(() => undefined);
       }
     };
-  }, []);
+  }, [clearAttemptTimers]);
 
   const resultMessage = useMemo(() => {
-    const accuracy = score / ROUNDS.length;
+    const denominator = isInfinite ? Math.max(completedCount, 1) : ROUNDS.length;
+    const accuracy = score / denominator;
     if (accuracy === 1) return "Perfect set.";
     if (accuracy >= 0.7) return "Sharp work.";
     return "Good practice.";
-  }, [score]);
+  }, [completedCount, isInfinite, score]);
+
+  const showRedemptionOffer = !isRedemption && mistakes.length > 0;
+  const resultTitle = isRedemption
+    ? "Redemption complete."
+    : showRedemptionOffer
+      ? "Here’s your chance at redemption."
+      : resultMessage;
+  const resultDenominator = isInfinite ? completedCount : ROUNDS.length;
 
   const soundButton = (
     <button
@@ -526,7 +780,7 @@ export default function RotationMatchPage() {
       <div
         className={`${styles.ghostFlight} ${
           ghost.reducedMotion ? styles.ghostReduced : ""
-        }`}
+        } ${phase === "wrong-review" ? styles.ghostLanded : ""}`}
         style={
           {
             left: `${ghost.left}px`,
@@ -537,6 +791,7 @@ export default function RotationMatchPage() {
             "--ghost-y": `${ghost.deltaY}px`,
             "--ghost-scale": `${ghost.scale}`,
             "--ghost-transform": ghost.transformCss,
+            "--ghost-duration": `${GHOST_ANIMATION_MS}ms`,
           } as CustomProperties
         }
         aria-hidden="true"
@@ -555,7 +810,7 @@ export default function RotationMatchPage() {
           <span aria-hidden="true">←</span>
           <span>Games</span>
         </Link>
-        <span className={styles.gameTitle}>{rotationMatchGame.title}</span>
+        <span className={styles.gameTitle}>{transformationMatchGame.title}</span>
         {soundButton}
       </header>
 
@@ -563,7 +818,7 @@ export default function RotationMatchPage() {
         {!started ? (
           <section className={styles.tutorial} aria-labelledby="tutorial-title">
             <p className={styles.kicker}>Example</p>
-            <h1 id="tutorial-title">Turn it. Find it.</h1>
+            <h1 id="tutorial-title">Transform it. Find it.</h1>
 
             <div className={styles.exampleFlow}>
               <PatternGrid
@@ -591,7 +846,7 @@ export default function RotationMatchPage() {
               <PatternGrid
                 pattern={TUTORIAL.mirror}
                 size="option"
-                label={`Mirror image, not the answer: ${describePattern(
+                label={`Mirror image, not the answer for this turn: ${describePattern(
                   TUTORIAL.mirror,
                 )}`}
               />
@@ -600,43 +855,85 @@ export default function RotationMatchPage() {
               </span>
             </div>
 
-            <button className={styles.primaryButton} type="button" onClick={startGame}>
-              Start
-              <span aria-hidden="true">→</span>
-            </button>
+            <div className={styles.modeActions} aria-label="Choose a game mode">
+              <button
+                className={styles.primaryButton}
+                type="button"
+                onClick={startCurated}
+              >
+                36 puzzles
+                <span aria-hidden="true">→</span>
+              </button>
+              <button
+                className={styles.modeButton}
+                type="button"
+                onClick={startInfinite}
+              >
+                <span aria-hidden="true">∞</span>
+                Infinite
+              </button>
+            </div>
           </section>
         ) : !complete ? (
           <>
             <div className={styles.gameStatus}>
-              <div
-                className={styles.progressTrack}
-                role="progressbar"
-                aria-label="Game progress"
-                aria-valuemin={0}
-                aria-valuemax={ROUNDS.length}
-                aria-valuenow={progress}
-              >
-                {ROUNDS.map((_, index) => (
-                  <span
-                    className={index < progress ? styles.progressDone : undefined}
-                    key={index}
-                  />
-                ))}
-              </div>
+              {isInfinite ? (
+                <div className={styles.infiniteTrack} aria-label="Infinite mode">
+                  ∞
+                </div>
+              ) : (
+                <div
+                  className={styles.progressTrack}
+                  role="progressbar"
+                  aria-label="Game progress"
+                  aria-valuemin={0}
+                  aria-valuemax={sessionLength}
+                  aria-valuenow={progress}
+                  style={{ gridTemplateColumns: `repeat(${sessionLength}, 1fr)` }}
+                >
+                  {roundQueue.map(({ id }, index) => (
+                    <span
+                      className={index < progress ? styles.progressDone : undefined}
+                      key={id}
+                    />
+                  ))}
+                </div>
+              )}
               <span className={styles.roundCount}>
-                {roundIndex + 1} / {ROUNDS.length}
+                {activeSessionRound?.ordinal ?? roundCursor + 1} / {isInfinite ? "∞" : sessionLength}
               </span>
               <span className={styles.difficulty}>{round.difficulty}</span>
-              <span className={styles.score} aria-label={`Score ${score}`}>
-                {score} ✓
+              <span
+                className={styles.score}
+                aria-label={
+                  isRedemption ? "Redemption mode" : `First try score ${score}`
+                }
+              >
+                {isRedemption ? "Retry" : `${score} ✓`}
               </span>
+              {isInfinite ? (
+                <button
+                  className={styles.endButton}
+                  type="button"
+                  onClick={endInfinite}
+                  disabled={
+                    completedCount === 0 ||
+                    phase === "animating" ||
+                    phase === "wrong-review"
+                  }
+                >
+                  End
+                </button>
+              ) : null}
             </div>
 
             <div className={styles.gameBoard}>
               <section className={styles.cluePanel} aria-label="Pattern and transform">
                 <div
                   className={`${styles.clueStage} ${
-                    phase === "animating" ? styles.clueAnimating : ""
+                    phase === "animating" || phase === "wrong-review"
+                      ? styles.clueAnimating
+                      : ""
                   }`}
                 >
                   <PatternGrid
@@ -654,14 +951,19 @@ export default function RotationMatchPage() {
                   {round.options.map((option, optionIndex) => {
                     const isCorrect = optionIndex === round.correctIndex;
                     const isSelected = selectedIndex === optionIndex;
-                    const showAnswer = phase === "answered";
-                    const showCorrect = showAnswer && isCorrect;
-                    const showWrong = showAnswer && isSelected && !isCorrect;
-                    const muted = showAnswer && !isCorrect && !isSelected;
+                    const showCorrect = phase === "answered" && isCorrect;
+                    const showWrong =
+                      phase === "wrong-review" && isSelected && !isCorrect;
+                    const muted =
+                      (phase === "answered" && !isCorrect) ||
+                      (phase === "wrong-review" && !isSelected);
+                    const differences = showWrong
+                      ? differingTileIndexes(option, round.correctPattern)
+                      : [];
                     const answerState = showCorrect
                       ? ", correct answer"
                       : showWrong
-                        ? ", your incorrect answer"
+                        ? `, your answer; ${differences.length} tiles differ`
                         : "";
 
                     return (
@@ -678,7 +980,9 @@ export default function RotationMatchPage() {
                           option,
                         )}${answerState}`}
                         aria-keyshortcuts={`${optionIndex + 1}`}
-                        ref={optionIndex === 0 ? firstOptionRef : undefined}
+                        ref={(node) => {
+                          optionButtonRefs.current[optionIndex] = node;
+                        }}
                         key={`${optionIndex}-${patternKey(option)}`}
                       >
                         <span className={styles.optionNumber} aria-hidden="true">
@@ -688,6 +992,7 @@ export default function RotationMatchPage() {
                           pattern={option}
                           size="option"
                           hidden
+                          differenceIndexes={differences}
                           gridRef={(node) => {
                             optionGridRefs.current[optionIndex] = node;
                           }}
@@ -710,40 +1015,113 @@ export default function RotationMatchPage() {
             </div>
 
             <div className={styles.feedbackBar} aria-live="polite" role="status">
-              {phase === "answered" ? (
+              {phase === "wrong-review" ? (
+                <strong className={styles.wrongText}>
+                  Not quite · {selectedDifferenceCount}{" "}
+                  {selectedDifferenceCount === 1 ? "tile differs" : "tiles differ"}
+                </strong>
+              ) : phase === "answered" ? (
                 <>
-                  <strong className={selectedCorrect ? styles.correctText : styles.wrongText}>
-                    {selectedCorrect ? "Correct" : "Not quite"}
-                  </strong>
+                  <strong className={styles.correctText}>Correct</strong>
                   <button
                     className={styles.nextButton}
                     type="button"
                     onClick={goNext}
                     ref={nextButtonRef}
                   >
-                    {roundIndex === ROUNDS.length - 1 ? "Results" : "Next"}
+                    {isLastFiniteRound ? "Results" : "Next"}
                     <span aria-hidden="true">→</span>
                   </button>
                 </>
+              ) : retryReady ? (
+                <strong className={styles.retryText}>Try again</strong>
               ) : null}
             </div>
 
             <p className={styles.keyboardHint}>Keys 1–4</p>
           </>
         ) : (
-          <section className={styles.results} aria-labelledby="results-title">
-            <p className={styles.kicker}>Complete</p>
+          <section
+            className={`${styles.results} ${
+              showRedemptionOffer ? styles.resultsWithReview : ""
+            }`}
+            aria-labelledby="results-title"
+          >
+            <p className={styles.kicker}>
+              {isRedemption ? "Redeemed" : "Complete"}
+            </p>
             <h1 id="results-title" ref={resultHeadingRef} tabIndex={-1}>
-              {resultMessage}
+              {resultTitle}
             </h1>
             <p className={styles.resultScore}>
-              <strong>{score}</strong>
-              <span>/ {ROUNDS.length}</span>
+              <strong>{isRedemption ? redemptionTotal : score}</strong>
+              <span>
+                {isRedemption
+                  ? `of ${redemptionTotal} cleared`
+                  : `/ ${resultDenominator} first try`}
+              </span>
             </p>
+
+            {showRedemptionOffer ? (
+              <div className={styles.reviewGrid} aria-label="Puzzles to retry">
+                {mistakes.map(({ sessionRound: missed, chosenIndex }) => {
+                  const missedRound = missed.round;
+                  const wrongPattern = missedRound.options[chosenIndex];
+                  const differences = differingTileIndexes(
+                    wrongPattern,
+                    missedRound.correctPattern,
+                  );
+
+                  return (
+                    <article className={styles.reviewCard} key={missed.id}>
+                      <span className={styles.reviewRound}>
+                        Puzzle {missed.ordinal} · {missedRound.difficulty}
+                      </span>
+                      <div className={styles.reviewVisual}>
+                        <PatternGrid
+                          pattern={missedRound.clue}
+                          size="review"
+                          label={`Puzzle ${missed.ordinal} starting pattern: ${describePattern(
+                            missedRound.clue,
+                          )}`}
+                        />
+                        <TransformCue transform={missedRound.transform} />
+                        <div className={styles.reviewWrong}>
+                          <PatternGrid
+                            pattern={wrongPattern}
+                            size="review"
+                            differenceIndexes={differences}
+                            label={`Your answer with ${differences.length} differing tiles: ${describePattern(
+                              wrongPattern,
+                            )}`}
+                          />
+                          <span aria-hidden="true">×</span>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : null}
+
             <div className={styles.resultActions}>
-              <button className={styles.primaryButton} type="button" onClick={restart}>
-                Play again
-              </button>
+              {showRedemptionOffer ? (
+                <button
+                  className={styles.primaryButton}
+                  type="button"
+                  onClick={startRedemption}
+                >
+                  Retry missed
+                </button>
+              ) : (
+                <button
+                  className={styles.primaryButton}
+                  type="button"
+                  onClick={startCurated}
+                >
+                  Play again
+                </button>
+              )}
               <Link className={styles.secondaryLink} href="/">
                 All games
               </Link>

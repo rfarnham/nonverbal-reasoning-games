@@ -116,7 +116,38 @@ const MIRROR_AXIS_NAMES: Record<MirrorAxis, string> = {
   "anti-diagonal": "diagonal up-right",
 };
 
+const FILLED_COLORS: readonly Exclude<TileColor, "empty">[] = [
+  "coral",
+  "gold",
+  "teal",
+  "violet",
+];
+
+const MIRROR_DISTRACTORS: readonly DistractorKind[] = [
+  "mirror-vertical",
+  "mirror-horizontal",
+  "mirror-main-diagonal",
+  "mirror-anti-diagonal",
+];
+
+const GENERATED_DIFFICULTY_RULES: Record<
+  Difficulty,
+  {
+    minFilled: number;
+    maxFilled: number;
+    minMotifs: number;
+    maxMotifs: number;
+  }
+> = {
+  Easy: { minFilled: 3, maxFilled: 4, minMotifs: 0, maxMotifs: 0 },
+  Medium: { minFilled: 5, maxFilled: 6, minMotifs: 0, maxMotifs: 0 },
+  Hard: { minFilled: 6, maxFilled: 7, minMotifs: 2, maxMotifs: 4 },
+};
+
+export const GENERATOR_MAX_ATTEMPTS = 128;
+
 const ROUND_SPECS: readonly RoundSpec[] = [
+  // Easy: sparse, flat-color patterns introduce every transform family.
   {
     pattern: "CT..G...V",
     direction: "clockwise",
@@ -150,6 +181,72 @@ const ROUND_SPECS: readonly RoundSpec[] = [
     distractors: ["mirror-vertical", "mirror-horizontal", "one-block-off"],
   },
   {
+    pattern: "V.C...T.G",
+    axis: "vertical",
+    difficulty: "Easy",
+    correctIndex: 2,
+    distractors: [
+      "mirror-horizontal",
+      "mirror-main-diagonal",
+      "one-block-off",
+    ],
+  },
+  {
+    pattern: ".CG...V.T",
+    axis: "horizontal",
+    difficulty: "Easy",
+    correctIndex: 1,
+    distractors: ["mirror-vertical", "mirror-anti-diagonal", "one-block-off"],
+  },
+  {
+    pattern: "G..T.C..V",
+    axis: "main-diagonal",
+    difficulty: "Easy",
+    correctIndex: 3,
+    distractors: ["mirror-anti-diagonal", "mirror-vertical", "one-block-off"],
+  },
+  {
+    pattern: "..VCT.G..",
+    axis: "anti-diagonal",
+    difficulty: "Easy",
+    correctIndex: 0,
+    distractors: ["mirror-main-diagonal", "mirror-horizontal", "one-block-off"],
+  },
+  {
+    pattern: "C.G..VT..",
+    direction: "clockwise",
+    quarterTurns: 3,
+    difficulty: "Easy",
+    correctIndex: 1,
+    distractors: ["wrong-rotation", "mirror-main-diagonal", "one-block-off"],
+  },
+  {
+    pattern: ".T.C...GV",
+    direction: "counterclockwise",
+    quarterTurns: 2,
+    difficulty: "Easy",
+    correctIndex: 3,
+    distractors: ["wrong-rotation", "mirror-vertical", "one-block-off"],
+  },
+  {
+    pattern: "GV...C.T.",
+    direction: "clockwise",
+    quarterTurns: 1,
+    difficulty: "Easy",
+    correctIndex: 0,
+    distractors: ["wrong-rotation", "mirror-horizontal", "one-block-off"],
+  },
+  {
+    pattern: "T..G.V.C.",
+    direction: "counterclockwise",
+    quarterTurns: 3,
+    difficulty: "Easy",
+    correctIndex: 2,
+    distractors: ["wrong-rotation", "mirror-anti-diagonal", "one-block-off"],
+  },
+
+  // Medium: denser flat patterns make geometric near-matches less obvious.
+  {
     pattern: "C.VT.G.CT",
     axis: "vertical",
     difficulty: "Medium",
@@ -181,6 +278,70 @@ const ROUND_SPECS: readonly RoundSpec[] = [
     correctIndex: 0,
     distractors: ["mirror-main-diagonal", "mirror-horizontal", "one-block-off"],
   },
+  {
+    pattern: "CGV.T..CT",
+    direction: "clockwise",
+    quarterTurns: 1,
+    difficulty: "Medium",
+    correctIndex: 1,
+    distractors: ["wrong-rotation", "mirror-horizontal", "one-block-off"],
+  },
+  {
+    pattern: "T.CGV.G..",
+    direction: "counterclockwise",
+    quarterTurns: 1,
+    difficulty: "Medium",
+    correctIndex: 3,
+    distractors: ["wrong-rotation", "mirror-vertical", "one-block-off"],
+  },
+  {
+    pattern: ".VGCT..CG",
+    direction: "clockwise",
+    quarterTurns: 2,
+    difficulty: "Medium",
+    correctIndex: 0,
+    distractors: ["wrong-rotation", "mirror-main-diagonal", "one-block-off"],
+  },
+  {
+    pattern: "C.TG.VG.C",
+    direction: "counterclockwise",
+    quarterTurns: 2,
+    difficulty: "Medium",
+    correctIndex: 2,
+    distractors: ["wrong-rotation", "mirror-anti-diagonal", "one-block-off"],
+  },
+  {
+    pattern: "GT..C.VTG",
+    direction: "clockwise",
+    quarterTurns: 3,
+    difficulty: "Medium",
+    correctIndex: 3,
+    distractors: ["wrong-rotation", "mirror-vertical", "one-block-off"],
+  },
+  {
+    pattern: ".CVG.TC.G",
+    direction: "counterclockwise",
+    quarterTurns: 3,
+    difficulty: "Medium",
+    correctIndex: 1,
+    distractors: ["wrong-rotation", "mirror-horizontal", "one-block-off"],
+  },
+  {
+    pattern: "V.GCT.CG.",
+    axis: "vertical",
+    difficulty: "Medium",
+    correctIndex: 2,
+    distractors: ["mirror-horizontal", "mirror-anti-diagonal", "one-block-off"],
+  },
+  {
+    pattern: "TC.G..VGC",
+    axis: "anti-diagonal",
+    difficulty: "Medium",
+    correctIndex: 0,
+    distractors: ["mirror-main-diagonal", "mirror-vertical", "one-block-off"],
+  },
+
+  // Hard: directional motifs must transform along with their tiles.
   {
     pattern: "G.CVT..CG",
     motifs: [
@@ -248,6 +409,112 @@ const ROUND_SPECS: readonly RoundSpec[] = [
       "mirror-main-diagonal",
       "one-motif-off",
     ],
+  },
+  {
+    pattern: "CG.VT.CGV",
+    motifs: [
+      { index: 0, orientation: 0 },
+      { index: 3, orientation: 2 },
+      { index: 8, orientation: 1 },
+    ],
+    direction: "clockwise",
+    quarterTurns: 1,
+    difficulty: "Hard",
+    correctIndex: 2,
+    distractors: ["one-motif-off", "one-block-off", "mirror-vertical"],
+  },
+  {
+    pattern: "T.VCG.GCT",
+    motifs: [
+      { index: 2, orientation: 3 },
+      { index: 4, orientation: 0 },
+      { index: 6, orientation: 1 },
+      { index: 8, orientation: 2 },
+    ],
+    direction: "counterclockwise",
+    quarterTurns: 2,
+    difficulty: "Hard",
+    correctIndex: 0,
+    distractors: ["one-motif-off", "one-block-off", "mirror-horizontal"],
+  },
+  {
+    pattern: "VGC.TC.GT",
+    motifs: [
+      { index: 0, orientation: 2 },
+      { index: 2, orientation: 0 },
+      { index: 5, orientation: 3 },
+    ],
+    direction: "clockwise",
+    quarterTurns: 3,
+    difficulty: "Hard",
+    correctIndex: 1,
+    distractors: ["one-motif-off", "one-block-off", "mirror-main-diagonal"],
+  },
+  {
+    pattern: ".CTGV.VCG",
+    motifs: [
+      { index: 1, orientation: 1 },
+      { index: 3, orientation: 3 },
+      { index: 4, orientation: 0 },
+      { index: 8, orientation: 2 },
+    ],
+    direction: "counterclockwise",
+    quarterTurns: 3,
+    difficulty: "Hard",
+    correctIndex: 3,
+    distractors: ["one-motif-off", "one-block-off", "mirror-anti-diagonal"],
+  },
+  {
+    pattern: "GTV.C.CVG",
+    motifs: [
+      { index: 0, orientation: 0 },
+      { index: 2, orientation: 2 },
+      { index: 4, orientation: 1 },
+      { index: 7, orientation: 3 },
+    ],
+    axis: "horizontal",
+    difficulty: "Hard",
+    correctIndex: 1,
+    distractors: ["one-motif-off", "one-block-off", "mirror-vertical"],
+  },
+  {
+    pattern: "C.GVTC.VG",
+    motifs: [
+      { index: 2, orientation: 1 },
+      { index: 3, orientation: 2 },
+      { index: 5, orientation: 0 },
+      { index: 8, orientation: 3 },
+    ],
+    axis: "main-diagonal",
+    difficulty: "Hard",
+    correctIndex: 3,
+    distractors: ["one-motif-off", "one-block-off", "mirror-anti-diagonal"],
+  },
+  {
+    pattern: "VT.CG.GTC",
+    motifs: [
+      { index: 0, orientation: 3 },
+      { index: 4, orientation: 1 },
+      { index: 6, orientation: 0 },
+      { index: 8, orientation: 2 },
+    ],
+    axis: "vertical",
+    difficulty: "Hard",
+    correctIndex: 0,
+    distractors: ["one-motif-off", "one-block-off", "mirror-horizontal"],
+  },
+  {
+    pattern: "G.CTVGC.T",
+    motifs: [
+      { index: 0, orientation: 1 },
+      { index: 2, orientation: 3 },
+      { index: 4, orientation: 2 },
+      { index: 6, orientation: 0 },
+    ],
+    axis: "anti-diagonal",
+    difficulty: "Hard",
+    correctIndex: 2,
+    distractors: ["one-motif-off", "one-block-off", "mirror-main-diagonal"],
   },
 ] as const;
 
@@ -483,10 +750,255 @@ function makeDistractor(
   return rotatePattern(clue, (salt % 3) + 1);
 }
 
+function turnLabel(transform: PuzzleTransform): string {
+  return transform.kind === "rotation"
+    ? `${transform.degrees}° ${transform.direction}`
+    : `${MIRROR_AXIS_NAMES[transform.axis]} flip`;
+}
+
+function assembleRound(
+  clue: Pattern,
+  transform: PuzzleTransform,
+  difficulty: Difficulty,
+  correctIndex: number,
+  distractorKinds: readonly [DistractorKind, DistractorKind, DistractorKind],
+  salts: readonly [number, number, number],
+): Round | null {
+  const correctPattern = applyTransform(clue, transform);
+  const distractors = distractorKinds.map((kind, index) => ({
+    kind,
+    pattern: makeDistractor(kind, clue, correctPattern, transform, salts[index]),
+  }));
+  const options = distractors.map(({ pattern }) => pattern);
+  const optionKinds: OptionKind[] = distractors.map(({ kind }) => kind);
+  options.splice(correctIndex, 0, correctPattern);
+  optionKinds.splice(correctIndex, 0, "correct");
+
+  const correctKey = patternKey(correctPattern);
+  const optionKeys = options.map(patternKey);
+  const exactMatches = optionKeys.filter((key) => key === correctKey).length;
+  if (new Set(optionKeys).size !== 4 || exactMatches !== 1) return null;
+
+  return {
+    clue,
+    options,
+    optionKinds,
+    correctIndex,
+    correctPattern,
+    transform,
+    difficulty,
+    turn: turnLabel(transform),
+  };
+}
+
 export function patternKey(pattern: Pattern): string {
   return pattern
     .map((item) => `${item.color}:${item.motif}:${item.orientation}`)
     .join("|");
+}
+
+export function differingTileIndexes(
+  candidate: Pattern,
+  expected: Pattern,
+): readonly number[] {
+  if (candidate.length !== expected.length) {
+    throw new Error("Patterns must have the same number of tiles.");
+  }
+
+  return candidate.flatMap((tile, index) => {
+    const target = expected[index];
+    const matches =
+      tile.color === target.color &&
+      tile.motif === target.motif &&
+      tile.orientation === target.orientation;
+    return matches ? [] : [index];
+  });
+}
+
+function unitRandom(random: () => number): number {
+  const value = random();
+  if (!Number.isFinite(value) || value < 0 || value >= 1) {
+    throw new Error("Random source must return a finite number from 0 up to 1.");
+  }
+  return value;
+}
+
+function randomInteger(random: () => number, exclusiveMaximum: number): number {
+  return Math.floor(unitRandom(random) * exclusiveMaximum);
+}
+
+function shuffled<T>(values: readonly T[], random: () => number): T[] {
+  const result = [...values];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swapIndex = randomInteger(random, index + 1);
+    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+  }
+  return result;
+}
+
+function makeGeneratedPattern(
+  difficulty: Difficulty,
+  random: () => number,
+): Pattern {
+  const rules = GENERATED_DIFFICULTY_RULES[difficulty];
+  const filledCount =
+    rules.minFilled +
+    randomInteger(random, rules.maxFilled - rules.minFilled + 1);
+  const filledIndexes = shuffled(
+    Array.from({ length: 9 }, (_, index) => index),
+    random,
+  ).slice(0, filledCount);
+  const pattern = Array.from({ length: 9 }, () => tile("empty"));
+
+  for (const index of filledIndexes) {
+    pattern[index] = tile(FILLED_COLORS[randomInteger(random, FILLED_COLORS.length)]);
+  }
+
+  if (rules.maxMotifs > 0) {
+    const motifCount =
+      rules.minMotifs +
+      randomInteger(random, rules.maxMotifs - rules.minMotifs + 1);
+    for (const index of shuffled(filledIndexes, random).slice(0, motifCount)) {
+      pattern[index] = tile(
+        pattern[index].color,
+        "cap",
+        randomInteger(random, 4),
+      );
+    }
+  }
+
+  return pattern;
+}
+
+function dihedralKeys(pattern: Pattern): readonly string[] {
+  return [
+    patternKey(pattern),
+    patternKey(rotatePattern(pattern, 1)),
+    patternKey(rotatePattern(pattern, 2)),
+    patternKey(rotatePattern(pattern, 3)),
+    patternKey(reflectPattern(pattern, "vertical")),
+    patternKey(reflectPattern(pattern, "horizontal")),
+    patternKey(reflectPattern(pattern, "main-diagonal")),
+    patternKey(reflectPattern(pattern, "anti-diagonal")),
+  ];
+}
+
+function isInterestingGeneratedPattern(
+  pattern: Pattern,
+  difficulty: Difficulty,
+): boolean {
+  const rules = GENERATED_DIFFICULTY_RULES[difficulty];
+  const filled = pattern.filter(({ color }) => color !== "empty");
+  const motifCount = filled.filter(({ motif }) => motif === "cap").length;
+  const colorCount = new Set(filled.map(({ color }) => color)).size;
+
+  return (
+    filled.length >= rules.minFilled &&
+    filled.length <= rules.maxFilled &&
+    motifCount >= rules.minMotifs &&
+    motifCount <= rules.maxMotifs &&
+    colorCount >= 2 &&
+    new Set(dihedralKeys(pattern)).size === 8
+  );
+}
+
+function randomTransform(random: () => number): PuzzleTransform {
+  const transformIndex = randomInteger(random, 10);
+  if (transformIndex < 6) {
+    const direction: RotationDirection =
+      transformIndex < 3 ? "clockwise" : "counterclockwise";
+    const quarterTurns = ((transformIndex % 3) + 1) as 1 | 2 | 3;
+    return makeRotationTransform(direction, quarterTurns);
+  }
+
+  const axes: readonly MirrorAxis[] = [
+    "vertical",
+    "horizontal",
+    "main-diagonal",
+    "anti-diagonal",
+  ];
+  return makeReflectionTransform(axes[transformIndex - 6]);
+}
+
+function generatedDistractorKinds(
+  difficulty: Difficulty,
+  transform: PuzzleTransform,
+  random: () => number,
+): readonly [DistractorKind, DistractorKind, DistractorKind] {
+  const geometricKinds = shuffled(
+    [
+      "wrong-rotation" as const,
+      ...MIRROR_DISTRACTORS.filter((kind) => {
+        if (transform.kind !== "reflection") return true;
+        return kind !== `mirror-${transform.axis}`;
+      }),
+    ],
+    random,
+  );
+
+  if (difficulty === "Hard") {
+    return ["one-motif-off", "one-block-off", geometricKinds[0]];
+  }
+
+  return ["one-block-off", geometricKinds[0], geometricKinds[1]];
+}
+
+/**
+ * Generates one validated round from an effectively unbounded random stream.
+ * A supplied random function makes sessions reproducible in tests or seeded UI.
+ */
+export function generateInfiniteRound(
+  difficulty: Difficulty,
+  random: () => number = Math.random,
+): Round {
+  if (!(difficulty in GENERATED_DIFFICULTY_RULES)) {
+    throw new Error(`Unknown difficulty: ${difficulty}`);
+  }
+
+  for (let attempt = 0; attempt < GENERATOR_MAX_ATTEMPTS; attempt += 1) {
+    const clue = makeGeneratedPattern(difficulty, random);
+    if (!isInterestingGeneratedPattern(clue, difficulty)) continue;
+
+    const transform = randomTransform(random);
+    const correctIndex = randomInteger(random, 4);
+    const distractorKinds = generatedDistractorKinds(
+      difficulty,
+      transform,
+      random,
+    );
+    const salts = [
+      randomInteger(random, 1_000_000),
+      randomInteger(random, 1_000_000),
+      randomInteger(random, 1_000_000),
+    ] as const;
+    const round = assembleRound(
+      clue,
+      transform,
+      difficulty,
+      correctIndex,
+      distractorKinds,
+      salts,
+    );
+    if (!round) continue;
+
+    const hasCloseDistractor = round.options.some(
+      (option, index) =>
+        index !== round.correctIndex &&
+        differingTileIndexes(option, round.correctPattern).length <= 2,
+    );
+    if (hasCloseDistractor) return round;
+  }
+
+  throw new Error(
+    `Unable to generate a valid ${difficulty} round after ${GENERATOR_MAX_ATTEMPTS} attempts.`,
+  );
+}
+
+/** Identifies a clue-to-answer puzzle independently of option ordering. */
+export function roundFingerprint(round: Round): string {
+  return `${round.difficulty}:${patternKey(round.clue)}=>${patternKey(
+    round.correctPattern,
+  )}`;
 }
 
 export function isRotationOf(candidate: Pattern, clue: Pattern): boolean {
@@ -503,40 +1015,18 @@ export function buildRounds(): readonly Round[] {
       spec.axis === undefined
         ? makeRotationTransform(spec.direction, spec.quarterTurns)
         : makeReflectionTransform(spec.axis);
-    const correctPattern = applyTransform(clue, transform);
-    const distractors = spec.distractors.map((kind, distractorIndex) => ({
-      kind,
-      pattern: makeDistractor(
-        kind,
-        clue,
-        correctPattern,
-        transform,
-        roundIndex + distractorIndex,
-      ),
-    }));
-    const options = distractors.map(({ pattern }) => pattern);
-    const optionKinds: OptionKind[] = distractors.map(({ kind }) => kind);
-    options.splice(spec.correctIndex, 0, correctPattern);
-    optionKinds.splice(spec.correctIndex, 0, "correct");
-
-    const uniqueOptions = new Set(options.map(patternKey));
-    if (uniqueOptions.size !== 4) {
+    const round = assembleRound(
+      clue,
+      transform,
+      spec.difficulty,
+      spec.correctIndex,
+      spec.distractors,
+      [roundIndex, roundIndex + 1, roundIndex + 2],
+    );
+    if (!round) {
       throw new Error(`Round ${roundIndex + 1} has duplicate answer options.`);
     }
-
-    return {
-      clue,
-      options,
-      optionKinds,
-      correctIndex: spec.correctIndex,
-      correctPattern,
-      transform,
-      difficulty: spec.difficulty,
-      turn:
-        transform.kind === "rotation"
-          ? `${transform.degrees}° ${transform.direction}`
-          : `${MIRROR_AXIS_NAMES[transform.axis]} flip`,
-    };
+    return round;
   });
 }
 

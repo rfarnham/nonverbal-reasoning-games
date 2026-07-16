@@ -24,8 +24,8 @@ test("exports the catalog and first game as refresh-safe pages", async () => {
 
   assert.match(home, /Spatial Gym/);
   assert.match(home, /Train how/);
-  assert.match(home, /Rotation Match/);
-  assert.match(game, /Rotation Match/);
+  assert.match(home, /Transformation Match/);
+  assert.match(game, /Transformation Match/);
   assert.doesNotMatch(home, /codex-preview|Your site is taking shape/i);
 });
 

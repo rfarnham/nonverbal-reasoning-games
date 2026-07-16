@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Rotation Match",
+  title: "Transformation Match",
   description:
-    "Practice mental rotation by finding a turned tile pattern among reflections and near-matches.",
+    "Practice mental transformations by finding the exact rotation or reflection among near-matches.",
 };
 
 export default function RotationMatchLayout({

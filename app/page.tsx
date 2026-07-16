@@ -76,7 +76,7 @@ export default function Home() {
           </p>
           <div className="hero-actions">
             <Link className="button button-primary" href="/games/rotation-match/">
-              Play Rotation Match
+              Play Transformation Match
               <span aria-hidden="true">↗</span>
             </Link>
             <a className="button button-secondary" href="#games">
@@ -89,8 +89,8 @@ export default function Home() {
               <dd>game live</dd>
             </div>
             <div>
-              <dt>3–5</dt>
-              <dd>minute rounds</dd>
+              <dt>5–12</dt>
+              <dd>minute sessions</dd>
             </div>
             <div>
               <dt>3</dt>

@@ -1,10 +1,10 @@
 export const rotationMatchGame = {
   slug: "rotation-match",
   href: "/games/rotation-match",
-  title: "Rotation Match",
+  title: "Transformation Match",
   description:
-    "Turn a tile pattern in your mind and spot its true rotation among reflections and near-matches.",
-  skills: ["mental rotation", "visual comparison"],
-  estimatedMinutes: 3,
+    "Transform a tile pattern in your mind and spot the exact rotation or reflection among near-matches.",
+  skills: ["mental transformation", "visual comparison"],
+  estimatedMinutes: 10,
   status: "playable",
 } as const;
