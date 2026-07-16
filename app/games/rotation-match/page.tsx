@@ -1,28 +1,60 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type Ref,
+} from "react";
+import { createPortal } from "react-dom";
 
 import { rotationMatchGame } from "./game-info";
 import {
   ROUNDS,
+  TUTORIAL,
   describePattern,
   patternKey,
-  rotatePattern,
+  type MirrorAxis,
   type Pattern,
+  type PuzzleTransform,
+  type RotationTransform,
 } from "./game-engine";
 import styles from "./rotation-match.module.css";
+
+type PatternSize = "tutorialPattern" | "clue" | "option" | "ghost";
+type GamePhase = "idle" | "animating" | "answered";
+
+type GhostState = {
+  pattern: Pattern;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  deltaX: number;
+  deltaY: number;
+  scale: number;
+  transformCss: string;
+  reducedMotion: boolean;
+};
+
+type CustomProperties = CSSProperties & Record<`--${string}`, string>;
 
 function PatternGrid({
   pattern,
   size,
   label,
   hidden = false,
+  gridRef,
 }: {
   pattern: Pattern;
-  size: "clue" | "option" | "result";
+  size: PatternSize;
   label?: string;
   hidden?: boolean;
+  gridRef?: Ref<HTMLDivElement>;
 }) {
   return (
     <div
@@ -30,82 +62,386 @@ function PatternGrid({
       role={hidden ? undefined : "img"}
       aria-label={hidden ? undefined : label}
       aria-hidden={hidden || undefined}
+      ref={gridRef}
     >
-      {pattern.map((tile, index) => (
-        <span
-          className={`${styles.tile} ${styles[tile]}`}
-          aria-hidden="true"
-          key={`${index}-${tile}`}
-        />
-      ))}
+      {pattern.map((tile, index) => {
+        const motifStyle = {
+          "--motif-turn": `${tile.orientation * 90}deg`,
+        } as CustomProperties;
+
+        return (
+          <span
+            className={`${styles.tile} ${styles[tile.color]}`}
+            aria-hidden="true"
+            key={`${index}-${tile.color}-${tile.motif}-${tile.orientation}`}
+          >
+            {tile.motif === "cap" ? (
+              <span className={styles.capMark} style={motifStyle} />
+            ) : null}
+          </span>
+        );
+      })}
     </div>
   );
 }
 
+function TurnArrow({ transform }: { transform: RotationTransform }) {
+  const shortDirection = transform.direction === "clockwise" ? "CW" : "CCW";
+  const label = `Rotate ${transform.degrees} degrees ${transform.direction}`;
+  const cueStyle = {
+    "--arc": `${transform.degrees}deg`,
+    "--arc-start":
+      transform.direction === "clockwise"
+        ? "0deg"
+        : `-${transform.degrees}deg`,
+    "--end-turn": `${transform.angleDegrees}deg`,
+  } as CustomProperties;
+
+  return (
+    <div className={styles.turnCue} role="img" aria-label={label}>
+      <div
+        className={`${styles.turnGraphic} ${
+          transform.direction === "clockwise"
+            ? styles.clockwise
+            : styles.counterclockwise
+        }`}
+        style={cueStyle}
+        aria-hidden="true"
+      >
+        <span className={styles.turnArc} />
+        <span className={styles.turnEnd}>
+          <span className={styles.turnArrowHead}>
+            {transform.direction === "clockwise" ? "›" : "‹"}
+          </span>
+        </span>
+        <span className={styles.turnCenter} />
+      </div>
+      <span className={styles.turnLabel} aria-hidden="true">
+        {transform.degrees}° {shortDirection}
+      </span>
+    </div>
+  );
+}
+
+function MirrorCue({ axis }: { axis: MirrorAxis }) {
+  const config: Record<
+    MirrorAxis,
+    { label: string; shortLabel: string; className: string }
+  > = {
+    vertical: {
+      label: "Flip across the vertical axis",
+      shortLabel: "V FLIP",
+      className: styles.mirrorVertical,
+    },
+    horizontal: {
+      label: "Flip across the horizontal axis",
+      shortLabel: "H FLIP",
+      className: styles.mirrorHorizontal,
+    },
+    "main-diagonal": {
+      label: "Flip across the diagonal from top left to bottom right",
+      shortLabel: "\\ FLIP",
+      className: styles.mirrorMainDiagonal,
+    },
+    "anti-diagonal": {
+      label: "Flip across the diagonal from bottom left to top right",
+      shortLabel: "/ FLIP",
+      className: styles.mirrorAntiDiagonal,
+    },
+  };
+  const current = config[axis];
+
+  return (
+    <div className={styles.turnCue} role="img" aria-label={current.label}>
+      <div
+        className={`${styles.mirrorGraphic} ${current.className}`}
+        aria-hidden="true"
+      >
+        <span className={styles.mirrorAxis} />
+        <span className={styles.mirrorSides}>
+          <span>→</span>
+          <span>←</span>
+        </span>
+      </div>
+      <span className={styles.turnLabel} aria-hidden="true">
+        {current.shortLabel}
+      </span>
+    </div>
+  );
+}
+
+function TransformCue({ transform }: { transform: PuzzleTransform }) {
+  return transform.kind === "rotation" ? (
+    <TurnArrow transform={transform} />
+  ) : (
+    <MirrorCue axis={transform.axis} />
+  );
+}
+
+function ghostTransformCss(transform: PuzzleTransform) {
+  if (transform.kind === "rotation") {
+    return `rotate(${transform.angleDegrees}deg)`;
+  }
+
+  switch (transform.axis) {
+    case "vertical":
+      return "rotateY(180deg)";
+    case "horizontal":
+      return "rotateX(180deg)";
+    case "main-diagonal":
+      return "rotate(45deg) rotateX(180deg) rotate(-45deg)";
+    case "anti-diagonal":
+      return "rotate(-45deg) rotateX(180deg) rotate(45deg)";
+  }
+}
+
+function scheduleTone(
+  context: AudioContext,
+  frequency: number,
+  start: number,
+  duration: number,
+  volume: number,
+) {
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(frequency, start);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(volume, start + 0.008);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start(start);
+  oscillator.stop(start + duration + 0.015);
+  oscillator.addEventListener(
+    "ended",
+    () => {
+      oscillator.disconnect();
+      gain.disconnect();
+    },
+    { once: true },
+  );
+}
+
+function playTones(context: AudioContext, correct: boolean) {
+  const now = context.currentTime + 0.012;
+
+  if (correct) {
+    scheduleTone(context, 523.25, now, 0.13, 0.052);
+    scheduleTone(context, 659.25, now + 0.075, 0.15, 0.048);
+    return;
+  }
+
+  scheduleTone(context, 220, now, 0.11, 0.048);
+  scheduleTone(context, 174.61, now + 0.055, 0.12, 0.044);
+}
+
 export default function RotationMatchPage() {
+  const [started, setStarted] = useState(false);
   const [roundIndex, setRoundIndex] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [score, setScore] = useState(0);
-  const [streak, setStreak] = useState(0);
-  const [bestStreak, setBestStreak] = useState(0);
   const [complete, setComplete] = useState(false);
+  const [phase, setPhase] = useState<GamePhase>("idle");
+  const [ghost, setGhost] = useState<GhostState | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+
+  const clueGridRef = useRef<HTMLDivElement>(null);
+  const optionGridRefs = useRef<Array<HTMLDivElement | null>>([]);
   const firstOptionRef = useRef<HTMLButtonElement>(null);
-  const focusFirstOption = useRef(false);
   const nextButtonRef = useRef<HTMLButtonElement>(null);
   const resultHeadingRef = useRef<HTMLHeadingElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const animationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const animationTokenRef = useRef(0);
+  const inputLockedRef = useRef(false);
+  const shouldFocusFirstOption = useRef(false);
 
   const round = ROUNDS[roundIndex];
   const selectedCorrect = selectedIndex === round.correctIndex;
-  const answered = roundIndex + (selectedIndex === null ? 0 : 1);
+  const progress = roundIndex + (phase === "answered" ? 1 : 0);
+
+  const ensureAudioContext = useCallback(() => {
+    if (typeof window === "undefined") return null;
+
+    const AudioContextClass =
+      window.AudioContext ??
+      (
+        window as typeof window & {
+          webkitAudioContext?: typeof AudioContext;
+        }
+      ).webkitAudioContext;
+
+    if (!AudioContextClass) return null;
+
+    if (
+      audioContextRef.current === null ||
+      audioContextRef.current.state === "closed"
+    ) {
+      try {
+        audioContextRef.current = new AudioContextClass();
+      } catch {
+        return null;
+      }
+    }
+
+    return audioContextRef.current;
+  }, []);
+
+  const resumeAudio = useCallback(() => {
+    const context = ensureAudioContext();
+    if (!context || context.state !== "suspended") return;
+    void context.resume().catch(() => undefined);
+  }, [ensureAudioContext]);
+
+  const playFeedbackSound = useCallback(
+    (correct: boolean) => {
+      if (!soundEnabled) return;
+      const context = ensureAudioContext();
+      if (!context) return;
+
+      if (context.state === "suspended") {
+        void context
+          .resume()
+          .then(() => playTones(context, correct))
+          .catch(() => undefined);
+        return;
+      }
+
+      if (context.state === "running") playTones(context, correct);
+    },
+    [ensureAudioContext, soundEnabled],
+  );
 
   const chooseOption = useCallback(
     (optionIndex: number) => {
-      if (selectedIndex !== null || complete) return;
-
-      setSelectedIndex(optionIndex);
-      if (optionIndex === round.correctIndex) {
-        setScore((current) => current + 1);
-        setStreak((current) => {
-          const nextStreak = current + 1;
-          setBestStreak((best) => Math.max(best, nextStreak));
-          return nextStreak;
-        });
-      } else {
-        setStreak(0);
+      if (
+        inputLockedRef.current ||
+        phase !== "idle" ||
+        complete ||
+        !started
+      ) {
+        return;
       }
+
+      inputLockedRef.current = true;
+      const isCorrect = optionIndex === round.correctIndex;
+      const sourceRect = clueGridRef.current?.getBoundingClientRect();
+      const targetRect =
+        optionGridRefs.current[round.correctIndex]?.getBoundingClientRect();
+      const reducedMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+
+      playFeedbackSound(isCorrect);
+      setSelectedIndex(optionIndex);
+      if (isCorrect) setScore((current) => current + 1);
+      setPhase("animating");
+
+      if (sourceRect && targetRect) {
+        setGhost({
+          pattern: round.clue,
+          left: sourceRect.left,
+          top: sourceRect.top,
+          width: sourceRect.width,
+          height: sourceRect.height,
+          deltaX: targetRect.left - sourceRect.left,
+          deltaY: targetRect.top - sourceRect.top,
+          scale: targetRect.width / sourceRect.width,
+          transformCss: ghostTransformCss(round.transform),
+          reducedMotion,
+        });
+      }
+
+      const animationToken = animationTokenRef.current + 1;
+      animationTokenRef.current = animationToken;
+      if (animationTimerRef.current) clearTimeout(animationTimerRef.current);
+      animationTimerRef.current = setTimeout(
+        () => {
+          if (animationTokenRef.current !== animationToken) return;
+          setGhost(null);
+          setPhase("answered");
+        },
+        reducedMotion ? 140 : 680,
+      );
     },
-    [complete, round.correctIndex, selectedIndex],
+    [complete, phase, playFeedbackSound, round, started],
   );
 
+  const resetRoundState = useCallback(() => {
+    animationTokenRef.current += 1;
+    if (animationTimerRef.current) {
+      clearTimeout(animationTimerRef.current);
+      animationTimerRef.current = null;
+    }
+    inputLockedRef.current = false;
+    setSelectedIndex(null);
+    setGhost(null);
+    setPhase("idle");
+  }, []);
+
+  const startGame = useCallback(() => {
+    resumeAudio();
+    setStarted(true);
+    setComplete(false);
+    setRoundIndex(0);
+    setScore(0);
+    resetRoundState();
+    shouldFocusFirstOption.current = true;
+  }, [resetRoundState, resumeAudio]);
+
   const goNext = useCallback(() => {
-    if (selectedIndex === null) return;
+    if (phase !== "answered") return;
 
     if (roundIndex === ROUNDS.length - 1) {
+      resetRoundState();
       setComplete(true);
-      setSelectedIndex(null);
       return;
     }
 
-    focusFirstOption.current = true;
+    shouldFocusFirstOption.current = true;
+    resetRoundState();
     setRoundIndex((current) => current + 1);
-    setSelectedIndex(null);
-  }, [roundIndex, selectedIndex]);
+  }, [phase, resetRoundState, roundIndex]);
 
   const restart = useCallback(() => {
-    focusFirstOption.current = true;
-    setRoundIndex(0);
-    setSelectedIndex(null);
-    setScore(0);
-    setStreak(0);
-    setBestStreak(0);
     setComplete(false);
+    setStarted(true);
+    setRoundIndex(0);
+    setScore(0);
+    resetRoundState();
+    shouldFocusFirstOption.current = true;
+  }, [resetRoundState]);
+
+  const toggleSound = useCallback(() => {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    try {
+      window.localStorage.setItem("rotation-match-sound", String(next));
+    } catch {
+      // Sound still works for this visit when storage is unavailable.
+    }
+    if (next) resumeAudio();
+  }, [resumeAudio, soundEnabled]);
+
+  useEffect(() => {
+    let stored: string | null = null;
+    try {
+      stored = window.localStorage.getItem("rotation-match-sound");
+    } catch {
+      return;
+    }
+    if (stored !== "false") return;
+    const timer = window.setTimeout(() => setSoundEnabled(false), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (
+        !started ||
         complete ||
-        selectedIndex !== null ||
+        phase !== "idle" ||
         event.altKey ||
         event.ctrlKey ||
         event.metaKey
@@ -122,142 +458,211 @@ export default function RotationMatchPage() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [chooseOption, complete, selectedIndex]);
+  }, [chooseOption, complete, phase, started]);
 
   useEffect(() => {
-    if (selectedIndex !== null) nextButtonRef.current?.focus();
-  }, [selectedIndex]);
+    if (phase === "answered") nextButtonRef.current?.focus();
+  }, [phase]);
 
   useEffect(() => {
-    if (focusFirstOption.current) {
+    if (shouldFocusFirstOption.current && started && !complete) {
       firstOptionRef.current?.focus();
-      focusFirstOption.current = false;
+      shouldFocusFirstOption.current = false;
     }
-  }, [roundIndex]);
+  }, [complete, roundIndex, started]);
 
   useEffect(() => {
     if (complete) resultHeadingRef.current?.focus();
   }, [complete]);
 
+  useEffect(() => {
+    function finishAnimationOnResize() {
+      if (inputLockedRef.current && phase === "animating") {
+        animationTokenRef.current += 1;
+        if (animationTimerRef.current) clearTimeout(animationTimerRef.current);
+        setGhost(null);
+        setPhase("answered");
+      }
+    }
+
+    window.addEventListener("resize", finishAnimationOnResize);
+    return () => window.removeEventListener("resize", finishAnimationOnResize);
+  }, [phase]);
+
+  useEffect(() => {
+    return () => {
+      animationTokenRef.current += 1;
+      if (animationTimerRef.current) clearTimeout(animationTimerRef.current);
+      const context = audioContextRef.current;
+      if (context && context.state !== "closed") {
+        void context.close().catch(() => undefined);
+      }
+    };
+  }, []);
+
   const resultMessage = useMemo(() => {
     const accuracy = score / ROUNDS.length;
-    if (accuracy === 1) return "Flawless rotation sense.";
-    if (accuracy >= 0.75) return "Your mental turns are sharp.";
-    if (accuracy >= 0.5) return "A strong start—another run will lock it in.";
-    return "Reflections are sneaky. Slow down and track one corner tile.";
+    if (accuracy === 1) return "Perfect set.";
+    if (accuracy >= 0.7) return "Sharp work.";
+    return "Good practice.";
   }, [score]);
+
+  const soundButton = (
+    <button
+      className={styles.soundButton}
+      type="button"
+      onClick={toggleSound}
+      aria-pressed={soundEnabled}
+      aria-label="Sound"
+    >
+      <span aria-hidden="true">♪</span>
+      <small aria-hidden="true">{soundEnabled ? "On" : "Off"}</small>
+    </button>
+  );
+
+  const ghostPortal =
+    ghost &&
+    createPortal(
+      <div
+        className={`${styles.ghostFlight} ${
+          ghost.reducedMotion ? styles.ghostReduced : ""
+        }`}
+        style={
+          {
+            left: `${ghost.left}px`,
+            top: `${ghost.top}px`,
+            width: `${ghost.width}px`,
+            height: `${ghost.height}px`,
+            "--ghost-x": `${ghost.deltaX}px`,
+            "--ghost-y": `${ghost.deltaY}px`,
+            "--ghost-scale": `${ghost.scale}`,
+            "--ghost-transform": ghost.transformCss,
+          } as CustomProperties
+        }
+        aria-hidden="true"
+      >
+        <div className={styles.ghostTurn}>
+          <PatternGrid pattern={ghost.pattern} size="ghost" hidden />
+        </div>
+      </div>,
+      document.body,
+    );
 
   return (
     <div className={styles.pageShell}>
-      <div className={styles.ambientOne} aria-hidden="true" />
-      <div className={styles.ambientTwo} aria-hidden="true" />
-
       <header className={styles.topbar}>
-        <Link className={styles.backLink} href="/">
+        <Link className={styles.backLink} href="/" aria-label="All games">
           <span aria-hidden="true">←</span>
-          <span>All games</span>
+          <span>Games</span>
         </Link>
-        <span className={styles.gameNumber}>Game 01</span>
+        <span className={styles.gameTitle}>{rotationMatchGame.title}</span>
+        {soundButton}
       </header>
 
       <main className={styles.main}>
-        {!complete ? (
-          <>
-            <section className={styles.gameHeading} aria-labelledby="game-title">
-              <div>
-                <p className={styles.eyebrow}>Spatial workout</p>
-                <h1 id="game-title">{rotationMatchGame.title}</h1>
-                <p className={styles.intro}>{rotationMatchGame.description}</p>
-              </div>
+        {!started ? (
+          <section className={styles.tutorial} aria-labelledby="tutorial-title">
+            <p className={styles.kicker}>Example</p>
+            <h1 id="tutorial-title">Turn it. Find it.</h1>
 
-              <dl className={styles.scoreboard} aria-label="Current game score">
-                <div>
-                  <dt>Score</dt>
-                  <dd>{score}</dd>
-                </div>
-                <div>
-                  <dt>Streak</dt>
-                  <dd>{streak}</dd>
-                </div>
-              </dl>
-            </section>
-
-            <div className={styles.progressBlock}>
-              <div className={styles.progressLabels}>
-                <span>
-                  Round {roundIndex + 1} of {ROUNDS.length}
+            <div className={styles.exampleFlow}>
+              <PatternGrid
+                pattern={TUTORIAL.clue}
+                size="tutorialPattern"
+                label={`Starting pattern: ${describePattern(TUTORIAL.clue)}`}
+              />
+              <TransformCue transform={TUTORIAL.transform} />
+              <div className={styles.exampleAnswer}>
+                <PatternGrid
+                  pattern={TUTORIAL.answer}
+                  size="tutorialPattern"
+                  label={`Correct answer: ${describePattern(TUTORIAL.answer)}`}
+                />
+                <span className={styles.exampleMark} aria-label="Correct">
+                  ✓
                 </span>
-                <span>{answered} complete</span>
               </div>
+            </div>
+
+            <div className={styles.mirrorExample}>
+              <span className={styles.notEqual} aria-hidden="true">
+                ≠
+              </span>
+              <PatternGrid
+                pattern={TUTORIAL.mirror}
+                size="option"
+                label={`Mirror image, not the answer: ${describePattern(
+                  TUTORIAL.mirror,
+                )}`}
+              />
+              <span className={styles.mirrorMark} aria-label="Not a match">
+                ×
+              </span>
+            </div>
+
+            <button className={styles.primaryButton} type="button" onClick={startGame}>
+              Start
+              <span aria-hidden="true">→</span>
+            </button>
+          </section>
+        ) : !complete ? (
+          <>
+            <div className={styles.gameStatus}>
               <div
                 className={styles.progressTrack}
                 role="progressbar"
                 aria-label="Game progress"
                 aria-valuemin={0}
                 aria-valuemax={ROUNDS.length}
-                aria-valuenow={answered}
+                aria-valuenow={progress}
               >
                 {ROUNDS.map((_, index) => (
                   <span
-                    className={index < answered ? styles.progressDone : undefined}
+                    className={index < progress ? styles.progressDone : undefined}
                     key={index}
                   />
                 ))}
               </div>
+              <span className={styles.roundCount}>
+                {roundIndex + 1} / {ROUNDS.length}
+              </span>
+              <span className={styles.difficulty}>{round.difficulty}</span>
+              <span className={styles.score} aria-label={`Score ${score}`}>
+                {score} ✓
+              </span>
             </div>
 
             <div className={styles.gameBoard}>
-              <section className={styles.cluePanel} aria-labelledby="clue-title">
-                <div className={styles.panelTopline}>
-                  <span className={styles.stepBadge}>01</span>
-                  <span>Study the pattern</span>
-                </div>
-
-                <div className={styles.clueCopy}>
-                  <h2 id="clue-title">Turn it in your mind.</h2>
-                  <p>
-                    Find this exact arrangement after a rotation. A mirror image
-                    does not count.
-                  </p>
-                </div>
-
-                <div className={styles.clueStage}>
-                  <div className={styles.rotationCue} aria-hidden="true">
-                    <span>↻</span>
-                    <small>{round.turn}</small>
-                  </div>
+              <section className={styles.cluePanel} aria-label="Pattern and transform">
+                <div
+                  className={`${styles.clueStage} ${
+                    phase === "animating" ? styles.clueAnimating : ""
+                  }`}
+                >
                   <PatternGrid
                     pattern={round.clue}
                     size="clue"
-                    label={`Pattern to rotate: ${describePattern(round.clue)}`}
+                    label={`Starting pattern: ${describePattern(round.clue)}`}
+                    gridRef={clueGridRef}
                   />
+                  <TransformCue transform={round.transform} />
                 </div>
-
-                <p className={styles.tip}>
-                  <span aria-hidden="true">◎</span>
-                  Tip: anchor one corner tile, then follow its neighbors.
-                </p>
               </section>
 
-              <section className={styles.answerPanel} aria-labelledby="answer-title">
-                <div className={styles.panelTopline}>
-                  <span className={styles.stepBadge}>02</span>
-                  <span>Choose the match</span>
-                  <span className={styles.keyHint}>Keys 1–4</span>
-                </div>
-
-                <h2 id="answer-title" className={styles.visuallyHidden}>
-                  Four answer choices
-                </h2>
-
+              <section className={styles.answerPanel} aria-label="Answer choices">
                 <div className={styles.optionGrid} role="group" aria-label="Answer choices">
                   {round.options.map((option, optionIndex) => {
                     const isCorrect = optionIndex === round.correctIndex;
                     const isSelected = selectedIndex === optionIndex;
-                    const showCorrect = selectedIndex !== null && isCorrect;
-                    const showWrong = isSelected && !isCorrect;
-                    const muted =
-                      selectedIndex !== null && !isCorrect && !isSelected;
+                    const showAnswer = phase === "answered";
+                    const showCorrect = showAnswer && isCorrect;
+                    const showWrong = showAnswer && isSelected && !isCorrect;
+                    const muted = showAnswer && !isCorrect && !isSelected;
+                    const answerState = showCorrect
+                      ? ", correct answer"
+                      : showWrong
+                        ? ", your incorrect answer"
+                        : "";
 
                     return (
                       <button
@@ -268,16 +673,25 @@ export default function RotationMatchPage() {
                         }`}
                         type="button"
                         onClick={() => chooseOption(optionIndex)}
-                        disabled={selectedIndex !== null}
-                        aria-label={`Option ${optionIndex + 1}: ${describePattern(option)}`}
+                        disabled={phase !== "idle"}
+                        aria-label={`Option ${optionIndex + 1}: ${describePattern(
+                          option,
+                        )}${answerState}`}
                         aria-keyshortcuts={`${optionIndex + 1}`}
                         ref={optionIndex === 0 ? firstOptionRef : undefined}
-                        key={patternKey(option)}
+                        key={`${optionIndex}-${patternKey(option)}`}
                       >
                         <span className={styles.optionNumber} aria-hidden="true">
                           {optionIndex + 1}
                         </span>
-                        <PatternGrid pattern={option} size="option" hidden />
+                        <PatternGrid
+                          pattern={option}
+                          size="option"
+                          hidden
+                          gridRef={(node) => {
+                            optionGridRefs.current[optionIndex] = node;
+                          }}
+                        />
                         {showCorrect ? (
                           <span className={styles.choiceMark} aria-hidden="true">
                             ✓
@@ -292,88 +706,53 @@ export default function RotationMatchPage() {
                     );
                   })}
                 </div>
-
-                <div
-                  className={`${styles.feedback} ${
-                    selectedIndex === null
-                      ? styles.feedbackWaiting
-                      : selectedCorrect
-                        ? styles.feedbackCorrect
-                        : styles.feedbackWrong
-                  }`}
-                  aria-live="polite"
-                  role="status"
-                >
-                  {selectedIndex === null ? (
-                    <p>Choose the grid that keeps every tile in the same order.</p>
-                  ) : (
-                    <>
-                      <div>
-                        <strong>
-                          {selectedCorrect ? "That’s the rotation." : "Close—check the mirror."}
-                        </strong>
-                        <span>
-                          {selectedCorrect
-                            ? "Every tile kept the same relationship."
-                            : `The true match is option ${round.correctIndex + 1}.`}
-                        </span>
-                      </div>
-                      <button
-                        className={styles.nextButton}
-                        type="button"
-                        onClick={goNext}
-                        ref={nextButtonRef}
-                      >
-                        {roundIndex === ROUNDS.length - 1
-                          ? "See results"
-                          : "Next round"}
-                        <span aria-hidden="true">→</span>
-                      </button>
-                    </>
-                  )}
-                </div>
               </section>
             </div>
+
+            <div className={styles.feedbackBar} aria-live="polite" role="status">
+              {phase === "answered" ? (
+                <>
+                  <strong className={selectedCorrect ? styles.correctText : styles.wrongText}>
+                    {selectedCorrect ? "Correct" : "Not quite"}
+                  </strong>
+                  <button
+                    className={styles.nextButton}
+                    type="button"
+                    onClick={goNext}
+                    ref={nextButtonRef}
+                  >
+                    {roundIndex === ROUNDS.length - 1 ? "Results" : "Next"}
+                    <span aria-hidden="true">→</span>
+                  </button>
+                </>
+              ) : null}
+            </div>
+
+            <p className={styles.keyboardHint}>Keys 1–4</p>
           </>
         ) : (
           <section className={styles.results} aria-labelledby="results-title">
-            <div className={styles.resultMotif} aria-hidden="true">
-              <PatternGrid
-                pattern={rotatePattern(ROUNDS[0].clue, 1)}
-                size="result"
-                hidden
-              />
-            </div>
-            <p className={styles.eyebrow}>Workout complete</p>
+            <p className={styles.kicker}>Complete</p>
             <h1 id="results-title" ref={resultHeadingRef} tabIndex={-1}>
               {resultMessage}
             </h1>
-            <p className={styles.resultIntro}>
-              You found {score} of {ROUNDS.length} rotations and reached a best
-              streak of {bestStreak}.
+            <p className={styles.resultScore}>
+              <strong>{score}</strong>
+              <span>/ {ROUNDS.length}</span>
             </p>
-
-            <div className={styles.resultScore} aria-label={`${score} out of ${ROUNDS.length}`}>
-              <span>{score}</span>
-              <small>out of {ROUNDS.length}</small>
-            </div>
-
             <div className={styles.resultActions}>
-              <button className={styles.restartButton} type="button" onClick={restart}>
+              <button className={styles.primaryButton} type="button" onClick={restart}>
                 Play again
-                <span aria-hidden="true">↻</span>
               </button>
               <Link className={styles.secondaryLink} href="/">
-                Back to all games
+                All games
               </Link>
             </div>
-
-            <p className={styles.resultTip}>
-              Next run: name a corner in your head and track it through the turn.
-            </p>
           </section>
         )}
       </main>
+
+      {ghostPortal}
     </div>
   );
 }
