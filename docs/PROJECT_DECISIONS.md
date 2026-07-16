@@ -1,0 +1,51 @@
+# Project decisions
+
+These defaults let development move while keeping the choices inexpensive to
+change. They are product decisions, not permanent constraints.
+
+## Decided for the first version
+
+| Topic | Initial choice | Why |
+| --- | --- | --- |
+| Audience | Teens and adults, with plain instructions | A useful baseline without pretending the games are age-normed assessments |
+| Session style | Short, untimed rounds | Encourages reasoning before speed and works for casual practice |
+| Feedback | Immediate, non-color-only feedback | Makes each answer a learning moment and stays accessible |
+| Difficulty | Authored progression first | Easier to verify than an adaptive system while the game set is small |
+| Progress | Session-only; no account | Keeps the launch private and frictionless |
+| Devices | Phone, tablet, and desktop | The public link should be useful wherever it is opened |
+| Input | Keyboard, touch, and mouse | A basic accessibility and usability requirement |
+| Hosting | Static GitHub Pages | Free, public, and directly linked from the repository |
+| Architecture | One repository, one route per game | Shared tooling without premature packages or separate release cycles |
+| Privacy | No analytics or third-party runtime calls | No policy or consent burden before there is a real measurement need |
+| License | MIT for project code | Makes reuse and community contributions straightforward |
+
+The site name is **Spatial Gym**; the repository remains descriptively named
+`nonverbal-reasoning-games`.
+
+## Good next decisions
+
+None of these block the initial release, but they should be decided before the
+related feature is built:
+
+1. **Target range:** Is the main audience students, adults practicing aptitude
+   tests, older adults, or a deliberately broad group?
+2. **Scoring:** Should speed ever affect score, or should accuracy and streaks
+   remain the only signals?
+3. **Roadmap order:** After mental rotation, prioritize matrix reasoning, paper
+   folding, visual sequences, spatial memory, or another skill?
+4. **Difficulty:** Prefer explicit Easy/Medium/Hard modes, automatic adaptation,
+   or both?
+5. **Persistence:** Should progress stay local, be exportable, or eventually
+   sync through optional accounts?
+6. **Accessibility boundary:** What alternate experience should be offered when
+   a task is inherently visual and a text equivalent would reveal its answer?
+7. **Community:** Invite new-game contributions immediately, or first stabilize
+   a stronger puzzle and review contract?
+8. **Measurement:** If analytics become useful, what smallest privacy-preserving
+   event set would answer a concrete question?
+
+## Product guardrail
+
+These are practice games, not validated cognitive tests. Avoid diagnostic,
+clinical, or intelligence-score claims unless future work supplies the research,
+norming, and review needed to support them.
