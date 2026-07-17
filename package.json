@@ -8,13 +8,14 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "build:pages": "NEXT_PUBLIC_BASE_PATH=/nonverbal-reasoning-games next build",
+    "generate:games": "node scripts/generate-game-registry.mjs",
+    "dev": "npm run generate:games && next dev",
+    "build": "npm run generate:games && next build",
+    "build:pages": "npm run generate:games && NEXT_PUBLIC_BASE_PATH=/nonverbal-reasoning-games next build",
     "start": "next start",
-    "test": "node --test tests/*.test.mjs",
-    "lint": "eslint .",
-    "typecheck": "next typegen && tsc --noEmit",
+    "test": "npm run generate:games && node --test tests/*.test.mjs",
+    "lint": "npm run generate:games && eslint .",
+    "typecheck": "npm run generate:games && next typegen && tsc --noEmit",
     "check": "npm run lint && npm run typecheck && npm run build:pages && npm test"
   },
   "dependencies": {

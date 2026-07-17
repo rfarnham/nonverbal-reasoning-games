@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { games } from "@/lib/games";
+import { games, type GameCatalogEntry } from "@/lib/games";
 
 const previewTiles = [
   "coral",
@@ -44,9 +44,23 @@ function PatternPreview() {
   );
 }
 
+function GameCardVisual({
+  game,
+}: Readonly<{ game: GameCatalogEntry }>) {
+  const { ShelfIcon } = game;
+  return (
+    <div
+      className="game-card-visual"
+      data-game-icon={game.slug}
+      aria-hidden="true"
+    >
+      <ShelfIcon className="game-card-icon" focusable="false" />
+    </div>
+  );
+}
+
 export default function Home() {
-  const liveGames = games.filter((game) => game.status === "live");
-  const plannedGames = games.filter((game) => game.status === "planned");
+  const featuredGame = games.find(({ featured }) => featured) ?? games[0];
 
   return (
     <main>
@@ -75,18 +89,20 @@ export default function Home() {
             spatial memory, and visual logic. No account. No download.
           </p>
           <div className="hero-actions">
-            <Link className="button button-primary" href="/games/rotation-match/">
-              Play Transformation Match
-              <span aria-hidden="true">↗</span>
-            </Link>
+            {featuredGame ? (
+              <Link className="button button-primary" href={featuredGame.href}>
+                Play {featuredGame.title}
+                <span aria-hidden="true">↗</span>
+              </Link>
+            ) : null}
             <a className="button button-secondary" href="#games">
               Browse the lab
             </a>
           </div>
           <dl className="quick-facts" aria-label="Project highlights">
             <div>
-              <dt>{liveGames.length}</dt>
-              <dd>game live</dd>
+              <dt>{games.length}</dt>
+              <dd>{games.length === 1 ? "game live" : "games live"}</dd>
             </div>
             <div>
               <dt>5–12</dt>
@@ -114,17 +130,15 @@ export default function Home() {
         </div>
 
         <div className="game-grid">
-          {liveGames.map((game, index) => (
+          {games.map((game, index) => (
             <article className="game-card game-card-live" key={game.slug}>
               <div className="game-card-topline">
-                <span className="game-number">0{index + 1}</span>
+                <span className="game-number">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
                 <span className="status-pill status-live">Live</span>
               </div>
-              <div className="game-card-visual game-card-visual-rotation" aria-hidden="true">
-                <span className="mini-shape mini-shape-one" />
-                <span className="mini-shape mini-shape-two" />
-                <span className="turn-arrow">↻</span>
-              </div>
+              <GameCardVisual game={game} />
               <h3>{game.title}</h3>
               <p>{game.description}</p>
               <ul className="skill-list" aria-label="Skills trained">
@@ -132,35 +146,13 @@ export default function Home() {
                   <li key={skill}>{skill}</li>
                 ))}
               </ul>
-              <Link className="game-link" href={`/games/${game.slug}/`}>
+              <Link
+                className="game-link"
+                href={game.href}
+                aria-label={`Start a round of ${game.title}`}
+              >
                 Start a round <span aria-hidden="true">→</span>
               </Link>
-            </article>
-          ))}
-
-          {plannedGames.map((game, index) => (
-            <article className="game-card game-card-planned" key={game.slug}>
-              <div className="game-card-topline">
-                <span className="game-number">0{liveGames.length + index + 1}</span>
-                <span className="status-pill">Planned</span>
-              </div>
-              <div
-                className={`game-card-visual game-card-visual-${game.slug}`}
-                aria-hidden="true"
-              >
-                <span />
-                <span />
-                <span />
-                <span />
-              </div>
-              <h3>{game.title}</h3>
-              <p>{game.description}</p>
-              <ul className="skill-list" aria-label="Skills trained">
-                {game.skills.map((skill) => (
-                  <li key={skill}>{skill}</li>
-                ))}
-              </ul>
-              <span className="game-link game-link-muted">On the roadmap</span>
             </article>
           ))}
         </div>

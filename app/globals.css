@@ -400,7 +400,7 @@ a {
 
 .game-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 16px;
 }
 
@@ -459,67 +459,10 @@ a {
   background: #e7e2d6;
 }
 
-.game-card-visual-rotation {
-  background: #dce8f8;
-}
-
-.mini-shape {
-  position: absolute;
-  width: 68px;
-  height: 68px;
-  border-radius: 11px 30px 11px 11px;
-}
-
-.mini-shape-one {
-  top: 29px;
-  left: 54px;
-  background: var(--blue);
-  box-shadow: 31px 31px 0 var(--blue), 0 62px 0 var(--blue);
-}
-
-.mini-shape-two {
-  right: 54px;
-  bottom: 30px;
-  background: var(--coral);
-  box-shadow: -31px -31px 0 var(--coral), -62px 0 0 var(--coral);
-  transform: scale(0.72) rotate(90deg);
-}
-
-.turn-arrow {
-  position: absolute;
-  top: 12px;
-  right: 16px;
-  font-size: 2rem;
-}
-
-.game-card-visual-pattern-matrix,
-.game-card-visual-shape-fold {
-  display: grid;
-  grid-template-columns: repeat(2, 56px);
-  place-content: center;
-  gap: 8px;
-}
-
-.game-card-visual-pattern-matrix span {
-  height: 56px;
-  border: 2px solid #7d7970;
-  border-radius: 50%;
-}
-
-.game-card-visual-pattern-matrix span:nth-child(2),
-.game-card-visual-pattern-matrix span:nth-child(3) {
-  background: #c5c0b4;
-}
-
-.game-card-visual-shape-fold {
-  transform: rotate(-5deg);
-}
-
-.game-card-visual-shape-fold span {
-  width: 56px;
-  height: 56px;
-  border: 1px dashed #8f8a7f;
-  background: rgb(255 255 255 / 35%);
+.game-card-icon {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .game-card h3 {
@@ -570,10 +513,6 @@ a {
 
 .game-link span {
   transition: transform 150ms ease;
-}
-
-.game-link-muted {
-  color: #8b877e;
 }
 
 .principles {
@@ -685,7 +624,7 @@ a {
     grid-template-columns: 1fr 1fr;
   }
 
-  .game-card-live {
+  .game-card:last-child:nth-child(odd) {
     grid-column: 1 / -1;
   }
 
