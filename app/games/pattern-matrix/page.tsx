@@ -17,37 +17,44 @@ import {
   readSoundPreference,
   writeSoundPreference,
 } from "@/lib/game-audio";
-
-import { rotationMatchGame as transformationMatchGame } from "./game-info";
-import {
-  ROUNDS,
-  TUTORIAL,
-  describePattern,
-  differingTileIndexes,
-  generateInfiniteRound,
-  patternKey,
-  roundFingerprint,
-  type MirrorAxis,
-  type Pattern,
-  type PuzzleTransform,
-  type RotationTransform,
-  type Round,
-  type Difficulty,
-} from "./game-engine";
 import {
   MAX_ENERGY_COMBO,
   comboEnergyPercent,
   initialInfiniteAdaptiveState,
   infiniteLevelLabel,
   recordInfiniteFirstAttempt,
-} from "./infinite-progression";
-import styles from "./rotation-match.module.css";
+} from "@/lib/infinite-progression";
 
-type PatternSize = "tutorialPattern" | "clue" | "option" | "review" | "ghost";
+import {
+  CAMPAIGN_ROUNDS,
+  TUTORIAL,
+  differingDotIndexes,
+  generateInfiniteRound,
+  incorrectFeedback,
+  operationLabel,
+  patternKey,
+  roundFingerprint,
+  ruleLabel,
+  transformLabel,
+  type CueMode,
+  type Difficulty,
+  type Matrix,
+  type MatrixRule,
+  type Pattern,
+  type PatternTransform,
+  type Round,
+} from "./game-engine";
+import { patternMatrixGame } from "./game-info";
+import styles from "./pattern-matrix.module.css";
+
+type PatternSize = "tutorialTile" | "matrixTile" | "optionTile" | "reviewTile" | "ghostTile";
+type MatrixSize = "tutorialMatrix" | "clueMatrix" | "reviewMatrix";
 type GamePhase = "idle" | "animating" | "wrong-review" | "answered";
 type SessionMode = "campaign" | "infinite" | "redemption";
+type OriginMode = "campaign" | "infinite";
 type CampaignLevelId = "starter" | "junior" | "expert" | "wizard";
 type CampaignMarker = "correct" | "incorrect";
+type GenerationRecovery = "start" | "next";
 
 type SessionRound = {
   id: string;
@@ -85,7 +92,6 @@ type GhostState = {
   deltaX: number;
   deltaY: number;
   scale: number;
-  transformCss: string;
   reducedMotion: boolean;
 };
 
@@ -94,7 +100,6 @@ type CustomProperties = CSSProperties & Record<`--${string}`, string>;
 const GHOST_ANIMATION_MS = 900;
 const GHOST_SETTLE_MS = 930;
 const REDUCED_GHOST_MS = 140;
-const HIDDEN_WRONG_FEEDBACK_MS = 180;
 const WRONG_REVIEW_MS = 2200;
 const REDUCED_WRONG_REVIEW_MS = 1300;
 const CAMPAIGN_PROBLEMS_PER_LEVEL = 12;
@@ -127,7 +132,7 @@ function campaignLevel(levelId: CampaignLevelId) {
 
 function campaignRounds(levelId: CampaignLevelId): readonly Round[] {
   const { difficulty } = campaignLevel(levelId);
-  return ROUNDS.filter((round) => round.difficulty === difficulty);
+  return CAMPAIGN_ROUNDS.filter((round) => round.difficulty === difficulty);
 }
 
 function campaignRoundId(
@@ -143,7 +148,7 @@ function buildCampaignSessionRound(
 ): SessionRound {
   const level = campaignLevel(levelId);
   const levelIndex = CAMPAIGN_LEVELS.findIndex(({ id }) => id === levelId);
-  const round = campaignRounds(levelId)[problemIndex] ?? ROUNDS[0];
+  const round = campaignRounds(levelId)[problemIndex] ?? CAMPAIGN_ROUNDS[0];
 
   return {
     id: campaignRoundId(levelId, problemIndex),
@@ -183,178 +188,188 @@ function nextIncompleteCampaignLevel(
   return null;
 }
 
-function PatternGrid({
+function PatternTile({
   pattern,
   size,
   label,
   hidden = false,
-  gridRef,
+  tileRef,
   differenceIndexes = [],
 }: {
   pattern: Pattern;
   size: PatternSize;
   label?: string;
   hidden?: boolean;
-  gridRef?: Ref<HTMLDivElement>;
+  tileRef?: Ref<HTMLDivElement>;
   differenceIndexes?: readonly number[];
 }) {
   const differenceSet = new Set(differenceIndexes);
 
   return (
     <div
-      className={`${styles.pattern} ${styles[size]}`}
+      className={`${styles.patternTile} ${styles[size]}`}
       role={hidden ? undefined : "img"}
       aria-label={hidden ? undefined : label}
       aria-hidden={hidden || undefined}
-      ref={gridRef}
+      ref={tileRef}
     >
-      {pattern.map((tile, index) => {
-        const motifStyle = {
-          "--motif-turn": `${tile.orientation * 90}deg`,
-        } as CustomProperties;
+      {pattern.map((filled, index) => (
+        <span
+          className={`${styles.dot} ${
+            filled ? styles.dotFilled : styles.dotEmpty
+          } ${differenceSet.has(index) ? styles.differenceDot : ""}`}
+          aria-hidden="true"
+          key={`${index}-${Number(filled)}`}
+        />
+      ))}
+    </div>
+  );
+}
+
+function MatrixBoard({
+  matrix,
+  answer,
+  size,
+  label,
+  missingRef,
+  highlightFinalRow = false,
+  showSolvedMark = false,
+}: {
+  matrix: Matrix;
+  answer?: Pattern;
+  size: MatrixSize;
+  label: string;
+  missingRef?: Ref<HTMLDivElement>;
+  highlightFinalRow?: boolean;
+  showSolvedMark?: boolean;
+}) {
+  return (
+    <div
+      className={`${styles.matrix} ${styles[size]} ${
+        answer ? styles.matrixComplete : ""
+      }`}
+      role="img"
+      aria-label={label}
+    >
+      {matrix.map((pattern, index) => {
+        const finalRow = index >= 6;
+        const cellClass = `${styles.matrixCell} ${
+          finalRow && highlightFinalRow ? styles.matrixCellRelated : ""
+        }`;
+
+        if (pattern) {
+          return (
+            <span className={cellClass} aria-hidden="true" key={index}>
+              <PatternTile pattern={pattern} size="matrixTile" hidden />
+            </span>
+          );
+        }
 
         return (
-          <span
-            className={`${styles.tile} ${styles[tile.color]} ${
-              differenceSet.has(index) ? styles.differenceTile : ""
+          <div
+            className={`${cellClass} ${styles.missingCell} ${
+              answer ? styles.filledMissingCell : ""
             }`}
             aria-hidden="true"
-            key={`${index}-${tile.color}-${tile.motif}-${tile.orientation}`}
+            ref={missingRef}
+            key={index}
           >
-            {tile.motif === "cap" ? (
-              <span className={styles.capMark} style={motifStyle} />
-            ) : null}
-          </span>
+            {answer ? (
+              <>
+                <PatternTile pattern={answer} size="matrixTile" hidden />
+                {showSolvedMark ? (
+                  <span className={styles.solvedMark}>✓</span>
+                ) : null}
+              </>
+            ) : (
+              <span className={styles.missingMark}>?</span>
+            )}
+          </div>
         );
       })}
     </div>
   );
 }
 
-function TurnArrow({ transform }: { transform: RotationTransform }) {
-  const shortDirection = transform.direction === "clockwise" ? "CW" : "CCW";
-  const label = `Rotate ${transform.degrees} degrees ${transform.direction}`;
-  const cueStyle = {
-    "--arc": `${transform.degrees}deg`,
-    "--arc-start":
-      transform.direction === "clockwise"
-        ? "0deg"
-        : `-${transform.degrees}deg`,
-    "--end-turn": `${transform.angleDegrees}deg`,
-  } as CustomProperties;
+const OPERATION_SYMBOLS: Record<MatrixRule["operation"], string> = {
+  join: "＋",
+  overlap: "∩",
+  cancel: "⊕",
+  "left-minus-right": "L−R",
+  "right-minus-left": "R−L",
+};
 
-  return (
-    <div className={styles.turnCue} role="img" aria-label={label}>
+const TRANSFORM_SYMBOLS: Record<PatternTransform, string> = {
+  none: "→",
+  "rotate-clockwise": "↻ 90°",
+  "rotate-half": "↻ 180°",
+  "rotate-counterclockwise": "↺ 90°",
+};
+
+function RuleCue({
+  rule,
+  cueMode,
+  compact = false,
+}: {
+  rule: MatrixRule;
+  cueMode: CueMode;
+  compact?: boolean;
+}) {
+  const accessibleLabel =
+    cueMode === "hidden"
+      ? "Infer the complete rule from the solved rows"
+      : cueMode === "operation-only"
+        ? `${operationLabel(rule.operation)}. Infer the turn from the solved rows.`
+        : ruleLabel(rule);
+
+  if (cueMode === "hidden") {
+    return (
       <div
-        className={`${styles.turnGraphic} ${
-          transform.direction === "clockwise"
-            ? styles.clockwise
-            : styles.counterclockwise
+        className={`${styles.ruleCue} ${styles.hiddenRuleCue} ${
+          compact ? styles.compactRuleCue : ""
         }`}
-        style={cueStyle}
-        aria-hidden="true"
+        role="img"
+        aria-label={accessibleLabel}
       >
-        <span className={styles.turnArc} />
-        <span className={styles.turnEnd}>
-          <span className={styles.turnArrowHead}>
-            {transform.direction === "clockwise" ? "›" : "‹"}
-          </span>
-        </span>
-        <span className={styles.turnCenter} />
+        <span aria-hidden="true">?</span>
       </div>
-      <span className={styles.turnLabel} aria-hidden="true">
-        {transform.degrees}° {shortDirection}
-      </span>
-    </div>
-  );
-}
-
-function MirrorCue({ axis }: { axis: MirrorAxis }) {
-  const config: Record<
-    MirrorAxis,
-    { label: string; shortLabel: string; className: string }
-  > = {
-    vertical: {
-      label: "Flip across the vertical axis",
-      shortLabel: "V FLIP",
-      className: styles.mirrorVertical,
-    },
-    horizontal: {
-      label: "Flip across the horizontal axis",
-      shortLabel: "H FLIP",
-      className: styles.mirrorHorizontal,
-    },
-    "main-diagonal": {
-      label: "Flip across the diagonal from top left to bottom right",
-      shortLabel: "\\ FLIP",
-      className: styles.mirrorMainDiagonal,
-    },
-    "anti-diagonal": {
-      label: "Flip across the diagonal from bottom left to top right",
-      shortLabel: "/ FLIP",
-      className: styles.mirrorAntiDiagonal,
-    },
-  };
-  const current = config[axis];
-
-  return (
-    <div className={styles.turnCue} role="img" aria-label={current.label}>
-      <div
-        className={`${styles.mirrorGraphic} ${current.className}`}
-        aria-hidden="true"
-      >
-        <span className={styles.mirrorAxis} />
-        <span className={styles.mirrorSides}>
-          <span>→</span>
-          <span>←</span>
-        </span>
-      </div>
-      <span className={styles.turnLabel} aria-hidden="true">
-        {current.shortLabel}
-      </span>
-    </div>
-  );
-}
-
-function TransformCue({ transform }: { transform: PuzzleTransform }) {
-  return transform.kind === "rotation" ? (
-    <TurnArrow transform={transform} />
-  ) : (
-    <MirrorCue axis={transform.axis} />
-  );
-}
-
-function PuzzleTransformCue({ round }: { round: Round }) {
-  if (round.difficulty !== "Wizard") {
-    return <TransformCue transform={round.transform} />;
+    );
   }
+
+  const transformText =
+    cueMode === "operation-only"
+      ? "Infer the turn"
+      : rule.transform === "none"
+        ? "Keep in place"
+        : transformLabel(rule.transform);
 
   return (
     <div
-      className={`${styles.turnCue} ${styles.mysteryCue}`}
+      className={`${styles.ruleCue} ${
+        compact ? styles.compactRuleCue : ""
+      }`}
       role="img"
-      aria-label="Mystery transformation"
+      aria-label={accessibleLabel}
     >
-      <span aria-hidden="true">?</span>
+      <span className={styles.operationSymbol} aria-hidden="true">
+        {OPERATION_SYMBOLS[rule.operation]}
+      </span>
+      <span className={styles.ruleCueText} aria-hidden="true">
+        <strong>{operationLabel(rule.operation)}</strong>
+        <small>{transformText}</small>
+      </span>
+      <span
+        className={`${styles.transformSymbol} ${
+          cueMode === "operation-only" ? styles.unknownTransform : ""
+        }`}
+        aria-hidden="true"
+      >
+        {cueMode === "operation-only"
+          ? "?"
+          : TRANSFORM_SYMBOLS[rule.transform]}
+      </span>
     </div>
   );
-}
-
-function ghostTransformCss(transform: PuzzleTransform) {
-  if (transform.kind === "rotation") {
-    return `rotate(${transform.angleDegrees}deg)`;
-  }
-
-  switch (transform.axis) {
-    case "vertical":
-      return "rotateY(180deg)";
-    case "horizontal":
-      return "rotateX(180deg)";
-    case "main-diagonal":
-      return "rotate(45deg) rotateX(180deg) rotate(-45deg)";
-    case "anti-diagonal":
-      return "rotate(-45deg) rotateX(180deg) rotate(45deg)";
-  }
 }
 
 function buildInfiniteSessionRound(
@@ -362,16 +377,15 @@ function buildInfiniteSessionRound(
   seenFingerprints: Set<string>,
   difficulty: Difficulty,
 ): SessionRound {
-  let round = generateInfiniteRound(difficulty);
-  let fingerprint = roundFingerprint(round);
+  const round = generateInfiniteRound(
+    difficulty,
+    Math.random,
+    seenFingerprints,
+  );
+  const fingerprint = roundFingerprint(round);
 
-  for (
-    let attempt = 0;
-    attempt < 24 && seenFingerprints.has(fingerprint);
-    attempt += 1
-  ) {
-    round = generateInfiniteRound(difficulty);
-    fingerprint = roundFingerprint(round);
+  if (seenFingerprints.has(fingerprint)) {
+    throw new Error("Infinite generation returned a repeated puzzle.");
   }
 
   seenFingerprints.add(fingerprint);
@@ -382,9 +396,10 @@ function buildInfiniteSessionRound(
   };
 }
 
-export default function TransformationMatchPage() {
+export default function PatternMatrixPage() {
   const [started, setStarted] = useState(false);
   const [sessionMode, setSessionMode] = useState<SessionMode>("campaign");
+  const [originMode, setOriginMode] = useState<OriginMode>("campaign");
   const [roundQueue, setRoundQueue] = useState<readonly SessionRound[]>([]);
   const [roundCursor, setRoundCursor] = useState(0);
   const [activeCampaignLevel, setActiveCampaignLevel] =
@@ -399,7 +414,6 @@ export default function TransformationMatchPage() {
     initialInfiniteAdaptiveState,
   );
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const [score, setScore] = useState(0);
   const [completedCount, setCompletedCount] = useState(0);
   const [complete, setComplete] = useState(false);
   const [phase, setPhase] = useState<GamePhase>("idle");
@@ -416,13 +430,17 @@ export default function TransformationMatchPage() {
   const [redemptionMistakeIds, setRedemptionMistakeIds] = useState<
     readonly string[]
   >([]);
+  const [generationError, setGenerationError] = useState(false);
+  const [generationRecovery, setGenerationRecovery] =
+    useState<GenerationRecovery>("start");
 
-  const clueGridRef = useRef<HTMLDivElement>(null);
-  const optionGridRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const missingCellRef = useRef<HTMLDivElement>(null);
+  const optionTileRefs = useRef<Array<HTMLDivElement | null>>([]);
   const optionButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const nextButtonRef = useRef<HTMLButtonElement>(null);
   const levelCompleteButtonRef = useRef<HTMLButtonElement>(null);
   const resultHeadingRef = useRef<HTMLHeadingElement>(null);
+  const generationRetryButtonRef = useRef<HTMLButtonElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const flightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -430,6 +448,7 @@ export default function TransformationMatchPage() {
   const inputLockedRef = useRef(false);
   const shouldFocusFirstOption = useRef(false);
   const retryFocusIndexRef = useRef<number | null>(null);
+  const attemptScrollRef = useRef({ x: 0, y: 0 });
   const infiniteFingerprintsRef = useRef(new Set<string>());
   const infiniteAdaptiveRef = useRef(initialInfiniteAdaptiveState());
 
@@ -444,14 +463,13 @@ export default function TransformationMatchPage() {
   const activeSessionRound = isCampaign
     ? campaignSessionRound
     : (roundQueue[roundCursor] ?? roundQueue[0]);
-  const round = activeSessionRound?.round ?? ROUNDS[0];
+  const round = activeSessionRound?.round ?? CAMPAIGN_ROUNDS[0];
   const sessionLength = roundQueue.length;
   const selectedCorrect = selectedIndex === round.correctIndex;
-  const selectedDifferenceCount =
+  const activeIncorrectFeedback =
     selectedIndex !== null && !selectedCorrect
-      ? differingTileIndexes(round.options[selectedIndex], round.correctPattern)
-          .length
-      : 0;
+      ? incorrectFeedback(round, selectedIndex)
+      : null;
   const progress = roundCursor + (phase === "answered" ? 1 : 0);
   const isLastRedemptionRound =
     isRedemption && roundCursor === sessionLength - 1;
@@ -463,7 +481,10 @@ export default function TransformationMatchPage() {
     activeCampaignLevel,
   );
   const showCampaignLevelComplete =
-    isCampaign && activeCampaignLevelComplete && phase === "idle";
+    isCampaign &&
+    activeCampaignLevelComplete &&
+    phase === "idle" &&
+    !generationError;
   const nextCampaignLevel = nextIncompleteCampaignLevel(
     campaignProgress,
     activeCampaignLevel,
@@ -493,6 +514,13 @@ export default function TransformationMatchPage() {
   const infiniteEnergy = comboEnergyPercent(infiniteAdaptive.combo);
   const infiniteSupercharged =
     infiniteAdaptive.combo >= MAX_ENERGY_COMBO;
+  const infiniteFirstTryScore = infiniteAdaptive.attempts.filter(
+    ({ firstTryCorrect }) => firstTryCorrect,
+  ).length;
+  const firstTryScore =
+    originMode === "campaign"
+      ? campaignFirstTryScore
+      : infiniteFirstTryScore;
 
   const clearAttemptTimers = useCallback(() => {
     if (flightTimerRef.current) {
@@ -555,15 +583,20 @@ export default function TransformationMatchPage() {
       const context = ensureAudioContext();
       if (!context) return;
 
+      const play = () => {
+        try {
+          playFeedbackEarcon(context, correct);
+        } catch {
+          // Visual feedback remains complete when Web Audio is unavailable.
+        }
+      };
+
       if (context.state === "suspended") {
-        void context
-          .resume()
-          .then(() => playFeedbackEarcon(context, correct))
-          .catch(() => undefined);
+        void context.resume().then(play).catch(() => undefined);
         return;
       }
 
-      if (context.state === "running") playFeedbackEarcon(context, correct);
+      if (context.state === "running") play();
     },
     [ensureAudioContext, soundEnabled],
   );
@@ -574,6 +607,7 @@ export default function TransformationMatchPage() {
         inputLockedRef.current ||
         phase !== "idle" ||
         complete ||
+        generationError ||
         !started ||
         (isCampaign && activeCampaignLevelComplete) ||
         !activeSessionRound
@@ -584,16 +618,16 @@ export default function TransformationMatchPage() {
       inputLockedRef.current = true;
       setRetryReady(false);
       const isCorrect = optionIndex === round.correctIndex;
-      const wasMissed = mistakes.some(
-        ({ sessionRound }) => sessionRound.id === activeSessionRound.id,
-      );
-      const suppressWizardHint =
-        round.difficulty === "Wizard" && !isCorrect;
-      const sourceRect = clueGridRef.current?.getBoundingClientRect();
-      const targetRect = optionGridRefs.current[optionIndex]?.getBoundingClientRect();
+      const sourceRect =
+        optionTileRefs.current[optionIndex]?.getBoundingClientRect();
+      const targetRect = missingCellRef.current?.getBoundingClientRect();
       const reducedMotion = window.matchMedia(
         "(prefers-reduced-motion: reduce)",
       ).matches;
+      attemptScrollRef.current = {
+        x: window.scrollX,
+        y: window.scrollY,
+      };
 
       playFeedbackSound(isCorrect);
       setSelectedIndex(optionIndex);
@@ -630,9 +664,6 @@ export default function TransformationMatchPage() {
       }
 
       if (isCorrect) {
-        if (!isRedemption && !wasMissed) {
-          setScore((current) => current + 1);
-        }
         setCompletedCount((current) => current + 1);
       } else if (!isRedemption) {
         setMistakes((current) =>
@@ -640,13 +671,19 @@ export default function TransformationMatchPage() {
             ({ sessionRound }) => sessionRound.id === activeSessionRound.id,
           )
             ? current
-            : [...current, { sessionRound: activeSessionRound, chosenIndex: optionIndex }],
+            : [
+                ...current,
+                {
+                  sessionRound: activeSessionRound,
+                  chosenIndex: optionIndex,
+                },
+              ],
         );
       }
 
-      if (!suppressWizardHint && sourceRect && targetRect) {
+      if (sourceRect && targetRect) {
         setGhost({
-          pattern: round.clue,
+          pattern: round.options[optionIndex],
           left: sourceRect.left,
           top: sourceRect.top,
           width: sourceRect.width,
@@ -654,7 +691,6 @@ export default function TransformationMatchPage() {
           deltaX: targetRect.left - sourceRect.left,
           deltaY: targetRect.top - sourceRect.top,
           scale: targetRect.width / sourceRect.width,
-          transformCss: ghostTransformCss(round.transform),
           reducedMotion,
         });
       }
@@ -686,22 +722,18 @@ export default function TransformationMatchPage() {
             reducedMotion ? REDUCED_WRONG_REVIEW_MS : WRONG_REVIEW_MS,
           );
         },
-        suppressWizardHint
-          ? HIDDEN_WRONG_FEEDBACK_MS
-          : reducedMotion
-            ? REDUCED_GHOST_MS
-            : GHOST_SETTLE_MS,
+        reducedMotion ? REDUCED_GHOST_MS : GHOST_SETTLE_MS,
       );
     },
     [
-      activeSessionRound,
       activeCampaignLevelComplete,
+      activeSessionRound,
       clearAttemptTimers,
       complete,
+      generationError,
       isCampaign,
       isInfinite,
       isRedemption,
-      mistakes,
       phase,
       playFeedbackSound,
       round,
@@ -715,19 +747,21 @@ export default function TransformationMatchPage() {
     const initialAdaptive = initialInfiniteAdaptiveState();
     infiniteAdaptiveRef.current = initialAdaptive;
     setSessionMode("campaign");
+    setOriginMode("campaign");
     setRoundQueue([]);
     setRoundCursor(0);
     setActiveCampaignLevel("starter");
     setCampaignCursors(initialCampaignCursors());
     setCampaignProgress({});
     setInfiniteAdaptive(initialAdaptive);
-    setScore(0);
     setCompletedCount(0);
     setMistakes([]);
     setRedemptionTotal(0);
     setReviewLevelId(null);
     setRedeemedMistakeIds([]);
     setRedemptionMistakeIds([]);
+    setGenerationError(false);
+    setGenerationRecovery("start");
     setStarted(true);
     setComplete(false);
     resetAttemptState();
@@ -739,26 +773,36 @@ export default function TransformationMatchPage() {
     infiniteFingerprintsRef.current.clear();
     const initialAdaptive = initialInfiniteAdaptiveState();
     infiniteAdaptiveRef.current = initialAdaptive;
-    const firstRound = buildInfiniteSessionRound(
-      1,
-      infiniteFingerprintsRef.current,
-      initialAdaptive.targetDifficulty,
-    );
+    let firstRound: SessionRound | null = null;
+
+    try {
+      firstRound = buildInfiniteSessionRound(
+        1,
+        infiniteFingerprintsRef.current,
+        initialAdaptive.targetDifficulty,
+      );
+    } catch {
+      // A recoverable state is rendered below instead of serving a bad round.
+    }
+
     setSessionMode("infinite");
-    setRoundQueue([firstRound]);
+    setOriginMode("infinite");
+    setRoundQueue(firstRound ? [firstRound] : []);
     setRoundCursor(0);
+    setCampaignProgress({});
     setInfiniteAdaptive(initialAdaptive);
-    setScore(0);
     setCompletedCount(0);
     setMistakes([]);
     setRedemptionTotal(0);
     setReviewLevelId(null);
     setRedeemedMistakeIds([]);
     setRedemptionMistakeIds([]);
+    setGenerationError(firstRound === null);
+    setGenerationRecovery("start");
     setStarted(true);
     setComplete(false);
     resetAttemptState();
-    shouldFocusFirstOption.current = true;
+    shouldFocusFirstOption.current = firstRound !== null;
   }, [resetAttemptState, resumeAudio]);
 
   const selectCampaignLevel = useCallback(
@@ -766,6 +810,7 @@ export default function TransformationMatchPage() {
       if (
         !isCampaign ||
         phase !== "idle" ||
+        generationError ||
         levelId === activeCampaignLevel
       ) {
         return;
@@ -781,6 +826,7 @@ export default function TransformationMatchPage() {
     [
       activeCampaignLevel,
       campaignProgress,
+      generationError,
       isCampaign,
       phase,
       resetAttemptState,
@@ -802,6 +848,7 @@ export default function TransformationMatchPage() {
     setRoundCursor(0);
     setCompletedCount(0);
     setRedemptionTotal(redemptionQueue.length);
+    setGenerationError(false);
     setComplete(false);
     resetAttemptState();
     shouldFocusFirstOption.current = true;
@@ -828,11 +875,20 @@ export default function TransformationMatchPage() {
 
     if (isInfinite) {
       const nextOrdinal = (activeSessionRound?.ordinal ?? roundCursor + 1) + 1;
-      const nextRound = buildInfiniteSessionRound(
-        nextOrdinal,
-        infiniteFingerprintsRef.current,
-        infiniteAdaptiveRef.current.targetDifficulty,
-      );
+      let nextRound: SessionRound;
+
+      try {
+        nextRound = buildInfiniteSessionRound(
+          nextOrdinal,
+          infiniteFingerprintsRef.current,
+          infiniteAdaptiveRef.current.targetDifficulty,
+        );
+      } catch {
+        setGenerationRecovery("next");
+        setGenerationError(true);
+        return;
+      }
+
       shouldFocusFirstOption.current = true;
       resetAttemptState();
       setRoundQueue((current) => [...current, nextRound]);
@@ -842,13 +898,13 @@ export default function TransformationMatchPage() {
 
     if (isLastRedemptionRound) {
       resetAttemptState();
+      setRedeemedMistakeIds((current) => [
+        ...new Set([...current, ...redemptionMistakeIds]),
+      ]);
+      setRedemptionMistakeIds([]);
 
       if (reviewLevelId) {
         const redeemedLevelId = reviewLevelId;
-        setRedeemedMistakeIds((current) => [
-          ...new Set([...current, ...redemptionMistakeIds]),
-        ]);
-        setRedemptionMistakeIds([]);
         setReviewLevelId(null);
         setSessionMode("campaign");
         setRoundQueue([]);
@@ -860,7 +916,6 @@ export default function TransformationMatchPage() {
         return;
       }
 
-      setRedemptionMistakeIds([]);
       setComplete(true);
       return;
     }
@@ -882,6 +937,44 @@ export default function TransformationMatchPage() {
     roundCursor,
   ]);
 
+  const retryGeneration = useCallback(() => {
+    if (!isInfinite) return;
+
+    const isStarting = generationRecovery === "start";
+    const nextOrdinal = isStarting
+      ? 1
+      : (activeSessionRound?.ordinal ?? roundCursor + 1) + 1;
+    let recoveredRound: SessionRound;
+
+    try {
+      recoveredRound = buildInfiniteSessionRound(
+        nextOrdinal,
+        infiniteFingerprintsRef.current,
+        infiniteAdaptiveRef.current.targetDifficulty,
+      );
+    } catch {
+      setGenerationError(true);
+      return;
+    }
+
+    setGenerationError(false);
+    resetAttemptState();
+    if (isStarting) {
+      setRoundQueue([recoveredRound]);
+      setRoundCursor(0);
+    } else {
+      setRoundQueue((current) => [...current, recoveredRound]);
+      setRoundCursor((current) => current + 1);
+    }
+    shouldFocusFirstOption.current = true;
+  }, [
+    activeSessionRound?.ordinal,
+    generationRecovery,
+    isInfinite,
+    resetAttemptState,
+    roundCursor,
+  ]);
+
   const endInfinite = useCallback(() => {
     if (
       !isInfinite ||
@@ -891,6 +984,7 @@ export default function TransformationMatchPage() {
     ) {
       return;
     }
+    setGenerationError(false);
     resetAttemptState();
     setComplete(true);
   }, [completedCount, isInfinite, phase, resetAttemptState]);
@@ -903,7 +997,7 @@ export default function TransformationMatchPage() {
   }, [resumeAudio, soundEnabled]);
 
   useEffect(() => {
-    const enabled = readSoundPreference(["rotation-match-sound"]);
+    const enabled = readSoundPreference();
     if (enabled) return;
     const timer = window.setTimeout(() => setSoundEnabled(enabled), 0);
     return () => window.clearTimeout(timer);
@@ -912,16 +1006,18 @@ export default function TransformationMatchPage() {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       const target = event.target;
-      const isEditing =
+      const isEditable =
         target instanceof Element &&
         (target.closest("input, textarea, select, [contenteditable]") !== null ||
           (target instanceof HTMLElement && target.isContentEditable));
 
       if (
+        event.defaultPrevented ||
+        isEditable ||
         !started ||
         complete ||
+        generationError ||
         phase !== "idle" ||
-        isEditing ||
         event.altKey ||
         event.ctrlKey ||
         event.metaKey
@@ -938,14 +1034,19 @@ export default function TransformationMatchPage() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [chooseOption, complete, phase, started]);
+  }, [chooseOption, complete, generationError, phase, started]);
 
   useEffect(() => {
     if (phase === "answered") nextButtonRef.current?.focus();
   }, [phase]);
 
   useEffect(() => {
-    if (shouldFocusFirstOption.current && started && !complete) {
+    if (
+      shouldFocusFirstOption.current &&
+      started &&
+      !complete &&
+      !generationError
+    ) {
       optionButtonRefs.current[0]?.focus();
       shouldFocusFirstOption.current = false;
     }
@@ -953,6 +1054,7 @@ export default function TransformationMatchPage() {
     activeCampaignLevel,
     campaignProblemIndex,
     complete,
+    generationError,
     roundCursor,
     sessionMode,
     started,
@@ -974,8 +1076,19 @@ export default function TransformationMatchPage() {
   }, [activeCampaignLevel, showCampaignLevelComplete]);
 
   useEffect(() => {
-    function finishMovingGhost() {
+    if (generationError) generationRetryButtonRef.current?.focus();
+  }, [generationError]);
+
+  useEffect(() => {
+    function finishMovingGhost(event: Event) {
       if (!inputLockedRef.current) return;
+      if (event.type === "scroll") {
+        const scrollDelta = Math.max(
+          Math.abs(window.scrollX - attemptScrollRef.current.x),
+          Math.abs(window.scrollY - attemptScrollRef.current.y),
+        );
+        if (scrollDelta <= 8) return;
+      }
 
       if (phase === "animating") {
         animationTokenRef.current += 1;
@@ -984,21 +1097,28 @@ export default function TransformationMatchPage() {
         if (selectedCorrect) {
           setPhase("answered");
         } else {
-          retryFocusIndexRef.current = selectedIndex;
-          inputLockedRef.current = false;
-          setSelectedIndex(null);
-          setRetryReady(true);
-          setPhase("idle");
+          const optionIndex = selectedIndex;
+          const animationToken = animationTokenRef.current;
+          const reducedMotion = window.matchMedia(
+            "(prefers-reduced-motion: reduce)",
+          ).matches;
+          setPhase("wrong-review");
+          reviewTimerRef.current = setTimeout(
+            () => {
+              if (animationTokenRef.current !== animationToken) return;
+              retryFocusIndexRef.current = optionIndex;
+              inputLockedRef.current = false;
+              setSelectedIndex(null);
+              setRetryReady(true);
+              setPhase("idle");
+            },
+            reducedMotion ? REDUCED_WRONG_REVIEW_MS : WRONG_REVIEW_MS,
+          );
         }
       } else if (phase === "wrong-review") {
-        animationTokenRef.current += 1;
-        clearAttemptTimers();
-        retryFocusIndexRef.current = selectedIndex;
-        inputLockedRef.current = false;
+        // The fixed-position teaching copy is no longer trustworthy after a
+        // layout move, but the explanatory review should remain available.
         setGhost(null);
-        setSelectedIndex(null);
-        setRetryReady(true);
-        setPhase("idle");
       }
     }
 
@@ -1021,23 +1141,20 @@ export default function TransformationMatchPage() {
     };
   }, [clearAttemptTimers]);
 
-  const infiniteFirstTryScore = infiniteAdaptive.attempts.filter(
-    ({ firstTryCorrect }) => firstTryCorrect,
-  ).length;
-  const firstTryScore = isCampaign
-    ? campaignFirstTryScore
-    : isInfinite
-      ? infiniteFirstTryScore
-      : score;
   const resultMessage = useMemo(() => {
-    const denominator = isInfinite
-      ? Math.max(infiniteAdaptive.attempts.length, 1)
-      : ROUNDS.length;
+    const denominator =
+      originMode === "infinite"
+        ? Math.max(infiniteAdaptive.attempts.length, 1)
+        : CAMPAIGN_ROUNDS.length;
     const accuracy = firstTryScore / denominator;
     if (accuracy === 1) return "Perfect set.";
     if (accuracy >= 0.7) return "Sharp work.";
     return "Good practice.";
-  }, [firstTryScore, infiniteAdaptive.attempts.length, isInfinite]);
+  }, [
+    firstTryScore,
+    infiniteAdaptive.attempts.length,
+    originMode,
+  ]);
 
   const showRedemptionOffer =
     !isRedemption && visibleMistakes.length > 0;
@@ -1051,9 +1168,9 @@ export default function TransformationMatchPage() {
     : firstTryScore;
   const resultDenominator = reviewLevelId
     ? CAMPAIGN_PROBLEMS_PER_LEVEL
-    : isInfinite
+    : originMode === "infinite"
       ? infiniteAdaptive.attempts.length
-      : ROUNDS.length;
+      : CAMPAIGN_ROUNDS.length;
 
   const soundButton = (
     <button
@@ -1084,15 +1201,12 @@ export default function TransformationMatchPage() {
             "--ghost-x": `${ghost.deltaX}px`,
             "--ghost-y": `${ghost.deltaY}px`,
             "--ghost-scale": `${ghost.scale}`,
-            "--ghost-transform": ghost.transformCss,
             "--ghost-duration": `${GHOST_ANIMATION_MS}ms`,
           } as CustomProperties
         }
         aria-hidden="true"
       >
-        <div className={styles.ghostTurn}>
-          <PatternGrid pattern={ghost.pattern} size="ghost" hidden />
-        </div>
+        <PatternTile pattern={ghost.pattern} size="ghostTile" hidden />
       </div>,
       document.body,
     );
@@ -1104,7 +1218,7 @@ export default function TransformationMatchPage() {
           <span aria-hidden="true">←</span>
           <span>Games</span>
         </Link>
-        <span className={styles.gameTitle}>{transformationMatchGame.title}</span>
+        <span className={styles.gameTitle}>{patternMatrixGame.title}</span>
         {soundButton}
       </header>
 
@@ -1112,20 +1226,20 @@ export default function TransformationMatchPage() {
         {!started ? (
           <section className={styles.tutorial} aria-labelledby="tutorial-title">
             <p className={styles.kicker}>Example</p>
-            <h1 id="tutorial-title">Transform it. Find it.</h1>
+            <h1 id="tutorial-title">Find the rule. Fill the gap.</h1>
 
             <div className={styles.exampleFlow}>
-              <PatternGrid
-                pattern={TUTORIAL.clue}
-                size="tutorialPattern"
-                label={`Starting pattern: ${describePattern(TUTORIAL.clue)}`}
+              <MatrixBoard
+                matrix={TUTORIAL.matrix}
+                size="tutorialMatrix"
+                label="Example three by three visual matrix with its final tile missing"
               />
-              <TransformCue transform={TUTORIAL.transform} />
+              <RuleCue rule={TUTORIAL.rule} cueMode={TUTORIAL.cueMode} />
               <div className={styles.exampleAnswer}>
-                <PatternGrid
+                <PatternTile
                   pattern={TUTORIAL.answer}
-                  size="tutorialPattern"
-                  label={`Correct answer: ${describePattern(TUTORIAL.answer)}`}
+                  size="tutorialTile"
+                  label="Correct tile for the example"
                 />
                 <span className={styles.exampleMark} aria-label="Correct">
                   ✓
@@ -1133,23 +1247,23 @@ export default function TransformationMatchPage() {
               </div>
             </div>
 
-            <div className={styles.mirrorExample}>
-              <span className={styles.notEqual} aria-hidden="true">
-                ≠
-              </span>
-              <PatternGrid
-                pattern={TUTORIAL.mirror}
-                size="option"
-                label={`Mirror image, not the answer for this turn: ${describePattern(
-                  TUTORIAL.mirror,
-                )}`}
+            <div className={styles.nearMissExample}>
+              <span className={styles.nearMissLabel}>Near match</span>
+              <PatternTile
+                pattern={TUTORIAL.nearMiss}
+                size="tutorialTile"
+                label="Near match that does not complete the example"
               />
-              <span className={styles.mirrorMark} aria-label="Not a match">
+              <span className={styles.nearMissMark} aria-label="Not a match">
                 ×
               </span>
             </div>
 
-            <div className={styles.modeActions} aria-label="Choose a game mode">
+            <div
+              className={styles.modeActions}
+              role="group"
+              aria-label="Choose a game mode"
+            >
               <button
                 className={styles.primaryButton}
                 type="button"
@@ -1170,6 +1284,7 @@ export default function TransformationMatchPage() {
           </section>
         ) : !complete ? (
           <>
+            <h1 className={styles.srOnly}>{patternMatrixGame.title}</h1>
             <div
               className={`${styles.gameStatus} ${
                 isCampaign ? styles.campaignStatus : ""
@@ -1182,6 +1297,7 @@ export default function TransformationMatchPage() {
                 >
                   <div
                     className={styles.campaignLevels}
+                    role="group"
                     aria-label="Campaign levels"
                   >
                     {CAMPAIGN_LEVELS.map((level) => {
@@ -1320,7 +1436,7 @@ export default function TransformationMatchPage() {
                 <div
                   className={styles.progressTrack}
                   role="progressbar"
-                  aria-label="Game progress"
+                  aria-label="Redemption progress"
                   aria-valuemin={0}
                   aria-valuemax={sessionLength}
                   aria-valuenow={progress}
@@ -1328,7 +1444,9 @@ export default function TransformationMatchPage() {
                 >
                   {roundQueue.map(({ id }, index) => (
                     <span
-                      className={index < progress ? styles.progressDone : undefined}
+                      className={
+                        index < progress ? styles.progressDone : undefined
+                      }
                       key={id}
                     />
                   ))}
@@ -1406,126 +1524,209 @@ export default function TransformationMatchPage() {
                   <span aria-hidden="true">→</span>
                 </button>
               </section>
+            ) : generationError ? (
+              <section
+                className={styles.generationCard}
+                id="campaign-play-area"
+                role="alert"
+                aria-labelledby="generation-title"
+              >
+                <p className={styles.kicker}>Infinite paused</p>
+                <h2 id="generation-title">Let’s make a fresh puzzle.</h2>
+                <p>
+                  This one could not be built safely. Try again for another
+                  validated matrix.
+                </p>
+                <button
+                  className={styles.primaryButton}
+                  type="button"
+                  onClick={retryGeneration}
+                  ref={generationRetryButtonRef}
+                >
+                  Try another
+                  <span aria-hidden="true">↻</span>
+                </button>
+              </section>
             ) : (
               <>
                 <div className={styles.gameBoard} id="campaign-play-area">
-              <section className={styles.cluePanel} aria-label="Pattern and transform">
-                <div
-                  className={`${styles.clueStage} ${
-                    phase === "animating" || phase === "wrong-review"
-                      ? styles.clueAnimating
-                      : ""
-                  }`}
-                >
-                  <PatternGrid
-                    pattern={round.clue}
-                    size="clue"
-                    label={`Starting pattern: ${describePattern(round.clue)}`}
-                    gridRef={clueGridRef}
-                  />
-                  <PuzzleTransformCue round={round} />
-                </div>
-              </section>
-
-              <section className={styles.answerPanel} aria-label="Answer choices">
-                <div className={styles.optionGrid} role="group" aria-label="Answer choices">
-                  {round.options.map((option, optionIndex) => {
-                    const isCorrect = optionIndex === round.correctIndex;
-                    const isSelected = selectedIndex === optionIndex;
-                    const showCorrect = phase === "answered" && isCorrect;
-                    const showWrong =
-                      phase === "wrong-review" && isSelected && !isCorrect;
-                    const muted =
-                      (phase === "answered" && !isCorrect) ||
-                      (phase === "wrong-review" && !isSelected);
-                    const differences = showWrong
-                      ? differingTileIndexes(option, round.correctPattern)
-                      : [];
-                    const answerState = showCorrect
-                      ? ", correct answer"
-                      : showWrong
-                        ? `, your answer; ${differences.length} tiles differ`
-                        : "";
-
-                    return (
-                      <button
-                        className={`${styles.optionButton} ${
-                          showCorrect ? styles.correctOption : ""
-                        } ${showWrong ? styles.wrongOption : ""} ${
-                          muted ? styles.mutedOption : ""
-                        }`}
-                        type="button"
-                        onClick={() => chooseOption(optionIndex)}
-                        disabled={phase !== "idle"}
-                        aria-label={`Option ${optionIndex + 1}: ${describePattern(
-                          option,
-                        )}${answerState}`}
-                        aria-keyshortcuts={`${optionIndex + 1}`}
-                        ref={(node) => {
-                          optionButtonRefs.current[optionIndex] = node;
-                        }}
-                        key={`${optionIndex}-${patternKey(option)}`}
-                      >
-                        <span className={styles.optionNumber} aria-hidden="true">
-                          {optionIndex + 1}
-                        </span>
-                        <PatternGrid
-                          pattern={option}
-                          size="option"
-                          hidden
-                          differenceIndexes={differences}
-                          gridRef={(node) => {
-                            optionGridRefs.current[optionIndex] = node;
-                          }}
-                        />
-                        {showCorrect ? (
-                          <span className={styles.choiceMark} aria-hidden="true">
-                            ✓
-                          </span>
-                        ) : null}
-                        {showWrong ? (
-                          <span className={styles.choiceMark} aria-hidden="true">
-                            ×
-                          </span>
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-                </div>
-
-            <div className={styles.feedbackBar} aria-live="polite" role="status">
-              {phase === "wrong-review" ? (
-                <strong className={styles.wrongText}>
-                  Not quite · {selectedDifferenceCount}{" "}
-                  {selectedDifferenceCount === 1 ? "tile differs" : "tiles differ"}
-                </strong>
-              ) : phase === "answered" ? (
-                <>
-                  <strong className={styles.correctText}>Correct</strong>
-                  <button
-                    className={styles.nextButton}
-                    type="button"
-                    onClick={goNext}
-                    ref={nextButtonRef}
+                  <section
+                    className={styles.cluePanel}
+                    aria-label="Pattern matrix and rule cue"
                   >
-                    {isLastRedemptionRound
-                      ? reviewLevelId
-                        ? "Finish review"
-                        : "Results"
-                      : isCampaign &&
-                          campaignProblemIndex ===
-                            CAMPAIGN_PROBLEMS_PER_LEVEL - 1
-                        ? "Finish level"
-                        : "Next"}
-                    <span aria-hidden="true">→</span>
-                  </button>
-                </>
-              ) : retryReady ? (
-                <strong className={styles.retryText}>Try again</strong>
-              ) : null}
-            </div>
+                    <div
+                      className={`${styles.matrixStage} ${
+                        phase === "animating" ||
+                        phase === "wrong-review"
+                          ? styles.matrixAnimating
+                          : ""
+                      }`}
+                    >
+                      <MatrixBoard
+                        matrix={round.matrix}
+                        answer={
+                          phase === "answered"
+                            ? round.correctPattern
+                            : undefined
+                        }
+                        size="clueMatrix"
+                        label={`${
+                          phase === "answered"
+                            ? "Completed three by three visual matrix."
+                            : "Three by three visual matrix with the final tile missing."
+                        } ${
+                          round.cueMode === "hidden"
+                            ? "Infer the complete rule."
+                            : round.cueMode === "operation-only"
+                              ? `${operationLabel(
+                                  round.rule.operation,
+                                )}; infer the turn.`
+                              : ruleLabel(round.rule)
+                        }`}
+                        missingRef={missingCellRef}
+                        highlightFinalRow={phase === "wrong-review"}
+                      />
+                      <RuleCue
+                        rule={round.rule}
+                        cueMode={round.cueMode}
+                      />
+                    </div>
+                  </section>
+
+                  <section
+                    className={styles.answerPanel}
+                    aria-label="Answer choices"
+                  >
+                    <div
+                      className={styles.optionGrid}
+                      role="group"
+                      aria-label="Answer choices"
+                    >
+                      {round.options.map((option, optionIndex) => {
+                        const isCorrect =
+                          optionIndex === round.correctIndex;
+                        const isSelected = selectedIndex === optionIndex;
+                        const showCorrect =
+                          phase === "answered" && isCorrect;
+                        const showWrong =
+                          phase === "wrong-review" &&
+                          isSelected &&
+                          !isCorrect;
+                        const muted =
+                          (phase === "answered" && !isCorrect) ||
+                          (phase === "wrong-review" && !isSelected);
+                        const differences =
+                          showWrong &&
+                          activeIncorrectFeedback?.revealDifferences
+                            ? differingDotIndexes(
+                                option,
+                                round.correctPattern,
+                              )
+                            : [];
+                        const answerState = showCorrect
+                          ? ", correct answer"
+                          : showWrong
+                            ? `, your answer; ${activeIncorrectFeedback?.message ?? "does not complete the row"}`
+                            : "";
+
+                        return (
+                          <button
+                            className={`${styles.optionButton} ${
+                              showCorrect ? styles.correctOption : ""
+                            } ${showWrong ? styles.wrongOption : ""} ${
+                              muted ? styles.mutedOption : ""
+                            }`}
+                            type="button"
+                            onClick={() => chooseOption(optionIndex)}
+                            disabled={phase !== "idle"}
+                            aria-label={`Option ${
+                              optionIndex + 1
+                            }, visual dot tile${answerState}`}
+                            aria-keyshortcuts={`${optionIndex + 1}`}
+                            ref={(node) => {
+                              optionButtonRefs.current[optionIndex] = node;
+                            }}
+                            key={`${optionIndex}-${patternKey(option)}`}
+                          >
+                            <span
+                              className={styles.optionNumber}
+                              aria-hidden="true"
+                            >
+                              {optionIndex + 1}
+                            </span>
+                            <PatternTile
+                              pattern={option}
+                              size="optionTile"
+                              hidden
+                              differenceIndexes={differences}
+                              tileRef={(node) => {
+                                optionTileRefs.current[optionIndex] = node;
+                              }}
+                            />
+                            {showCorrect ? (
+                              <span
+                                className={styles.choiceMark}
+                                aria-hidden="true"
+                              >
+                                ✓
+                              </span>
+                            ) : null}
+                            {showWrong ? (
+                              <span
+                                className={styles.choiceMark}
+                                aria-hidden="true"
+                              >
+                                ×
+                              </span>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                </div>
+
+                <div
+                  className={styles.feedbackBar}
+                  aria-live="polite"
+                  role="status"
+                >
+                  {phase === "wrong-review" &&
+                  activeIncorrectFeedback ? (
+                    <>
+                      <strong className={styles.wrongText}>
+                        × {activeIncorrectFeedback.heading}
+                      </strong>
+                      <span>{activeIncorrectFeedback.message}</span>
+                    </>
+                  ) : phase === "answered" ? (
+                    <>
+                      <span className={styles.correctMessage}>
+                        <strong className={styles.correctText}>✓ Correct</strong>
+                        <small>{ruleLabel(round.rule)}</small>
+                      </span>
+                      <button
+                        className={styles.nextButton}
+                        type="button"
+                        onClick={goNext}
+                        ref={nextButtonRef}
+                      >
+                        {isLastRedemptionRound
+                          ? reviewLevelId
+                            ? "Finish review"
+                            : "Results"
+                          : isCampaign &&
+                              campaignProblemIndex ===
+                                CAMPAIGN_PROBLEMS_PER_LEVEL - 1
+                            ? "Finish level"
+                            : "Next"}
+                        <span aria-hidden="true">→</span>
+                      </button>
+                    </>
+                  ) : retryReady ? (
+                    <strong className={styles.retryText}>Try again</strong>
+                  ) : null}
+                </div>
 
                 <p className={styles.keyboardHint}>Keys 1–4</p>
               </>
@@ -1562,50 +1763,69 @@ export default function TransformationMatchPage() {
             </p>
 
             {showRedemptionOffer ? (
-              <div className={styles.reviewGrid} aria-label="Puzzles to retry">
+              <div
+                className={styles.reviewGrid}
+                role="list"
+                aria-label="Puzzles to retry"
+              >
                 {visibleMistakes.map(
                   ({ sessionRound: missed, chosenIndex }) => {
-                  const missedRound = missed.round;
-                  const wrongPattern = missedRound.options[chosenIndex];
-                  const differences = differingTileIndexes(
-                    wrongPattern,
-                    missedRound.correctPattern,
-                  );
+                    const missedRound = missed.round;
+                    const wrongPattern = missedRound.options[chosenIndex];
+                    const feedback = incorrectFeedback(
+                      missedRound,
+                      chosenIndex,
+                    );
+                    const differences = feedback.revealDifferences
+                      ? differingDotIndexes(
+                          wrongPattern,
+                          missedRound.correctPattern,
+                        )
+                      : [];
 
-                  return (
-                    <article className={styles.reviewCard} key={missed.id}>
-                      <span className={styles.reviewRound}>
-                        {missed.campaign
-                          ? `${missed.campaign.levelLabel} · Puzzle ${
-                              missed.campaign.problemIndex + 1
-                            }`
-                          : `Puzzle ${missed.ordinal} · ${infiniteLevelLabel(
-                              missedRound.difficulty,
-                            )}`}
-                      </span>
-                      <div className={styles.reviewVisual}>
-                        <PatternGrid
-                          pattern={missedRound.clue}
-                          size="review"
-                          label={`Puzzle ${missed.ordinal} starting pattern: ${describePattern(
-                            missedRound.clue,
-                          )}`}
-                        />
-                        <PuzzleTransformCue round={missedRound} />
-                        <div className={styles.reviewWrong}>
-                          <PatternGrid
-                            pattern={wrongPattern}
-                            size="review"
-                            differenceIndexes={differences}
-                            label={`Your answer with ${differences.length} differing tiles: ${describePattern(
-                              wrongPattern,
-                            )}`}
+                    return (
+                      <article
+                        className={styles.reviewCard}
+                        role="listitem"
+                        key={missed.id}
+                      >
+                        <span className={styles.reviewRound}>
+                          {missed.campaign
+                            ? `${missed.campaign.levelLabel} · Puzzle ${
+                                missed.campaign.problemIndex + 1
+                              }`
+                            : `Puzzle ${
+                                missed.ordinal
+                              } · ${infiniteLevelLabel(
+                                missedRound.difficulty,
+                              )}`}
+                        </span>
+                        <div className={styles.reviewVisual}>
+                          <MatrixBoard
+                            matrix={missedRound.matrix}
+                            size="reviewMatrix"
+                            label={`Puzzle ${missed.ordinal} visual matrix with its final tile missing`}
                           />
-                          <span aria-hidden="true">×</span>
+                          <RuleCue
+                            rule={missedRound.rule}
+                            cueMode={missedRound.cueMode}
+                            compact
+                          />
+                          <div className={styles.reviewWrong}>
+                            <PatternTile
+                              pattern={wrongPattern}
+                              size="reviewTile"
+                              differenceIndexes={differences}
+                              label={`Your answer. ${feedback.message}`}
+                            />
+                            <span aria-hidden="true">×</span>
+                          </div>
                         </div>
-                      </div>
-                    </article>
-                  );
+                        <p className={styles.reviewExplanation}>
+                          {feedback.message}
+                        </p>
+                      </article>
+                    );
                   },
                 )}
               </div>
@@ -1624,7 +1844,11 @@ export default function TransformationMatchPage() {
                 <button
                   className={styles.primaryButton}
                   type="button"
-                  onClick={startCampaign}
+                  onClick={
+                    originMode === "infinite"
+                      ? startInfinite
+                      : startCampaign
+                  }
                 >
                   Play again
                 </button>

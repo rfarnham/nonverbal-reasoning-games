@@ -44,6 +44,34 @@ function PatternPreview() {
   );
 }
 
+function GameCardVisual({ slug }: Readonly<{ slug: string }>) {
+  if (slug === "rotation-match") {
+    return (
+      <div
+        className="game-card-visual game-card-visual-rotation"
+        aria-hidden="true"
+      >
+        <span className="mini-shape mini-shape-one" />
+        <span className="mini-shape mini-shape-two" />
+        <span className="turn-arrow">↻</span>
+      </div>
+    );
+  }
+
+  const tileCount = slug === "pattern-matrix" ? 9 : 4;
+
+  return (
+    <div
+      className={`game-card-visual game-card-visual-${slug}`}
+      aria-hidden="true"
+    >
+      {Array.from({ length: tileCount }, (_, index) => (
+        <span key={index} />
+      ))}
+    </div>
+  );
+}
+
 export default function Home() {
   const liveGames = games.filter((game) => game.status === "live");
   const plannedGames = games.filter((game) => game.status === "planned");
@@ -86,7 +114,7 @@ export default function Home() {
           <dl className="quick-facts" aria-label="Project highlights">
             <div>
               <dt>{liveGames.length}</dt>
-              <dd>game live</dd>
+              <dd>{liveGames.length === 1 ? "game live" : "games live"}</dd>
             </div>
             <div>
               <dt>5–12</dt>
@@ -120,11 +148,7 @@ export default function Home() {
                 <span className="game-number">0{index + 1}</span>
                 <span className="status-pill status-live">Live</span>
               </div>
-              <div className="game-card-visual game-card-visual-rotation" aria-hidden="true">
-                <span className="mini-shape mini-shape-one" />
-                <span className="mini-shape mini-shape-two" />
-                <span className="turn-arrow">↻</span>
-              </div>
+              <GameCardVisual slug={game.slug} />
               <h3>{game.title}</h3>
               <p>{game.description}</p>
               <ul className="skill-list" aria-label="Skills trained">
@@ -144,15 +168,7 @@ export default function Home() {
                 <span className="game-number">0{liveGames.length + index + 1}</span>
                 <span className="status-pill">Planned</span>
               </div>
-              <div
-                className={`game-card-visual game-card-visual-${game.slug}`}
-                aria-hidden="true"
-              >
-                <span />
-                <span />
-                <span />
-                <span />
-              </div>
+              <GameCardVisual slug={game.slug} />
               <h3>{game.title}</h3>
               <p>{game.description}</p>
               <ul className="skill-list" aria-label="Skills trained">

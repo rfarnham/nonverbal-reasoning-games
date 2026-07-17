@@ -16,7 +16,7 @@ There is no account, download, backend, or analytics.
 | Game | Trains | Status |
 | --- | --- | --- |
 | [Transformation Match](https://rfarnham.github.io/nonverbal-reasoning-games/games/rotation-match/) | Mental rotation and reflection control | Playable |
-| Pattern Matrix | Rule finding and pattern completion | Planned |
+| Pattern Matrix | Visual rule finding and pattern completion | Ready for launch |
 | Shape Fold | Spatial folding and working memory | Planned |
 
 ## Project shape
@@ -29,8 +29,9 @@ keeping the runtime entirely in the browser.
 ```text
 app/
   games/
-    rotation-match/   # one independent mini-game
-  page.tsx            # game catalog
+    pattern-matrix/   # matrix-rule completion game
+    rotation-match/   # transformation matching game
+  page.tsx             # game catalog
 lib/
   games.ts            # catalog metadata
 docs/

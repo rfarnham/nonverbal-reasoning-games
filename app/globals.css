@@ -492,23 +492,92 @@ a {
   font-size: 2rem;
 }
 
-.game-card-visual-pattern-matrix,
+.game-card-visual-pattern-matrix {
+  display: grid;
+  grid-template-columns: repeat(3, 42px);
+  place-content: center;
+  gap: 7px;
+  background: #f7e7c8;
+}
+
+.game-card-visual-pattern-matrix span {
+  --dot-a: #e8e3d9;
+  --dot-b: #e8e3d9;
+  --dot-c: #e8e3d9;
+  --dot-d: #e8e3d9;
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border: 1px solid #cfcabd;
+  border-radius: 8px;
+  background: #fffdf8;
+}
+
+.game-card-visual-pattern-matrix span::after {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  left: 8px;
+  top: 8px;
+  border-radius: 50%;
+  background: var(--dot-a);
+  box-shadow:
+    18px 0 0 var(--dot-b),
+    0 18px 0 var(--dot-c),
+    18px 18px 0 var(--dot-d);
+  content: "";
+}
+
+.game-card-visual-pattern-matrix span:nth-child(1),
+.game-card-visual-pattern-matrix span:nth-child(7) {
+  --dot-a: #f06f5f;
+}
+
+.game-card-visual-pattern-matrix span:nth-child(2) {
+  --dot-b: #f06f5f;
+}
+
+.game-card-visual-pattern-matrix span:nth-child(3) {
+  --dot-a: #f06f5f;
+  --dot-b: #f06f5f;
+}
+
+.game-card-visual-pattern-matrix span:nth-child(4) {
+  --dot-c: #f06f5f;
+}
+
+.game-card-visual-pattern-matrix span:nth-child(5),
+.game-card-visual-pattern-matrix span:nth-child(8) {
+  --dot-d: #f06f5f;
+}
+
+.game-card-visual-pattern-matrix span:nth-child(6) {
+  --dot-c: #f06f5f;
+  --dot-d: #f06f5f;
+}
+
+.game-card-visual-pattern-matrix span:last-child {
+  display: grid;
+  place-items: center;
+  border: 2px dashed #657087;
+  color: #17213d;
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.game-card-visual-pattern-matrix span:last-child::after {
+  display: none;
+}
+
+.game-card-visual-pattern-matrix span:last-child::before {
+  content: "?";
+}
+
 .game-card-visual-shape-fold {
   display: grid;
   grid-template-columns: repeat(2, 56px);
   place-content: center;
   gap: 8px;
-}
-
-.game-card-visual-pattern-matrix span {
-  height: 56px;
-  border: 2px solid #7d7970;
-  border-radius: 50%;
-}
-
-.game-card-visual-pattern-matrix span:nth-child(2),
-.game-card-visual-pattern-matrix span:nth-child(3) {
-  background: #c5c0b4;
 }
 
 .game-card-visual-shape-fold {
@@ -685,7 +754,7 @@ a {
     grid-template-columns: 1fr 1fr;
   }
 
-  .game-card-live {
+  .game-card:last-child:nth-child(odd) {
     grid-column: 1 / -1;
   }
 

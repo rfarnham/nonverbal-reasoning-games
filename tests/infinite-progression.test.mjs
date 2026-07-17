@@ -7,7 +7,7 @@ import {
   initialInfiniteAdaptiveState,
   infiniteLevelLabel,
   recordInfiniteFirstAttempt,
-} from "../app/games/rotation-match/infinite-progression.ts";
+} from "../lib/infinite-progression.ts";
 
 test("infinite mode uses the four campaign level names", () => {
   assert.equal(infiniteLevelLabel("Easy"), "Starter");

@@ -21,7 +21,7 @@ export const games: readonly GameDefinition[] = [
     slug: "pattern-matrix",
     title: "Pattern Matrix",
     description:
-      "Complete a visual matrix by discovering the rule across rows and columns.",
+      "Find the rule repeated across the solved rows, then choose the one tile that completes the matrix.",
     skills: ["Rule finding", "Pattern completion"],
     status: "planned",
   },

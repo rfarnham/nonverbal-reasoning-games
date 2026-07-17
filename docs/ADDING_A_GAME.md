@@ -9,15 +9,17 @@ another.
 Add a folder at `app/games/<slug>/` containing:
 
 ```text
-page.tsx          # route metadata and the game entry point
-Game.tsx          # interactive client component
+layout.tsx        # route metadata
+page.tsx          # game entry point
+Game.tsx          # optional interactive client component
 game-data.ts      # authored rounds or pure puzzle generation
 game.module.css   # styles scoped to this game
 ```
 
 Names can vary when the game is small, but keep logic separate from rendering
-once it becomes non-trivial. Do not add server-only APIs: GitHub Pages hosts a
-static export.
+once it becomes non-trivial. Keep metadata in the server-rendered layout when
+the page or game component uses `"use client"`. Do not add server-only APIs:
+GitHub Pages hosts a static export.
 
 ## 2. Define the puzzle contract
 
