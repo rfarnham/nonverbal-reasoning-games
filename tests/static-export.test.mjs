@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
+import { discoverGamePackages } from "../scripts/generate-game-registry.mjs";
+
 const projectRoot = new URL("../", import.meta.url);
 const outputRoot = new URL("../out/", import.meta.url);
 const basePath = "/nonverbal-reasoning-games";
@@ -11,10 +13,12 @@ async function readOutput(relativePath) {
 }
 
 test("exports the catalog and implemented game routes as refresh-safe pages", async () => {
+  const packages = await discoverGamePackages();
   await Promise.all([
     access(new URL("index.html", outputRoot)),
-    access(new URL("games/rotation-match/index.html", outputRoot)),
-    access(new URL("games/pattern-matrix/index.html", outputRoot)),
+    ...packages.map(({ slug }) =>
+      access(new URL(`games/${slug}/index.html`, outputRoot)),
+    ),
     access(new URL("404.html", outputRoot)),
   ]);
 
@@ -43,12 +47,16 @@ test("exports the catalog and implemented game routes as refresh-safe pages", as
 });
 
 test("applies the GitHub Pages project base path to internal assets and links", async () => {
+  const packages = await discoverGamePackages();
   const [home, patternGame] = await Promise.all([
     readOutput("index.html"),
     readOutput("games/pattern-matrix/index.html"),
   ]);
 
-  assert.match(home, new RegExp(`href=["']${basePath}/games/rotation-match/`));
+  for (const { slug } of packages) {
+    assert.match(home, new RegExp(`href=["']${basePath}/games/${slug}/`));
+    assert.match(home, new RegExp(`data-game-icon=["']${slug}["']`));
+  }
   assert.match(home, new RegExp(`["']${basePath}/_next/`));
   assert.match(patternGame, new RegExp(`href=["']${basePath}/["']`));
   assert.match(patternGame, new RegExp(`["']${basePath}/_next/`));
@@ -69,7 +77,7 @@ test("ships project metadata and contributor documentation", async () => {
   assert.match(readme, /Play the games/);
   assert.match(
     readme,
-    /Pattern Matrix.*Ready for launch/,
+    /\[Pattern Matrix\]\(https:\/\/rfarnham\.github\.io\/nonverbal-reasoning-games\/games\/pattern-matrix\/\).*Playable/,
   );
   assert.match(decisions, /Good next decisions/);
   assert.match(gameGuide, /exactly one correct answer/);

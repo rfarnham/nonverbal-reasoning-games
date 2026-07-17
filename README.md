@@ -16,7 +16,7 @@ There is no account, download, backend, or analytics.
 | Game | Trains | Status |
 | --- | --- | --- |
 | [Transformation Match](https://rfarnham.github.io/nonverbal-reasoning-games/games/rotation-match/) | Mental rotation and reflection control | Playable |
-| Pattern Matrix | Visual rule finding and pattern completion | Ready for launch |
+| [Pattern Matrix](https://rfarnham.github.io/nonverbal-reasoning-games/games/pattern-matrix/) | Visual rule finding and pattern completion | Playable |
 | Shape Fold | Spatial folding and working memory | Planned |
 
 ## Project shape
@@ -29,11 +29,13 @@ keeping the runtime entirely in the browser.
 ```text
 app/
   games/
-    pattern-matrix/   # matrix-rule completion game
-    rotation-match/   # transformation matching game
-  page.tsx             # game catalog
+    pattern-matrix/   # route, catalog metadata, and shelf icon
+    rotation-match/   # route, catalog metadata, and shelf icon
+  page.tsx            # auto-discovered game catalog
 lib/
-  games.ts            # catalog metadata
+  games.ts            # catalog validation and ordering
+scripts/
+  generate-game-registry.mjs
 docs/
   ADDING_A_GAME.md
   PROJECT_DECISIONS.md
@@ -67,9 +69,13 @@ npm test
 The short version:
 
 1. Add a self-contained route at `app/games/<slug>/`.
-2. Keep its state and interactions in a client component.
-3. Add the catalog entry to `lib/games.ts`.
+2. Export the game’s shelf metadata and `ShelfIcon` from `catalog.tsx`.
+3. Keep its state and interactions in a client component.
 4. Add deterministic logic tests and verify keyboard, touch, and mouse use.
+
+The standard development, lint, test, and build commands regenerate the game
+registry. A committed route with `page.tsx` and `catalog.tsx` therefore appears
+on the home shelf without editing a shared list.
 
 See [Adding a game](docs/ADDING_A_GAME.md) for the full contract.
 

@@ -538,10 +538,14 @@ difficulty. The current acceptance precedent is at least 400 seeds per level,
 - Share shell primitives, semantic tokens, earcons, and progress components
   when reuse is proven; do not force unrelated puzzle mechanics into a generic
   abstraction.
-- Register each game in `lib/games.ts` and mark it live only after a complete
-  session and all checks pass.
+- Every implemented game MUST own a `catalog.tsx` that exports typed `gameInfo`
+  metadata and a self-contained `ShelfIcon`. The build-time registry discovers
+  route directories with `page.tsx` and `catalog.tsx`; do not maintain a central
+  game list.
+- A discoverable `catalog.tsx` is the release marker. Add it only after the
+  complete session and all checks pass.
 - Keep the repository public and open source.
-- Link every live game from both the catalog and README.
+- Link every discovered game from README; the catalog link is generated.
 - Verify the production GitHub Pages URL before calling a game live.
 
 Runtime interaction must not produce unhandled promise rejections or console

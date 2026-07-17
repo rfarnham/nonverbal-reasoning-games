@@ -11,6 +11,7 @@ Add a folder at `app/games/<slug>/` containing:
 ```text
 layout.tsx        # route metadata
 page.tsx          # game entry point
+catalog.tsx       # shelf metadata and game-owned ShelfIcon
 Game.tsx          # optional interactive client component
 game-data.ts      # authored rounds or pure puzzle generation
 game.module.css   # styles scoped to this game
@@ -44,10 +45,18 @@ or progress; the current project has no backend or account system.
 The route must remain usable after a hard refresh at its exported directory URL.
 Use `next/link` for internal navigation so the GitHub Pages base path is applied.
 
-## 4. Register it
+## 4. Provide the shelf entry
 
-Add title, slug, status, description, and trained skills to `lib/games.ts`. Mark
-the entry `live` only when a complete round and all checks pass.
+Export a typed `gameInfo` object and `ShelfIcon` component from `catalog.tsx`.
+The slug and route are derived from the game directory, so do not repeat them in
+metadata. The icon must be code-native, self-contained, and make no network
+requests.
+
+The standard project commands discover every `app/games/<slug>/` directory that
+contains both `page.tsx` and `catalog.tsx`, then generate the shelf registry.
+There is no shared catalog list to edit. Add `catalog.tsx` only when the complete
+game and all checks are ready to ship; an incomplete implemented route fails the
+build rather than disappearing silently.
 
 ## 5. Accessibility and input
 
@@ -69,4 +78,5 @@ npm run check
 ```
 
 Then complete at least one round with keyboard, touch-sized controls, and mouse.
-Check both the home catalog link and a hard refresh of the game URL.
+Check the generated home-shelf card, its game-owned icon, and a hard refresh of
+the game URL.

@@ -11,7 +11,7 @@ change. They are product decisions, not permanent constraints.
 | Session style | Short, untimed rounds | Encourages reasoning before speed and works for casual practice |
 | Feedback | Immediate, non-color-only feedback | Makes each answer a learning moment and stays accessible |
 | Difficulty | Starter, Junior, Expert, and Wizard levels in authored Campaign and adaptive Infinite modes | Keeps progression and adaptation consistent across games |
-| Roadmap | Transformation Match, followed by Pattern Matrix | Establishes transformation and rule-finding games before expanding the suite |
+| Roadmap | Transformation Match and Pattern Matrix establish the initial suite; the next reasoning skill is still open | Establishes transformation and rule-finding games before expanding the suite |
 | Progress | Session-only; no account | Keeps the launch private and frictionless |
 | Devices | Phone, tablet, and desktop | The public link should be useful wherever it is opened |
 | Input | Keyboard, touch, and mouse | A basic accessibility and usability requirement |
@@ -32,8 +32,8 @@ related feature is built:
    tests, older adults, or a deliberately broad group?
 2. **Scoring:** Should speed ever affect score, or should accuracy and streaks
    remain the only signals?
-3. **Roadmap order:** After Pattern Matrix, prioritize paper folding, visual
-   sequences, spatial memory, or another skill?
+3. **Roadmap order:** Prioritize paper folding, visual sequences, spatial
+   memory, or another skill next?
 4. **Persistence:** Should progress stay local, be exportable, or eventually
    sync through optional accounts?
 5. **Accessibility boundary:** What alternate experience should be offered when
