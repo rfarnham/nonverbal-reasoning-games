@@ -101,7 +101,8 @@ export type OptionKind =
   | "correct"
   | "wrong-rule"
   | "skipped-stage"
-  | "one-feature-off";
+  | "one-feature-off"
+  | "clear-contrast";
 
 export type Round = {
   id: string;
@@ -138,6 +139,7 @@ export type RulePart = {
   section: RulePartSection;
   name: string;
   shortName: string;
+  symbol: string;
   description: string;
 };
 
@@ -209,23 +211,43 @@ const GRID_TRANSFORMS: readonly GridTransform[] = [
 ];
 
 const OPERATION_LABELS: Record<Operation, string> = {
-  join: "Join",
-  overlap: "Keep overlap",
-  cancel: "Cancel matches",
-  "left-minus-right": "Left minus right",
-  "right-minus-left": "Right minus left",
-  match: "Match complements",
-  neither: "Keep neither",
+  join: "Union",
+  overlap: "Intersection",
+  cancel: "Exclusive or",
+  "left-minus-right": "Set difference A minus B",
+  "right-minus-left": "Set difference B minus A",
+  match: "Equivalence",
+  neither: "Complement of union",
+};
+
+const OPERATION_SHORT_LABELS: Record<Operation, string> = {
+  join: "Union",
+  overlap: "Intersection",
+  cancel: "XOR",
+  "left-minus-right": "A minus B",
+  "right-minus-left": "B minus A",
+  match: "XNOR",
+  neither: "NOR",
 };
 
 const OPERATION_DESCRIPTIONS: Record<Operation, string> = {
-  join: "Keep every occupied position from either input.",
-  overlap: "Keep only positions occupied in both inputs.",
-  cancel: "Keep positions occupied in exactly one input.",
-  "left-minus-right": "Remove the right input’s occupied positions from the left.",
-  "right-minus-left": "Remove the left input’s occupied positions from the right.",
-  match: "Keep positions where both inputs agree, including shared gaps.",
-  neither: "Keep positions left empty by both inputs.",
+  join: "A ∪ B keeps every occupied position from either input.",
+  overlap: "A ∩ B keeps only positions occupied in both inputs.",
+  cancel: "A ⊕ B keeps positions occupied in exactly one input.",
+  "left-minus-right": "A ∖ B removes B’s occupied positions from A.",
+  "right-minus-left": "B ∖ A removes A’s occupied positions from B.",
+  match: "¬(A ⊕ B) keeps positions where both inputs agree.",
+  neither: "(A ∪ B)ᶜ keeps positions left empty by both inputs.",
+};
+
+const OPERATION_SYMBOLS: Record<Operation, string> = {
+  join: "∪",
+  overlap: "∩",
+  cancel: "⊕",
+  "left-minus-right": "A∖B",
+  "right-minus-left": "B∖A",
+  match: "≡",
+  neither: "∪ᶜ",
 };
 
 const TRANSFORM_LABELS: Record<PatternTransform, string> = {
@@ -233,6 +255,13 @@ const TRANSFORM_LABELS: Record<PatternTransform, string> = {
   "rotate-clockwise": "Quarter-turn clockwise",
   "rotate-half": "Half-turn",
   "rotate-counterclockwise": "Quarter-turn counterclockwise",
+};
+
+const TRANSFORM_SYMBOLS: Record<PatternTransform, string> = {
+  none: "=",
+  "rotate-clockwise": "↻90°",
+  "rotate-half": "180°",
+  "rotate-counterclockwise": "↺90°",
 };
 
 const SEQUENCE_LABELS: Record<SequenceStep, string> = {
@@ -260,6 +289,18 @@ const SEQUENCE_DESCRIPTIONS: Record<SequenceStep, string> = {
   "fill-cycle": "The motif advances through solid, outline, and stripe fills.",
   "texture-shift": "The stripe pattern moves one phase inside each motif.",
   "motif-turn": "Directional motifs turn while their positions stay fixed.",
+};
+
+const SEQUENCE_SYMBOLS: Record<SequenceStep, string> = {
+  "rotate-clockwise": "↻90°",
+  "rotate-counterclockwise": "↺90°",
+  "move-clockwise": "P↻90°",
+  grow: "s↦s+1",
+  shrink: "s↦s−1",
+  "shape-cycle": "○→△→□→▭",
+  "fill-cycle": "●→○→▧",
+  "texture-shift": "φ↦φ+1",
+  "motif-turn": "θ↦θ+90°",
 };
 
 const DIFFICULTY_LABELS: Record<Difficulty, string> = {
@@ -377,9 +418,7 @@ export function patternStyleKey(pattern: Pattern): string {
 }
 
 export function patternDistance(left: Pattern, right: Pattern): number {
-  const cellDifferences = patternCells(left).filter(
-    (filled, index) => filled !== patternCells(right)[index],
-  ).length;
+  const cellDifferences = maskDifferenceCount(left, right);
   return (
     cellDifferences +
     Number(left.shape !== right.shape) +
@@ -388,6 +427,17 @@ export function patternDistance(left: Pattern, right: Pattern): number {
     Number(left.orientation !== right.orientation) +
     Number(left.texturePhase !== right.texturePhase)
   );
+}
+
+export function maskDifferenceCount(
+  left: Pattern,
+  right: Pattern,
+): number {
+  const leftCells = patternCells(left);
+  const rightCells = patternCells(right);
+  return leftCells.filter(
+    (filled, index) => filled !== rightCells[index],
+  ).length;
 }
 
 export function differingDotIndexes(
@@ -570,12 +620,24 @@ export function operationLabel(operation: Operation): string {
   return OPERATION_LABELS[operation];
 }
 
+export function operationSymbol(operation: Operation): string {
+  return OPERATION_SYMBOLS[operation];
+}
+
 export function transformLabel(transform: PatternTransform): string {
   return TRANSFORM_LABELS[transform];
 }
 
+export function transformSymbol(transform: PatternTransform): string {
+  return TRANSFORM_SYMBOLS[transform];
+}
+
 export function sequenceLabel(step: SequenceStep): string {
   return SEQUENCE_LABELS[step];
+}
+
+export function sequenceSymbol(step: SequenceStep): string {
+  return SEQUENCE_SYMBOLS[step];
 }
 
 export function difficultyLabel(difficulty: Difficulty): string {
@@ -640,7 +702,8 @@ export const RULE_CATALOGUE: readonly RulePart[] = [
       id: `combine:${operation}`,
       section: "combine",
       name: operationLabel(operation),
-      shortName: operationLabel(operation),
+      shortName: OPERATION_SHORT_LABELS[operation],
+      symbol: operationSymbol(operation),
       description: OPERATION_DESCRIPTIONS[operation],
     }),
   ),
@@ -650,6 +713,7 @@ export const RULE_CATALOGUE: readonly RulePart[] = [
       section: "change",
       name: sequenceLabel(step),
       shortName: sequenceLabel(step),
+      symbol: sequenceSymbol(step),
       description: SEQUENCE_DESCRIPTIONS[step],
     }),
   ),
@@ -658,6 +722,7 @@ export const RULE_CATALOGUE: readonly RulePart[] = [
     section: "change",
     name: "Half-turn",
     shortName: "Half-turn",
+    symbol: transformSymbol("rotate-half"),
     description: "Turn the combined pattern through 180 degrees.",
   },
   {
@@ -665,6 +730,7 @@ export const RULE_CATALOGUE: readonly RulePart[] = [
     section: "change",
     name: "Top-down",
     shortName: "Top-down",
+    symbol: "↓",
     description: "Read the same relation down columns instead of across rows.",
   },
   {
@@ -672,6 +738,7 @@ export const RULE_CATALOGUE: readonly RulePart[] = [
     section: "change",
     name: "Matrix cascade",
     shortName: "Cascade",
+    symbol: "f∘f",
     description:
       "Use linked results as inputs to build one connected whole-matrix rule.",
   },
@@ -1145,7 +1212,15 @@ function validatesInterestingness(
       }
     }
 
-    if (difficulty === "Hard" || difficulty === "Wizard") {
+    // A complete sequence line necessarily names its step once that step is in
+    // the visible catalogue. Requiring two competing predictions per line
+    // therefore rejects every honest sequence puzzle. Sequence rounds instead
+    // use two distinct completed lines to confirm the same step; the stronger
+    // single-line ambiguity check remains useful for binary-operation rounds.
+    if (
+      rule.family === "combine" &&
+      (difficulty === "Hard" || difficulty === "Wizard")
+    ) {
       for (const evidenceIndex of [0, 1]) {
         const compatible = singleLineCompatibleRules(
           matrix,
@@ -1214,6 +1289,21 @@ function localMutations(pattern: Pattern): readonly Pattern[] {
   return mutations;
 }
 
+function clearContrastMutations(pattern: Pattern): readonly Pattern[] {
+  const mutations: Pattern[] = [];
+  for (let first = 0; first < 4; first += 1) {
+    for (let second = first + 1; second < 4; second += 1) {
+      mutations.push(
+        makePattern(
+          pattern.mask ^ (1 << first) ^ (1 << second),
+          pattern,
+        ),
+      );
+    }
+  }
+  return mutations;
+}
+
 function distractorCandidates(
   matrix: Matrix,
   rule: MatrixRule,
@@ -1264,6 +1354,9 @@ function distractorCandidates(
   for (const mutation of localMutations(correct)) {
     add("one-feature-off", mutation);
   }
+  for (const mutation of clearContrastMutations(correct)) {
+    add("clear-contrast", mutation);
+  }
 
   return candidates.sort((left, right) => {
     const distance =
@@ -1280,12 +1373,18 @@ function chooseDistractors(
   matrix: Matrix,
   rule: MatrixRule,
   correct: Pattern,
+  difficulty: Difficulty,
 ): readonly [
   DistractorCandidate,
   DistractorCandidate,
   DistractorCandidate,
 ] | null {
-  const candidates = distractorCandidates(matrix, rule, correct);
+  const candidates = distractorCandidates(matrix, rule, correct).filter(
+    ({ pattern }) =>
+      difficulty !== "Easy" ||
+      (patternStyleKey(pattern) === patternStyleKey(correct) &&
+        maskDifferenceCount(pattern, correct) >= 2),
+  );
   const selected: DistractorCandidate[] = [];
 
   const take = (
@@ -1299,8 +1398,13 @@ function chooseDistractors(
     return true;
   };
 
-  if (!take(({ kind }) => kind === "one-feature-off")) return null;
-  if (!take(({ kind }) => kind === "wrong-rule")) return null;
+  if (difficulty === "Easy") {
+    if (!take(({ kind }) => kind === "wrong-rule")) return null;
+    if (!take(() => true)) return null;
+  } else {
+    if (!take(({ kind }) => kind === "one-feature-off")) return null;
+    if (!take(({ kind }) => kind === "wrong-rule")) return null;
+  }
   if (!take(() => true)) return null;
 
   return [
@@ -1331,6 +1435,7 @@ export function buildRound(blueprint: RoundBlueprint): Round {
     matrix,
     blueprint.rule,
     correctPattern,
+    blueprint.difficulty,
   );
   if (!distractors) {
     throw new Error(`${blueprint.id} could not produce meaningful options.`);
@@ -1375,28 +1480,56 @@ function ruleAllowedAtDifficulty(
   }
   if (difficulty === "Easy") {
     if (rule.axis !== "rows") return false;
+    return (
+      rule.family === "combine" &&
+      (
+        [
+          "join",
+          "overlap",
+          "cancel",
+          "left-minus-right",
+        ] as readonly Operation[]
+      ).includes(rule.operation) &&
+      rule.transform === "none"
+    );
+  }
+  if (difficulty === "Medium") {
     if (rule.family === "combine") {
       return (
-        ["join", "cancel", "match", "neither"] as readonly Operation[]
-      ).includes(rule.operation) && rule.transform === "none";
+        rule.transform === "none" &&
+        rule.operation !== "match" &&
+        rule.operation !== "neither"
+      );
     }
     return (
       [
         "rotate-clockwise",
+        "rotate-counterclockwise",
         "grow",
-        "shape-cycle",
+        "shrink",
       ] as readonly SequenceStep[]
     ).includes(rule.step);
   }
-  if (difficulty === "Medium") {
-    if (rule.family === "combine") return rule.transform === "none";
-    return true;
+  if (rule.family === "combine") {
+    return (
+      rule.transform !== "none" ||
+      (
+        ["match", "neither"] as readonly Operation[]
+      ).includes(rule.operation)
+    );
   }
-  if (difficulty === "Hard") {
-    if (rule.family === "combine") return rule.transform !== "none";
-    return false;
+  if (rule.family === "sequence") {
+    return (
+      [
+        "move-clockwise",
+        "shape-cycle",
+        "fill-cycle",
+        "texture-shift",
+        "motif-turn",
+      ] as readonly SequenceStep[]
+    ).includes(rule.step);
   }
-  return rule.family === "combine" && rule.transform !== "none";
+  return true;
 }
 
 export function validateRound(round: Round): readonly string[] {
@@ -1472,8 +1605,25 @@ export function validateRound(round: Round): readonly string[] {
   const wrongOptions = round.options.filter(
     (_, index) => index !== round.correctIndex,
   );
-  if (!wrongOptions.some((option) => patternDistance(option, round.correctPattern) === 1)) {
-    errors.push("Every round must include a one-feature near miss.");
+  if (round.difficulty === "Easy") {
+    if (
+      wrongOptions.some(
+        (option) =>
+          patternStyleKey(option) !==
+            patternStyleKey(round.correctPattern) ||
+          maskDifferenceCount(option, round.correctPattern) < 2,
+      )
+    ) {
+      errors.push(
+        "Starter distractors must share the answer style and differ in at least two positions.",
+      );
+    }
+  } else if (
+    !wrongOptions.some(
+      (option) => patternDistance(option, round.correctPattern) === 1,
+    )
+  ) {
+    errors.push("Every non-Starter round must include a one-feature near miss.");
   }
   if (
     !round.optionKinds.some(
@@ -1570,6 +1720,21 @@ function randomNonEmptyMask(random: RandomSource): number {
   return 1 + randomInteger(random, FULL_MASK);
 }
 
+function usefulSourceMaskPairs(
+  operation: Operation,
+): readonly (readonly [number, number])[] {
+  const pairs: Array<readonly [number, number]> = [];
+  for (let left = 1; left <= FULL_MASK; left += 1) {
+    for (let right = 1; right <= FULL_MASK; right += 1) {
+      const result = operationMask(left, right, operation);
+      if (result !== 0 && result !== left && result !== right) {
+        pairs.push([left, right]);
+      }
+    }
+  }
+  return pairs;
+}
+
 function randomStyle(
   random: RandomSource,
   step?: SequenceStep,
@@ -1601,6 +1766,7 @@ function randomStyle(
 }
 
 function randomSourcePatterns(
+  difficulty: Difficulty,
   rule: MatrixRule,
   random: RandomSource,
 ): readonly Pattern[] {
@@ -1616,7 +1782,32 @@ function randomSourcePatterns(
     );
   }
   return Array.from({ length: 3 }, () => {
-    const style = randomStyle(random);
+    const style =
+      difficulty === "Easy"
+        ? {
+            shape: randomChoice(
+              random,
+              ["circle", "square"] as const,
+            ),
+            fill: randomChoice(
+              random,
+              ["solid", "outline"] as const,
+            ),
+            scale: 1 as const,
+            orientation: 0 as const,
+            texturePhase: 0 as const,
+          }
+        : randomStyle(random);
+    if (difficulty === "Easy") {
+      const [leftMask, rightMask] = randomChoice(
+        random,
+        usefulSourceMaskPairs(rule.operation),
+      );
+      return [
+        makePattern(leftMask, style),
+        makePattern(rightMask, style),
+      ];
+    }
     return [
       makePattern(randomNonEmptyMask(random), style),
       makePattern(randomNonEmptyMask(random), style),
@@ -1642,7 +1833,7 @@ export function generateRoundForRule(
       id: `${idPrefix}-${attempt + 1}`,
       difficulty,
       rule,
-      sourcePatterns: randomSourcePatterns(rule, random),
+      sourcePatterns: randomSourcePatterns(difficulty, rule, random),
       correctIndex,
     };
     try {

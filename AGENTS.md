@@ -172,6 +172,40 @@ round. Expert MUST withhold it until the first incorrect attempt, and Wizard
 MUST withhold it for the entire round. A post-solve rule discovery or catalogue
 explanation MAY name and teach the solved rule; it is not an in-round hint.
 
+### Rule curriculum and notation
+
+Rule-inference games MUST teach atomic rules before their complements, chains,
+or whole-matrix compositions. The default conceptual order is:
+
+1. union;
+2. intersection;
+3. exclusive or;
+4. set difference;
+5. rotation and other single-pattern sequences;
+6. complements such as equivalence and complement of union;
+7. chained and whole-matrix rules.
+
+An authored Starter campaign MUST repeat each newly introduced atomic rule for
+at least three consecutive puzzles before introducing another. Later levels
+SHOULD continue to teach new families in coherent blocks, and Wizard MUST NOT
+introduce an atomic rule part the campaign has not already taught. Infinite
+difficulty pools MUST NOT surface a rule earlier than its authored curriculum
+tier.
+
+Starter alternatives MUST be generously distinguishable while still testing
+the intended rule. In a four-cell pattern game, alternatives SHOULD use the
+same shape, fill, size, orientation, and texture encoding as the correct answer
+and differ in at least two occupied positions. Do not make an early trap depend
+only on stripe phase, fill, size, orientation, or one tiny local feature.
+
+Every player-visible rule part MUST have one stable, mathematically appropriate
+symbol used consistently in hints, discovery lessons, feedback, and the rule
+catalogue. A transformation diagram MUST use evidence from the active puzzle,
+preserve a fixed reading direction, and show chained operations as distinct
+ordered stages. Do not invent an unrelated miniature example inside a puzzle
+cue. A discovery lesson teaches only the newly discovered atomic part; it MUST
+NOT present the full compound rule as if every part were new.
+
 Incorrect Wizard feedback MUST NOT reveal the hidden rule, operation, or cue.
 Give localized “this does not match” feedback only when it preserves the
 remaining reasoning challenge.

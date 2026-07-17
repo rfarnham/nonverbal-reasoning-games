@@ -52,6 +52,7 @@ import {
   MatrixBoard,
   PatternTile,
   RuleCue,
+  RulePartLessonCue,
 } from "./pattern-visuals";
 import styles from "./pattern-matrix.module.css";
 
@@ -67,7 +68,6 @@ type CampaignReviewSelection = {
 };
 type RuleLesson = {
   partId: RulePartId;
-  rule: MatrixRule;
 };
 
 type SessionRound = {
@@ -440,7 +440,7 @@ export default function PatternMatrixPage() {
           current.map(({ partId }) => partId),
           partIds,
         )
-          .map((partId) => ({ partId, rule: lessonRule }));
+          .map((partId) => ({ partId }));
         return additions.length > 0 ? [...current, ...additions] : current;
       });
     },
@@ -1256,7 +1256,11 @@ export default function PatternMatrixPage() {
                 size="tutorialMatrix"
                 label="Example three by three visual matrix with its final tile missing"
               />
-              <RuleCue rule={TUTORIAL.rule} cueMode={TUTORIAL.cueMode} />
+              <RuleCue
+                rule={TUTORIAL.rule}
+                matrix={TUTORIAL.matrix}
+                cueMode={TUTORIAL.cueMode}
+              />
               <div className={styles.exampleAnswer}>
                 <PatternTile
                   pattern={TUTORIAL.answer}
@@ -1643,6 +1647,7 @@ export default function PatternMatrixPage() {
                   />
                   <RuleCue
                     rule={historicalSessionRound.round.rule}
+                    matrix={historicalSessionRound.round.matrix}
                     cueMode="full-rule"
                   />
                   <div className={styles.historicalAnswers}>
@@ -1713,9 +1718,7 @@ export default function PatternMatrixPage() {
                             <ul>
                               {discovered.map((part) => (
                                 <li title={part.name} key={part.id}>
-                                  <span aria-hidden="true">
-                                    {section === "combine" ? "◆" : "↻"}
-                                  </span>
+                                  <span aria-hidden="true">{part.symbol}</span>
                                   <strong>{part.shortName}</strong>
                                 </li>
                               ))}
@@ -1765,6 +1768,7 @@ export default function PatternMatrixPage() {
                       />
                       <RuleCue
                         rule={round.rule}
+                        matrix={round.matrix}
                         cueMode={activeCueMode}
                       />
                     </div>
@@ -1882,6 +1886,7 @@ export default function PatternMatrixPage() {
                         <strong className={styles.correctText}>✓ Correct</strong>
                         <RuleCue
                           rule={round.rule}
+                          matrix={round.matrix}
                           cueMode="full-rule"
                           compact
                         />
@@ -1990,6 +1995,7 @@ export default function PatternMatrixPage() {
                           />
                           <RuleCue
                             rule={missedRound.rule}
+                            matrix={missedRound.matrix}
                             cueMode="full-rule"
                             compact
                           />
@@ -2057,10 +2063,7 @@ export default function PatternMatrixPage() {
             <p className={styles.kicker}>New rule discovered</p>
             <h2 id="rule-lesson-title">{activeLessonPart.name}</h2>
             <p>{activeLessonPart.description}</p>
-            <RuleCue
-              rule={activeLesson.rule}
-              cueMode="full-rule"
-            />
+            <RulePartLessonCue part={activeLessonPart} />
             <button
               className={styles.primaryButton}
               type="button"

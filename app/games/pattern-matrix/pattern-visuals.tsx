@@ -1,22 +1,20 @@
 import {
-  applyGridRule,
-  applySequenceStep,
   combinePatterns,
   dotCount,
-  makePattern,
+  operationLabel,
+  operationSymbol,
   patternCells,
-  patternKey,
   ruleLabel,
-  transformPattern,
+  sequenceLabel,
+  sequenceSymbol,
+  transformSymbol,
   type CueMode,
-  type GridRule,
   type Matrix,
   type MatrixRule,
   type MotifFill,
   type MotifShape,
   type Pattern,
-  type PatternTransform,
-  type SequenceStep,
+  type RulePart,
 } from "./rule-engine";
 import styles from "./pattern-matrix.module.css";
 
@@ -44,35 +42,6 @@ const FILL_CLASSES: Record<MotifFill, string> = {
   solid: styles.motifSolid,
   outline: styles.motifOutline,
   striped: styles.motifStriped,
-};
-
-const OPERATION_SYMBOLS = {
-  join: "∪",
-  overlap: "∩",
-  cancel: "⊕",
-  "left-minus-right": "L−R",
-  "right-minus-left": "R−L",
-  match: "≡",
-  neither: "∅",
-} as const;
-
-const TRANSFORM_SYMBOLS: Record<PatternTransform, string> = {
-  none: "→",
-  "rotate-clockwise": "↻¼",
-  "rotate-half": "↻½",
-  "rotate-counterclockwise": "↺¼",
-};
-
-const SEQUENCE_SYMBOLS: Record<SequenceStep, string> = {
-  "rotate-clockwise": "↻¼",
-  "rotate-counterclockwise": "↺¼",
-  "move-clockwise": "↷",
-  grow: "▸",
-  shrink: "◂",
-  "shape-cycle": "○▸△",
-  "fill-cycle": "○▸●",
-  "texture-shift": "≋▸",
-  "motif-turn": "△↻",
 };
 
 type PatternStyle = React.CSSProperties & Record<`--${string}`, string>;
@@ -205,114 +174,108 @@ export function MatrixBoard({
   );
 }
 
-function combineExample(rule: Extract<MatrixRule, { family: "combine" }>) {
-  const style = {
-    shape: "triangle",
-    fill: "striped",
-    scale: 1,
-    orientation: 0,
-    texturePhase: 0,
-  } as const;
-  const left = makePattern(0b1001, style);
-  const right = makePattern(0b0011, style);
-  const intermediate = combinePatterns(left, right, rule.operation);
-  if (!intermediate) return null;
-  return {
-    left,
-    right,
-    intermediate,
-    result: transformPattern(intermediate, rule.transform),
-  };
-}
-
-function sequenceExample(
-  step: SequenceStep,
+function evidenceLine(
+  matrix: Matrix,
+  axis: "rows" | "columns",
 ): readonly [Pattern, Pattern, Pattern] {
-  const base =
-    step === "texture-shift"
-      ? makePattern(0b0111, {
-          shape: "triangle",
-          fill: "striped",
-          scale: 1,
-          orientation: 0,
-          texturePhase: 0,
-        })
-      : step === "motif-turn"
-        ? makePattern(0b0101, {
-            shape: "triangle",
-            fill: "outline",
-            scale: 1,
-            orientation: 0,
-          })
-        : step === "grow"
-          ? makePattern(0b1001, {
-              shape: "circle",
-              fill: "solid",
-              scale: 0,
-            })
-          : step === "shrink"
-            ? makePattern(0b1001, {
-                shape: "square",
-                fill: "outline",
-                scale: 2,
-              })
-            : makePattern(0b0111, {
-                shape: step === "shape-cycle" ? "circle" : "bar",
-                fill: step === "fill-cycle" ? "solid" : "outline",
-                scale: 1,
-                orientation: 0,
-              });
-  const second = applySequenceStep(base, step) ?? base;
-  const third = applySequenceStep(second, step) ?? second;
-  return [base, second, third];
-}
-
-function gridExample(rule: GridRule): readonly Pattern[] {
-  const style = {
-    shape: "triangle",
-    fill: "outline",
-    scale: 1,
-    orientation: 0,
-    texturePhase: 0,
-  } as const;
-  for (let first = 1; first <= 0b1111; first += 1) {
-    for (let second = 1; second <= 0b1111; second += 1) {
-      for (let third = 1; third <= 0b1111; third += 1) {
-        const completed = applyGridRule(
-          [
-            makePattern(first, style),
-            makePattern(second, style),
-            makePattern(third, style),
-          ],
-          rule,
-        );
-        const keys = completed.map((pattern) => patternKey(pattern));
-        if (
-          completed.every((pattern) => pattern.mask !== 0) &&
-          new Set(keys).size === keys.length
-        ) {
-          return completed;
-        }
-      }
-    }
+  const indexes =
+    axis === "rows" ? ([0, 1, 2] as const) : ([0, 3, 6] as const);
+  const patterns = indexes.map((index) => matrix[index]);
+  if (patterns.some((pattern) => pattern === null)) {
+    throw new Error("A rule cue requires one complete evidence line.");
   }
-  throw new Error("Unable to build a visual example for the matrix cascade.");
+  return patterns as unknown as readonly [Pattern, Pattern, Pattern];
 }
 
-function RuleAxis({ axis }: { axis: "rows" | "columns" }) {
+function CueHeader({
+  symbol,
+  name,
+  direction,
+}: {
+  symbol: string;
+  name: string;
+  direction: string;
+}) {
   return (
-    <span className={styles.ruleAxis} aria-hidden="true">
-      {axis === "rows" ? "↔" : "↕"}
+    <span className={styles.ruleCueHeader} aria-hidden="true">
+      <span className={styles.ruleNotation}>{symbol}</span>
+      <strong>{name}</strong>
+      <small>{direction}</small>
     </span>
+  );
+}
+
+function PatternEquation({
+  patterns,
+  operator,
+  axis,
+}: {
+  patterns: readonly [Pattern, Pattern, Pattern];
+  operator: string;
+  axis: "rows" | "columns";
+}) {
+  return (
+    <span
+      className={`${styles.cueEquation} ${
+        axis === "columns" ? styles.cueEquationColumn : ""
+      }`}
+      aria-hidden="true"
+    >
+      <PatternTile pattern={patterns[0]} size="cueTile" hidden />
+      <span className={styles.operationSymbol}>{operator}</span>
+      <PatternTile pattern={patterns[1]} size="cueTile" hidden />
+      <span className={styles.equalsSymbol}>=</span>
+      <PatternTile pattern={patterns[2]} size="cueTile" hidden />
+    </span>
+  );
+}
+
+function SequenceEquation({
+  patterns,
+  symbol,
+  axis,
+}: {
+  patterns: readonly [Pattern, Pattern, Pattern];
+  symbol: string;
+  axis: "rows" | "columns";
+}) {
+  return (
+    <span
+      className={`${styles.cueEquation} ${
+        axis === "columns" ? styles.cueEquationColumn : ""
+      }`}
+      aria-hidden="true"
+    >
+      <PatternTile pattern={patterns[0]} size="cueTile" hidden />
+      <span className={styles.transformSymbol}>{symbol}</span>
+      <PatternTile pattern={patterns[1]} size="cueTile" hidden />
+      <span className={styles.transformSymbol}>{symbol}</span>
+      <PatternTile pattern={patterns[2]} size="cueTile" hidden />
+    </span>
+  );
+}
+
+export function RulePartLessonCue({ part }: { part: RulePart }) {
+  return (
+    <div
+      className={styles.rulePartLessonCue}
+      role="img"
+      aria-label={`${part.name}. ${part.description}`}
+    >
+      <span aria-hidden="true">{part.symbol}</span>
+      <strong>{part.shortName}</strong>
+    </div>
   );
 }
 
 export function RuleCue({
   rule,
+  matrix,
   cueMode,
   compact = false,
 }: {
   rule: MatrixRule;
+  matrix: Matrix;
   cueMode: CueMode;
   compact?: boolean;
 }) {
@@ -331,8 +294,14 @@ export function RuleCue({
   }
 
   if (rule.family === "combine") {
-    const example = combineExample(rule);
-    if (!example) return null;
+    const evidence = evidenceLine(matrix, rule.axis);
+    const intermediate = combinePatterns(
+      evidence[0],
+      evidence[1],
+      rule.operation,
+    );
+    if (!intermediate) return null;
+
     return (
       <div
         className={`${styles.ruleCue} ${styles.visualRuleCue} ${
@@ -341,34 +310,39 @@ export function RuleCue({
         role="img"
         aria-label={ruleLabel(rule)}
       >
-        <RuleAxis axis={rule.axis} />
-        <PatternTile pattern={example.left} size="cueTile" hidden />
-        <span className={styles.operationSymbol} aria-hidden="true">
-          {OPERATION_SYMBOLS[rule.operation]}
-        </span>
-        <PatternTile pattern={example.right} size="cueTile" hidden />
-        <span className={styles.transformSymbol} aria-hidden="true">
-          {rule.transform === "none" ? "→" : "⇒"}
-        </span>
+        <CueHeader
+          symbol={operationSymbol(rule.operation)}
+          name={operationLabel(rule.operation)}
+          direction={rule.axis === "rows" ? "rows →" : "columns ↓"}
+        />
+        <PatternEquation
+          patterns={[
+            evidence[0],
+            evidence[1],
+            rule.transform === "none" ? evidence[2] : intermediate,
+          ]}
+          operator={operationSymbol(rule.operation)}
+          axis={rule.axis}
+        />
         {rule.transform !== "none" ? (
-          <>
-            <PatternTile
-              pattern={example.intermediate}
-              size="cueTile"
-              hidden
-            />
-            <span className={styles.transformSymbol} aria-hidden="true">
-              {TRANSFORM_SYMBOLS[rule.transform]}
+          <span className={styles.cueSecondStage} aria-hidden="true">
+            <small>then</small>
+            <span className={styles.cueEquation}>
+              <PatternTile pattern={intermediate} size="cueTile" hidden />
+              <span className={styles.transformSymbol}>
+                {transformSymbol(rule.transform)}
+              </span>
+              <span className={styles.equalsSymbol}>=</span>
+              <PatternTile pattern={evidence[2]} size="cueTile" hidden />
             </span>
-          </>
+          </span>
         ) : null}
-        <PatternTile pattern={example.result} size="cueTile" hidden />
       </div>
     );
   }
 
   if (rule.family === "sequence") {
-    const example = sequenceExample(rule.step);
+    const evidence = evidenceLine(matrix, rule.axis);
     return (
       <div
         className={`${styles.ruleCue} ${styles.visualRuleCue} ${
@@ -377,17 +351,16 @@ export function RuleCue({
         role="img"
         aria-label={ruleLabel(rule)}
       >
-        <RuleAxis axis={rule.axis} />
-        {example.map((pattern, index) => (
-          <span className={styles.sequenceCueStep} key={index}>
-            {index > 0 ? (
-              <span className={styles.transformSymbol} aria-hidden="true">
-                {SEQUENCE_SYMBOLS[rule.step]}
-              </span>
-            ) : null}
-            <PatternTile pattern={pattern} size="cueTile" hidden />
-          </span>
-        ))}
+        <CueHeader
+          symbol={sequenceSymbol(rule.step)}
+          name={sequenceLabel(rule.step)}
+          direction={rule.axis === "rows" ? "rows →" : "columns ↓"}
+        />
+        <SequenceEquation
+          patterns={evidence}
+          symbol={sequenceSymbol(rule.step)}
+          axis={rule.axis}
+        />
       </div>
     );
   }
@@ -400,22 +373,31 @@ export function RuleCue({
       role="img"
       aria-label={ruleLabel(rule)}
     >
-      <span className={styles.gridCue} aria-hidden="true">
-        {gridExample(rule).map((pattern, index) => (
-          <PatternTile
-            pattern={pattern}
-            size="cueTile"
-            hidden
-            key={index}
-          />
-        ))}
+      <CueHeader
+        symbol="f∘f"
+        name="Matrix cascade"
+        direction="whole grid"
+      />
+      <span className={styles.cascadeDefinition} aria-hidden="true">
+        <strong>f(A,B)</strong>
+        <span>=</span>
+        <span>{transformSymbol(rule.transform)}</span>
+        <span>(A {operationSymbol(rule.operation)} B)</span>
       </span>
-      <span className={styles.gridCueArrows} aria-hidden="true">
-        <span>
-          {OPERATION_SYMBOLS[rule.operation]} ⇒{" "}
-          {TRANSFORM_SYMBOLS[rule.transform]}
+      <span className={styles.cascadeTrace} aria-hidden="true">
+        <span className={styles.cascadeMap}>
+          {["A", "B", "C", "D", "E", "F", "G", "H", "?"].map(
+            (label) => <span key={label}>{label}</span>,
+          )}
         </span>
-        <span>↘ ↙ ↗</span>
+        <span className={styles.cascadeSteps}>
+          <span>f(A,B)=C</span>
+          <span>f(A,D)=G</span>
+          <span>f(B,D)=E</span>
+          <span>f(C,E)=F</span>
+          <span>f(E,G)=H</span>
+          <span>f(F,H)=?</span>
+        </span>
       </span>
     </div>
   );

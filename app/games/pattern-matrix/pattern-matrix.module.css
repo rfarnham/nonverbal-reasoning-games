@@ -470,13 +470,12 @@
 }
 
 .ruleCue {
-  min-width: 172px;
+  width: min(100%, 430px);
+  min-width: 232px;
   min-height: 70px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 10px;
+  display: grid;
+  justify-items: center;
+  gap: 9px;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--panel);
@@ -485,17 +484,69 @@
 }
 
 .visualRuleCue {
-  max-width: min(100%, 420px);
+  max-width: min(100%, 430px);
+}
+
+.ruleCueHeader {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+}
+
+.ruleCueHeader strong {
+  font-size: 0.72rem;
+  font-weight: 850;
+  line-height: 1.15;
+}
+
+.ruleCueHeader small {
+  color: var(--muted);
+  font-size: 0.64rem;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.ruleNotation {
+  min-width: 44px;
+  min-height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: #f7dfaa;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.cueEquation {
+  display: grid;
+  grid-template-columns: auto auto auto auto auto;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.cueEquationColumn {
+  grid-template-columns: auto;
+  grid-template-rows: auto auto auto auto auto;
+  gap: 4px;
 }
 
 .operationSymbol,
-.transformSymbol {
+.transformSymbol,
+.equalsSymbol {
   display: grid;
   place-items: center;
   color: var(--ink);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-weight: 900;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .operationSymbol {
@@ -503,76 +554,178 @@
   min-height: 32px;
   border-radius: 10px;
   background: #f7dfaa;
-  font-size: 0.82rem;
+  font-size: 0.76rem;
 }
 
 .transformSymbol {
-  min-width: 25px;
-  font-size: 0.68rem;
-  white-space: nowrap;
+  min-width: 34px;
+  min-height: 28px;
+  border: 1px solid #ded8ca;
+  border-radius: 9px;
+  background: #f7f3ea;
+  font-size: 0.66rem;
 }
 
-.ruleAxis {
-  min-width: 28px;
+.equalsSymbol {
+  min-width: 20px;
+  font-size: 0.78rem;
+}
+
+.cueSecondStage {
+  width: 100%;
   display: grid;
-  place-items: center;
-  color: var(--muted);
-  font-size: 1.15rem;
-  font-weight: 900;
+  grid-template-columns: minmax(30px, 1fr) auto minmax(30px, 1fr);
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid #e6e0d3;
+  padding-top: 9px;
 }
 
-.sequenceCueStep {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
+.cueSecondStage::before,
+.cueSecondStage::after {
+  height: 1px;
+  background: #ded8ca;
+  content: "";
+}
+
+.cueSecondStage > small {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  justify-self: center;
+  color: var(--muted);
+  font-size: 0.6rem;
+  font-weight: 820;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cueSecondStage::before {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.cueSecondStage::after {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.cueSecondStage .cueEquation {
+  grid-column: 1 / -1;
+  grid-row: 2;
 }
 
 .gridRuleCue {
-  gap: 12px;
+  gap: 10px;
 }
 
-.gridCue {
-  width: 98px;
+.cascadeDefinition {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-radius: 10px;
+  background: #f7f3ea;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.7rem;
+  padding: 8px 10px;
+}
+
+.cascadeTrace {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.cascadeMap {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 3px;
-  padding: 4px;
+  border: 3px solid var(--ink);
   border-radius: 9px;
   background: var(--ink);
+  overflow: hidden;
 }
 
-.gridCue .cueTile {
-  --tile-size: 28px;
-  border: 0;
-  border-radius: 4px;
-}
-
-.gridCueArrows {
+.cascadeMap span {
+  min-width: 20px;
+  min-height: 20px;
   display: grid;
-  gap: 6px;
-  color: var(--ink);
+  place-items: center;
+  background: #fffdf8;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.68rem;
+  font-size: 0.58rem;
   font-weight: 900;
 }
 
-.ruleCueText {
-  min-width: 0;
+.cascadeMap span:last-child {
+  background: #f2eee5;
+  color: var(--muted);
+}
+
+.cascadeSteps {
   display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.61rem;
+  font-weight: 780;
+}
+
+.cascadeSteps span {
+  border: 1px solid #e3ddcf;
+  border-radius: 7px;
+  background: #fffdf8;
+  padding: 5px 4px;
+  text-align: center;
+}
+
+.compactRuleCue .cascadeTrace {
+  grid-template-columns: 62px minmax(0, 1fr);
+}
+
+.compactRuleCue .cascadeMap span {
+  min-width: 16px;
+  min-height: 16px;
+  font-size: 0.52rem;
+}
+
+.compactRuleCue .cascadeSteps {
   gap: 3px;
+  font-size: 0.52rem;
+}
+
+.rulePartLessonCue {
+  min-width: min(290px, 100%);
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #f7f3ea;
+  padding: 16px;
   text-align: left;
 }
 
-.ruleCueText strong {
-  font-size: 0.72rem;
-  font-weight: 850;
-  line-height: 1.15;
+.rulePartLessonCue > span {
+  min-width: 96px;
+  min-height: 72px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: #f7dfaa;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 1.45rem;
+  font-weight: 900;
+  white-space: nowrap;
 }
 
-.ruleCueText small {
-  color: var(--muted);
-  font-size: 0.64rem;
-  font-weight: 720;
+.rulePartLessonCue strong {
+  font-size: 1rem;
   line-height: 1.2;
 }
 
@@ -587,6 +740,7 @@
 .hiddenRuleCue {
   min-width: 76px;
   width: 76px;
+  display: grid;
   place-items: center;
   padding: 8px;
 }
@@ -599,15 +753,16 @@
 }
 
 .compactRuleCue {
-  min-width: 88px;
+  width: min(100%, 300px);
+  min-width: 194px;
   min-height: 54px;
-  gap: 6px;
+  gap: 5px;
   border-radius: 13px;
   padding: 7px;
 }
 
 .compactRuleCue .cueTile {
-  --tile-size: 27px;
+  --tile-size: 25px;
 }
 
 .compactRuleCue .operationSymbol {
@@ -616,13 +771,32 @@
   font-size: 0.64rem;
 }
 
-.compactRuleCue .ruleCueText {
-  display: none;
+.compactRuleCue .ruleCueHeader {
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+}
+
+.compactRuleCue .ruleNotation {
+  min-width: 34px;
+  min-height: 28px;
+  font-size: 0.6rem;
+}
+
+.compactRuleCue .ruleCueHeader strong {
+  font-size: 0.64rem;
+}
+
+.compactRuleCue .ruleCueHeader small {
+  font-size: 0.58rem;
+}
+
+.compactRuleCue .cueEquation {
+  gap: 5px;
 }
 
 .compactRuleCue .transformSymbol {
-  min-width: 19px;
-  font-size: 0.6rem;
+  min-width: 28px;
+  min-height: 23px;
+  font-size: 0.56rem;
 }
 
 .compactRuleCue.hiddenRuleCue {
@@ -990,10 +1164,8 @@
     box-shadow 180ms ease;
 }
 
-.ruleCatalogueExpanded,
-.ruleCatalogue:hover,
-.ruleCatalogue:focus-within {
-  width: 242px;
+.ruleCatalogueExpanded {
+  width: 270px;
   box-shadow: 0 14px 34px rgb(23 33 61 / 16%);
 }
 
@@ -1038,16 +1210,12 @@
 }
 
 .ruleCatalogueExpanded .catalogueToggle strong,
-.ruleCatalogueExpanded .catalogueToggle small,
-.ruleCatalogue:hover .catalogueToggle strong,
-.ruleCatalogue:hover .catalogueToggle small,
-.ruleCatalogue:focus-within .catalogueToggle strong,
-.ruleCatalogue:focus-within .catalogueToggle small {
+.ruleCatalogueExpanded .catalogueToggle small {
   opacity: 1;
 }
 
 .catalogueContents {
-  width: 240px;
+  width: 268px;
   display: grid;
   gap: 20px;
   opacity: 0;
@@ -1056,9 +1224,7 @@
   transition: opacity 120ms ease;
 }
 
-.ruleCatalogueExpanded .catalogueContents,
-.ruleCatalogue:hover .catalogueContents,
-.ruleCatalogue:focus-within .catalogueContents {
+.ruleCatalogueExpanded .catalogueContents {
   opacity: 1;
   pointer-events: auto;
 }
@@ -1081,9 +1247,9 @@
 }
 
 .catalogueContents li {
-  min-height: 36px;
+  min-height: 44px;
   display: grid;
-  grid-template-columns: 26px 1fr;
+  grid-template-columns: 44px 1fr;
   align-items: center;
   gap: 7px;
   border: 1px solid #dfd9cc;
@@ -1094,9 +1260,17 @@
 }
 
 .catalogueContents li > span {
+  min-height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #f7dfaa;
   color: var(--violet);
-  font-size: 0.76rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.7rem;
+  font-weight: 900;
   text-align: center;
+  white-space: nowrap;
 }
 
 .catalogueContents p {
@@ -1603,9 +1777,7 @@
   }
 
   .ruleCatalogue,
-  .ruleCatalogueExpanded,
-  .ruleCatalogue:hover,
-  .ruleCatalogue:focus-within {
+  .ruleCatalogueExpanded {
     width: 100%;
     min-height: 0;
   }
@@ -1632,9 +1804,7 @@
       padding 180ms ease;
   }
 
-  .ruleCatalogueExpanded .catalogueContents,
-  .ruleCatalogue:hover .catalogueContents,
-  .ruleCatalogue:focus-within .catalogueContents {
+  .ruleCatalogueExpanded .catalogueContents {
     max-height: 520px;
     opacity: 1;
     padding-block: 18px;
@@ -1715,6 +1885,7 @@
   }
 
   .exampleFlow {
+    flex-direction: column;
     gap: 12px;
   }
 
@@ -1728,8 +1899,7 @@
   }
 
   .exampleFlow .ruleCue {
-    min-width: 132px;
-    width: 132px;
+    width: min(300px, 100%);
   }
 
   .gameStatus {
@@ -1791,8 +1961,7 @@
   }
 
   .matrixStage .ruleCue {
-    min-width: 142px;
-    width: 142px;
+    width: min(260px, 100%);
   }
 
   .optionGrid {
@@ -1837,19 +2006,9 @@
   }
 
   .exampleFlow .ruleCue {
-    min-width: 58px;
-    width: 58px;
-    min-height: 58px;
-    grid-template-columns: 1fr;
-    padding: 6px;
-  }
-
-  .exampleFlow .ruleCueText {
-    display: none;
-  }
-
-  .exampleFlow .transformSymbol {
-    display: none;
+    width: min(280px, 100%);
+    min-height: 70px;
+    padding: 9px;
   }
 
   .modeActions {
@@ -1895,7 +2054,7 @@
   }
 
   .matrixStage .ruleCue {
-    width: min(220px, 100%);
+    width: min(280px, 100%);
     min-height: 56px;
   }
 
@@ -1929,8 +2088,8 @@
   }
 
   .compactRuleCue {
-    min-width: 52px;
-    width: 52px;
+    min-width: 194px;
+    width: min(270px, 100%);
   }
 }
 

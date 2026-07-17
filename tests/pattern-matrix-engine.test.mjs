@@ -18,6 +18,8 @@ import {
   hintPolicyForDifficulty,
   inferenceOptionIndexes,
   makePattern,
+  maskDifferenceCount,
+  operationSymbol,
   patternCells,
   patternKey,
   renderKey,
@@ -27,7 +29,9 @@ import {
   ruleMatchesEvidence,
   rulePartIds,
   rulesForDifficulty,
+  sequenceSymbol,
   transformPattern,
+  transformSymbol,
   validateRound,
 } from "../app/games/pattern-matrix/rule-engine.ts";
 
@@ -81,6 +85,16 @@ function applyGridPairOracle(first, second, rule) {
   const combined = combinePatterns(first, second, rule.operation);
   assert.ok(combined);
   return transformPattern(combined, rule.transform);
+}
+
+function patternStyle(pattern) {
+  return {
+    shape: pattern.shape,
+    fill: pattern.fill,
+    scale: pattern.scale,
+    orientation: pattern.orientation,
+    texturePhase: pattern.texturePhase,
+  };
 }
 
 test("semantic patterns canonicalize invisible state", () => {
@@ -309,11 +323,206 @@ test("the inference catalogue keeps every cascade candidate without precedence",
 test("every catalogue rule part has metadata", () => {
   const catalogueIds = new Set(RULE_CATALOGUE.map(({ id }) => id));
   assert.equal(catalogueIds.size, RULE_CATALOGUE.length);
+  for (const part of RULE_CATALOGUE) {
+    assert.equal(typeof part.symbol, "string", `${part.id} needs a symbol`);
+    assert.ok(part.symbol.trim().length > 0, `${part.id} needs a symbol`);
+  }
   for (const rule of ALL_RULES) {
     for (const partId of rulePartIds(rule)) {
       assert.ok(catalogueIds.has(partId), `${partId} is missing`);
     }
   }
+});
+
+test("rule symbols are stable, mathematical, and shared with the catalogue", () => {
+  const expectedOperations = {
+    join: "∪",
+    overlap: "∩",
+    cancel: "⊕",
+    "left-minus-right": "A∖B",
+    "right-minus-left": "B∖A",
+    match: "≡",
+    neither: "∪ᶜ",
+  };
+  const expectedTransforms = {
+    none: "=",
+    "rotate-clockwise": "↻90°",
+    "rotate-half": "180°",
+    "rotate-counterclockwise": "↺90°",
+  };
+  const expectedSequences = {
+    "rotate-clockwise": "↻90°",
+    "rotate-counterclockwise": "↺90°",
+    "move-clockwise": "P↻90°",
+    grow: "s↦s+1",
+    shrink: "s↦s−1",
+    "shape-cycle": "○→△→□→▭",
+    "fill-cycle": "●→○→▧",
+    "texture-shift": "φ↦φ+1",
+    "motif-turn": "θ↦θ+90°",
+  };
+
+  for (const [operation, symbol] of Object.entries(expectedOperations)) {
+    assert.equal(operationSymbol(operation), symbol);
+    assert.equal(
+      RULE_CATALOGUE.find(({ id }) => id === `combine:${operation}`)
+        ?.symbol,
+      symbol,
+    );
+  }
+  for (const [transform, symbol] of Object.entries(expectedTransforms)) {
+    assert.equal(transformSymbol(transform), symbol);
+  }
+  for (const [step, symbol] of Object.entries(expectedSequences)) {
+    assert.equal(sequenceSymbol(step), symbol);
+    assert.equal(
+      RULE_CATALOGUE.find(({ id }) => id === `change:${step}`)?.symbol,
+      symbol,
+    );
+  }
+  assert.equal(
+    RULE_CATALOGUE.find(({ id }) => id === "change:rotate-half")?.symbol,
+    expectedTransforms["rotate-half"],
+  );
+  assert.equal(
+    RULE_CATALOGUE.find(({ id }) => id === "change:columns")?.symbol,
+    "↓",
+  );
+  assert.equal(
+    RULE_CATALOGUE.find(({ id }) => id === "change:grid-cascade")?.symbol,
+    "f∘f",
+  );
+});
+
+test("Campaign introduces foundational rules in a slow, fixed order", () => {
+  const easy = CAMPAIGN_ROUNDS.filter(
+    ({ difficulty }) => difficulty === "Easy",
+  );
+  assert.deepEqual(
+    easy.map(({ rule }) => ruleKey(rule)),
+    [
+      ...Array(3).fill("combine:rows:join:none"),
+      ...Array(3).fill("combine:rows:overlap:none"),
+      ...Array(3).fill("combine:rows:cancel:none"),
+      ...Array(3).fill("combine:rows:left-minus-right:none"),
+    ],
+  );
+  assert.equal(easy[0].rule.operation, "join", "Starter 1 teaches union");
+  assert.equal(easy[2].rule.operation, "join", "Starter 3 repeats union");
+  assert.equal(
+    easy[4].rule.operation,
+    "overlap",
+    "Starter 5 teaches intersection",
+  );
+
+  const medium = CAMPAIGN_ROUNDS.filter(
+    ({ difficulty }) => difficulty === "Medium",
+  );
+  assert.deepEqual(
+    medium.map(({ rule }) => ruleKey(rule)),
+    [
+      ...Array(3).fill("combine:rows:right-minus-left:none"),
+      ...Array(3).fill("sequence:rows:rotate-clockwise"),
+      ...Array(3).fill("sequence:rows:grow"),
+      "combine:columns:join:none",
+      "combine:columns:overlap:none",
+      "combine:columns:cancel:none",
+    ],
+  );
+});
+
+test("Starter choices are visually generous instead of style-based traps", () => {
+  const easy = CAMPAIGN_ROUNDS.filter(
+    ({ difficulty }) => difficulty === "Easy",
+  );
+
+  for (const round of easy) {
+    for (const pattern of [
+      ...round.matrix.filter(Boolean),
+      ...round.options,
+    ]) {
+      assert.ok(
+        pattern.shape === "circle" || pattern.shape === "square",
+        `${round.id} uses an advanced shape`,
+      );
+      assert.ok(
+        pattern.fill === "solid" || pattern.fill === "outline",
+        `${round.id} uses an advanced fill`,
+      );
+      assert.equal(pattern.scale, 1, `${round.id} changes motif size`);
+    }
+
+    const correctStyle = patternStyle(round.correctPattern);
+    for (const [index, option] of round.options.entries()) {
+      assert.deepEqual(
+        patternStyle(option),
+        correctStyle,
+        `${round.id} option ${index + 1} is a style-only trap`,
+      );
+      if (index !== round.correctIndex) {
+        assert.ok(
+          maskDifferenceCount(option, round.correctPattern) >= 2,
+          `${round.id} option ${index + 1} is diabolically close`,
+        );
+      }
+    }
+  }
+});
+
+test("complements wait until Expert and Wizard introduces no atomic rules", () => {
+  const easyAndMedium = CAMPAIGN_ROUNDS.filter(
+    ({ difficulty }) =>
+      difficulty === "Easy" || difficulty === "Medium",
+  );
+  assert.ok(
+    easyAndMedium.every(
+      ({ rule }) =>
+        rule.family !== "combine" ||
+        (rule.operation !== "match" && rule.operation !== "neither"),
+    ),
+  );
+
+  const hard = CAMPAIGN_ROUNDS.filter(
+    ({ difficulty }) => difficulty === "Hard",
+  );
+  assert.equal(hard[0].rule.family, "combine");
+  assert.equal(hard[0].rule.operation, "match");
+  assert.equal(hard[0].rule.transform, "none");
+
+  const introducedBeforeWizard = new Set(
+    CAMPAIGN_ROUNDS.slice(0, 36).flatMap(({ rule }) => rulePartIds(rule)),
+  );
+  for (const round of CAMPAIGN_ROUNDS.slice(36)) {
+    for (const partId of rulePartIds(round.rule)) {
+      assert.ok(
+        introducedBeforeWizard.has(partId),
+        `${round.id} introduces ${partId}`,
+      );
+    }
+  }
+});
+
+test("Infinite Starter and Junior respect the paced rule catalogue", () => {
+  const easyRules = rulesForDifficulty("Easy");
+  assert.ok(easyRules.every(({ family }) => family === "combine"));
+  assert.deepEqual(
+    [...new Set(easyRules.map(({ operation }) => operation))].sort(),
+    ["cancel", "join", "left-minus-right", "overlap"],
+  );
+  assert.ok(
+    easyRules.every(
+      ({ operation }) => operation !== "match" && operation !== "neither",
+    ),
+  );
+
+  const mediumRules = rulesForDifficulty("Medium");
+  assert.ok(
+    mediumRules.every(
+      (rule) =>
+        rule.family !== "combine" ||
+        (rule.operation !== "match" && rule.operation !== "neither"),
+    ),
+  );
 });
 
 test("Campaign is a balanced, unique, fully validated 48-round curriculum", () => {
