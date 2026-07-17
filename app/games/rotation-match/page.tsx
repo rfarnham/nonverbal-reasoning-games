@@ -28,6 +28,13 @@ import {
   type Round,
   type Difficulty,
 } from "./game-engine";
+import {
+  MAX_ENERGY_COMBO,
+  comboEnergyPercent,
+  initialInfiniteAdaptiveState,
+  infiniteLevelLabel,
+  recordInfiniteFirstAttempt,
+} from "./infinite-progression";
 import styles from "./rotation-match.module.css";
 
 type PatternSize = "tutorialPattern" | "clue" | "option" | "review" | "ghost";
@@ -81,6 +88,7 @@ type CustomProperties = CSSProperties & Record<`--${string}`, string>;
 const GHOST_ANIMATION_MS = 900;
 const GHOST_SETTLE_MS = 930;
 const REDUCED_GHOST_MS = 140;
+const HIDDEN_WRONG_FEEDBACK_MS = 180;
 const WRONG_REVIEW_MS = 2200;
 const REDUCED_WRONG_REVIEW_MS = 1300;
 const CAMPAIGN_PROBLEMS_PER_LEVEL = 12;
@@ -343,18 +351,11 @@ function ghostTransformCss(transform: PuzzleTransform) {
   }
 }
 
-function infiniteDifficulty(ordinal: number): Difficulty {
-  const positionInCycle = (ordinal - 1) % 12;
-  if (positionInCycle < 4) return "Easy";
-  if (positionInCycle < 8) return "Medium";
-  return "Hard";
-}
-
 function buildInfiniteSessionRound(
   ordinal: number,
   seenFingerprints: Set<string>,
+  difficulty: Difficulty,
 ): SessionRound {
-  const difficulty = infiniteDifficulty(ordinal);
   let round = generateInfiniteRound(difficulty);
   let fingerprint = roundFingerprint(round);
 
@@ -429,6 +430,9 @@ export default function TransformationMatchPage() {
   const [campaignProgress, setCampaignProgress] = useState<CampaignProgress>(
     {},
   );
+  const [infiniteAdaptive, setInfiniteAdaptive] = useState(
+    initialInfiniteAdaptiveState,
+  );
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [score, setScore] = useState(0);
   const [completedCount, setCompletedCount] = useState(0);
@@ -453,6 +457,7 @@ export default function TransformationMatchPage() {
   const shouldFocusFirstOption = useRef(false);
   const retryFocusIndexRef = useRef<number | null>(null);
   const infiniteFingerprintsRef = useRef(new Set<string>());
+  const infiniteAdaptiveRef = useRef(initialInfiniteAdaptiveState());
 
   const isCampaign = sessionMode === "campaign";
   const isInfinite = sessionMode === "infinite";
@@ -493,6 +498,9 @@ export default function TransformationMatchPage() {
     campaignProgress,
     activeCampaignLevel,
   );
+  const infiniteEnergy = comboEnergyPercent(infiniteAdaptive.combo);
+  const infiniteSupercharged =
+    infiniteAdaptive.combo >= MAX_ENERGY_COMBO;
 
   const clearAttemptTimers = useCallback(() => {
     if (flightTimerRef.current) {
@@ -584,6 +592,11 @@ export default function TransformationMatchPage() {
       inputLockedRef.current = true;
       setRetryReady(false);
       const isCorrect = optionIndex === round.correctIndex;
+      const wasMissed = mistakes.some(
+        ({ sessionRound }) => sessionRound.id === activeSessionRound.id,
+      );
+      const suppressWizardHint =
+        round.difficulty === "Wizard" && !isCorrect;
       const sourceRect = clueGridRef.current?.getBoundingClientRect();
       const targetRect = optionGridRefs.current[optionIndex]?.getBoundingClientRect();
       const reducedMotion = window.matchMedia(
@@ -609,10 +622,22 @@ export default function TransformationMatchPage() {
         });
       }
 
-      if (isCorrect) {
-        const wasMissed = mistakes.some(
-          ({ sessionRound }) => sessionRound.id === activeSessionRound.id,
+      if (isInfinite) {
+        const nextAdaptive = recordInfiniteFirstAttempt(
+          infiniteAdaptiveRef.current,
+          {
+            roundId: activeSessionRound.id,
+            difficulty: round.difficulty,
+            firstTryCorrect: isCorrect,
+          },
         );
+        if (nextAdaptive !== infiniteAdaptiveRef.current) {
+          infiniteAdaptiveRef.current = nextAdaptive;
+          setInfiniteAdaptive(nextAdaptive);
+        }
+      }
+
+      if (isCorrect) {
         if (!isRedemption && !wasMissed) {
           setScore((current) => current + 1);
         }
@@ -627,7 +652,7 @@ export default function TransformationMatchPage() {
         );
       }
 
-      if (sourceRect && targetRect) {
+      if (!suppressWizardHint && sourceRect && targetRect) {
         setGhost({
           pattern: round.clue,
           left: sourceRect.left,
@@ -669,7 +694,11 @@ export default function TransformationMatchPage() {
             reducedMotion ? REDUCED_WRONG_REVIEW_MS : WRONG_REVIEW_MS,
           );
         },
-        reducedMotion ? REDUCED_GHOST_MS : GHOST_SETTLE_MS,
+        suppressWizardHint
+          ? HIDDEN_WRONG_FEEDBACK_MS
+          : reducedMotion
+            ? REDUCED_GHOST_MS
+            : GHOST_SETTLE_MS,
       );
     },
     [
@@ -678,6 +707,7 @@ export default function TransformationMatchPage() {
       clearAttemptTimers,
       complete,
       isCampaign,
+      isInfinite,
       isRedemption,
       mistakes,
       phase,
@@ -690,12 +720,15 @@ export default function TransformationMatchPage() {
   const startCampaign = useCallback(() => {
     resumeAudio();
     infiniteFingerprintsRef.current.clear();
+    const initialAdaptive = initialInfiniteAdaptiveState();
+    infiniteAdaptiveRef.current = initialAdaptive;
     setSessionMode("campaign");
     setRoundQueue([]);
     setRoundCursor(0);
     setActiveCampaignLevel("starter");
     setCampaignCursors(initialCampaignCursors());
     setCampaignProgress({});
+    setInfiniteAdaptive(initialAdaptive);
     setScore(0);
     setCompletedCount(0);
     setMistakes([]);
@@ -709,13 +742,17 @@ export default function TransformationMatchPage() {
   const startInfinite = useCallback(() => {
     resumeAudio();
     infiniteFingerprintsRef.current.clear();
+    const initialAdaptive = initialInfiniteAdaptiveState();
+    infiniteAdaptiveRef.current = initialAdaptive;
     const firstRound = buildInfiniteSessionRound(
       1,
       infiniteFingerprintsRef.current,
+      initialAdaptive.targetDifficulty,
     );
     setSessionMode("infinite");
     setRoundQueue([firstRound]);
     setRoundCursor(0);
+    setInfiniteAdaptive(initialAdaptive);
     setScore(0);
     setCompletedCount(0);
     setMistakes([]);
@@ -800,6 +837,7 @@ export default function TransformationMatchPage() {
       const nextRound = buildInfiniteSessionRound(
         nextOrdinal,
         infiniteFingerprintsRef.current,
+        infiniteAdaptiveRef.current.targetDifficulty,
       );
       shouldFocusFirstOption.current = true;
       resetAttemptState();
@@ -968,14 +1006,23 @@ export default function TransformationMatchPage() {
     };
   }, [clearAttemptTimers]);
 
-  const firstTryScore = isCampaign ? campaignFirstTryScore : score;
+  const infiniteFirstTryScore = infiniteAdaptive.attempts.filter(
+    ({ firstTryCorrect }) => firstTryCorrect,
+  ).length;
+  const firstTryScore = isCampaign
+    ? campaignFirstTryScore
+    : isInfinite
+      ? infiniteFirstTryScore
+      : score;
   const resultMessage = useMemo(() => {
-    const denominator = isInfinite ? Math.max(completedCount, 1) : ROUNDS.length;
+    const denominator = isInfinite
+      ? Math.max(infiniteAdaptive.attempts.length, 1)
+      : ROUNDS.length;
     const accuracy = firstTryScore / denominator;
     if (accuracy === 1) return "Perfect set.";
     if (accuracy >= 0.7) return "Sharp work.";
     return "Good practice.";
-  }, [completedCount, firstTryScore, isInfinite]);
+  }, [firstTryScore, infiniteAdaptive.attempts.length, isInfinite]);
 
   const showRedemptionOffer = !isRedemption && mistakes.length > 0;
   const resultTitle = isRedemption
@@ -983,7 +1030,9 @@ export default function TransformationMatchPage() {
     : showRedemptionOffer
       ? "Here’s your chance at redemption."
       : resultMessage;
-  const resultDenominator = isInfinite ? completedCount : ROUNDS.length;
+  const resultDenominator = isInfinite
+    ? infiniteAdaptive.attempts.length
+    : ROUNDS.length;
 
   const soundButton = (
     <button
@@ -1203,8 +1252,48 @@ export default function TransformationMatchPage() {
                   </div>
                 </nav>
               ) : isInfinite ? (
-                <div className={styles.infiniteTrack} aria-label="Infinite mode">
-                  ∞
+                <div
+                  className={`${styles.infiniteHud} ${
+                    infiniteSupercharged ? styles.infiniteSupercharged : ""
+                  }`}
+                  role="group"
+                  aria-label="Infinite combo energy"
+                >
+                  <span
+                    className={styles.comboAnnouncement}
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
+                  >
+                    Combo {infiniteAdaptive.combo}. Energy{" "}
+                    {Math.round(infiniteEnergy)} percent.
+                    {infiniteSupercharged ? " Maximum energy." : ""}
+                  </span>
+                  <div className={styles.infiniteHudLabels}>
+                    <span className={styles.comboCount}>
+                      Combo {infiniteAdaptive.combo}
+                    </span>
+                    <span className={styles.energyState}>
+                      {infiniteSupercharged ? "Max" : "Energy"}
+                    </span>
+                  </div>
+                  <div
+                    className={styles.energyTrack}
+                    role="progressbar"
+                    aria-label="Combo energy"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.round(infiniteEnergy)}
+                  >
+                    <span
+                      className={styles.energyFill}
+                      style={
+                        {
+                          "--energy-fill": `${infiniteEnergy}%`,
+                        } as CustomProperties
+                      }
+                    />
+                  </div>
                 </div>
               ) : (
                 <div
@@ -1232,7 +1321,9 @@ export default function TransformationMatchPage() {
                     }`}
               </span>
               {!isCampaign ? (
-                <span className={styles.difficulty}>{round.difficulty}</span>
+                <span className={styles.difficulty}>
+                  {infiniteLevelLabel(round.difficulty)}
+                </span>
               ) : null}
               <span
                 className={styles.score}
@@ -1451,7 +1542,9 @@ export default function TransformationMatchPage() {
                           ? `${missed.campaign.levelLabel} · Puzzle ${
                               missed.campaign.problemIndex + 1
                             }`
-                          : `Puzzle ${missed.ordinal} · ${missedRound.difficulty}`}
+                          : `Puzzle ${missed.ordinal} · ${infiniteLevelLabel(
+                              missedRound.difficulty,
+                            )}`}
                       </span>
                       <div className={styles.reviewVisual}>
                         <PatternGrid

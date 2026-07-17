@@ -10,7 +10,6 @@ export type Tile = {
 
 export type Pattern = readonly Tile[];
 export type Difficulty = "Easy" | "Medium" | "Hard" | "Wizard";
-type GeneratedDifficulty = Exclude<Difficulty, "Wizard">;
 export type RotationDirection = "clockwise" | "counterclockwise";
 export type MirrorAxis =
   | "vertical"
@@ -132,7 +131,7 @@ const MIRROR_DISTRACTORS: readonly DistractorKind[] = [
 ];
 
 const GENERATED_DIFFICULTY_RULES: Record<
-  GeneratedDifficulty,
+  Difficulty,
   {
     minFilled: number;
     maxFilled: number;
@@ -143,6 +142,7 @@ const GENERATED_DIFFICULTY_RULES: Record<
   Easy: { minFilled: 3, maxFilled: 4, minMotifs: 0, maxMotifs: 0 },
   Medium: { minFilled: 5, maxFilled: 6, minMotifs: 0, maxMotifs: 0 },
   Hard: { minFilled: 6, maxFilled: 7, minMotifs: 2, maxMotifs: 4 },
+  Wizard: { minFilled: 7, maxFilled: 8, minMotifs: 4, maxMotifs: 6 },
 };
 
 export const GENERATOR_MAX_ATTEMPTS = 128;
@@ -1004,7 +1004,7 @@ function shuffled<T>(values: readonly T[], random: () => number): T[] {
 }
 
 function makeGeneratedPattern(
-  difficulty: GeneratedDifficulty,
+  difficulty: Difficulty,
   random: () => number,
 ): Pattern {
   const rules = GENERATED_DIFFICULTY_RULES[difficulty];
@@ -1079,18 +1079,19 @@ export function hiddenTransformOptionIndexes(
 }
 
 function isGeneratedDifficulty(
-  difficulty: Difficulty,
-): difficulty is GeneratedDifficulty {
+  difficulty: string,
+): difficulty is Difficulty {
   return (
     difficulty === "Easy" ||
     difficulty === "Medium" ||
-    difficulty === "Hard"
+    difficulty === "Hard" ||
+    difficulty === "Wizard"
   );
 }
 
 function isInterestingGeneratedPattern(
   pattern: Pattern,
-  difficulty: GeneratedDifficulty,
+  difficulty: Difficulty,
 ): boolean {
   const rules = GENERATED_DIFFICULTY_RULES[difficulty];
   const filled = pattern.filter(({ color }) => color !== "empty");
@@ -1126,10 +1127,14 @@ function randomTransform(random: () => number): PuzzleTransform {
 }
 
 function generatedDistractorKinds(
-  difficulty: GeneratedDifficulty,
+  difficulty: Difficulty,
   transform: PuzzleTransform,
   random: () => number,
 ): readonly [DistractorKind, DistractorKind, DistractorKind] {
+  if (difficulty === "Wizard") {
+    return ["one-motif-off", "one-block-off", "one-motif-off"];
+  }
+
   const geometricKinds = shuffled(
     [
       "wrong-rotation" as const,
@@ -1185,6 +1190,40 @@ export function generateInfiniteRound(
       salts,
     );
     if (!round) continue;
+
+    if (difficulty === "Wizard") {
+      const hiddenAnswerIndexes = hiddenTransformOptionIndexes(
+        round.clue,
+        round.options,
+      );
+      const fullOrbitKeys = new Set([
+        patternKey(round.clue),
+        ...hiddenTransformKeys(round.clue),
+      ]);
+      const everyTrapIsCloseAndOutsideOrbit = round.options.every(
+        (option, index) => {
+          if (index === round.correctIndex) return true;
+          const differenceCount = differingTileIndexes(
+            option,
+            round.correctPattern,
+          ).length;
+          return (
+            differenceCount >= 1 &&
+            differenceCount <= 2 &&
+            !fullOrbitKeys.has(patternKey(option))
+          );
+        },
+      );
+
+      if (
+        hiddenAnswerIndexes.length === 1 &&
+        hiddenAnswerIndexes[0] === round.correctIndex &&
+        everyTrapIsCloseAndOutsideOrbit
+      ) {
+        return round;
+      }
+      continue;
+    }
 
     const hasCloseDistractor = round.options.some(
       (option, index) =>

@@ -627,22 +627,86 @@
   background: var(--ink);
 }
 
-.infiniteTrack {
-  min-height: 5px;
-  display: flex;
-  align-items: center;
-  color: var(--ink);
-  font-size: 1.2rem;
-  font-weight: 900;
+.infiniteHud {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
 }
 
-.infiniteTrack::after {
-  content: "";
-  height: 5px;
-  flex: 1;
-  margin-left: 10px;
+.comboAnnouncement {
+  width: 1px;
+  height: 1px;
+  position: absolute;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.infiniteHudLabels {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--ink);
+  font-size: 0.66rem;
+  font-weight: 880;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.comboCount,
+.energyState {
+  white-space: nowrap;
+}
+
+.energyState {
+  color: var(--muted);
+}
+
+.energyTrack {
+  height: 9px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #b9b3a7;
   border-radius: 999px;
-  background: var(--ink);
+  background: #e5e0d5;
+}
+
+.energyFill {
+  width: var(--energy-fill);
+  height: 100%;
+  display: block;
+  border-radius: inherit;
+  background: #a66b00;
+  transition:
+    width 260ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.infiniteSupercharged .infiniteHudLabels {
+  color: #087ee6;
+  text-shadow: 0 0 8px rgb(50 170 255 / 65%);
+}
+
+.infiniteSupercharged .energyState {
+  color: #087ee6;
+}
+
+.infiniteSupercharged .energyTrack {
+  border-color: #168ee8;
+  box-shadow:
+    0 0 5px #55c7ff,
+    0 0 13px rgb(29 142 255 / 72%);
+  animation: superchargeAura 850ms ease-in-out infinite alternate;
+}
+
+.infiniteSupercharged .energyFill {
+  background: #42bdff;
+  box-shadow:
+    0 0 8px #b9efff inset,
+    0 0 12px #42bdff;
 }
 
 .roundCount,
@@ -673,6 +737,20 @@
 .endButton:disabled {
   cursor: default;
   opacity: 0.45;
+}
+
+@keyframes superchargeAura {
+  from {
+    box-shadow:
+      0 0 4px #55c7ff,
+      0 0 10px rgb(29 142 255 / 62%);
+  }
+
+  to {
+    box-shadow:
+      0 0 8px #8edcff,
+      0 0 20px rgb(29 142 255 / 86%);
+  }
 }
 
 .gameBoard {
@@ -1267,5 +1345,9 @@
   .pageShell *::after {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .infiniteSupercharged .energyTrack {
+    animation: none;
   }
 }

@@ -18,8 +18,8 @@ import {
   roundFingerprint,
 } from "../app/games/rotation-match/game-engine.ts";
 
-const DIFFICULTIES = ["Easy", "Medium", "Hard"];
-const CAMPAIGN_DIFFICULTIES = [...DIFFICULTIES, "Wizard"];
+const DIFFICULTIES = ["Easy", "Medium", "Hard", "Wizard"];
+const CAMPAIGN_DIFFICULTIES = DIFFICULTIES;
 const MIRROR_AXES = [
   "vertical",
   "horizontal",
@@ -314,7 +314,7 @@ test("difference indexes identify exact block and motif mistakes", () => {
   );
 });
 
-test("1,200 seeded generated rounds are exact, unique, and asymmetric", () => {
+test("1,600 seeded generated rounds are exact, unique, and asymmetric", () => {
   for (const difficulty of DIFFICULTIES) {
     const fingerprints = new Set();
     for (const [index, round] of GENERATED[difficulty].entries()) {
@@ -346,6 +346,7 @@ test("generated density and motif rules scale with difficulty", () => {
     Easy: { minFilled: 3, maxFilled: 4, minMotifs: 0, maxMotifs: 0 },
     Medium: { minFilled: 5, maxFilled: 6, minMotifs: 0, maxMotifs: 0 },
     Hard: { minFilled: 6, maxFilled: 7, minMotifs: 2, maxMotifs: 4 },
+    Wizard: { minFilled: 7, maxFilled: 8, minMotifs: 4, maxMotifs: 6 },
   };
 
   for (const difficulty of DIFFICULTIES) {
@@ -404,7 +405,7 @@ test("generated distractors always include a meaningful close mistake", () => {
       assert.ok(wrongDifferences.every((differences) => differences.length > 0));
       assert.ok(wrongDifferences.some((differences) => differences.length <= 2));
       assert.ok(round.optionKinds.includes("one-block-off"));
-      if (difficulty === "Hard") {
+      if (difficulty === "Hard" || difficulty === "Wizard") {
         assert.ok(round.optionKinds.includes("one-motif-off"));
       } else {
         assert.ok(!round.optionKinds.includes("one-motif-off"));
@@ -453,6 +454,39 @@ test("generated distractors always include a meaningful close mistake", () => {
           );
         }
       }
+    }
+  }
+});
+
+test("generated wizard traps are close, distinct, and outside the full transform orbit", () => {
+  for (const [roundIndex, round] of GENERATED.Wizard.entries()) {
+    assert.deepEqual(
+      hiddenTransformOptionIndexes(round.clue, round.options),
+      [round.correctIndex],
+      `generated wizard ${roundIndex + 1} hidden answer`,
+    );
+
+    const fullOrbitKeys = new Set([
+      patternKey(round.clue),
+      ...hiddenTransformKeys(round.clue),
+    ]);
+    assert.equal(fullOrbitKeys.size, 8);
+    assert.equal(new Set(round.options.map(patternKey)).size, 4);
+
+    for (const [optionIndex, option] of round.options.entries()) {
+      if (optionIndex === round.correctIndex) continue;
+      const differenceCount = differingTileIndexes(
+        option,
+        round.correctPattern,
+      ).length;
+      assert.ok(
+        differenceCount >= 1 && differenceCount <= 2,
+        `generated wizard ${roundIndex + 1} trap ${optionIndex + 1}`,
+      );
+      assert.ok(
+        !fullOrbitKeys.has(patternKey(option)),
+        `generated wizard ${roundIndex + 1} trap ${optionIndex + 1} orbit`,
+      );
     }
   }
 });
@@ -522,9 +556,9 @@ test("generation retries rejected candidates and fails safely for hostile random
     () => generateInfiniteRound("Impossible", makeSeededRandom(1)),
     /Unknown difficulty/,
   );
-  assert.throws(
-    () => generateInfiniteRound("Wizard", makeSeededRandom(1)),
-    /Unknown difficulty/,
+  assertValidRound(
+    generateInfiniteRound("Wizard", makeSeededRandom(1)),
+    "seeded wizard round",
   );
 });
 
