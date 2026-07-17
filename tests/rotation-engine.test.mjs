@@ -105,6 +105,20 @@ test("the authored session contains 12 rounds at each progressive difficulty", (
   }
 });
 
+test("each campaign level balances the correct answer across all four positions", () => {
+  for (const difficulty of CAMPAIGN_DIFFICULTIES) {
+    const rounds = ROUNDS.filter((round) => round.difficulty === difficulty);
+    assert.deepEqual(
+      [0, 1, 2, 3].map(
+        (correctIndex) =>
+          rounds.filter((round) => round.correctIndex === correctIndex).length,
+      ),
+      [3, 3, 3, 3],
+      `${difficulty} answer position distribution`,
+    );
+  }
+});
+
 test("each authored difficulty covers every turn length, direction, and reflection axis", () => {
   for (const difficulty of CAMPAIGN_DIFFICULTIES) {
     const rounds = ROUNDS.filter((round) => round.difficulty === difficulty);
@@ -163,28 +177,48 @@ test("wizard rounds have one and only one valid answer with the operation hidden
   assert.equal(wizardRounds.length, 12);
 
   for (const [index, round] of wizardRounds.entries()) {
+    const fullOrbitKeys = new Set([
+      patternKey(round.clue),
+      ...hiddenTransformKeys(round.clue),
+    ]);
     assert.equal(
       hiddenTransformKeys(round.clue).size,
       7,
       `wizard ${index + 1} must have no rotational or mirror symmetry`,
     );
+    assert.equal(fullOrbitKeys.size, 8);
     assert.deepEqual(
       hiddenTransformOptionIndexes(round.clue, round.options),
       [round.correctIndex],
       `wizard ${index + 1} hidden answer`,
     );
     assert.equal(new Set(round.options.map(patternKey)).size, 4);
+    assert.ok(
+      round.options.every(
+        (option, optionIndex) =>
+          optionIndex === round.correctIndex ||
+          !fullOrbitKeys.has(patternKey(option)),
+      ),
+      `wizard ${index + 1} traps must be outside the transform orbit`,
+    );
   }
 });
 
-test("wizard rounds are dense motif puzzles with only close near-misses", () => {
+test("wizard rounds match expert complexity and use only close near-misses", () => {
+  const complexityProfile = (difficulty) =>
+    ROUNDS.filter((round) => round.difficulty === difficulty)
+      .map((round) => {
+        const filled = round.clue.filter(({ color }) => color !== "empty");
+        const motifs = filled.filter(({ motif }) => motif === "cap");
+        return `${filled.length}:${motifs.length}`;
+      })
+      .sort();
+
+  assert.deepEqual(complexityProfile("Wizard"), complexityProfile("Hard"));
+
   for (const [index, round] of ROUNDS.filter(
     ({ difficulty }) => difficulty === "Wizard",
   ).entries()) {
-    const filled = round.clue.filter(({ color }) => color !== "empty");
-    const motifs = filled.filter(({ motif }) => motif === "cap");
-    assert.ok(filled.length >= 7, `wizard ${index + 1} density`);
-    assert.ok(motifs.length >= 4, `wizard ${index + 1} motifs`);
     assert.equal(
       round.optionKinds.filter((kind) => kind === "one-motif-off").length,
       2,
@@ -342,12 +376,20 @@ test("1,600 seeded generated rounds are exact, unique, and asymmetric", () => {
 });
 
 test("generated density and motif rules scale with difficulty", () => {
+  const expertRules = {
+    minFilled: 6,
+    maxFilled: 7,
+    minMotifs: 2,
+    maxMotifs: 4,
+  };
   const expected = {
     Easy: { minFilled: 3, maxFilled: 4, minMotifs: 0, maxMotifs: 0 },
     Medium: { minFilled: 5, maxFilled: 6, minMotifs: 0, maxMotifs: 0 },
-    Hard: { minFilled: 6, maxFilled: 7, minMotifs: 2, maxMotifs: 4 },
-    Wizard: { minFilled: 7, maxFilled: 8, minMotifs: 4, maxMotifs: 6 },
+    Hard: expertRules,
+    Wizard: expertRules,
   };
+
+  assert.deepEqual(expected.Wizard, expected.Hard);
 
   for (const difficulty of DIFFICULTIES) {
     const rules = expected[difficulty];

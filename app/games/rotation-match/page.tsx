@@ -443,11 +443,20 @@ export default function TransformationMatchPage() {
   const [mistakes, setMistakes] = useState<readonly MistakeRecord[]>([]);
   const [retryReady, setRetryReady] = useState(false);
   const [redemptionTotal, setRedemptionTotal] = useState(0);
+  const [reviewLevelId, setReviewLevelId] =
+    useState<CampaignLevelId | null>(null);
+  const [redeemedMistakeIds, setRedeemedMistakeIds] = useState<
+    readonly string[]
+  >([]);
+  const [redemptionMistakeIds, setRedemptionMistakeIds] = useState<
+    readonly string[]
+  >([]);
 
   const clueGridRef = useRef<HTMLDivElement>(null);
   const optionGridRefs = useRef<Array<HTMLDivElement | null>>([]);
   const optionButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const nextButtonRef = useRef<HTMLButtonElement>(null);
+  const levelCompleteButtonRef = useRef<HTMLButtonElement>(null);
   const resultHeadingRef = useRef<HTMLHeadingElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const flightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -481,13 +490,9 @@ export default function TransformationMatchPage() {
   const progress = roundCursor + (phase === "answered" ? 1 : 0);
   const isLastRedemptionRound =
     isRedemption && roundCursor === sessionLength - 1;
-  const campaignSolvedCount = Object.values(campaignProgress).filter(
-    (problem) => problem?.solved,
-  ).length;
   const campaignFirstTryScore = Object.values(campaignProgress).filter(
     (problem) => problem?.firstAttempt === "correct",
   ).length;
-  const campaignComplete = campaignSolvedCount === ROUNDS.length;
   const activeCampaignLevelComplete = isCampaignLevelComplete(
     campaignProgress,
     activeCampaignLevel,
@@ -498,6 +503,28 @@ export default function TransformationMatchPage() {
     campaignProgress,
     activeCampaignLevel,
   );
+  const redeemedMistakeIdSet = new Set(redeemedMistakeIds);
+  const outstandingMistakes = mistakes.filter(
+    ({ sessionRound }) => !redeemedMistakeIdSet.has(sessionRound.id),
+  );
+  const activeLevelMistakes = outstandingMistakes.filter(
+    ({ sessionRound }) =>
+      sessionRound.campaign?.levelId === activeCampaignLevel,
+  );
+  const visibleMistakes = reviewLevelId
+    ? outstandingMistakes.filter(
+        ({ sessionRound }) =>
+          sessionRound.campaign?.levelId === reviewLevelId,
+      )
+    : outstandingMistakes;
+  const reviewLevelFirstTryScore = reviewLevelId
+    ? Array.from(
+        { length: CAMPAIGN_PROBLEMS_PER_LEVEL },
+        (_, problemIndex) =>
+          campaignProgress[campaignRoundId(reviewLevelId, problemIndex)]
+            ?.firstAttempt === "correct",
+      ).filter(Boolean).length
+    : 0;
   const infiniteEnergy = comboEnergyPercent(infiniteAdaptive.combo);
   const infiniteSupercharged =
     infiniteAdaptive.combo >= MAX_ENERGY_COMBO;
@@ -733,6 +760,9 @@ export default function TransformationMatchPage() {
     setCompletedCount(0);
     setMistakes([]);
     setRedemptionTotal(0);
+    setReviewLevelId(null);
+    setRedeemedMistakeIds([]);
+    setRedemptionMistakeIds([]);
     setStarted(true);
     setComplete(false);
     resetAttemptState();
@@ -757,6 +787,9 @@ export default function TransformationMatchPage() {
     setCompletedCount(0);
     setMistakes([]);
     setRedemptionTotal(0);
+    setReviewLevelId(null);
+    setRedeemedMistakeIds([]);
+    setRedemptionMistakeIds([]);
     setStarted(true);
     setComplete(false);
     resetAttemptState();
@@ -790,12 +823,15 @@ export default function TransformationMatchPage() {
   );
 
   const startRedemption = useCallback(() => {
-    if (mistakes.length === 0) return;
-    const redemptionQueue = mistakes.map(({ sessionRound }, index) => ({
+    if (visibleMistakes.length === 0) return;
+    const redemptionQueue = visibleMistakes.map(({ sessionRound }, index) => ({
       ...sessionRound,
       id: `redemption-${index}-${sessionRound.id}`,
       ordinal: index + 1,
     }));
+    setRedemptionMistakeIds(
+      visibleMistakes.map(({ sessionRound }) => sessionRound.id),
+    );
     setSessionMode("redemption");
     setRoundQueue(redemptionQueue);
     setRoundCursor(0);
@@ -804,16 +840,16 @@ export default function TransformationMatchPage() {
     setComplete(false);
     resetAttemptState();
     shouldFocusFirstOption.current = true;
-  }, [mistakes, resetAttemptState]);
+  }, [resetAttemptState, visibleMistakes]);
 
   const goNext = useCallback(() => {
     if (phase !== "answered") return;
 
     if (isCampaign) {
-      shouldFocusFirstOption.current = true;
       resetAttemptState();
 
       if (campaignProblemIndex < CAMPAIGN_PROBLEMS_PER_LEVEL - 1) {
+        shouldFocusFirstOption.current = true;
         setCampaignCursors((current) => ({
           ...current,
           [activeCampaignLevel]: campaignProblemIndex + 1,
@@ -821,14 +857,7 @@ export default function TransformationMatchPage() {
         return;
       }
 
-      if (campaignComplete) {
-        setComplete(true);
-        return;
-      }
-
-      if (nextCampaignLevel) {
-        setActiveCampaignLevel(nextCampaignLevel);
-      }
+      shouldFocusFirstOption.current = false;
       return;
     }
 
@@ -848,6 +877,25 @@ export default function TransformationMatchPage() {
 
     if (isLastRedemptionRound) {
       resetAttemptState();
+
+      if (reviewLevelId) {
+        const redeemedLevelId = reviewLevelId;
+        setRedeemedMistakeIds((current) => [
+          ...new Set([...current, ...redemptionMistakeIds]),
+        ]);
+        setRedemptionMistakeIds([]);
+        setReviewLevelId(null);
+        setSessionMode("campaign");
+        setRoundQueue([]);
+        setRoundCursor(0);
+        setRedemptionTotal(0);
+        setActiveCampaignLevel(redeemedLevelId);
+        setComplete(false);
+        shouldFocusFirstOption.current = false;
+        return;
+      }
+
+      setRedemptionMistakeIds([]);
       setComplete(true);
       return;
     }
@@ -858,13 +906,13 @@ export default function TransformationMatchPage() {
   }, [
     activeCampaignLevel,
     activeSessionRound?.ordinal,
-    campaignComplete,
     campaignProblemIndex,
     isCampaign,
     isInfinite,
     isLastRedemptionRound,
-    nextCampaignLevel,
     phase,
+    redemptionMistakeIds,
+    reviewLevelId,
     resetAttemptState,
     roundCursor,
   ]);
@@ -959,6 +1007,10 @@ export default function TransformationMatchPage() {
   }, [complete]);
 
   useEffect(() => {
+    if (showCampaignLevelComplete) levelCompleteButtonRef.current?.focus();
+  }, [activeCampaignLevel, showCampaignLevelComplete]);
+
+  useEffect(() => {
     function finishMovingGhost() {
       if (!inputLockedRef.current) return;
 
@@ -1024,15 +1076,21 @@ export default function TransformationMatchPage() {
     return "Good practice.";
   }, [firstTryScore, infiniteAdaptive.attempts.length, isInfinite]);
 
-  const showRedemptionOffer = !isRedemption && mistakes.length > 0;
+  const showRedemptionOffer =
+    !isRedemption && visibleMistakes.length > 0;
   const resultTitle = isRedemption
     ? "Redemption complete."
     : showRedemptionOffer
       ? "Here’s your chance at redemption."
       : resultMessage;
-  const resultDenominator = isInfinite
-    ? infiniteAdaptive.attempts.length
-    : ROUNDS.length;
+  const displayedResultFirstTryScore = reviewLevelId
+    ? reviewLevelFirstTryScore
+    : firstTryScore;
+  const resultDenominator = reviewLevelId
+    ? CAMPAIGN_PROBLEMS_PER_LEVEL
+    : isInfinite
+      ? infiniteAdaptive.attempts.length
+      : ROUNDS.length;
 
   const soundButton = (
     <button
@@ -1364,17 +1422,24 @@ export default function TransformationMatchPage() {
                 <button
                   className={styles.primaryButton}
                   type="button"
+                  ref={levelCompleteButtonRef}
                   onClick={() => {
-                    if (nextCampaignLevel) {
+                    if (activeLevelMistakes.length > 0) {
+                      setReviewLevelId(activeCampaignLevel);
+                      setComplete(true);
+                    } else if (nextCampaignLevel) {
                       selectCampaignLevel(nextCampaignLevel);
                     } else {
+                      setReviewLevelId(null);
                       setComplete(true);
                     }
                   }}
                 >
-                  {nextCampaignLevel
-                    ? campaignLevel(nextCampaignLevel).label
-                    : "Results"}
+                  {activeLevelMistakes.length > 0
+                    ? "Review Mistakes"
+                    : nextCampaignLevel
+                      ? campaignLevel(nextCampaignLevel).label
+                      : "Results"}
                   <span aria-hidden="true">→</span>
                 </button>
               </section>
@@ -1482,12 +1547,14 @@ export default function TransformationMatchPage() {
                     onClick={goNext}
                     ref={nextButtonRef}
                   >
-                    {isLastRedemptionRound || (isCampaign && campaignComplete)
-                      ? "Results"
+                    {isLastRedemptionRound
+                      ? reviewLevelId
+                        ? "Finish review"
+                        : "Results"
                       : isCampaign &&
                           campaignProblemIndex ===
                             CAMPAIGN_PROBLEMS_PER_LEVEL - 1
-                        ? "Next level"
+                        ? "Finish level"
                         : "Next"}
                     <span aria-hidden="true">→</span>
                   </button>
@@ -1509,14 +1576,20 @@ export default function TransformationMatchPage() {
             aria-labelledby="results-title"
           >
             <p className={styles.kicker}>
-              {isRedemption ? "Redeemed" : "Complete"}
+              {isRedemption
+                ? "Redeemed"
+                : reviewLevelId
+                  ? `${campaignLevel(reviewLevelId).label} complete`
+                  : "Complete"}
             </p>
             <h1 id="results-title" ref={resultHeadingRef} tabIndex={-1}>
               {resultTitle}
             </h1>
             <p className={styles.resultScore}>
               <strong>
-                {isRedemption ? redemptionTotal : firstTryScore}
+                {isRedemption
+                  ? redemptionTotal
+                  : displayedResultFirstTryScore}
               </strong>
               <span>
                 {isRedemption
@@ -1527,7 +1600,8 @@ export default function TransformationMatchPage() {
 
             {showRedemptionOffer ? (
               <div className={styles.reviewGrid} aria-label="Puzzles to retry">
-                {mistakes.map(({ sessionRound: missed, chosenIndex }) => {
+                {visibleMistakes.map(
+                  ({ sessionRound: missed, chosenIndex }) => {
                   const missedRound = missed.round;
                   const wrongPattern = missedRound.options[chosenIndex];
                   const differences = differingTileIndexes(
@@ -1569,7 +1643,8 @@ export default function TransformationMatchPage() {
                       </div>
                     </article>
                   );
-                })}
+                  },
+                )}
               </div>
             ) : null}
 

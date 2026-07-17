@@ -130,6 +130,13 @@ const MIRROR_DISTRACTORS: readonly DistractorKind[] = [
   "mirror-anti-diagonal",
 ];
 
+const EXPERT_GENERATION_RULES = {
+  minFilled: 6,
+  maxFilled: 7,
+  minMotifs: 2,
+  maxMotifs: 4,
+} as const;
+
 const GENERATED_DIFFICULTY_RULES: Record<
   Difficulty,
   {
@@ -141,8 +148,8 @@ const GENERATED_DIFFICULTY_RULES: Record<
 > = {
   Easy: { minFilled: 3, maxFilled: 4, minMotifs: 0, maxMotifs: 0 },
   Medium: { minFilled: 5, maxFilled: 6, minMotifs: 0, maxMotifs: 0 },
-  Hard: { minFilled: 6, maxFilled: 7, minMotifs: 2, maxMotifs: 4 },
-  Wizard: { minFilled: 7, maxFilled: 8, minMotifs: 4, maxMotifs: 6 },
+  Hard: EXPERT_GENERATION_RULES,
+  Wizard: EXPERT_GENERATION_RULES,
 };
 
 export const GENERATOR_MAX_ATTEMPTS = 128;
@@ -521,11 +528,10 @@ const ROUND_SPECS: readonly RoundSpec[] = [
   // Wizard: the operation is hidden in the UI, so every near-miss is a small
   // edit of the true answer rather than another valid geometric transform.
   {
-    pattern: "CTV.GC.VT",
+    pattern: "C.V.GC.VT",
     motifs: [
       { index: 0, orientation: 0 },
       { index: 2, orientation: 3 },
-      { index: 4, orientation: 1 },
       { index: 8, orientation: 2 },
     ],
     direction: "clockwise",
@@ -535,7 +541,7 @@ const ROUND_SPECS: readonly RoundSpec[] = [
     distractors: ["one-motif-off", "one-block-off", "one-motif-off"],
   },
   {
-    pattern: "G.VCTTG.C",
+    pattern: "G.VC.TG.C",
     motifs: [
       { index: 0, orientation: 2 },
       { index: 2, orientation: 0 },
@@ -549,10 +555,9 @@ const ROUND_SPECS: readonly RoundSpec[] = [
     distractors: ["one-motif-off", "one-block-off", "one-motif-off"],
   },
   {
-    pattern: "VC.TG.CVT",
+    pattern: "V..TG.CVT",
     motifs: [
       { index: 0, orientation: 3 },
-      { index: 3, orientation: 1 },
       { index: 6, orientation: 0 },
       { index: 8, orientation: 2 },
     ],
@@ -563,7 +568,7 @@ const ROUND_SPECS: readonly RoundSpec[] = [
     distractors: ["one-motif-off", "one-block-off", "one-motif-off"],
   },
   {
-    pattern: ".TGCV.VCG",
+    pattern: ".T.CV.V.G",
     motifs: [
       { index: 1, orientation: 0 },
       { index: 3, orientation: 2 },
@@ -581,7 +586,6 @@ const ROUND_SPECS: readonly RoundSpec[] = [
     motifs: [
       { index: 0, orientation: 1 },
       { index: 2, orientation: 3 },
-      { index: 4, orientation: 0 },
       { index: 6, orientation: 2 },
     ],
     direction: "clockwise",
@@ -608,7 +612,6 @@ const ROUND_SPECS: readonly RoundSpec[] = [
     pattern: "GCTV..CVG",
     motifs: [
       { index: 0, orientation: 3 },
-      { index: 2, orientation: 1 },
       { index: 6, orientation: 2 },
       { index: 8, orientation: 0 },
     ],
@@ -1078,6 +1081,35 @@ export function hiddenTransformOptionIndexes(
   );
 }
 
+function isValidWizardRound(round: Round): boolean {
+  const hiddenAnswerIndexes = hiddenTransformOptionIndexes(
+    round.clue,
+    round.options,
+  );
+  const fullOrbitKeys = new Set(dihedralKeys(round.clue));
+  const everyTrapIsCloseAndOutsideOrbit = round.options.every(
+    (option, index) => {
+      if (index === round.correctIndex) return true;
+      const differenceCount = differingTileIndexes(
+        option,
+        round.correctPattern,
+      ).length;
+      return (
+        differenceCount >= 1 &&
+        differenceCount <= 2 &&
+        !fullOrbitKeys.has(patternKey(option))
+      );
+    },
+  );
+
+  return (
+    fullOrbitKeys.size === 8 &&
+    hiddenAnswerIndexes.length === 1 &&
+    hiddenAnswerIndexes[0] === round.correctIndex &&
+    everyTrapIsCloseAndOutsideOrbit
+  );
+}
+
 function isGeneratedDifficulty(
   difficulty: string,
 ): difficulty is Difficulty {
@@ -1192,36 +1224,7 @@ export function generateInfiniteRound(
     if (!round) continue;
 
     if (difficulty === "Wizard") {
-      const hiddenAnswerIndexes = hiddenTransformOptionIndexes(
-        round.clue,
-        round.options,
-      );
-      const fullOrbitKeys = new Set([
-        patternKey(round.clue),
-        ...hiddenTransformKeys(round.clue),
-      ]);
-      const everyTrapIsCloseAndOutsideOrbit = round.options.every(
-        (option, index) => {
-          if (index === round.correctIndex) return true;
-          const differenceCount = differingTileIndexes(
-            option,
-            round.correctPattern,
-          ).length;
-          return (
-            differenceCount >= 1 &&
-            differenceCount <= 2 &&
-            !fullOrbitKeys.has(patternKey(option))
-          );
-        },
-      );
-
-      if (
-        hiddenAnswerIndexes.length === 1 &&
-        hiddenAnswerIndexes[0] === round.correctIndex &&
-        everyTrapIsCloseAndOutsideOrbit
-      ) {
-        return round;
-      }
+      if (isValidWizardRound(round)) return round;
       continue;
     }
 
@@ -1253,7 +1256,7 @@ export function isRotationOf(candidate: Pattern, clue: Pattern): boolean {
 }
 
 export function buildRounds(): readonly Round[] {
-  return ROUND_SPECS.map((spec, roundIndex) => {
+  const rounds = ROUND_SPECS.map((spec, roundIndex) => {
     const clue = decodePattern(spec.pattern, spec.motifs);
     const transform =
       spec.axis === undefined
@@ -1270,19 +1273,36 @@ export function buildRounds(): readonly Round[] {
     if (!round) {
       throw new Error(`Round ${roundIndex + 1} has duplicate answer options.`);
     }
-    if (
-      spec.difficulty === "Wizard" &&
-      (new Set(dihedralKeys(round.clue)).size !== 8 ||
-        hiddenTransformOptionIndexes(round.clue, round.options).length !== 1 ||
-        hiddenTransformOptionIndexes(round.clue, round.options)[0] !==
-          round.correctIndex)
-    ) {
+    if (spec.difficulty === "Wizard" && !isValidWizardRound(round)) {
       throw new Error(
         `Wizard round ${roundIndex + 1} does not have one unique hidden-transform answer.`,
       );
     }
     return round;
   });
+
+  for (const difficulty of [
+    "Easy",
+    "Medium",
+    "Hard",
+    "Wizard",
+  ] as const) {
+    const answerPositionCounts = [0, 1, 2, 3].map(
+      (correctIndex) =>
+        rounds.filter(
+          (round) =>
+            round.difficulty === difficulty &&
+            round.correctIndex === correctIndex,
+        ).length,
+    );
+    if (answerPositionCounts.some((count) => count !== 3)) {
+      throw new Error(
+        `${difficulty} answer positions must each be used exactly three times.`,
+      );
+    }
+  }
+
+  return rounds;
 }
 
 export const ROUNDS = buildRounds();
