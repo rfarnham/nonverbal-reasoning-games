@@ -551,6 +551,41 @@ difficulty. The current acceptance precedent is at least 400 seeds per level,
 Runtime interaction must not produce unhandled promise rejections or console
 errors. Audio, storage, animation, and browser API failures must degrade safely.
 
+## Delivery and deployment
+
+Unless a direct user instruction says to keep work local or branch-only,
+finishing a game includes merging it into `main`, pushing it to GitHub, and
+verifying the production deployment. Do not stop after a local commit or a
+feature-branch push.
+
+Use this release sequence:
+
+1. Commit only the intended game and shared changes on the feature branch.
+   Confirm the worktree is clean and `npm run check` passes.
+2. Fetch `origin`, incorporate the latest `origin/main` into the feature branch,
+   resolve only unambiguous in-scope conflicts, and rerun `npm run check`. Stop
+   and ask for direction if a conflict would require guessing about unrelated
+   work.
+3. Push the feature branch to GitHub, then advance `main` with a guarded
+   fast-forward. Never force-push or bypass branch protection. If protection
+   requires a pull request, create or update the PR and enable its normal
+   auto-merge path after required checks pass.
+4. Treat a rejected non-fast-forward update as a race: fetch the new
+   `origin/main`, integrate it on the feature branch, rerun checks, and retry
+   the guarded update. Do not overwrite newer remote work.
+5. Follow the GitHub Actions Pages workflow triggered by the `main` update until
+   it succeeds. If it fails because of the shipped changes, diagnose the
+   failure, fix it on the feature branch, and repeat the safe integration flow.
+6. Verify both the production catalog and the game’s hard-refresh URL under
+   `https://rfarnham.github.io/nonverbal-reasoning-games/`. Confirm the new
+   shelf card, game-owned icon, navigation, page content, and browser console
+   load without errors before reporting the game deployed.
+
+A game delivery is complete only when the remote `main` commit contains the
+change, the Pages deployment for that commit succeeds, and the public game URL
+has been verified. Report the feature branch, final commit, deployment result,
+and playable URL.
+
 ## Transformation Match reference requirements
 
 The following requirements are specific to Transformation Match. They illustrate
