@@ -113,8 +113,12 @@ Every puzzle MUST:
 - be solvable from the information shown;
 - have exactly one correct answer or verifiable completion state under the
   complete rule set;
+- in a rule-inference game, admit exactly one normalized rule from the complete
+  player-visible rule catalogue, not merely one rule from the intended subset;
 - expose enough state for code to verify that result;
 - reject accidental equivalence, symmetry, and degeneracy;
+- reject duplicate evidence lines, evidence that exposes the answer, and
+  transformations whose effect is a no-op or visually imperceptible;
 - remain legible at supported phone sizes.
 
 For a discrete-choice puzzle, answer options MUST also be mutually distinct and
@@ -159,6 +163,15 @@ Wizard is not “more visual clutter.” Its base density and feature count SHOU
 match Expert. The challenge comes from hidden information or a deeper inference.
 The hidden information MUST still leave exactly one valid answer.
 
+When a mechanic provides multiple evidence groups, Expert and Wizard puzzles
+SHOULD keep each group insufficient on its own and require their combined,
+gestalt evidence to identify the rule.
+
+In rule-inference games, Starter and Junior MAY show the rule cue throughout the
+round. Expert MUST withhold it until the first incorrect attempt, and Wizard
+MUST withhold it for the entire round. A post-solve rule discovery or catalogue
+explanation MAY name and teach the solved rule; it is not an in-round hint.
+
 Incorrect Wizard feedback MUST NOT reveal the hidden rule, operation, or cue.
 Give localized “this does not match” feedback only when it preserves the
 remaining reasoning challenge.
@@ -182,6 +195,12 @@ Campaign is the authored, deterministic learning path.
 - State must never be communicated by color alone.
 - A retry or redemption MUST NOT rewrite a red first-attempt marker or improve
   the recorded first-try score.
+- Every completed problem marker MUST open a read-only historical review of that
+  problem. Historical review is inspection, not **Review Mistakes**: opening or
+  leaving it MUST NOT mutate level cursors, first-attempt history, score,
+  outstanding mistakes, redemption state, or adaptive state.
+- Focus MUST move into historical review when it opens and return to the
+  originating problem marker when it closes.
 
 For every four-choice 12-puzzle level, the correct answer MUST appear exactly
 three times in each position. Validate the resulting order as a sequence too:
@@ -481,6 +500,8 @@ text.
 ## Puzzle generation and data
 
 Keep authored puzzle data and pure puzzle logic separate from React rendering.
+Authored results MUST be calculated by executing typed rule programs over source
+pattern objects, never maintained as independently trusted output literals.
 
 Generated puzzles MUST:
 

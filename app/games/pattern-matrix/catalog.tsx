@@ -3,21 +3,21 @@ import type {
   ShelfIconProps,
 } from "@/lib/game-catalog-types";
 
-const patterns = [
-  [true, false, false, false],
-  [false, true, false, false],
-  [true, true, false, false],
-  [false, false, true, false],
-  [false, false, false, true],
-  [false, false, true, true],
-  [true, false, false, false],
-  [false, false, false, true],
+const panels = [
+  { mask: [true, false, false, false], shape: "triangle", color: "#7767d7" },
+  { mask: [false, true, false, false], shape: "triangle", color: "#7767d7" },
+  { mask: [true, true, false, false], shape: "triangle", color: "#7767d7" },
+  { mask: [false, false, true, false], shape: "circle", color: "#35a999" },
+  { mask: [false, false, false, true], shape: "circle", color: "#35a999" },
+  { mask: [false, false, true, true], shape: "circle", color: "#35a999" },
+  { mask: [true, false, false, false], shape: "bar", color: "#f06f5f" },
+  { mask: [false, false, false, true], shape: "bar", color: "#f06f5f" },
 ] as const;
 
 export const gameInfo = {
   title: "Pattern Matrix",
   description:
-    "Find the rule repeated across the solved rows, then choose the one tile that completes the matrix.",
+    "Track visual rules across rows, columns, and the whole grid, then choose the tile that completes the matrix.",
   skills: ["Rule finding", "Pattern completion"],
   estimatedMinutes: 10,
   shelfOrder: 20,
@@ -36,9 +36,9 @@ export function ShelfIcon({ style, ...props }: ShelfIconProps) {
         const row = Math.floor(tileIndex / 3);
         const x = 85 + column * 52;
         const y = 18 + row * 52;
-        const pattern = patterns[tileIndex];
+        const panel = panels[tileIndex];
 
-        if (!pattern) {
+        if (!panel) {
           return (
             <g key={tileIndex}>
               <rect
@@ -78,15 +78,64 @@ export function ShelfIcon({ style, ...props }: ShelfIconProps) {
               fill="#fffdf8"
               stroke="#cfcabd"
             />
-            {pattern.map((filled, dotIndex) => (
-              <circle
-                key={dotIndex}
-                cx={x + 13 + (dotIndex % 2) * 18}
-                cy={y + 13 + Math.floor(dotIndex / 2) * 18}
-                r="5"
-                fill={filled ? "#f06f5f" : "#e8e3d9"}
-              />
-            ))}
+            {panel.mask.map((filled, motifIndex) => {
+              const motifX = x + 13 + (motifIndex % 2) * 18;
+              const motifY =
+                y + 13 + Math.floor(motifIndex / 2) * 18;
+
+              if (!filled) {
+                return (
+                  <rect
+                    key={motifIndex}
+                    x={motifX - 5}
+                    y={motifY - 5}
+                    width="10"
+                    height="10"
+                    rx="3"
+                    fill="#eee9df"
+                  />
+                );
+              }
+              if (panel.shape === "circle") {
+                return (
+                  <circle
+                    key={motifIndex}
+                    cx={motifX}
+                    cy={motifY}
+                    r="5"
+                    fill={panel.color}
+                  />
+                );
+              }
+              if (panel.shape === "bar") {
+                return (
+                  <rect
+                    key={motifIndex}
+                    x={motifX - 2.5}
+                    y={motifY - 6}
+                    width="5"
+                    height="12"
+                    rx="2.5"
+                    fill={panel.color}
+                    transform={`rotate(90 ${motifX} ${motifY})`}
+                  />
+                );
+              }
+              return (
+                <path
+                  key={motifIndex}
+                  d={`M ${motifX} ${motifY - 6} L ${
+                    motifX + 6
+                  } ${motifY + 5} L ${motifX - 6} ${
+                    motifY + 5
+                  } Z`}
+                  fill="none"
+                  stroke={panel.color}
+                  strokeWidth="2"
+                  strokeLinejoin="round"
+                />
+              );
+            })}
           </g>
         );
       })}

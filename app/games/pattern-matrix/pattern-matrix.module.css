@@ -282,21 +282,90 @@
   --tile-size: 100%;
 }
 
+.cueTile {
+  --tile-size: 38px;
+  border-radius: 8px;
+}
+
 .dot {
   min-width: 0;
   aspect-ratio: 1;
   position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
   border: max(1px, calc(var(--tile-size) * 0.018)) solid #c7c1b5;
-  border-radius: 50%;
+  border-radius: 24%;
 }
 
 .dotFilled {
-  border-color: #c95649;
-  background: var(--coral, #f06f5f);
+  border-color: #aaa396;
+  background: #f7f2e9;
 }
 
 .dotEmpty {
   background: #f1ede4;
+}
+
+.motif {
+  width: calc(100% * var(--motif-scale));
+  height: calc(100% * var(--motif-scale));
+  position: relative;
+  display: block;
+  background: var(--coral, #f06f5f);
+  transform: rotate(var(--motif-turn));
+  transform-origin: center;
+}
+
+.motif::after {
+  content: "";
+  position: absolute;
+  inset: 18%;
+  background: #f7f2e9;
+}
+
+.motifCircle,
+.motifCircle::after {
+  border-radius: 50%;
+}
+
+.motifSquare,
+.motifSquare::after {
+  border-radius: 16%;
+}
+
+.motifTriangle,
+.motifTriangle::after {
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.motifBar {
+  width: calc(42% * var(--motif-scale));
+  border-radius: 999px;
+}
+
+.motifBar::after {
+  border-radius: inherit;
+}
+
+.motifSolid::after,
+.motifStriped::after {
+  display: none;
+}
+
+.motifOutline {
+  background: var(--violet, #7767d7);
+}
+
+.motifStriped {
+  background-color: var(--teal, #35a999);
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgb(255 255 255 / 0%) 0 17%,
+    rgb(255 253 248 / 86%) 17% 31%
+  );
+  background-position: var(--texture-shift) var(--texture-shift);
+  background-size: 145% 145%;
 }
 
 .differenceDot::after {
@@ -403,15 +472,20 @@
 .ruleCue {
   min-width: 172px;
   min-height: 70px;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+  display: flex;
   align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
   gap: 10px;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--panel);
   color: var(--ink);
   padding: 10px 12px;
+}
+
+.visualRuleCue {
+  max-width: min(100%, 420px);
 }
 
 .operationSymbol,
@@ -425,17 +499,61 @@
 }
 
 .operationSymbol {
-  min-width: 35px;
-  min-height: 35px;
+  min-width: 32px;
+  min-height: 32px;
   border-radius: 10px;
   background: #f7dfaa;
-  font-size: 1rem;
+  font-size: 0.82rem;
 }
 
 .transformSymbol {
-  min-width: 46px;
-  font-size: 0.72rem;
+  min-width: 25px;
+  font-size: 0.68rem;
   white-space: nowrap;
+}
+
+.ruleAxis {
+  min-width: 28px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 1.15rem;
+  font-weight: 900;
+}
+
+.sequenceCueStep {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.gridRuleCue {
+  gap: 12px;
+}
+
+.gridCue {
+  width: 98px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  padding: 4px;
+  border-radius: 9px;
+  background: var(--ink);
+}
+
+.gridCue .cueTile {
+  --tile-size: 28px;
+  border: 0;
+  border-radius: 4px;
+}
+
+.gridCueArrows {
+  display: grid;
+  gap: 6px;
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.68rem;
+  font-weight: 900;
 }
 
 .ruleCueText {
@@ -469,7 +587,6 @@
 .hiddenRuleCue {
   min-width: 76px;
   width: 76px;
-  grid-template-columns: 1fr;
   place-items: center;
   padding: 8px;
 }
@@ -489,10 +606,14 @@
   padding: 7px;
 }
 
+.compactRuleCue .cueTile {
+  --tile-size: 27px;
+}
+
 .compactRuleCue .operationSymbol {
-  min-width: 28px;
-  min-height: 28px;
-  font-size: 0.75rem;
+  min-width: 24px;
+  min-height: 24px;
+  font-size: 0.64rem;
 }
 
 .compactRuleCue .ruleCueText {
@@ -500,7 +621,7 @@
 }
 
 .compactRuleCue .transformSymbol {
-  min-width: 34px;
+  min-width: 19px;
   font-size: 0.6rem;
 }
 
@@ -617,28 +738,43 @@
 }
 
 .campaignProblem {
+  --problem-color: #c9c5bb;
   min-width: 0;
-  height: 13px;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  background: #c9c5bb;
+  min-height: 44px;
+  position: relative;
+  display: block;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
   color: white;
+  cursor: pointer;
   font-family: Arial, sans-serif;
   font-size: 0.56rem;
   font-weight: 900;
   line-height: 1;
+  padding: 0;
   transition:
-    background-color 140ms ease,
     transform 140ms ease;
 }
 
+.campaignProblem::before {
+  content: "";
+  position: absolute;
+  inset: 15px 0;
+  border-radius: 999px;
+  background: var(--problem-color);
+}
+
 .campaignProblem::after {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
   line-height: 1;
 }
 
 .campaignProblemCorrect {
-  background: var(--correct);
+  --problem-color: var(--correct);
 }
 
 .campaignProblemCorrect::after {
@@ -646,7 +782,7 @@
 }
 
 .campaignProblemIncorrect {
-  background: var(--wrong);
+  --problem-color: var(--wrong);
 }
 
 .campaignProblemIncorrect::after {
@@ -654,13 +790,26 @@
 }
 
 .campaignProblemNotDone {
-  background: #c9c5bb;
+  --problem-color: #c9c5bb;
+  cursor: default;
 }
 
 .campaignProblemCurrent {
+  transform: scaleY(1.08);
+}
+
+.campaignProblemCurrent::before {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
-  transform: scaleY(1.18);
+}
+
+.campaignProblem[aria-pressed="true"]::before {
+  outline: 3px solid #1679d2;
+  outline-offset: 3px;
+}
+
+.campaignProblem:disabled {
+  cursor: default;
 }
 
 .progressTrack {
@@ -815,6 +964,148 @@
   background: var(--panel);
 }
 
+.playWithCatalogue {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+
+.playSurface {
+  min-width: 0;
+}
+
+.ruleCatalogue {
+  width: 58px;
+  min-height: 550px;
+  position: relative;
+  z-index: 20;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: 0 10px 30px rgb(23 33 61 / 0%);
+  transition:
+    width 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.ruleCatalogueExpanded,
+.ruleCatalogue:hover,
+.ruleCatalogue:focus-within {
+  width: 242px;
+  box-shadow: 0 14px 34px rgb(23 33 61 / 16%);
+}
+
+.catalogueToggle {
+  width: 100%;
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: #f2eee5;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  padding: 8px 11px;
+  text-align: left;
+}
+
+.catalogueToggle > span {
+  font-size: 1.1rem;
+  font-weight: 900;
+}
+
+.catalogueToggle strong,
+.catalogueToggle small {
+  opacity: 0;
+  white-space: nowrap;
+  transition: opacity 120ms ease;
+}
+
+.catalogueToggle small {
+  min-width: 26px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: white;
+  font-size: 0.64rem;
+  font-weight: 850;
+  padding: 4px 7px;
+  text-align: center;
+}
+
+.ruleCatalogueExpanded .catalogueToggle strong,
+.ruleCatalogueExpanded .catalogueToggle small,
+.ruleCatalogue:hover .catalogueToggle strong,
+.ruleCatalogue:hover .catalogueToggle small,
+.ruleCatalogue:focus-within .catalogueToggle strong,
+.ruleCatalogue:focus-within .catalogueToggle small {
+  opacity: 1;
+}
+
+.catalogueContents {
+  width: 240px;
+  display: grid;
+  gap: 20px;
+  opacity: 0;
+  padding: 18px 14px;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.ruleCatalogueExpanded .catalogueContents,
+.ruleCatalogue:hover .catalogueContents,
+.ruleCatalogue:focus-within .catalogueContents {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.catalogueContents h2 {
+  margin: 0 0 9px;
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 880;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.catalogueContents ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.catalogueContents li {
+  min-height: 36px;
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #dfd9cc;
+  border-radius: 9px;
+  background: #fffdf8;
+  font-size: 0.72rem;
+  padding: 5px 8px;
+}
+
+.catalogueContents li > span {
+  color: var(--violet);
+  font-size: 0.76rem;
+  text-align: center;
+}
+
+.catalogueContents p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
 .levelCompleteCard,
 .generationCard {
   min-height: 550px;
@@ -826,6 +1117,78 @@
   background: var(--panel);
   text-align: center;
   padding: 32px;
+}
+
+.historicalReview {
+  min-height: 550px;
+  display: grid;
+  gap: 28px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--panel);
+  padding: clamp(22px, 4vw, 42px);
+}
+
+.historicalReviewHeader {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.historicalReviewHeader h2 {
+  margin: 0;
+  font-size: clamp(1.7rem, 4vw, 2.6rem);
+  letter-spacing: -0.045em;
+}
+
+.historicalOutcome {
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 720;
+}
+
+.historicalReviewBody {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: clamp(22px, 4vw, 42px);
+}
+
+.historicalAnswers {
+  display: flex;
+  align-items: end;
+  gap: 18px;
+}
+
+.historicalAnswers > div {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.historicalAnswers span {
+  color: var(--muted);
+  font-size: 0.65rem;
+  font-weight: 840;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.historicalWrongAnswer strong {
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--wrong);
+  color: white;
 }
 
 .levelCompleteCard h2,
@@ -1119,6 +1482,51 @@
   font-size: 0.88rem;
 }
 
+.ruleLessonDialog {
+  width: min(560px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 24px 80px rgb(23 33 61 / 28%);
+  padding: 0;
+}
+
+.ruleLessonDialog::backdrop {
+  background: rgb(23 33 61 / 48%);
+  backdrop-filter: blur(3px);
+}
+
+.ruleLessonCard {
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  padding: clamp(26px, 6vw, 44px);
+  text-align: center;
+}
+
+.ruleLessonCard h2 {
+  margin: -6px 0 0;
+  font-size: clamp(2rem, 7vw, 3.5rem);
+  font-weight: 860;
+  letter-spacing: -0.055em;
+  line-height: 0.98;
+}
+
+.ruleLessonCard > p:not(.kicker) {
+  max-width: 420px;
+  margin: -3px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.ruleLessonCard .ruleCue {
+  margin-block: 5px;
+}
+
 .ghostFlight {
   position: fixed;
   z-index: 10000;
@@ -1180,13 +1588,65 @@
 .modeButton:focus-visible,
 .endButton:focus-visible,
 .campaignLevel:focus-visible,
+.campaignProblem:focus-visible,
+.catalogueToggle:focus-visible,
 .nextButton:focus-visible,
-.results h1:focus-visible {
+.results h1:focus-visible,
+.historicalReview h2:focus-visible {
   outline: 3px solid #1679d2;
   outline-offset: 4px;
 }
 
 @media (max-width: 820px) {
+  .playWithCatalogue {
+    grid-template-columns: 1fr;
+  }
+
+  .ruleCatalogue,
+  .ruleCatalogueExpanded,
+  .ruleCatalogue:hover,
+  .ruleCatalogue:focus-within {
+    width: 100%;
+    min-height: 0;
+  }
+
+  .catalogueToggle {
+    grid-template-columns: 34px 1fr auto;
+  }
+
+  .catalogueToggle strong,
+  .catalogueToggle small {
+    opacity: 1;
+  }
+
+  .catalogueContents {
+    width: 100%;
+    max-height: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: hidden;
+    opacity: 0;
+    padding-block: 0;
+    transition:
+      max-height 180ms ease,
+      opacity 120ms ease,
+      padding 180ms ease;
+  }
+
+  .ruleCatalogueExpanded .catalogueContents,
+  .ruleCatalogue:hover .catalogueContents,
+  .ruleCatalogue:focus-within .catalogueContents {
+    max-height: 520px;
+    opacity: 1;
+    padding-block: 18px;
+  }
+
+  .ruleCatalogue:not(.ruleCatalogueExpanded) .catalogueContents {
+    max-height: 0;
+    opacity: 0;
+    padding-block: 0;
+    pointer-events: none;
+  }
+
   .gameBoard {
     grid-template-columns: 1fr;
   }
@@ -1296,7 +1756,21 @@
   }
 
   .campaignProblems {
+    grid-template-columns: repeat(6, minmax(44px, 1fr));
     gap: 3px;
+  }
+
+  .historicalReviewHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .historicalReviewHeader .modeButton {
+    align-self: start;
+  }
+
+  .catalogueContents {
+    grid-template-columns: 1fr;
   }
 
   .difficulty {

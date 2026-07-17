@@ -8,7 +8,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type Ref,
 } from "react";
 import { createPortal } from "react-dom";
 
@@ -25,36 +24,51 @@ import {
   recordInfiniteFirstAttempt,
 } from "@/lib/infinite-progression";
 
+import { CAMPAIGN_ROUNDS } from "./campaign-data";
 import {
-  CAMPAIGN_ROUNDS,
-  TUTORIAL,
+  canOpenHistoricalReview,
+  discoveredPartIdsAfterLesson,
+  hintRoundIdsAfterMiss,
+  unseenLessonPartIds,
+} from "./learning-state";
+import {
+  RULE_CATALOGUE,
   differingDotIndexes,
+  effectiveCueMode,
   generateInfiniteRound,
   incorrectFeedback,
-  operationLabel,
   patternKey,
   roundFingerprint,
+  rulePartIds,
   ruleLabel,
-  transformLabel,
-  type CueMode,
   type Difficulty,
-  type Matrix,
   type MatrixRule,
   type Pattern,
-  type PatternTransform,
   type Round,
-} from "./game-engine";
+  type RulePartId,
+} from "./rule-engine";
 import { patternMatrixGame } from "./game-info";
+import {
+  MatrixBoard,
+  PatternTile,
+  RuleCue,
+} from "./pattern-visuals";
 import styles from "./pattern-matrix.module.css";
 
-type PatternSize = "tutorialTile" | "matrixTile" | "optionTile" | "reviewTile" | "ghostTile";
-type MatrixSize = "tutorialMatrix" | "clueMatrix" | "reviewMatrix";
 type GamePhase = "idle" | "animating" | "wrong-review" | "answered";
 type SessionMode = "campaign" | "infinite" | "redemption";
 type OriginMode = "campaign" | "infinite";
 type CampaignLevelId = "starter" | "junior" | "expert" | "wizard";
 type CampaignMarker = "correct" | "incorrect";
 type GenerationRecovery = "start" | "next";
+type CampaignReviewSelection = {
+  levelId: CampaignLevelId;
+  problemIndex: number;
+};
+type RuleLesson = {
+  partId: RulePartId;
+  rule: MatrixRule;
+};
 
 type SessionRound = {
   id: string;
@@ -114,6 +128,18 @@ const CAMPAIGN_LEVELS: ReadonlyArray<{
   { id: "expert", label: "Expert", difficulty: "Hard" },
   { id: "wizard", label: "Wizard", difficulty: "Wizard" },
 ];
+
+const TUTORIAL_ROUND = CAMPAIGN_ROUNDS[0];
+const TUTORIAL = {
+  matrix: TUTORIAL_ROUND.matrix,
+  rule: TUTORIAL_ROUND.rule,
+  cueMode: "full-rule" as const,
+  answer: TUTORIAL_ROUND.correctPattern,
+  nearMiss:
+    TUTORIAL_ROUND.options.find(
+      (_, index) => index !== TUTORIAL_ROUND.correctIndex,
+    ) ?? TUTORIAL_ROUND.options[(TUTORIAL_ROUND.correctIndex + 1) % 4],
+};
 
 function initialCampaignCursors(): CampaignCursors {
   return {
@@ -188,190 +214,6 @@ function nextIncompleteCampaignLevel(
   return null;
 }
 
-function PatternTile({
-  pattern,
-  size,
-  label,
-  hidden = false,
-  tileRef,
-  differenceIndexes = [],
-}: {
-  pattern: Pattern;
-  size: PatternSize;
-  label?: string;
-  hidden?: boolean;
-  tileRef?: Ref<HTMLDivElement>;
-  differenceIndexes?: readonly number[];
-}) {
-  const differenceSet = new Set(differenceIndexes);
-
-  return (
-    <div
-      className={`${styles.patternTile} ${styles[size]}`}
-      role={hidden ? undefined : "img"}
-      aria-label={hidden ? undefined : label}
-      aria-hidden={hidden || undefined}
-      ref={tileRef}
-    >
-      {pattern.map((filled, index) => (
-        <span
-          className={`${styles.dot} ${
-            filled ? styles.dotFilled : styles.dotEmpty
-          } ${differenceSet.has(index) ? styles.differenceDot : ""}`}
-          aria-hidden="true"
-          key={`${index}-${Number(filled)}`}
-        />
-      ))}
-    </div>
-  );
-}
-
-function MatrixBoard({
-  matrix,
-  answer,
-  size,
-  label,
-  missingRef,
-  highlightFinalRow = false,
-  showSolvedMark = false,
-}: {
-  matrix: Matrix;
-  answer?: Pattern;
-  size: MatrixSize;
-  label: string;
-  missingRef?: Ref<HTMLDivElement>;
-  highlightFinalRow?: boolean;
-  showSolvedMark?: boolean;
-}) {
-  return (
-    <div
-      className={`${styles.matrix} ${styles[size]} ${
-        answer ? styles.matrixComplete : ""
-      }`}
-      role="img"
-      aria-label={label}
-    >
-      {matrix.map((pattern, index) => {
-        const finalRow = index >= 6;
-        const cellClass = `${styles.matrixCell} ${
-          finalRow && highlightFinalRow ? styles.matrixCellRelated : ""
-        }`;
-
-        if (pattern) {
-          return (
-            <span className={cellClass} aria-hidden="true" key={index}>
-              <PatternTile pattern={pattern} size="matrixTile" hidden />
-            </span>
-          );
-        }
-
-        return (
-          <div
-            className={`${cellClass} ${styles.missingCell} ${
-              answer ? styles.filledMissingCell : ""
-            }`}
-            aria-hidden="true"
-            ref={missingRef}
-            key={index}
-          >
-            {answer ? (
-              <>
-                <PatternTile pattern={answer} size="matrixTile" hidden />
-                {showSolvedMark ? (
-                  <span className={styles.solvedMark}>✓</span>
-                ) : null}
-              </>
-            ) : (
-              <span className={styles.missingMark}>?</span>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-const OPERATION_SYMBOLS: Record<MatrixRule["operation"], string> = {
-  join: "＋",
-  overlap: "∩",
-  cancel: "⊕",
-  "left-minus-right": "L−R",
-  "right-minus-left": "R−L",
-};
-
-const TRANSFORM_SYMBOLS: Record<PatternTransform, string> = {
-  none: "→",
-  "rotate-clockwise": "↻ 90°",
-  "rotate-half": "↻ 180°",
-  "rotate-counterclockwise": "↺ 90°",
-};
-
-function RuleCue({
-  rule,
-  cueMode,
-  compact = false,
-}: {
-  rule: MatrixRule;
-  cueMode: CueMode;
-  compact?: boolean;
-}) {
-  const accessibleLabel =
-    cueMode === "hidden"
-      ? "Infer the complete rule from the solved rows"
-      : cueMode === "operation-only"
-        ? `${operationLabel(rule.operation)}. Infer the turn from the solved rows.`
-        : ruleLabel(rule);
-
-  if (cueMode === "hidden") {
-    return (
-      <div
-        className={`${styles.ruleCue} ${styles.hiddenRuleCue} ${
-          compact ? styles.compactRuleCue : ""
-        }`}
-        role="img"
-        aria-label={accessibleLabel}
-      >
-        <span aria-hidden="true">?</span>
-      </div>
-    );
-  }
-
-  const transformText =
-    cueMode === "operation-only"
-      ? "Infer the turn"
-      : rule.transform === "none"
-        ? "Keep in place"
-        : transformLabel(rule.transform);
-
-  return (
-    <div
-      className={`${styles.ruleCue} ${
-        compact ? styles.compactRuleCue : ""
-      }`}
-      role="img"
-      aria-label={accessibleLabel}
-    >
-      <span className={styles.operationSymbol} aria-hidden="true">
-        {OPERATION_SYMBOLS[rule.operation]}
-      </span>
-      <span className={styles.ruleCueText} aria-hidden="true">
-        <strong>{operationLabel(rule.operation)}</strong>
-        <small>{transformText}</small>
-      </span>
-      <span
-        className={`${styles.transformSymbol} ${
-          cueMode === "operation-only" ? styles.unknownTransform : ""
-        }`}
-        aria-hidden="true"
-      >
-        {cueMode === "operation-only"
-          ? "?"
-          : TRANSFORM_SYMBOLS[rule.transform]}
-      </span>
-    </div>
-  );
-}
-
 function buildInfiniteSessionRound(
   ordinal: number,
   seenFingerprints: Set<string>,
@@ -433,6 +275,18 @@ export default function PatternMatrixPage() {
   const [generationError, setGenerationError] = useState(false);
   const [generationRecovery, setGenerationRecovery] =
     useState<GenerationRecovery>("start");
+  const [hintUnlockedRoundIds, setHintUnlockedRoundIds] = useState<
+    readonly string[]
+  >([]);
+  const [discoveredRulePartIds, setDiscoveredRulePartIds] = useState<
+    readonly RulePartId[]
+  >([]);
+  const [pendingLessons, setPendingLessons] = useState<
+    readonly RuleLesson[]
+  >([]);
+  const [catalogueExpanded, setCatalogueExpanded] = useState(false);
+  const [campaignReviewSelection, setCampaignReviewSelection] =
+    useState<CampaignReviewSelection | null>(null);
 
   const missingCellRef = useRef<HTMLDivElement>(null);
   const optionTileRefs = useRef<Array<HTMLDivElement | null>>([]);
@@ -441,6 +295,12 @@ export default function PatternMatrixPage() {
   const levelCompleteButtonRef = useRef<HTMLButtonElement>(null);
   const resultHeadingRef = useRef<HTMLHeadingElement>(null);
   const generationRetryButtonRef = useRef<HTMLButtonElement>(null);
+  const lessonDialogRef = useRef<HTMLDialogElement>(null);
+  const historicalReviewHeadingRef = useRef<HTMLHeadingElement>(null);
+  const campaignMarkerRefs = useRef<
+    Record<string, HTMLButtonElement | null>
+  >({});
+  const reviewOriginIdRef = useRef<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const flightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -464,6 +324,32 @@ export default function PatternMatrixPage() {
     ? campaignSessionRound
     : (roundQueue[roundCursor] ?? roundQueue[0]);
   const round = activeSessionRound?.round ?? CAMPAIGN_ROUNDS[0];
+  const activeCueMode = effectiveCueMode(
+    round.hintPolicy,
+    activeSessionRound
+      ? hintUnlockedRoundIds.includes(activeSessionRound.id)
+      : false,
+  );
+  const activeLesson = pendingLessons[0] ?? null;
+  const activeLessonPart = activeLesson
+    ? RULE_CATALOGUE.find(({ id }) => id === activeLesson.partId)
+    : undefined;
+  const discoveredPartIdSet = new Set(discoveredRulePartIds);
+  const historicalSessionRound = campaignReviewSelection
+    ? buildCampaignSessionRound(
+        campaignReviewSelection.levelId,
+        campaignReviewSelection.problemIndex,
+      )
+    : null;
+  const historicalProgress = historicalSessionRound
+    ? campaignProgress[historicalSessionRound.id]
+    : undefined;
+  const historicalMistake = historicalSessionRound
+    ? mistakes.find(
+        ({ sessionRound }) =>
+          sessionRound.id === historicalSessionRound.id,
+      )
+    : undefined;
   const sessionLength = roundQueue.length;
   const selectedCorrect = selectedIndex === round.correctIndex;
   const activeIncorrectFeedback =
@@ -484,6 +370,7 @@ export default function PatternMatrixPage() {
     isCampaign &&
     activeCampaignLevelComplete &&
     phase === "idle" &&
+    campaignReviewSelection === null &&
     !generationError;
   const nextCampaignLevel = nextIncompleteCampaignLevel(
     campaignProgress,
@@ -543,6 +430,56 @@ export default function PatternMatrixPage() {
     setRetryReady(false);
     setPhase("idle");
   }, [clearAttemptTimers]);
+
+  const queueRuleLessons = useCallback(
+    (lessonRule: MatrixRule) => {
+      const partIds = rulePartIds(lessonRule);
+      setPendingLessons((current) => {
+        const additions = unseenLessonPartIds(
+          discoveredRulePartIds,
+          current.map(({ partId }) => partId),
+          partIds,
+        )
+          .map((partId) => ({ partId, rule: lessonRule }));
+        return additions.length > 0 ? [...current, ...additions] : current;
+      });
+    },
+    [discoveredRulePartIds],
+  );
+
+  const closeActiveLesson = useCallback(() => {
+    if (!activeLesson) return;
+    setDiscoveredRulePartIds((current) =>
+      discoveredPartIdsAfterLesson(current, activeLesson.partId),
+    );
+    setPendingLessons((current) => current.slice(1));
+  }, [activeLesson]);
+
+  const openCampaignReview = useCallback(
+    (levelId: CampaignLevelId, problemIndex: number) => {
+      const id = campaignRoundId(levelId, problemIndex);
+      if (
+        !canOpenHistoricalReview({
+          isIdle: phase === "idle",
+          isSolved: Boolean(campaignProgress[id]?.solved),
+          hasPendingLessons: pendingLessons.length > 0,
+        })
+      ) {
+        return;
+      }
+      reviewOriginIdRef.current = id;
+      setCampaignReviewSelection({ levelId, problemIndex });
+    },
+    [campaignProgress, pendingLessons.length, phase],
+  );
+
+  const closeCampaignReview = useCallback(() => {
+    const originId = reviewOriginIdRef.current;
+    setCampaignReviewSelection(null);
+    window.requestAnimationFrame(() => {
+      if (originId) campaignMarkerRefs.current[originId]?.focus();
+    });
+  }, []);
 
   const ensureAudioContext = useCallback(() => {
     if (typeof window === "undefined") return null;
@@ -610,6 +547,8 @@ export default function PatternMatrixPage() {
         generationError ||
         !started ||
         (isCampaign && activeCampaignLevelComplete) ||
+        campaignReviewSelection !== null ||
+        pendingLessons.length > 0 ||
         !activeSessionRound
       ) {
         return;
@@ -677,7 +616,17 @@ export default function PatternMatrixPage() {
                   sessionRound: activeSessionRound,
                   chosenIndex: optionIndex,
                 },
-              ],
+            ],
+        );
+      }
+
+      if (!isCorrect && round.hintPolicy === "after-miss") {
+        setHintUnlockedRoundIds((current) =>
+          hintRoundIdsAfterMiss(
+            current,
+            activeSessionRound.id,
+            round.hintPolicy,
+          ),
         );
       }
 
@@ -705,6 +654,7 @@ export default function PatternMatrixPage() {
           if (isCorrect) {
             setGhost(null);
             setPhase("answered");
+            queueRuleLessons(round.rule);
             return;
           }
 
@@ -728,14 +678,17 @@ export default function PatternMatrixPage() {
     [
       activeCampaignLevelComplete,
       activeSessionRound,
+      campaignReviewSelection,
       clearAttemptTimers,
       complete,
       generationError,
       isCampaign,
       isInfinite,
       isRedemption,
+      pendingLessons.length,
       phase,
       playFeedbackSound,
+      queueRuleLessons,
       round,
       started,
     ],
@@ -762,6 +715,11 @@ export default function PatternMatrixPage() {
     setRedemptionMistakeIds([]);
     setGenerationError(false);
     setGenerationRecovery("start");
+    setHintUnlockedRoundIds([]);
+    setDiscoveredRulePartIds([]);
+    setPendingLessons([]);
+    setCatalogueExpanded(false);
+    setCampaignReviewSelection(null);
     setStarted(true);
     setComplete(false);
     resetAttemptState();
@@ -799,6 +757,11 @@ export default function PatternMatrixPage() {
     setRedemptionMistakeIds([]);
     setGenerationError(firstRound === null);
     setGenerationRecovery("start");
+    setHintUnlockedRoundIds([]);
+    setDiscoveredRulePartIds([]);
+    setPendingLessons([]);
+    setCatalogueExpanded(false);
+    setCampaignReviewSelection(null);
     setStarted(true);
     setComplete(false);
     resetAttemptState();
@@ -811,6 +774,7 @@ export default function PatternMatrixPage() {
         !isCampaign ||
         phase !== "idle" ||
         generationError ||
+        campaignReviewSelection !== null ||
         levelId === activeCampaignLevel
       ) {
         return;
@@ -825,6 +789,7 @@ export default function PatternMatrixPage() {
     },
     [
       activeCampaignLevel,
+      campaignReviewSelection,
       campaignProgress,
       generationError,
       isCampaign,
@@ -855,7 +820,13 @@ export default function PatternMatrixPage() {
   }, [resetAttemptState, visibleMistakes]);
 
   const goNext = useCallback(() => {
-    if (phase !== "answered") return;
+    if (
+      phase !== "answered" ||
+      pendingLessons.length > 0 ||
+      campaignReviewSelection !== null
+    ) {
+      return;
+    }
 
     if (isCampaign) {
       resetAttemptState();
@@ -926,11 +897,13 @@ export default function PatternMatrixPage() {
   }, [
     activeCampaignLevel,
     activeSessionRound?.ordinal,
+    campaignReviewSelection,
     campaignProblemIndex,
     isCampaign,
     isInfinite,
     isLastRedemptionRound,
     phase,
+    pendingLessons.length,
     redemptionMistakeIds,
     reviewLevelId,
     resetAttemptState,
@@ -1017,6 +990,8 @@ export default function PatternMatrixPage() {
         !started ||
         complete ||
         generationError ||
+        campaignReviewSelection !== null ||
+        pendingLessons.length > 0 ||
         phase !== "idle" ||
         event.altKey ||
         event.ctrlKey ||
@@ -1034,38 +1009,57 @@ export default function PatternMatrixPage() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [chooseOption, complete, generationError, phase, started]);
+  }, [
+    campaignReviewSelection,
+    chooseOption,
+    complete,
+    generationError,
+    pendingLessons.length,
+    phase,
+    started,
+  ]);
 
   useEffect(() => {
-    if (phase === "answered") nextButtonRef.current?.focus();
-  }, [phase]);
+    if (phase === "answered" && pendingLessons.length === 0) {
+      nextButtonRef.current?.focus();
+    }
+  }, [pendingLessons.length, phase]);
 
   useEffect(() => {
     if (
       shouldFocusFirstOption.current &&
       started &&
       !complete &&
-      !generationError
+      !generationError &&
+      campaignReviewSelection === null &&
+      pendingLessons.length === 0
     ) {
       optionButtonRefs.current[0]?.focus();
       shouldFocusFirstOption.current = false;
     }
   }, [
     activeCampaignLevel,
+    campaignReviewSelection,
     campaignProblemIndex,
     complete,
     generationError,
     roundCursor,
     sessionMode,
     started,
+    pendingLessons.length,
   ]);
 
   useEffect(() => {
-    if (phase === "idle" && retryReady && retryFocusIndexRef.current !== null) {
+    if (
+      phase === "idle" &&
+      retryReady &&
+      retryFocusIndexRef.current !== null &&
+      pendingLessons.length === 0
+    ) {
       optionButtonRefs.current[retryFocusIndexRef.current]?.focus();
       retryFocusIndexRef.current = null;
     }
-  }, [phase, retryReady]);
+  }, [pendingLessons.length, phase, retryReady]);
 
   useEffect(() => {
     if (complete) resultHeadingRef.current?.focus();
@@ -1078,6 +1072,26 @@ export default function PatternMatrixPage() {
   useEffect(() => {
     if (generationError) generationRetryButtonRef.current?.focus();
   }, [generationError]);
+
+  useEffect(() => {
+    const dialog = lessonDialogRef.current;
+    if (!dialog) return;
+    if (activeLesson && !dialog.open) {
+      try {
+        dialog.showModal();
+      } catch {
+        dialog.setAttribute("open", "");
+      }
+    } else if (!activeLesson && dialog.open) {
+      dialog.close();
+    }
+  }, [activeLesson]);
+
+  useEffect(() => {
+    if (campaignReviewSelection) {
+      historicalReviewHeadingRef.current?.focus();
+    }
+  }, [campaignReviewSelection]);
 
   useEffect(() => {
     function finishMovingGhost(event: Event) {
@@ -1096,6 +1110,7 @@ export default function PatternMatrixPage() {
         setGhost(null);
         if (selectedCorrect) {
           setPhase("answered");
+          queueRuleLessons(round.rule);
         } else {
           const optionIndex = selectedIndex;
           const animationToken = animationTokenRef.current;
@@ -1128,7 +1143,14 @@ export default function PatternMatrixPage() {
       window.removeEventListener("resize", finishMovingGhost);
       window.removeEventListener("scroll", finishMovingGhost, true);
     };
-  }, [clearAttemptTimers, phase, selectedCorrect, selectedIndex]);
+  }, [
+    clearAttemptTimers,
+    phase,
+    queueRuleLessons,
+    round.rule,
+    selectedCorrect,
+    selectedIndex,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -1335,7 +1357,11 @@ export default function PatternMatrixPage() {
                           aria-pressed={activeCampaignLevel === level.id}
                           aria-controls="campaign-play-area"
                           aria-label={`${level.label}, ${levelState}`}
-                          disabled={phase !== "idle"}
+                          disabled={
+                            phase !== "idle" ||
+                            campaignReviewSelection !== null ||
+                            pendingLessons.length > 0
+                          }
                           onClick={() => selectCampaignLevel(level.id)}
                           key={level.id}
                         >
@@ -1347,7 +1373,7 @@ export default function PatternMatrixPage() {
 
                   <div
                     className={styles.campaignProblems}
-                    role="list"
+                    role="group"
                     aria-label={`${campaignLevel(activeCampaignLevel).label} problems`}
                   >
                     {Array.from(
@@ -1364,9 +1390,18 @@ export default function PatternMatrixPage() {
                         const isCurrent =
                           !activeCampaignLevelComplete &&
                           problemIndex === campaignProblemIndex;
+                        const problemId = campaignRoundId(
+                          activeCampaignLevel,
+                          problemIndex,
+                        );
+                        const isReviewing =
+                          campaignReviewSelection?.levelId ===
+                            activeCampaignLevel &&
+                          campaignReviewSelection.problemIndex ===
+                            problemIndex;
 
                         return (
-                          <span
+                          <button
                             className={`${styles.campaignProblem} ${
                               marker === "correct"
                                 ? styles.campaignProblemCorrect
@@ -1376,11 +1411,30 @@ export default function PatternMatrixPage() {
                             } ${
                               isCurrent ? styles.campaignProblemCurrent : ""
                             }`}
-                            role="listitem"
+                            type="button"
                             aria-label={`${campaignLevel(activeCampaignLevel).label} problem ${
                               problemIndex + 1
-                            }: ${marker === "not-done" ? "not done" : marker}`}
+                            }: ${
+                              marker === "not-done"
+                                ? "not done"
+                                : `${marker}; review problem`
+                            }`}
                             aria-current={isCurrent ? "step" : undefined}
+                            aria-pressed={isReviewing}
+                            disabled={
+                              !problem?.solved ||
+                              phase !== "idle" ||
+                              pendingLessons.length > 0
+                            }
+                            onClick={() =>
+                              openCampaignReview(
+                                activeCampaignLevel,
+                                problemIndex,
+                              )
+                            }
+                            ref={(node) => {
+                              campaignMarkerRefs.current[problemId] = node;
+                            }}
                             key={problemIndex}
                           />
                         );
@@ -1547,9 +1601,136 @@ export default function PatternMatrixPage() {
                   <span aria-hidden="true">↻</span>
                 </button>
               </section>
+            ) : historicalSessionRound && historicalProgress ? (
+              <section
+                className={styles.historicalReview}
+                id="campaign-play-area"
+                aria-labelledby="historical-review-title"
+              >
+                <div className={styles.historicalReviewHeader}>
+                  <div>
+                    <p className={styles.kicker}>Completed problem</p>
+                    <h2
+                      id="historical-review-title"
+                      ref={historicalReviewHeadingRef}
+                      tabIndex={-1}
+                    >
+                      {historicalSessionRound.campaign?.levelLabel} · Problem{" "}
+                      {(historicalSessionRound.campaign?.problemIndex ?? 0) + 1}
+                    </h2>
+                    <p className={styles.historicalOutcome}>
+                      {historicalProgress.firstAttempt === "correct"
+                        ? "✓ Correct on the first try"
+                        : "× Missed on the first try, then solved"}
+                    </p>
+                  </div>
+                  <button
+                    className={styles.modeButton}
+                    type="button"
+                    onClick={closeCampaignReview}
+                  >
+                    Back to current problem
+                  </button>
+                </div>
+
+                <div className={styles.historicalReviewBody}>
+                  <MatrixBoard
+                    matrix={historicalSessionRound.round.matrix}
+                    answer={historicalSessionRound.round.correctPattern}
+                    size="clueMatrix"
+                    label="Completed historical pattern matrix with its correct answer filled in"
+                    showSolvedMark
+                  />
+                  <RuleCue
+                    rule={historicalSessionRound.round.rule}
+                    cueMode="full-rule"
+                  />
+                  <div className={styles.historicalAnswers}>
+                    <div>
+                      <span>Correct answer</span>
+                      <PatternTile
+                        pattern={historicalSessionRound.round.correctPattern}
+                        size="reviewTile"
+                        label="Correct answer"
+                      />
+                    </div>
+                    {historicalMistake ? (
+                      <div className={styles.historicalWrongAnswer}>
+                        <span>Your first answer</span>
+                        <PatternTile
+                          pattern={
+                            historicalSessionRound.round.options[
+                              historicalMistake.chosenIndex
+                            ]
+                          }
+                          size="reviewTile"
+                          label="Your first incorrect answer"
+                        />
+                        <strong aria-hidden="true">×</strong>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </section>
             ) : (
-              <>
-                <div className={styles.gameBoard} id="campaign-play-area">
+              <div className={styles.playWithCatalogue}>
+                <aside
+                  className={`${styles.ruleCatalogue} ${
+                    catalogueExpanded ? styles.ruleCatalogueExpanded : ""
+                  }`}
+                  aria-label="Discovered rule catalogue"
+                >
+                  <button
+                    className={styles.catalogueToggle}
+                    type="button"
+                    aria-expanded={catalogueExpanded}
+                    onClick={() =>
+                      setCatalogueExpanded((current) => !current)
+                    }
+                  >
+                    <span aria-hidden="true">⌘</span>
+                    <strong>Rules</strong>
+                    <small>{discoveredRulePartIds.length}</small>
+                  </button>
+                  <div
+                    className={styles.catalogueContents}
+                    aria-hidden={!catalogueExpanded}
+                  >
+                    {(["combine", "change"] as const).map((section) => {
+                      const discovered = RULE_CATALOGUE.filter(
+                        (part) =>
+                          part.section === section &&
+                          discoveredPartIdSet.has(part.id),
+                      );
+                      return (
+                        <section key={section}>
+                          <h2>
+                            {section === "combine"
+                              ? "Combine & compare"
+                              : "Change & arrange"}
+                          </h2>
+                          {discovered.length > 0 ? (
+                            <ul>
+                              {discovered.map((part) => (
+                                <li title={part.name} key={part.id}>
+                                  <span aria-hidden="true">
+                                    {section === "combine" ? "◆" : "↻"}
+                                  </span>
+                                  <strong>{part.shortName}</strong>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p>Discover a rule to add it here.</p>
+                          )}
+                        </section>
+                      );
+                    })}
+                  </div>
+                </aside>
+
+                <div className={styles.playSurface}>
+                  <div className={styles.gameBoard} id="campaign-play-area">
                   <section
                     className={styles.cluePanel}
                     aria-label="Pattern matrix and rule cue"
@@ -1575,20 +1756,16 @@ export default function PatternMatrixPage() {
                             ? "Completed three by three visual matrix."
                             : "Three by three visual matrix with the final tile missing."
                         } ${
-                          round.cueMode === "hidden"
+                          activeCueMode === "hidden"
                             ? "Infer the complete rule."
-                            : round.cueMode === "operation-only"
-                              ? `${operationLabel(
-                                  round.rule.operation,
-                                )}; infer the turn.`
-                              : ruleLabel(round.rule)
+                            : ruleLabel(round.rule)
                         }`}
                         missingRef={missingCellRef}
                         highlightFinalRow={phase === "wrong-review"}
                       />
                       <RuleCue
                         rule={round.rule}
-                        cueMode={round.cueMode}
+                        cueMode={activeCueMode}
                       />
                     </div>
                   </section>
@@ -1626,7 +1803,7 @@ export default function PatternMatrixPage() {
                         const answerState = showCorrect
                           ? ", correct answer"
                           : showWrong
-                            ? `, your answer; ${activeIncorrectFeedback?.message ?? "does not complete the row"}`
+                            ? `, your answer; ${activeIncorrectFeedback?.message ?? "does not complete the matrix"}`
                             : "";
 
                         return (
@@ -1641,7 +1818,7 @@ export default function PatternMatrixPage() {
                             disabled={phase !== "idle"}
                             aria-label={`Option ${
                               optionIndex + 1
-                            }, visual dot tile${answerState}`}
+                            }, visual pattern tile${answerState}`}
                             aria-keyshortcuts={`${optionIndex + 1}`}
                             ref={(node) => {
                               optionButtonRefs.current[optionIndex] = node;
@@ -1703,7 +1880,11 @@ export default function PatternMatrixPage() {
                     <>
                       <span className={styles.correctMessage}>
                         <strong className={styles.correctText}>✓ Correct</strong>
-                        <small>{ruleLabel(round.rule)}</small>
+                        <RuleCue
+                          rule={round.rule}
+                          cueMode="full-rule"
+                          compact
+                        />
                       </span>
                       <button
                         className={styles.nextButton}
@@ -1728,8 +1909,9 @@ export default function PatternMatrixPage() {
                   ) : null}
                 </div>
 
-                <p className={styles.keyboardHint}>Keys 1–4</p>
-              </>
+                  <p className={styles.keyboardHint}>Keys 1–4</p>
+                </div>
+              </div>
             )}
           </>
         ) : (
@@ -1808,7 +1990,7 @@ export default function PatternMatrixPage() {
                           />
                           <RuleCue
                             rule={missedRound.rule}
-                            cueMode={missedRound.cueMode}
+                            cueMode="full-rule"
                             compact
                           />
                           <div className={styles.reviewWrong}>
@@ -1860,6 +2042,36 @@ export default function PatternMatrixPage() {
           </section>
         )}
       </main>
+
+      <dialog
+        className={styles.ruleLessonDialog}
+        ref={lessonDialogRef}
+        aria-labelledby="rule-lesson-title"
+        onCancel={(event) => {
+          event.preventDefault();
+          closeActiveLesson();
+        }}
+      >
+        {activeLesson && activeLessonPart ? (
+          <div className={styles.ruleLessonCard}>
+            <p className={styles.kicker}>New rule discovered</p>
+            <h2 id="rule-lesson-title">{activeLessonPart.name}</h2>
+            <p>{activeLessonPart.description}</p>
+            <RuleCue
+              rule={activeLesson.rule}
+              cueMode="full-rule"
+            />
+            <button
+              className={styles.primaryButton}
+              type="button"
+              onClick={closeActiveLesson}
+            >
+              {pendingLessons.length > 1 ? "Next rule" : "Got it"}
+              <span aria-hidden="true">→</span>
+            </button>
+          </div>
+        ) : null}
+      </dialog>
 
       {ghostPortal}
     </div>
