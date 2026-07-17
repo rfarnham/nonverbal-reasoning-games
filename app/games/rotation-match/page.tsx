@@ -32,18 +32,36 @@ import styles from "./rotation-match.module.css";
 
 type PatternSize = "tutorialPattern" | "clue" | "option" | "review" | "ghost";
 type GamePhase = "idle" | "animating" | "wrong-review" | "answered";
-type SessionMode = "curated" | "infinite" | "redemption";
+type SessionMode = "campaign" | "infinite" | "redemption";
+type CampaignLevelId = "starter" | "junior" | "expert" | "wizard";
+type CampaignMarker = "correct" | "incorrect";
 
 type SessionRound = {
   id: string;
   ordinal: number;
   round: Round;
+  campaign?: {
+    levelId: CampaignLevelId;
+    levelLabel: string;
+    problemIndex: number;
+  };
 };
 
 type MistakeRecord = {
   sessionRound: SessionRound;
   chosenIndex: number;
 };
+
+type CampaignProblemProgress = {
+  solved: boolean;
+  firstAttempt: CampaignMarker;
+};
+
+type CampaignProgress = Readonly<
+  Record<string, CampaignProblemProgress | undefined>
+>;
+
+type CampaignCursors = Record<CampaignLevelId, number>;
 
 type GhostState = {
   pattern: Pattern;
@@ -65,6 +83,91 @@ const GHOST_SETTLE_MS = 930;
 const REDUCED_GHOST_MS = 140;
 const WRONG_REVIEW_MS = 2200;
 const REDUCED_WRONG_REVIEW_MS = 1300;
+const CAMPAIGN_PROBLEMS_PER_LEVEL = 12;
+
+const CAMPAIGN_LEVELS: ReadonlyArray<{
+  id: CampaignLevelId;
+  label: string;
+  difficulty: Difficulty;
+}> = [
+  { id: "starter", label: "Starter", difficulty: "Easy" },
+  { id: "junior", label: "Junior", difficulty: "Medium" },
+  { id: "expert", label: "Expert", difficulty: "Hard" },
+  { id: "wizard", label: "Wizard", difficulty: "Wizard" },
+];
+
+function initialCampaignCursors(): CampaignCursors {
+  return {
+    starter: 0,
+    junior: 0,
+    expert: 0,
+    wizard: 0,
+  };
+}
+
+function campaignLevel(levelId: CampaignLevelId) {
+  return (
+    CAMPAIGN_LEVELS.find(({ id }) => id === levelId) ?? CAMPAIGN_LEVELS[0]
+  );
+}
+
+function campaignRounds(levelId: CampaignLevelId): readonly Round[] {
+  const { difficulty } = campaignLevel(levelId);
+  return ROUNDS.filter((round) => round.difficulty === difficulty);
+}
+
+function campaignRoundId(
+  levelId: CampaignLevelId,
+  problemIndex: number,
+): string {
+  return `campaign-${levelId}-${problemIndex}`;
+}
+
+function buildCampaignSessionRound(
+  levelId: CampaignLevelId,
+  problemIndex: number,
+): SessionRound {
+  const level = campaignLevel(levelId);
+  const levelIndex = CAMPAIGN_LEVELS.findIndex(({ id }) => id === levelId);
+  const round = campaignRounds(levelId)[problemIndex] ?? ROUNDS[0];
+
+  return {
+    id: campaignRoundId(levelId, problemIndex),
+    ordinal: levelIndex * CAMPAIGN_PROBLEMS_PER_LEVEL + problemIndex + 1,
+    round,
+    campaign: {
+      levelId,
+      levelLabel: level.label,
+      problemIndex,
+    },
+  };
+}
+
+function isCampaignLevelComplete(
+  progress: CampaignProgress,
+  levelId: CampaignLevelId,
+): boolean {
+  return Array.from({ length: CAMPAIGN_PROBLEMS_PER_LEVEL }, (_, index) =>
+    progress[campaignRoundId(levelId, index)]?.solved,
+  ).every(Boolean);
+}
+
+function nextIncompleteCampaignLevel(
+  progress: CampaignProgress,
+  currentLevelId: CampaignLevelId,
+): CampaignLevelId | null {
+  const currentIndex = CAMPAIGN_LEVELS.findIndex(
+    ({ id }) => id === currentLevelId,
+  );
+
+  for (let offset = 1; offset <= CAMPAIGN_LEVELS.length; offset += 1) {
+    const candidate =
+      CAMPAIGN_LEVELS[(currentIndex + offset) % CAMPAIGN_LEVELS.length].id;
+    if (!isCampaignLevelComplete(progress, candidate)) return candidate;
+  }
+
+  return null;
+}
 
 function PatternGrid({
   pattern,
@@ -207,6 +310,22 @@ function TransformCue({ transform }: { transform: PuzzleTransform }) {
   );
 }
 
+function PuzzleTransformCue({ round }: { round: Round }) {
+  if (round.difficulty !== "Wizard") {
+    return <TransformCue transform={round.transform} />;
+  }
+
+  return (
+    <div
+      className={`${styles.turnCue} ${styles.mysteryCue}`}
+      role="img"
+      aria-label="Mystery transformation"
+    >
+      <span aria-hidden="true">?</span>
+    </div>
+  );
+}
+
 function ghostTransformCss(transform: PuzzleTransform) {
   if (transform.kind === "rotation") {
     return `rotate(${transform.angleDegrees}deg)`;
@@ -299,15 +418,17 @@ function playTones(context: AudioContext, correct: boolean) {
 
 export default function TransformationMatchPage() {
   const [started, setStarted] = useState(false);
-  const [sessionMode, setSessionMode] = useState<SessionMode>("curated");
-  const [roundQueue, setRoundQueue] = useState<readonly SessionRound[]>(() =>
-    ROUNDS.map((round, index) => ({
-      id: `curated-${index}`,
-      ordinal: index + 1,
-      round,
-    })),
-  );
+  const [sessionMode, setSessionMode] = useState<SessionMode>("campaign");
+  const [roundQueue, setRoundQueue] = useState<readonly SessionRound[]>([]);
   const [roundCursor, setRoundCursor] = useState(0);
+  const [activeCampaignLevel, setActiveCampaignLevel] =
+    useState<CampaignLevelId>("starter");
+  const [campaignCursors, setCampaignCursors] = useState<CampaignCursors>(
+    initialCampaignCursors,
+  );
+  const [campaignProgress, setCampaignProgress] = useState<CampaignProgress>(
+    {},
+  );
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [score, setScore] = useState(0);
   const [completedCount, setCompletedCount] = useState(0);
@@ -333,7 +454,17 @@ export default function TransformationMatchPage() {
   const retryFocusIndexRef = useRef<number | null>(null);
   const infiniteFingerprintsRef = useRef(new Set<string>());
 
-  const activeSessionRound = roundQueue[roundCursor] ?? roundQueue[0];
+  const isCampaign = sessionMode === "campaign";
+  const isInfinite = sessionMode === "infinite";
+  const isRedemption = sessionMode === "redemption";
+  const campaignProblemIndex = campaignCursors[activeCampaignLevel];
+  const campaignSessionRound = buildCampaignSessionRound(
+    activeCampaignLevel,
+    campaignProblemIndex,
+  );
+  const activeSessionRound = isCampaign
+    ? campaignSessionRound
+    : (roundQueue[roundCursor] ?? roundQueue[0]);
   const round = activeSessionRound?.round ?? ROUNDS[0];
   const sessionLength = roundQueue.length;
   const selectedCorrect = selectedIndex === round.correctIndex;
@@ -343,9 +474,25 @@ export default function TransformationMatchPage() {
           .length
       : 0;
   const progress = roundCursor + (phase === "answered" ? 1 : 0);
-  const isInfinite = sessionMode === "infinite";
-  const isRedemption = sessionMode === "redemption";
-  const isLastFiniteRound = !isInfinite && roundCursor === sessionLength - 1;
+  const isLastRedemptionRound =
+    isRedemption && roundCursor === sessionLength - 1;
+  const campaignSolvedCount = Object.values(campaignProgress).filter(
+    (problem) => problem?.solved,
+  ).length;
+  const campaignFirstTryScore = Object.values(campaignProgress).filter(
+    (problem) => problem?.firstAttempt === "correct",
+  ).length;
+  const campaignComplete = campaignSolvedCount === ROUNDS.length;
+  const activeCampaignLevelComplete = isCampaignLevelComplete(
+    campaignProgress,
+    activeCampaignLevel,
+  );
+  const showCampaignLevelComplete =
+    isCampaign && activeCampaignLevelComplete && phase === "idle";
+  const nextCampaignLevel = nextIncompleteCampaignLevel(
+    campaignProgress,
+    activeCampaignLevel,
+  );
 
   const clearAttemptTimers = useCallback(() => {
     if (flightTimerRef.current) {
@@ -428,6 +575,7 @@ export default function TransformationMatchPage() {
         phase !== "idle" ||
         complete ||
         !started ||
+        (isCampaign && activeCampaignLevelComplete) ||
         !activeSessionRound
       ) {
         return;
@@ -445,6 +593,21 @@ export default function TransformationMatchPage() {
       playFeedbackSound(isCorrect);
       setSelectedIndex(optionIndex);
       setPhase("animating");
+
+      if (isCampaign) {
+        setCampaignProgress((current) => {
+          const existing = current[activeSessionRound.id];
+          return {
+            ...current,
+            [activeSessionRound.id]: {
+              solved: Boolean(existing?.solved || isCorrect),
+              firstAttempt:
+                existing?.firstAttempt ??
+                (isCorrect ? "correct" : "incorrect"),
+            },
+          };
+        });
+      }
 
       if (isCorrect) {
         const wasMissed = mistakes.some(
@@ -511,8 +674,10 @@ export default function TransformationMatchPage() {
     },
     [
       activeSessionRound,
+      activeCampaignLevelComplete,
       clearAttemptTimers,
       complete,
+      isCampaign,
       isRedemption,
       mistakes,
       phase,
@@ -522,18 +687,15 @@ export default function TransformationMatchPage() {
     ],
   );
 
-  const startCurated = useCallback(() => {
+  const startCampaign = useCallback(() => {
     resumeAudio();
     infiniteFingerprintsRef.current.clear();
-    setSessionMode("curated");
-    setRoundQueue(
-      ROUNDS.map((roundItem, index) => ({
-        id: `curated-${index}`,
-        ordinal: index + 1,
-        round: roundItem,
-      })),
-    );
+    setSessionMode("campaign");
+    setRoundQueue([]);
     setRoundCursor(0);
+    setActiveCampaignLevel("starter");
+    setCampaignCursors(initialCampaignCursors());
+    setCampaignProgress({});
     setScore(0);
     setCompletedCount(0);
     setMistakes([]);
@@ -564,6 +726,32 @@ export default function TransformationMatchPage() {
     shouldFocusFirstOption.current = true;
   }, [resetAttemptState, resumeAudio]);
 
+  const selectCampaignLevel = useCallback(
+    (levelId: CampaignLevelId) => {
+      if (
+        !isCampaign ||
+        phase !== "idle" ||
+        levelId === activeCampaignLevel
+      ) {
+        return;
+      }
+
+      resetAttemptState();
+      setActiveCampaignLevel(levelId);
+      shouldFocusFirstOption.current = !isCampaignLevelComplete(
+        campaignProgress,
+        levelId,
+      );
+    },
+    [
+      activeCampaignLevel,
+      campaignProgress,
+      isCampaign,
+      phase,
+      resetAttemptState,
+    ],
+  );
+
   const startRedemption = useCallback(() => {
     if (mistakes.length === 0) return;
     const redemptionQueue = mistakes.map(({ sessionRound }, index) => ({
@@ -584,6 +772,29 @@ export default function TransformationMatchPage() {
   const goNext = useCallback(() => {
     if (phase !== "answered") return;
 
+    if (isCampaign) {
+      shouldFocusFirstOption.current = true;
+      resetAttemptState();
+
+      if (campaignProblemIndex < CAMPAIGN_PROBLEMS_PER_LEVEL - 1) {
+        setCampaignCursors((current) => ({
+          ...current,
+          [activeCampaignLevel]: campaignProblemIndex + 1,
+        }));
+        return;
+      }
+
+      if (campaignComplete) {
+        setComplete(true);
+        return;
+      }
+
+      if (nextCampaignLevel) {
+        setActiveCampaignLevel(nextCampaignLevel);
+      }
+      return;
+    }
+
     if (isInfinite) {
       const nextOrdinal = (activeSessionRound?.ordinal ?? roundCursor + 1) + 1;
       const nextRound = buildInfiniteSessionRound(
@@ -597,7 +808,7 @@ export default function TransformationMatchPage() {
       return;
     }
 
-    if (isLastFiniteRound) {
+    if (isLastRedemptionRound) {
       resetAttemptState();
       setComplete(true);
       return;
@@ -607,9 +818,14 @@ export default function TransformationMatchPage() {
     resetAttemptState();
     setRoundCursor((current) => current + 1);
   }, [
+    activeCampaignLevel,
     activeSessionRound?.ordinal,
+    campaignComplete,
+    campaignProblemIndex,
+    isCampaign,
     isInfinite,
-    isLastFiniteRound,
+    isLastRedemptionRound,
+    nextCampaignLevel,
     phase,
     resetAttemptState,
     roundCursor,
@@ -684,7 +900,14 @@ export default function TransformationMatchPage() {
       optionButtonRefs.current[0]?.focus();
       shouldFocusFirstOption.current = false;
     }
-  }, [complete, roundCursor, sessionMode, started]);
+  }, [
+    activeCampaignLevel,
+    campaignProblemIndex,
+    complete,
+    roundCursor,
+    sessionMode,
+    started,
+  ]);
 
   useEffect(() => {
     if (phase === "idle" && retryReady && retryFocusIndexRef.current !== null) {
@@ -745,13 +968,14 @@ export default function TransformationMatchPage() {
     };
   }, [clearAttemptTimers]);
 
+  const firstTryScore = isCampaign ? campaignFirstTryScore : score;
   const resultMessage = useMemo(() => {
     const denominator = isInfinite ? Math.max(completedCount, 1) : ROUNDS.length;
-    const accuracy = score / denominator;
+    const accuracy = firstTryScore / denominator;
     if (accuracy === 1) return "Perfect set.";
     if (accuracy >= 0.7) return "Sharp work.";
     return "Good practice.";
-  }, [completedCount, isInfinite, score]);
+  }, [completedCount, firstTryScore, isInfinite]);
 
   const showRedemptionOffer = !isRedemption && mistakes.length > 0;
   const resultTitle = isRedemption
@@ -859,9 +1083,9 @@ export default function TransformationMatchPage() {
               <button
                 className={styles.primaryButton}
                 type="button"
-                onClick={startCurated}
+                onClick={startCampaign}
               >
-                36 puzzles
+                Campaign
                 <span aria-hidden="true">→</span>
               </button>
               <button
@@ -876,8 +1100,109 @@ export default function TransformationMatchPage() {
           </section>
         ) : !complete ? (
           <>
-            <div className={styles.gameStatus}>
-              {isInfinite ? (
+            <div
+              className={`${styles.gameStatus} ${
+                isCampaign ? styles.campaignStatus : ""
+              }`}
+            >
+              {isCampaign ? (
+                <nav
+                  className={styles.campaignNavigator}
+                  aria-label="Campaign progress"
+                >
+                  <div
+                    className={styles.campaignLevels}
+                    aria-label="Campaign levels"
+                  >
+                    {CAMPAIGN_LEVELS.map((level) => {
+                      const levelComplete = isCampaignLevelComplete(
+                        campaignProgress,
+                        level.id,
+                      );
+                      const hasIncorrect = Array.from(
+                        { length: CAMPAIGN_PROBLEMS_PER_LEVEL },
+                        (_, index) =>
+                          campaignProgress[
+                            campaignRoundId(level.id, index)
+                          ]?.firstAttempt === "incorrect",
+                      ).some(Boolean);
+                      const levelState = hasIncorrect
+                        ? "incorrect"
+                        : levelComplete
+                          ? "correct"
+                          : "not done";
+
+                      return (
+                        <button
+                          className={`${styles.campaignLevel} ${
+                            levelState === "correct"
+                              ? styles.campaignLevelCorrect
+                              : levelState === "incorrect"
+                                ? styles.campaignLevelIncorrect
+                                : styles.campaignLevelNotDone
+                          } ${
+                            activeCampaignLevel === level.id
+                              ? styles.campaignLevelActive
+                              : ""
+                          }`}
+                          type="button"
+                          aria-pressed={activeCampaignLevel === level.id}
+                          aria-controls="campaign-play-area"
+                          aria-label={`${level.label}, ${levelState}`}
+                          disabled={phase !== "idle"}
+                          onClick={() => selectCampaignLevel(level.id)}
+                          key={level.id}
+                        >
+                          {level.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div
+                    className={styles.campaignProblems}
+                    role="list"
+                    aria-label={`${campaignLevel(activeCampaignLevel).label} problems`}
+                  >
+                    {Array.from(
+                      { length: CAMPAIGN_PROBLEMS_PER_LEVEL },
+                      (_, problemIndex) => {
+                        const problem =
+                          campaignProgress[
+                            campaignRoundId(
+                              activeCampaignLevel,
+                              problemIndex,
+                            )
+                          ];
+                        const marker = problem?.firstAttempt ?? "not-done";
+                        const isCurrent =
+                          !activeCampaignLevelComplete &&
+                          problemIndex === campaignProblemIndex;
+
+                        return (
+                          <span
+                            className={`${styles.campaignProblem} ${
+                              marker === "correct"
+                                ? styles.campaignProblemCorrect
+                                : marker === "incorrect"
+                                  ? styles.campaignProblemIncorrect
+                                  : styles.campaignProblemNotDone
+                            } ${
+                              isCurrent ? styles.campaignProblemCurrent : ""
+                            }`}
+                            role="listitem"
+                            aria-label={`${campaignLevel(activeCampaignLevel).label} problem ${
+                              problemIndex + 1
+                            }: ${marker === "not-done" ? "not done" : marker}`}
+                            aria-current={isCurrent ? "step" : undefined}
+                            key={problemIndex}
+                          />
+                        );
+                      },
+                    )}
+                  </div>
+                </nav>
+              ) : isInfinite ? (
                 <div className={styles.infiniteTrack} aria-label="Infinite mode">
                   ∞
                 </div>
@@ -900,16 +1225,24 @@ export default function TransformationMatchPage() {
                 </div>
               )}
               <span className={styles.roundCount}>
-                {activeSessionRound?.ordinal ?? roundCursor + 1} / {isInfinite ? "∞" : sessionLength}
+                {isCampaign
+                  ? `${campaignProblemIndex + 1} / ${CAMPAIGN_PROBLEMS_PER_LEVEL}`
+                  : `${activeSessionRound?.ordinal ?? roundCursor + 1} / ${
+                      isInfinite ? "∞" : sessionLength
+                    }`}
               </span>
-              <span className={styles.difficulty}>{round.difficulty}</span>
+              {!isCampaign ? (
+                <span className={styles.difficulty}>{round.difficulty}</span>
+              ) : null}
               <span
                 className={styles.score}
                 aria-label={
-                  isRedemption ? "Redemption mode" : `First try score ${score}`
+                  isRedemption
+                    ? "Redemption mode"
+                    : `First try score ${firstTryScore}`
                 }
               >
-                {isRedemption ? "Retry" : `${score} ✓`}
+                {isRedemption ? "Retry" : `${firstTryScore} ✓`}
               </span>
               {isInfinite ? (
                 <button
@@ -927,7 +1260,36 @@ export default function TransformationMatchPage() {
               ) : null}
             </div>
 
-            <div className={styles.gameBoard}>
+            {showCampaignLevelComplete ? (
+              <section
+                className={styles.levelCompleteCard}
+                id="campaign-play-area"
+                aria-labelledby="level-complete-title"
+              >
+                <p className={styles.kicker}>
+                  {campaignLevel(activeCampaignLevel).label} · 12 / 12
+                </p>
+                <h2 id="level-complete-title">Level complete</h2>
+                <button
+                  className={styles.primaryButton}
+                  type="button"
+                  onClick={() => {
+                    if (nextCampaignLevel) {
+                      selectCampaignLevel(nextCampaignLevel);
+                    } else {
+                      setComplete(true);
+                    }
+                  }}
+                >
+                  {nextCampaignLevel
+                    ? campaignLevel(nextCampaignLevel).label
+                    : "Results"}
+                  <span aria-hidden="true">→</span>
+                </button>
+              </section>
+            ) : (
+              <>
+                <div className={styles.gameBoard} id="campaign-play-area">
               <section className={styles.cluePanel} aria-label="Pattern and transform">
                 <div
                   className={`${styles.clueStage} ${
@@ -942,7 +1304,7 @@ export default function TransformationMatchPage() {
                     label={`Starting pattern: ${describePattern(round.clue)}`}
                     gridRef={clueGridRef}
                   />
-                  <TransformCue transform={round.transform} />
+                  <PuzzleTransformCue round={round} />
                 </div>
               </section>
 
@@ -1012,7 +1374,7 @@ export default function TransformationMatchPage() {
                   })}
                 </div>
               </section>
-            </div>
+                </div>
 
             <div className={styles.feedbackBar} aria-live="polite" role="status">
               {phase === "wrong-review" ? (
@@ -1029,7 +1391,13 @@ export default function TransformationMatchPage() {
                     onClick={goNext}
                     ref={nextButtonRef}
                   >
-                    {isLastFiniteRound ? "Results" : "Next"}
+                    {isLastRedemptionRound || (isCampaign && campaignComplete)
+                      ? "Results"
+                      : isCampaign &&
+                          campaignProblemIndex ===
+                            CAMPAIGN_PROBLEMS_PER_LEVEL - 1
+                        ? "Next level"
+                        : "Next"}
                     <span aria-hidden="true">→</span>
                   </button>
                 </>
@@ -1038,7 +1406,9 @@ export default function TransformationMatchPage() {
               ) : null}
             </div>
 
-            <p className={styles.keyboardHint}>Keys 1–4</p>
+                <p className={styles.keyboardHint}>Keys 1–4</p>
+              </>
+            )}
           </>
         ) : (
           <section
@@ -1054,7 +1424,9 @@ export default function TransformationMatchPage() {
               {resultTitle}
             </h1>
             <p className={styles.resultScore}>
-              <strong>{isRedemption ? redemptionTotal : score}</strong>
+              <strong>
+                {isRedemption ? redemptionTotal : firstTryScore}
+              </strong>
               <span>
                 {isRedemption
                   ? `of ${redemptionTotal} cleared`
@@ -1075,7 +1447,11 @@ export default function TransformationMatchPage() {
                   return (
                     <article className={styles.reviewCard} key={missed.id}>
                       <span className={styles.reviewRound}>
-                        Puzzle {missed.ordinal} · {missedRound.difficulty}
+                        {missed.campaign
+                          ? `${missed.campaign.levelLabel} · Puzzle ${
+                              missed.campaign.problemIndex + 1
+                            }`
+                          : `Puzzle ${missed.ordinal} · ${missedRound.difficulty}`}
                       </span>
                       <div className={styles.reviewVisual}>
                         <PatternGrid
@@ -1085,7 +1461,7 @@ export default function TransformationMatchPage() {
                             missedRound.clue,
                           )}`}
                         />
-                        <TransformCue transform={missedRound.transform} />
+                        <PuzzleTransformCue round={missedRound} />
                         <div className={styles.reviewWrong}>
                           <PatternGrid
                             pattern={wrongPattern}
@@ -1117,7 +1493,7 @@ export default function TransformationMatchPage() {
                 <button
                   className={styles.primaryButton}
                   type="button"
-                  onClick={startCurated}
+                  onClick={startCampaign}
                 >
                   Play again
                 </button>

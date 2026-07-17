@@ -10,6 +10,8 @@ import {
   buildRounds,
   differingTileIndexes,
   generateInfiniteRound,
+  hiddenTransformKeys,
+  hiddenTransformOptionIndexes,
   patternKey,
   reflectPattern,
   rotatePattern,
@@ -17,6 +19,7 @@ import {
 } from "../app/games/rotation-match/game-engine.ts";
 
 const DIFFICULTIES = ["Easy", "Medium", "Hard"];
+const CAMPAIGN_DIFFICULTIES = [...DIFFICULTIES, "Wizard"];
 const MIRROR_AXES = [
   "vertical",
   "horizontal",
@@ -82,18 +85,20 @@ function generatedCorpus(countPerDifficulty = 400) {
 const GENERATED = generatedCorpus();
 
 test("the authored session contains 12 rounds at each progressive difficulty", () => {
-  assert.equal(ROUNDS.length, 36);
+  assert.equal(ROUNDS.length, 48);
   assert.deepEqual(
-    DIFFICULTIES.map((difficulty) =>
+    CAMPAIGN_DIFFICULTIES.map((difficulty) =>
       ROUNDS.filter((round) => round.difficulty === difficulty).length,
     ),
-    [12, 12, 12],
+    [12, 12, 12, 12],
   );
   assert.deepEqual(
     ROUNDS.map((round) => round.difficulty),
-    DIFFICULTIES.flatMap((difficulty) => Array(12).fill(difficulty)),
+    CAMPAIGN_DIFFICULTIES.flatMap((difficulty) =>
+      Array(12).fill(difficulty),
+    ),
   );
-  assert.equal(new Set(ROUNDS.map(roundFingerprint)).size, 36);
+  assert.equal(new Set(ROUNDS.map(roundFingerprint)).size, 48);
 
   for (const [index, round] of ROUNDS.entries()) {
     assertValidRound(round, `authored round ${index + 1}`);
@@ -101,7 +106,7 @@ test("the authored session contains 12 rounds at each progressive difficulty", (
 });
 
 test("each authored difficulty covers every turn length, direction, and reflection axis", () => {
-  for (const difficulty of DIFFICULTIES) {
+  for (const difficulty of CAMPAIGN_DIFFICULTIES) {
     const rounds = ROUNDS.filter((round) => round.difficulty === difficulty);
     const rotations = rounds.filter(
       ({ transform }) => transform.kind === "rotation",
@@ -132,18 +137,68 @@ test("each authored difficulty covers every turn length, direction, and reflecti
   }
 });
 
-test("authored progression stays flat before directional motifs appear on hard", () => {
-  for (const round of ROUNDS.filter(({ difficulty }) => difficulty !== "Hard")) {
+test("authored progression stays flat before directional motifs appear on hard and wizard", () => {
+  for (const round of ROUNDS.filter(({ difficulty }) =>
+    ["Easy", "Medium"].includes(difficulty),
+  )) {
     assert.ok(round.clue.every((tile) => tile.motif === "none"));
   }
 
-  for (const round of ROUNDS.filter(({ difficulty }) => difficulty === "Hard")) {
+  for (const round of ROUNDS.filter(({ difficulty }) =>
+    ["Hard", "Wizard"].includes(difficulty),
+  )) {
     assert.ok(round.clue.some((tile) => tile.motif === "cap"));
     assert.ok(round.optionKinds.includes("one-motif-off"));
   }
 
   for (const round of ROUNDS.filter(({ difficulty }) => difficulty === "Medium")) {
     assert.ok(round.optionKinds.includes("one-block-off"));
+  }
+});
+
+test("wizard rounds have one and only one valid answer with the operation hidden", () => {
+  const wizardRounds = ROUNDS.filter(
+    ({ difficulty }) => difficulty === "Wizard",
+  );
+  assert.equal(wizardRounds.length, 12);
+
+  for (const [index, round] of wizardRounds.entries()) {
+    assert.equal(
+      hiddenTransformKeys(round.clue).size,
+      7,
+      `wizard ${index + 1} must have no rotational or mirror symmetry`,
+    );
+    assert.deepEqual(
+      hiddenTransformOptionIndexes(round.clue, round.options),
+      [round.correctIndex],
+      `wizard ${index + 1} hidden answer`,
+    );
+    assert.equal(new Set(round.options.map(patternKey)).size, 4);
+  }
+});
+
+test("wizard rounds are dense motif puzzles with only close near-misses", () => {
+  for (const [index, round] of ROUNDS.filter(
+    ({ difficulty }) => difficulty === "Wizard",
+  ).entries()) {
+    const filled = round.clue.filter(({ color }) => color !== "empty");
+    const motifs = filled.filter(({ motif }) => motif === "cap");
+    assert.ok(filled.length >= 7, `wizard ${index + 1} density`);
+    assert.ok(motifs.length >= 4, `wizard ${index + 1} motifs`);
+    assert.equal(
+      round.optionKinds.filter((kind) => kind === "one-motif-off").length,
+      2,
+    );
+    assert.ok(round.optionKinds.includes("one-block-off"));
+
+    for (const [optionIndex, option] of round.options.entries()) {
+      if (optionIndex === round.correctIndex) continue;
+      const differences = differingTileIndexes(option, round.correctPattern);
+      assert.ok(
+        differences.length >= 1 && differences.length <= 2,
+        `wizard ${index + 1} option ${optionIndex + 1} closeness`,
+      );
+    }
   }
 });
 
@@ -465,6 +520,10 @@ test("generation retries rejected candidates and fails safely for hostile random
   }
   assert.throws(
     () => generateInfiniteRound("Impossible", makeSeededRandom(1)),
+    /Unknown difficulty/,
+  );
+  assert.throws(
+    () => generateInfiniteRound("Wizard", makeSeededRandom(1)),
     /Unknown difficulty/,
   );
 });

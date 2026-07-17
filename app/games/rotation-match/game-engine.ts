@@ -9,7 +9,8 @@ export type Tile = {
 };
 
 export type Pattern = readonly Tile[];
-export type Difficulty = "Easy" | "Medium" | "Hard";
+export type Difficulty = "Easy" | "Medium" | "Hard" | "Wizard";
+type GeneratedDifficulty = Exclude<Difficulty, "Wizard">;
 export type RotationDirection = "clockwise" | "counterclockwise";
 export type MirrorAxis =
   | "vertical"
@@ -131,7 +132,7 @@ const MIRROR_DISTRACTORS: readonly DistractorKind[] = [
 ];
 
 const GENERATED_DIFFICULTY_RULES: Record<
-  Difficulty,
+  GeneratedDifficulty,
   {
     minFilled: number;
     maxFilled: number;
@@ -516,6 +517,172 @@ const ROUND_SPECS: readonly RoundSpec[] = [
     correctIndex: 2,
     distractors: ["one-motif-off", "one-block-off", "mirror-main-diagonal"],
   },
+
+  // Wizard: the operation is hidden in the UI, so every near-miss is a small
+  // edit of the true answer rather than another valid geometric transform.
+  {
+    pattern: "CTV.GC.VT",
+    motifs: [
+      { index: 0, orientation: 0 },
+      { index: 2, orientation: 3 },
+      { index: 4, orientation: 1 },
+      { index: 8, orientation: 2 },
+    ],
+    direction: "clockwise",
+    quarterTurns: 1,
+    difficulty: "Wizard",
+    correctIndex: 0,
+    distractors: ["one-motif-off", "one-block-off", "one-motif-off"],
+  },
+  {
+    pattern: "G.VCTTG.C",
+    motifs: [
+      { index: 0, orientation: 2 },
+      { index: 2, orientation: 0 },
+      { index: 5, orientation: 3 },
+      { index: 6, orientation: 1 },
+    ],
+    direction: "counterclockwise",
+    quarterTurns: 1,
+    difficulty: "Wizard",
+    correctIndex: 2,
+    distractors: ["one-motif-off", "one-block-off", "one-motif-off"],
+  },
+  {
+    pattern: "VC.TG.CVT",
+    motifs: [
+      { index: 0, orientation: 3 },
+      { index: 3, orientation: 1 },
+      { index: 6, orientation: 0 },
+      { index: 8, orientation: 2 },
+    ],
+    direction: "clockwise",
+    quarterTurns: 2,
+    difficulty: "Wizard",
+    correctIndex: 1,
+    distractors: ["one-motif-off", "one-block-off", "one-motif-off"],
+  },
+  {
+    pattern: ".TGCV.VCG",
+    motifs: [
+      { index: 1, orientation: 0 },
+      { index: 3, orientation: 2 },
+      { index: 6, orientation: 3 },
+      { index: 8, orientation: 1 },
+    ],
+    direction: "counterclockwise",
+    quarterTurns: 2,
+    difficulty: "Wizard",
+    correctIndex: 3,
+    distractors: ["one-motif-off", "one-block-off", "one-motif-off"],
+  },
+  {
+    pattern: "CGT.VCV.G",
+    motifs: [
+      { index: 0, orientation: 1 },
+      { index: 2, orientation: 3 },
+      { index: 4, orientation: 0 },
+      { index: 6, orientation: 2 },
+    ],
+    direction: "clockwise",
+    quarterTurns: 3,
+    difficulty: "Wizard",
+    correctIndex: 2,
+    distractors: ["one-motif-off", "one-block-off", "one-motif-off"],
+  },
+  {
+    pattern: "TV.CGGT.C",
+    motifs: [
+      { index: 0, orientation: 2 },
+      { index: 3, orientation: 0 },
+      { index: 5, orientation: 1 },
+      { index: 8, orientation: 3 },
+    ],
+    direction: "counterclockwise",
+    quarterTurns: 3,
+    difficulty: "Wizard",
+    correctIndex: 0,
+    distractors: ["one-motif-off", "one-block-off", "one-motif-off"],
+  },
+  {
+    pattern: "GCTV..CVG",
+    motifs: [
+      { index: 0, orientation: 3 },
+      { index: 2, orientation: 1 },
+      { index: 6, orientation: 2 },
+      { index: 8, orientation: 0 },
+    ],
+    axis: "vertical",
+    difficulty: "Wizard",
+    correctIndex: 3,
+    distractors: ["one-motif-off", "one-block-off", "one-motif-off"],
+  },
+  {
+    pattern: "V.CGTTC.G",
+    motifs: [
+      { index: 0, orientation: 0 },
+      { index: 3, orientation: 3 },
+      { index: 5, orientation: 2 },
+      { index: 8, orientation: 1 },
+    ],
+    axis: "horizontal",
+    difficulty: "Wizard",
+    correctIndex: 1,
+    distractors: ["one-motif-off", "one-block-off", "one-motif-off"],
+  },
+  {
+    pattern: "TC.VG.CGV",
+    motifs: [
+      { index: 0, orientation: 1 },
+      { index: 3, orientation: 2 },
+      { index: 6, orientation: 0 },
+      { index: 8, orientation: 3 },
+    ],
+    axis: "main-diagonal",
+    difficulty: "Wizard",
+    correctIndex: 2,
+    distractors: ["one-motif-off", "one-block-off", "one-motif-off"],
+  },
+  {
+    pattern: ".VCGTG.CT",
+    motifs: [
+      { index: 1, orientation: 3 },
+      { index: 3, orientation: 0 },
+      { index: 5, orientation: 2 },
+      { index: 8, orientation: 1 },
+    ],
+    axis: "anti-diagonal",
+    difficulty: "Wizard",
+    correctIndex: 0,
+    distractors: ["one-motif-off", "one-block-off", "one-motif-off"],
+  },
+  {
+    pattern: "CTG.VGCV.",
+    motifs: [
+      { index: 0, orientation: 2 },
+      { index: 2, orientation: 0 },
+      { index: 5, orientation: 3 },
+      { index: 7, orientation: 1 },
+    ],
+    direction: "clockwise",
+    quarterTurns: 1,
+    difficulty: "Wizard",
+    correctIndex: 1,
+    distractors: ["one-motif-off", "one-block-off", "one-motif-off"],
+  },
+  {
+    pattern: "GTCV.C.VT",
+    motifs: [
+      { index: 0, orientation: 0 },
+      { index: 3, orientation: 1 },
+      { index: 5, orientation: 3 },
+      { index: 8, orientation: 2 },
+    ],
+    axis: "horizontal",
+    difficulty: "Wizard",
+    correctIndex: 3,
+    distractors: ["one-motif-off", "one-block-off", "one-motif-off"],
+  },
 ] as const;
 
 function normalizeOrientation(value: number): Orientation {
@@ -837,7 +1004,7 @@ function shuffled<T>(values: readonly T[], random: () => number): T[] {
 }
 
 function makeGeneratedPattern(
-  difficulty: Difficulty,
+  difficulty: GeneratedDifficulty,
   random: () => number,
 ): Pattern {
   const rules = GENERATED_DIFFICULTY_RULES[difficulty];
@@ -883,9 +1050,47 @@ function dihedralKeys(pattern: Pattern): readonly string[] {
   ];
 }
 
+/**
+ * Returns every answer reachable by one supported non-identity rotation or
+ * reflection. Equivalent clockwise/counterclockwise rotations collapse to the
+ * same pattern key.
+ */
+export function hiddenTransformKeys(pattern: Pattern): ReadonlySet<string> {
+  return new Set([
+    patternKey(rotatePattern(pattern, 1)),
+    patternKey(rotatePattern(pattern, 2)),
+    patternKey(rotatePattern(pattern, 3)),
+    patternKey(reflectPattern(pattern, "vertical")),
+    patternKey(reflectPattern(pattern, "horizontal")),
+    patternKey(reflectPattern(pattern, "main-diagonal")),
+    patternKey(reflectPattern(pattern, "anti-diagonal")),
+  ]);
+}
+
+/** Finds the options that could be answers when the operation is hidden. */
+export function hiddenTransformOptionIndexes(
+  clue: Pattern,
+  options: readonly Pattern[],
+): readonly number[] {
+  const validKeys = hiddenTransformKeys(clue);
+  return options.flatMap((option, index) =>
+    validKeys.has(patternKey(option)) ? [index] : [],
+  );
+}
+
+function isGeneratedDifficulty(
+  difficulty: Difficulty,
+): difficulty is GeneratedDifficulty {
+  return (
+    difficulty === "Easy" ||
+    difficulty === "Medium" ||
+    difficulty === "Hard"
+  );
+}
+
 function isInterestingGeneratedPattern(
   pattern: Pattern,
-  difficulty: Difficulty,
+  difficulty: GeneratedDifficulty,
 ): boolean {
   const rules = GENERATED_DIFFICULTY_RULES[difficulty];
   const filled = pattern.filter(({ color }) => color !== "empty");
@@ -921,7 +1126,7 @@ function randomTransform(random: () => number): PuzzleTransform {
 }
 
 function generatedDistractorKinds(
-  difficulty: Difficulty,
+  difficulty: GeneratedDifficulty,
   transform: PuzzleTransform,
   random: () => number,
 ): readonly [DistractorKind, DistractorKind, DistractorKind] {
@@ -951,7 +1156,7 @@ export function generateInfiniteRound(
   difficulty: Difficulty,
   random: () => number = Math.random,
 ): Round {
-  if (!(difficulty in GENERATED_DIFFICULTY_RULES)) {
+  if (!isGeneratedDifficulty(difficulty)) {
     throw new Error(`Unknown difficulty: ${difficulty}`);
   }
 
@@ -1025,6 +1230,17 @@ export function buildRounds(): readonly Round[] {
     );
     if (!round) {
       throw new Error(`Round ${roundIndex + 1} has duplicate answer options.`);
+    }
+    if (
+      spec.difficulty === "Wizard" &&
+      (new Set(dihedralKeys(round.clue)).size !== 8 ||
+        hiddenTransformOptionIndexes(round.clue, round.options).length !== 1 ||
+        hiddenTransformOptionIndexes(round.clue, round.options)[0] !==
+          round.correctIndex)
+    ) {
+      throw new Error(
+        `Wizard round ${roundIndex + 1} does not have one unique hidden-transform answer.`,
+      );
     }
     return round;
   });
