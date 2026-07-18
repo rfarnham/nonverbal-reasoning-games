@@ -680,6 +680,7 @@ a {
 
   .pattern-scene {
     min-height: 400px;
+    overflow: clip;
   }
 
   .pattern-card {

@@ -22,11 +22,12 @@ test("exports the catalog and implemented game routes as refresh-safe pages", as
     access(new URL("404.html", outputRoot)),
   ]);
 
-  const [home, rotationGame, patternGame, libraGame] = await Promise.all([
+  const [home, rotationGame, patternGame, libraGame, whoseLeftGame] = await Promise.all([
     readOutput("index.html"),
     readOutput("games/rotation-match/index.html"),
     readOutput("games/pattern-matrix/index.html"),
     readOutput("games/libra/index.html"),
+    readOutput("games/whose-left/index.html"),
   ]);
 
   assert.match(home, /Spatial Gym/);
@@ -34,6 +35,7 @@ test("exports the catalog and implemented game routes as refresh-safe pages", as
   assert.match(home, /Transformation Match/);
   assert.match(home, /Pattern Matrix/);
   assert.match(home, /Libra/);
+  assert.match(home, /Whose Left\?/);
   assert.match(rotationGame, /Transformation Match/);
   assert.match(rotationGame, />Campaign</);
   assert.doesNotMatch(rotationGame, />36 puzzles</);
@@ -48,15 +50,19 @@ test("exports the catalog and implemented game routes as refresh-safe pages", as
   assert.match(libraGame, /Libra/);
   assert.match(libraGame, />Campaign</);
   assert.match(libraGame, />Infinite</);
+  assert.match(whoseLeftGame, /Whose Left\?/);
+  assert.match(whoseLeftGame, />Campaign</);
+  assert.match(whoseLeftGame, />Infinite</);
   assert.doesNotMatch(home, /codex-preview|Your site is taking shape/i);
 });
 
 test("applies the GitHub Pages project base path to internal assets and links", async () => {
   const packages = await discoverGamePackages();
-  const [home, patternGame, libraGame] = await Promise.all([
+  const [home, patternGame, libraGame, whoseLeftGame] = await Promise.all([
     readOutput("index.html"),
     readOutput("games/pattern-matrix/index.html"),
     readOutput("games/libra/index.html"),
+    readOutput("games/whose-left/index.html"),
   ]);
 
   for (const { slug } of packages) {
@@ -68,9 +74,12 @@ test("applies the GitHub Pages project base path to internal assets and links", 
   assert.match(patternGame, new RegExp(`["']${basePath}/_next/`));
   assert.match(libraGame, new RegExp(`href=["']${basePath}/["']`));
   assert.match(libraGame, new RegExp(`["']${basePath}/_next/`));
+  assert.match(whoseLeftGame, new RegExp(`href=["']${basePath}/["']`));
+  assert.match(whoseLeftGame, new RegExp(`["']${basePath}/_next/`));
   assert.doesNotMatch(home, /(?:href|src)=["']\/_next\//);
   assert.doesNotMatch(patternGame, /(?:href|src)=["']\/_next\//);
   assert.doesNotMatch(libraGame, /(?:href|src)=["']\/_next\//);
+  assert.doesNotMatch(whoseLeftGame, /(?:href|src)=["']\/_next\//);
 });
 
 test("ships project metadata and contributor documentation", async () => {
@@ -91,6 +100,10 @@ test("ships project metadata and contributor documentation", async () => {
   assert.match(
     readme,
     /\[Libra\]\(https:\/\/rfarnham\.github\.io\/nonverbal-reasoning-games\/games\/libra\/\).*Playable/,
+  );
+  assert.match(
+    readme,
+    /\[Whose Left\?\]\(https:\/\/rfarnham\.github\.io\/nonverbal-reasoning-games\/games\/whose-left\/\).*Playable/,
   );
   assert.match(decisions, /Good next decisions/);
   assert.match(gameGuide, /exactly one correct answer/);
