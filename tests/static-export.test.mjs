@@ -22,16 +22,18 @@ test("exports the catalog and implemented game routes as refresh-safe pages", as
     access(new URL("404.html", outputRoot)),
   ]);
 
-  const [home, rotationGame, patternGame] = await Promise.all([
+  const [home, rotationGame, patternGame, libraGame] = await Promise.all([
     readOutput("index.html"),
     readOutput("games/rotation-match/index.html"),
     readOutput("games/pattern-matrix/index.html"),
+    readOutput("games/libra/index.html"),
   ]);
 
   assert.match(home, /Spatial Gym/);
   assert.match(home, /Train how/);
   assert.match(home, /Transformation Match/);
   assert.match(home, /Pattern Matrix/);
+  assert.match(home, /Libra/);
   assert.match(rotationGame, /Transformation Match/);
   assert.match(rotationGame, />Campaign</);
   assert.doesNotMatch(rotationGame, />36 puzzles</);
@@ -43,14 +45,18 @@ test("exports the catalog and implemented game routes as refresh-safe pages", as
     patternGame,
     /https:\/\/rfarnham\.github\.io\/nonverbal-reasoning-games\/games\/pattern-matrix\//,
   );
+  assert.match(libraGame, /Libra/);
+  assert.match(libraGame, />Campaign</);
+  assert.match(libraGame, />Infinite</);
   assert.doesNotMatch(home, /codex-preview|Your site is taking shape/i);
 });
 
 test("applies the GitHub Pages project base path to internal assets and links", async () => {
   const packages = await discoverGamePackages();
-  const [home, patternGame] = await Promise.all([
+  const [home, patternGame, libraGame] = await Promise.all([
     readOutput("index.html"),
     readOutput("games/pattern-matrix/index.html"),
+    readOutput("games/libra/index.html"),
   ]);
 
   for (const { slug } of packages) {
@@ -60,8 +66,11 @@ test("applies the GitHub Pages project base path to internal assets and links", 
   assert.match(home, new RegExp(`["']${basePath}/_next/`));
   assert.match(patternGame, new RegExp(`href=["']${basePath}/["']`));
   assert.match(patternGame, new RegExp(`["']${basePath}/_next/`));
+  assert.match(libraGame, new RegExp(`href=["']${basePath}/["']`));
+  assert.match(libraGame, new RegExp(`["']${basePath}/_next/`));
   assert.doesNotMatch(home, /(?:href|src)=["']\/_next\//);
   assert.doesNotMatch(patternGame, /(?:href|src)=["']\/_next\//);
+  assert.doesNotMatch(libraGame, /(?:href|src)=["']\/_next\//);
 });
 
 test("ships project metadata and contributor documentation", async () => {
@@ -78,6 +87,10 @@ test("ships project metadata and contributor documentation", async () => {
   assert.match(
     readme,
     /\[Pattern Matrix\]\(https:\/\/rfarnham\.github\.io\/nonverbal-reasoning-games\/games\/pattern-matrix\/\).*Playable/,
+  );
+  assert.match(
+    readme,
+    /\[Libra\]\(https:\/\/rfarnham\.github\.io\/nonverbal-reasoning-games\/games\/libra\/\).*Playable/,
   );
   assert.match(decisions, /Good next decisions/);
   assert.match(gameGuide, /exactly one correct answer/);

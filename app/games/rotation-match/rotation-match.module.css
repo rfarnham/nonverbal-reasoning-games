@@ -496,7 +496,7 @@
 .campaignLevel {
   --level-marker: #c9c5bb;
   min-width: 0;
-  min-height: 30px;
+  min-height: 44px;
   position: relative;
   border: 1px solid var(--line);
   border-radius: 9px;
@@ -730,7 +730,7 @@
 }
 
 .endButton {
-  min-height: 34px;
+  min-height: 44px;
   padding-inline: 11px;
 }
 
@@ -1224,7 +1224,7 @@
   }
 
   .campaignLevel {
-    min-height: 28px;
+    min-height: 44px;
     font-size: 0.64rem;
     padding-inline: 19px 4px;
   }

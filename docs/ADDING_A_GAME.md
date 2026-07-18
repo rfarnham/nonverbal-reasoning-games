@@ -14,6 +14,7 @@ page.tsx          # game entry point
 catalog.tsx       # shelf metadata and game-owned ShelfIcon
 Game.tsx          # optional interactive client component
 game-data.ts      # authored rounds or pure puzzle generation
+game-engine.ts    # optional larger pure puzzle engine
 game.module.css   # styles scoped to this game
 ```
 
@@ -24,14 +25,23 @@ GitHub Pages hosts a static export.
 
 ## 2. Define the puzzle contract
 
+A new game follows the suite session contract in `AGENTS.md`: a solved visual
+example, Campaign and Infinite modes, 12 puzzles at each of Starter, Junior,
+Expert, and Wizard, level checkpoints, first-attempt history, mistake
+redemption, and adaptive Infinite combo energy.
+
 A puzzle should expose enough data to render the prompt and answer options,
 plus exactly one correct answer. Generated puzzles must accept a seed. Tests
-should sample representative seeds and prove that:
+must sample at least 400 deterministic seeds per level and prove that:
 
 - exactly one option is correct;
 - distractors are genuinely distinct;
 - the same seed produces the same puzzle;
 - every difficulty remains solvable by its stated rule.
+- fingerprints do not repeat within an authored set or Infinite session;
+- generation rejects bad candidates within a bounded number of attempts;
+- four-choice Campaign answer positions are balanced 3/3/3/3 without adjacent
+  repeats or a repeated four-position cycle.
 
 Authored rounds are a good first choice. A generator is worthwhile when it can
 guarantee those properties, not merely produce more combinations.
