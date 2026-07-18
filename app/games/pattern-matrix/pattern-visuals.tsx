@@ -196,9 +196,17 @@ function CueHeader({
   name: string;
   direction: string;
 }) {
+  const hasLongNotation = symbol.length > 4;
+
   return (
     <span className={styles.ruleCueHeader} aria-hidden="true">
-      <span className={styles.ruleNotation}>{symbol}</span>
+      <span
+        className={`${styles.ruleNotation} ${
+          hasLongNotation ? styles.longRuleNotation : ""
+        }`}
+      >
+        {symbol}
+      </span>
       <strong>{name}</strong>
       <small>{direction}</small>
     </span>

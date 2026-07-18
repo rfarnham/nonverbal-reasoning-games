@@ -6,16 +6,20 @@ import {
   ALL_RULES,
   DIFFICULTIES,
   OPERATIONS,
+  PLAYER_RULE_PROGRAMS,
   RULE_CATALOGUE,
   applyGridRule,
+  applyMatrixRule,
   applySequenceStep,
   combinePatterns,
+  compatiblePrograms,
   compatibleRules,
   createSeededRandom,
   effectiveCueMode,
   generateInfiniteRound,
   generateRoundForRule,
   hintPolicyForDifficulty,
+  inferredAnswerKeys,
   inferenceOptionIndexes,
   makePattern,
   maskDifferenceCount,
@@ -25,6 +29,8 @@ import {
   renderKey,
   rotatePattern,
   roundFingerprint,
+  programKey,
+  programMatchesEvidence,
   ruleKey,
   ruleMatchesEvidence,
   rulePartIds,
@@ -95,6 +101,20 @@ function patternStyle(pattern) {
     orientation: pattern.orientation,
     texturePhase: pattern.texturePhase,
   };
+}
+
+function assertGenerousOptionSeparation(round) {
+  for (let left = 0; left < round.options.length; left += 1) {
+    for (let right = left + 1; right < round.options.length; right += 1) {
+      assert.ok(
+        maskDifferenceCount(
+          round.options[left],
+          round.options[right],
+        ) >= 2,
+        `${round.id} options ${left + 1} and ${right + 1} are too similar`,
+      );
+    }
+  }
 }
 
 test("semantic patterns canonicalize invisible state", () => {
@@ -320,6 +340,142 @@ test("the inference catalogue keeps every cascade candidate without precedence",
   );
 });
 
+test("the inference grammar exhausts every taught one-stage rule chain", () => {
+  assert.equal(ALL_RULES.length, 84);
+  assert.equal(PLAYER_RULE_PROGRAMS.length, 248);
+  assert.equal(
+    PLAYER_RULE_PROGRAMS.filter(
+      ({ family }) => family === "combine-change",
+    ).length,
+    98,
+  );
+  assert.equal(
+    PLAYER_RULE_PROGRAMS.filter(
+      ({ family }) => family === "boolean-closure",
+    ).length,
+    24,
+  );
+  assert.equal(
+    PLAYER_RULE_PROGRAMS.filter(
+      ({ family }) => family === "boolean-closure-change",
+    ).length,
+    42,
+  );
+  assert.deepEqual(
+    [
+      ...new Set(
+        PLAYER_RULE_PROGRAMS.filter(
+          (program) =>
+            (program.family === "combine" ||
+              program.family === "boolean-closure") &&
+            program.axis === "rows" &&
+            program.transform === "none",
+        ).map((program) => Number(programKey(program).split(":")[2])),
+      ),
+    ].sort((left, right) => left - right),
+    [1, 2, 4, 6, 7, 8, 9, 11, 13, 14],
+    "every and only two-input-dependent Boolean function must be normalized",
+  );
+  assert.equal(
+    new Set(PLAYER_RULE_PROGRAMS.map(programKey)).size,
+    PLAYER_RULE_PROGRAMS.length,
+    "normalized program keys must be unique",
+  );
+
+  const oldAmbiguousSources = [
+    makePattern(4, {
+      shape: "triangle",
+      fill: "outline",
+      scale: 1,
+      orientation: 2,
+    }),
+    makePattern(10, {
+      shape: "triangle",
+      fill: "outline",
+      scale: 1,
+      orientation: 2,
+    }),
+    makePattern(12, {
+      shape: "square",
+      fill: "striped",
+      scale: 0,
+      texturePhase: 2,
+    }),
+    makePattern(7, {
+      shape: "square",
+      fill: "striped",
+      scale: 0,
+      texturePhase: 2,
+    }),
+    makePattern(12, {
+      shape: "triangle",
+      fill: "outline",
+      scale: 0,
+      orientation: 3,
+    }),
+    makePattern(6, {
+      shape: "triangle",
+      fill: "outline",
+      scale: 0,
+      orientation: 3,
+    }),
+  ];
+  const declared = {
+    family: "combine",
+    axis: "rows",
+    operation: "match",
+    transform: "none",
+  };
+  const completed = oldAmbiguousSources.flatMap((first, index, sources) => {
+    if (index % 2 !== 0) return [];
+    const second = sources[index + 1];
+    return [first, second, applyMatrixRule(first, second, declared)];
+  });
+  const matrix = [...completed.slice(0, 8), null];
+
+  assert.deepEqual(compatibleRules(matrix).map(ruleKey), [
+    ruleKey(declared),
+  ]);
+  assert.deepEqual(compatiblePrograms(matrix).map(programKey), [
+    programKey(declared),
+    "boolean-change:rows:4:move-clockwise",
+  ]);
+  assert.equal(inferredAnswerKeys(matrix).size, 2);
+
+  const ambiguousRound = {
+    id: "synthetic-composed-ambiguity",
+    difficulty: "Hard",
+    matrix,
+    rule: declared,
+    hintPolicy: "after-miss",
+    options: [
+      completed[8],
+      makePattern(4, patternStyle(completed[8])),
+      makePattern(2, patternStyle(completed[8])),
+      makePattern(8, patternStyle(completed[8])),
+    ],
+    optionKinds: [
+      "correct",
+      "wrong-rule",
+      "one-feature-off",
+      "one-feature-off",
+    ],
+    correctIndex: 0,
+    correctPattern: completed[8],
+  };
+  const errors = validateRound(ambiguousRound);
+  assert.ok(
+    errors.includes(
+      "Exactly one normalized rule program in the complete taught grammar must fit.",
+    ),
+  );
+  assert.ok(
+    errors.includes(
+      "The complete taught rule grammar must infer only the calculated option.",
+    ),
+  );
+});
+
 test("every catalogue rule part has metadata", () => {
   const catalogueIds = new Set(RULE_CATALOGUE.map(({ id }) => id));
   assert.equal(catalogueIds.size, RULE_CATALOGUE.length);
@@ -437,6 +593,7 @@ test("Starter choices are visually generous instead of style-based traps", () =>
   );
 
   for (const round of easy) {
+    assertGenerousOptionSeparation(round);
     for (const pattern of [
       ...round.matrix.filter(Boolean),
       ...round.options,
@@ -466,6 +623,68 @@ test("Starter choices are visually generous instead of style-based traps", () =>
         );
       }
     }
+  }
+});
+
+test("Junior choices use distinct positions instead of subtle style traps", () => {
+  const medium = CAMPAIGN_ROUNDS.filter(
+    ({ difficulty }) => difficulty === "Medium",
+  );
+
+  for (const round of medium) {
+    assertGenerousOptionSeparation(round);
+    assert.equal(
+      new Set(round.options.map(({ mask }) => mask)).size,
+      4,
+      `${round.id} repeats an option position pattern`,
+    );
+
+    const sizeIsTheRule =
+      round.rule.family === "sequence" &&
+      (round.rule.step === "grow" || round.rule.step === "shrink");
+    if (!sizeIsTheRule) {
+      for (const pattern of round.matrix.filter(Boolean)) {
+        assert.equal(
+          pattern.scale,
+          1,
+          `${round.id} adds an unrelated size change to the clue`,
+        );
+      }
+    }
+
+    for (const [index, option] of round.options.entries()) {
+      if (index === round.correctIndex) continue;
+      assert.ok(
+        maskDifferenceCount(option, round.correctPattern) >= 2,
+        `${round.id} option ${index + 1} is too close`,
+      );
+      assert.equal(
+        option.shape,
+        round.correctPattern.shape,
+        `${round.id} option ${index + 1} is a shape-only trap`,
+      );
+      assert.equal(
+        option.fill,
+        round.correctPattern.fill,
+        `${round.id} option ${index + 1} is a fill-only trap`,
+      );
+      if (!sizeIsTheRule) {
+        assert.equal(
+          option.scale,
+          round.correctPattern.scale,
+          `${round.id} option ${index + 1} is a size-only trap`,
+        );
+      }
+    }
+  }
+
+  for (const problemNumber of [3, 5, 11, 12]) {
+    const round = medium[problemNumber - 1];
+    assert.equal(
+      new Set(round.options.map(({ mask }) => mask)).size,
+      4,
+      `Junior ${problemNumber} regressed to look-alike options`,
+    );
   }
 });
 
@@ -549,17 +768,31 @@ test("Campaign is a balanced, unique, fully validated 48-round curriculum", () =
       assert.deepEqual(inferenceOptionIndexes(round.matrix, round.options), [
         round.correctIndex,
       ]);
-      const compatible = compatibleRules(round.matrix);
+      const compatible = compatiblePrograms(round.matrix);
+      const rawCompatiblePrograms = PLAYER_RULE_PROGRAMS.filter((program) =>
+        programMatchesEvidence(round.matrix, program),
+      );
+      assert.deepEqual(
+        compatible.map(programKey),
+        rawCompatiblePrograms.map(programKey),
+        `${round.id} must enumerate the complete taught grammar`,
+      );
+      assert.equal(compatible.length, 1, round.id);
+      assert.equal(
+        programKey(compatible[0]),
+        programKey(round.rule),
+        round.id,
+      );
+
+      const compatibleAtomicRules = compatibleRules(round.matrix);
       const rawCompatible = ALL_RULES.filter((rule) =>
         ruleMatchesEvidence(round.matrix, rule),
       );
       assert.deepEqual(
-        compatible.map(ruleKey),
+        compatibleAtomicRules.map(ruleKey),
         rawCompatible.map(ruleKey),
         `${round.id} must not suppress lower-precedence matches`,
       );
-      assert.equal(compatible.length, 1, round.id);
-      assert.equal(ruleKey(compatible[0]), ruleKey(round.rule), round.id);
       assert.equal(
         round.hintPolicy,
         hintPolicyForDifficulty(difficulty),
@@ -690,8 +923,11 @@ test("1,600 deterministic Infinite rounds remain valid and reproducible", () => 
       );
       assert.deepEqual(round, replay, `${difficulty} seed ${index}`);
       assert.deepEqual(validateRound(round), [], round.id);
+      if (difficulty === "Easy" || difficulty === "Medium") {
+        assertGenerousOptionSeparation(round);
+      }
       assert.equal(
-        compatibleRules(round.matrix).length,
+        compatiblePrograms(round.matrix).length,
         1,
         `${difficulty} seed ${index}`,
       );

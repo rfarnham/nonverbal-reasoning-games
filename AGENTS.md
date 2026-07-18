@@ -145,6 +145,13 @@ similar. Direct-manipulation games need the equivalent treatment: likely wrong
 actions or states should receive misconception-based feedback rather than a
 generic failure.
 
+Starter and Junior alternatives MUST NOT depend on a style-only distinction
+such as texture phase, motif heading, fill, shape, or size. Their four position
+patterns MUST be pairwise distinct, and every pair MUST differ in at least two
+positions. A size difference is allowed when changing size is the rule being
+taught. Close one-feature traps belong in Expert and Wizard, after the
+underlying rule is familiar.
+
 Difficulty must not depend on low contrast, microscopic marks, arbitrary visual
 noise, trick wording, or a faster clock.
 
@@ -403,6 +410,15 @@ lighting, faux-3D rendering, decorative shading, or textures to simple pieces.
 Necessary advanced marks or patterns may carry information, but they are puzzle
 state, not decoration.
 
+When the clue and answer choices use the same visual object, they MUST derive
+their rendered panel size from one shared token. Do not let responsive rules
+independently enlarge an option or shrink a clue panel.
+
+An active rule hint is teaching content, not metadata. Its mathematical symbol,
+name, and visual equation MUST be prominent enough for a child to inspect
+without zooming. Catalogue and rule-discovery symbols SHOULD use the same
+notation at an equally legible teaching scale.
+
 ### Responsive layout
 
 The desktop reference is a two-part board that stacks on smaller screens.
@@ -536,6 +552,18 @@ text.
 Keep authored puzzle data and pure puzzle logic separate from React rendering.
 Authored results MUST be calculated by executing typed rule programs over source
 pattern objects, never maintained as independently trusted output literals.
+
+Games with composable rules MUST define one explicit, finite player-visible
+rule-program grammar. Pattern Matrix permits one combine/compare operation
+followed by zero or one change, a standalone sequence, or an explicitly
+supported whole-matrix cascade. Its validator expands the taught Boolean
+operations to the complete normalized set of Boolean functions that genuinely
+depend on both shown inputs, so an equivalent multi-operation expression cannot
+evade uniqueness. Constants and projections are not legal combine rules because
+they discard a shown input. Generation, distractor construction, inference, and
+validation MUST enumerate that same normalized grammar; a puzzle is valid only
+when exactly one program fits all evidence and only its calculated answer
+appears among the choices.
 
 Generated puzzles MUST:
 

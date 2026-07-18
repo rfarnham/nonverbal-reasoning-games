@@ -94,6 +94,36 @@ export type GridRule = {
 
 export type MatrixRule = CombineRule | SequenceRule | GridRule;
 
+export type ComposedRule = {
+  family: "combine-change";
+  axis: Axis;
+  operation: Operation;
+  step: Exclude<
+    SequenceStep,
+    "rotate-clockwise" | "rotate-counterclockwise"
+  >;
+};
+
+export type BooleanClosureRule = {
+  family: "boolean-closure";
+  axis: Axis;
+  truthTable: number;
+  transform: PatternTransform;
+};
+
+export type BooleanClosureChangeRule = {
+  family: "boolean-closure-change";
+  axis: Axis;
+  truthTable: number;
+  step: ComposedRule["step"];
+};
+
+export type RuleProgram =
+  | MatrixRule
+  | ComposedRule
+  | BooleanClosureRule
+  | BooleanClosureChangeRule;
+
 export type HintPolicy = "always" | "after-miss" | "never";
 export type CueMode = "full-rule" | "hidden";
 
@@ -162,6 +192,47 @@ const NON_IDENTITY_TRANSFORMS: readonly Exclude<
   PatternTransform,
   "none"
 >[] = ["rotate-clockwise", "rotate-half", "rotate-counterclockwise"];
+
+const COMPOSABLE_SEQUENCE_STEPS: readonly ComposedRule["step"][] = [
+  "move-clockwise",
+  "grow",
+  "shrink",
+  "shape-cycle",
+  "fill-cycle",
+  "texture-shift",
+  "motif-turn",
+];
+
+const OPERATION_TRUTH_TABLES: Record<Operation, number> = {
+  join: 0b1110,
+  overlap: 0b1000,
+  cancel: 0b0110,
+  "left-minus-right": 0b0100,
+  "right-minus-left": 0b0010,
+  match: 0b1001,
+  neither: 0b0001,
+};
+
+function truthTableDependsOnBothInputs(truthTable: number): boolean {
+  const output = (left: 0 | 1, right: 0 | 1) =>
+    (truthTable >> (left * 2 + right)) & 1;
+  const dependsOnLeft =
+    output(0, 0) !== output(1, 0) ||
+    output(0, 1) !== output(1, 1);
+  const dependsOnRight =
+    output(0, 0) !== output(0, 1) ||
+    output(1, 0) !== output(1, 1);
+  return dependsOnLeft && dependsOnRight;
+}
+
+const COMPOSED_BOOLEAN_TRUTH_TABLES = Array.from(
+  { length: 16 },
+  (_, truthTable) => truthTable,
+).filter(
+  (truthTable) =>
+    truthTableDependsOnBothInputs(truthTable) &&
+    !Object.values(OPERATION_TRUTH_TABLES).includes(truthTable),
+);
 
 export const DIFFICULTIES: readonly Difficulty[] = [
   "Easy",
@@ -542,6 +613,42 @@ function operationMask(
   }
 }
 
+function truthTableMask(
+  leftMask: number,
+  rightMask: number,
+  truthTable: number,
+): number {
+  if (
+    !Number.isInteger(truthTable) ||
+    truthTable < 0 ||
+    truthTable > 0b1111
+  ) {
+    throw new Error(`Boolean truth table must be from 0 to 15: ${truthTable}`);
+  }
+  let result = 0;
+  for (let cellIndex = 0; cellIndex < 4; cellIndex += 1) {
+    const left = (leftMask & (1 << cellIndex)) !== 0;
+    const right = (rightMask & (1 << cellIndex)) !== 0;
+    const inputIndex = (left ? 2 : 0) + (right ? 1 : 0);
+    if ((truthTable & (1 << inputIndex)) !== 0) {
+      result |= 1 << cellIndex;
+    }
+  }
+  return result;
+}
+
+function combineByTruthTable(
+  left: Pattern,
+  right: Pattern,
+  truthTable: number,
+): Pattern | null {
+  if (!matchingStyles(left, right)) return null;
+  return makePattern(
+    truthTableMask(left.mask, right.mask, truthTable),
+    left,
+  );
+}
+
 export function combinePatterns(
   left: Pattern,
   right: Pattern,
@@ -678,6 +785,39 @@ export function ruleKey(rule: MatrixRule): string {
   ].join(":");
 }
 
+export function programKey(program: RuleProgram): string {
+  if (program.family === "combine") {
+    return [
+      "boolean",
+      program.axis,
+      OPERATION_TRUTH_TABLES[program.operation],
+      program.transform,
+    ].join(":");
+  }
+  if (program.family === "boolean-closure") {
+    return [
+      "boolean",
+      program.axis,
+      program.truthTable,
+      program.transform,
+    ].join(":");
+  }
+  if (
+    program.family === "combine-change" ||
+    program.family === "boolean-closure-change"
+  ) {
+    return [
+      "boolean-change",
+      program.axis,
+      program.family === "combine-change"
+        ? OPERATION_TRUTH_TABLES[program.operation]
+        : program.truthTable,
+      program.step,
+    ].join(":");
+  }
+  return ruleKey(program);
+}
+
 export function ruleLabel(rule: MatrixRule): string {
   if (rule.family === "combine") {
     const axis = rule.axis === "rows" ? "across rows" : "down columns";
@@ -802,6 +942,31 @@ function applyLineRule(
   return applySequenceStep(second, rule.step);
 }
 
+function applyComposedRule(
+  first: Pattern,
+  second: Pattern,
+  rule: ComposedRule,
+): Pattern | null {
+  const combined = combinePatterns(first, second, rule.operation);
+  return combined ? applySequenceStep(combined, rule.step) : null;
+}
+
+function applyBooleanClosureRule(
+  first: Pattern,
+  second: Pattern,
+  rule: BooleanClosureRule | BooleanClosureChangeRule,
+): Pattern | null {
+  const combined = combineByTruthTable(
+    first,
+    second,
+    rule.truthTable,
+  );
+  if (!combined) return null;
+  return rule.family === "boolean-closure"
+    ? transformPattern(combined, rule.transform)
+    : applySequenceStep(combined, rule.step);
+}
+
 function applyGridPair(
   first: Pattern,
   second: Pattern,
@@ -879,6 +1044,32 @@ function completeFromRule(matrix: Matrix, rule: MatrixRule): Pattern | null {
   );
 }
 
+function completeFromProgram(
+  matrix: Matrix,
+  program: RuleProgram,
+): Pattern | null {
+  if (program.family === "combine-change") {
+    const target = lineIndexes(program.axis)[2];
+    return applyComposedRule(
+      matrix[target[0]] as Pattern,
+      matrix[target[1]] as Pattern,
+      program,
+    );
+  }
+  if (
+    program.family === "boolean-closure" ||
+    program.family === "boolean-closure-change"
+  ) {
+    const target = lineIndexes(program.axis)[2];
+    return applyBooleanClosureRule(
+      matrix[target[0]] as Pattern,
+      matrix[target[1]] as Pattern,
+      program,
+    );
+  }
+  return completeFromRule(matrix, program);
+}
+
 export function applyMatrixRule(
   first: Pattern,
   second: Pattern,
@@ -929,6 +1120,38 @@ export function ruleMatchesEvidence(
   return ruleMatchesLine(matrix, rule, 0) && ruleMatchesLine(matrix, rule, 1);
 }
 
+export function programMatchesEvidence(
+  matrix: Matrix,
+  program: RuleProgram,
+): boolean {
+  if (
+    program.family !== "combine-change" &&
+    program.family !== "boolean-closure" &&
+    program.family !== "boolean-closure-change"
+  ) {
+    return ruleMatchesEvidence(matrix, program);
+  }
+  return [0, 1].every((lineIndex) => {
+    const indexes = lineIndexes(program.axis)[lineIndex];
+    const result =
+      program.family === "combine-change"
+        ? applyComposedRule(
+            matrix[indexes[0]] as Pattern,
+            matrix[indexes[1]] as Pattern,
+            program,
+          )
+        : applyBooleanClosureRule(
+            matrix[indexes[0]] as Pattern,
+            matrix[indexes[1]] as Pattern,
+            program,
+          );
+    return (
+      result !== null &&
+      patternKey(result) === patternKey(matrix[indexes[2]] as Pattern)
+    );
+  });
+}
+
 const ALL_COMBINE_RULES: readonly CombineRule[] = (
   ["rows", "columns"] as const
 ).flatMap((axis) =>
@@ -961,20 +1184,81 @@ const ALL_GRID_RULES: readonly GridRule[] = GRID_OPERATIONS.flatMap(
     })),
 );
 
+const ALL_COMPOSED_RULES: readonly ComposedRule[] = (
+  ["rows", "columns"] as const
+).flatMap((axis) =>
+  OPERATIONS.flatMap((operation) =>
+    COMPOSABLE_SEQUENCE_STEPS.map((step) => ({
+      family: "combine-change" as const,
+      axis,
+      operation,
+      step,
+    })),
+  ),
+);
+
+const ALL_BOOLEAN_CLOSURE_RULES: readonly BooleanClosureRule[] = (
+  ["rows", "columns"] as const
+).flatMap((axis) =>
+  COMPOSED_BOOLEAN_TRUTH_TABLES.flatMap((truthTable) =>
+    PATTERN_TRANSFORMS.map((transform) => ({
+      family: "boolean-closure" as const,
+      axis,
+      truthTable,
+      transform,
+    })),
+  ),
+);
+
+const ALL_BOOLEAN_CLOSURE_CHANGE_RULES:
+  readonly BooleanClosureChangeRule[] = (
+  ["rows", "columns"] as const
+).flatMap((axis) =>
+  COMPOSED_BOOLEAN_TRUTH_TABLES.flatMap((truthTable) =>
+    COMPOSABLE_SEQUENCE_STEPS.map((step) => ({
+      family: "boolean-closure-change" as const,
+      axis,
+      truthTable,
+      step,
+    })),
+  ),
+);
+
 export const ALL_RULES: readonly MatrixRule[] = [
   ...ALL_COMBINE_RULES,
   ...ALL_SEQUENCE_RULES,
   ...ALL_GRID_RULES,
 ];
 
+/**
+ * The complete player-visible grammar: every normalized Boolean function that
+ * genuinely depends on both inputs, followed by zero or one change, plus a
+ * standalone sequence or explicit grid cascade. Constant and projection
+ * expressions are not combine rules because they discard a shown input.
+ * Validation enumerates this same catalogue so an equivalent compound
+ * expression can never silently produce a second interpretation.
+ */
+export const PLAYER_RULE_PROGRAMS: readonly RuleProgram[] = [
+  ...ALL_RULES,
+  ...ALL_COMPOSED_RULES,
+  ...ALL_BOOLEAN_CLOSURE_RULES,
+  ...ALL_BOOLEAN_CLOSURE_CHANGE_RULES,
+];
+
 export function compatibleRules(matrix: Matrix): readonly MatrixRule[] {
   return ALL_RULES.filter((rule) => ruleMatchesEvidence(matrix, rule));
 }
 
+export function compatiblePrograms(matrix: Matrix): readonly RuleProgram[] {
+  return PLAYER_RULE_PROGRAMS.filter((program) =>
+    programMatchesEvidence(matrix, program),
+  );
+}
+
 export function inferredAnswerKeys(matrix: Matrix): ReadonlySet<string> {
   return new Set(
-    compatibleRules(matrix).flatMap((rule) => {
-      const answer = completeFromRule(matrix, rule);
+    compatiblePrograms(matrix).flatMap((program) => {
+      const answer = completeFromProgram(matrix, program);
       return answer ? [patternKey(answer)] : [];
     }),
   );
@@ -1304,6 +1588,20 @@ function clearContrastMutations(pattern: Pattern): readonly Pattern[] {
   return mutations;
 }
 
+function misconceptionPrediction(
+  matrix: Matrix,
+  program: RuleProgram,
+): Pattern | null {
+  if (program.family === "sequence") {
+    const target = lineIndexes(program.axis)[2];
+    return applySequenceStep(
+      matrix[target[1]] as Pattern,
+      program.step,
+    );
+  }
+  return completeFromProgram(matrix, program);
+}
+
 function distractorCandidates(
   matrix: Matrix,
   rule: MatrixRule,
@@ -1335,20 +1633,12 @@ function distractorCandidates(
     );
   }
 
-  for (const candidateRule of ALL_RULES) {
-    if (ruleKey(candidateRule) === ruleKey(rule)) continue;
-    if (candidateRule.family === "sequence") {
-      const target = lineIndexes(candidateRule.axis)[2];
-      add(
-        "wrong-rule",
-        applySequenceStep(
-          matrix[target[1]] as Pattern,
-          candidateRule.step,
-        ),
-      );
-    } else {
-      add("wrong-rule", completeFromRule(matrix, candidateRule));
-    }
+  for (const candidateProgram of PLAYER_RULE_PROGRAMS) {
+    if (programKey(candidateProgram) === programKey(rule)) continue;
+    add(
+      "wrong-rule",
+      misconceptionPrediction(matrix, candidateProgram),
+    );
   }
 
   for (const mutation of localMutations(correct)) {
@@ -1379,19 +1669,45 @@ function chooseDistractors(
   DistractorCandidate,
   DistractorCandidate,
 ] | null {
+  const sizeIsTheRule =
+    rule.family === "sequence" &&
+    (rule.step === "grow" || rule.step === "shrink");
   const candidates = distractorCandidates(matrix, rule, correct).filter(
-    ({ pattern }) =>
-      difficulty !== "Easy" ||
-      (patternStyleKey(pattern) === patternStyleKey(correct) &&
-        maskDifferenceCount(pattern, correct) >= 2),
+    ({ pattern }) => {
+      if (difficulty === "Easy") {
+        return (
+          patternStyleKey(pattern) === patternStyleKey(correct) &&
+          maskDifferenceCount(pattern, correct) >= 2
+        );
+      }
+      if (difficulty === "Medium") {
+        return (
+          maskDifferenceCount(pattern, correct) >= 2 &&
+          pattern.shape === correct.shape &&
+          pattern.fill === correct.fill &&
+          (sizeIsTheRule || pattern.scale === correct.scale)
+        );
+      }
+      return true;
+    },
   );
   const selected: DistractorCandidate[] = [];
+  const requiresGenerousSeparation =
+    difficulty === "Easy" || difficulty === "Medium";
 
   const take = (
     predicate: (candidate: DistractorCandidate) => boolean,
   ): boolean => {
     const candidate = candidates.find(
-      (item) => !selected.includes(item) && predicate(item),
+      (item) =>
+        !selected.includes(item) &&
+        !selected.some(
+          (chosen) =>
+            chosen.pattern.mask === item.pattern.mask ||
+            (requiresGenerousSeparation &&
+              maskDifferenceCount(chosen.pattern, item.pattern) < 2),
+        ) &&
+        predicate(item),
     );
     if (!candidate) return false;
     selected.push(candidate);
@@ -1399,6 +1715,9 @@ function chooseDistractors(
   };
 
   if (difficulty === "Easy") {
+    if (!take(({ kind }) => kind === "wrong-rule")) return null;
+    if (!take(() => true)) return null;
+  } else if (difficulty === "Medium") {
     if (!take(({ kind }) => kind === "wrong-rule")) return null;
     if (!take(() => true)) return null;
   } else {
@@ -1555,13 +1874,13 @@ export function validateRound(round: Round): readonly string[] {
     errors.push("The answer must be calculated from the declared rule.");
   }
 
-  const compatible = compatibleRules(round.matrix);
+  const compatible = compatiblePrograms(round.matrix);
   if (
     compatible.length !== 1 ||
-    ruleKey(compatible[0]) !== ruleKey(round.rule)
+    programKey(compatible[0]) !== programKey(round.rule)
   ) {
     errors.push(
-      "Exactly one normalized rule in the complete catalogue must fit.",
+      "Exactly one normalized rule program in the complete taught grammar must fit.",
     );
   }
 
@@ -1579,6 +1898,18 @@ export function validateRound(round: Round): readonly string[] {
     round.optionKinds[round.correctIndex] !== "correct"
   ) {
     errors.push("Exactly one option must be the calculated answer.");
+  }
+  const inferredIndexes = inferenceOptionIndexes(
+    round.matrix,
+    round.options,
+  );
+  if (
+    inferredIndexes.length !== 1 ||
+    inferredIndexes[0] !== round.correctIndex
+  ) {
+    errors.push(
+      "The complete taught rule grammar must infer only the calculated option.",
+    );
   }
   if (
     round.options.some((pattern) => pattern.mask === 0) ||
@@ -1605,6 +1936,21 @@ export function validateRound(round: Round): readonly string[] {
   const wrongOptions = round.options.filter(
     (_, index) => index !== round.correctIndex,
   );
+  if (
+    (round.difficulty === "Easy" || round.difficulty === "Medium") &&
+    round.options.some((option, optionIndex) =>
+      round.options
+        .slice(optionIndex + 1)
+        .some(
+          (otherOption) =>
+            maskDifferenceCount(option, otherOption) < 2,
+        ),
+    )
+  ) {
+    errors.push(
+      "Every pair of Starter and Junior options must differ in at least two positions.",
+    );
+  }
   if (round.difficulty === "Easy") {
     if (
       wrongOptions.some(
@@ -1618,12 +1964,30 @@ export function validateRound(round: Round): readonly string[] {
         "Starter distractors must share the answer style and differ in at least two positions.",
       );
     }
+  } else if (round.difficulty === "Medium") {
+    const sizeIsTheRule =
+      round.rule.family === "sequence" &&
+      (round.rule.step === "grow" || round.rule.step === "shrink");
+    if (
+      wrongOptions.some(
+        (option) =>
+          maskDifferenceCount(option, round.correctPattern) < 2 ||
+          option.shape !== round.correctPattern.shape ||
+          option.fill !== round.correctPattern.fill ||
+          (!sizeIsTheRule &&
+            option.scale !== round.correctPattern.scale),
+      )
+    ) {
+      errors.push(
+        "Junior distractors must use clearly different positions without unrelated shape, fill, or size traps.",
+      );
+    }
   } else if (
     !wrongOptions.some(
       (option) => patternDistance(option, round.correctPattern) === 1,
     )
   ) {
-    errors.push("Every non-Starter round must include a one-feature near miss.");
+    errors.push("Every Expert and Wizard round must include a one-feature near miss.");
   }
   if (
     !round.optionKinds.some(
