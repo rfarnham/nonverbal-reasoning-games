@@ -22,6 +22,7 @@ import { rotationMatchGame as transformationMatchGame } from "./game-info";
 import {
   ROUNDS,
   TUTORIAL,
+  applyTransform,
   describePattern,
   differingTileIndexes,
   generateInfiniteRound,
@@ -98,6 +99,46 @@ const HIDDEN_WRONG_FEEDBACK_MS = 180;
 const WRONG_REVIEW_MS = 2200;
 const REDUCED_WRONG_REVIEW_MS = 1300;
 const CAMPAIGN_PROBLEMS_PER_LEVEL = 12;
+
+function transformTutorialKey(transform: PuzzleTransform): string {
+  return transform.kind === "rotation"
+    ? `rotation:${transform.degrees}:${transform.direction}`
+    : `reflection:${transform.axis}`;
+}
+
+function transformTutorialTitle(transform: PuzzleTransform): string {
+  if (transform.kind === "rotation") {
+    return `Rotate ${transform.degrees}° ${transform.direction}`;
+  }
+
+  switch (transform.axis) {
+    case "vertical":
+      return "Flip across the vertical axis";
+    case "horizontal":
+      return "Flip across the horizontal axis";
+    case "main-diagonal":
+      return "Flip across the diagonal";
+    case "anti-diagonal":
+      return "Flip across the other diagonal";
+  }
+}
+
+function transformTutorialDescription(transform: PuzzleTransform): string {
+  if (transform.kind === "rotation") {
+    return "Every tile travels around the center. Any directional mark turns with its tile.";
+  }
+
+  switch (transform.axis) {
+    case "vertical":
+      return "Left and right trade places across the upright line.";
+    case "horizontal":
+      return "Top and bottom trade places across the flat line.";
+    case "main-diagonal":
+      return "Tiles cross the line from top left to bottom right, like a page turning on its fold.";
+    case "anti-diagonal":
+      return "Tiles cross the line from bottom left to top right, like a page turning on its fold.";
+  }
+}
 
 const CAMPAIGN_LEVELS: ReadonlyArray<{
   id: CampaignLevelId;
@@ -340,6 +381,79 @@ function PuzzleTransformCue({ round }: { round: Round }) {
   );
 }
 
+function TransformTutorialModal({
+  transform,
+  continueRef,
+  onContinue,
+}: {
+  transform: PuzzleTransform;
+  continueRef: Ref<HTMLButtonElement>;
+  onContinue: () => void;
+}) {
+  const transformedPattern = applyTransform(TUTORIAL.clue, transform);
+  const moverStyle = {
+    "--tutorial-transform": ghostTransformCss(transform),
+  } as CustomProperties;
+  const title = transformTutorialTitle(transform);
+
+  return (
+    <div className={styles.tutorialModalBackdrop} role="presentation">
+      <section
+        className={styles.tutorialModal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="transform-tutorial-title"
+        aria-describedby="transform-tutorial-description"
+      >
+        <p className={styles.kicker}>Quick look</p>
+        <h2 id="transform-tutorial-title">{title}</h2>
+        <p id="transform-tutorial-description" className={styles.tutorialModalCopy}>
+          {transformTutorialDescription(transform)}
+        </p>
+
+        <div className={styles.tutorialDemo} aria-label={`${title} demonstration`}>
+          <div className={styles.tutorialDemoPattern}>
+            <PatternGrid
+              pattern={TUTORIAL.clue}
+              size="tutorialPattern"
+              label={`Before: ${describePattern(TUTORIAL.clue)}`}
+            />
+            <span>Before</span>
+          </div>
+          <div className={styles.tutorialDemoMotion} aria-hidden="true">
+            <div className={styles.tutorialDemoMover} style={moverStyle}>
+              <PatternGrid pattern={TUTORIAL.clue} size="tutorialPattern" hidden />
+            </div>
+          </div>
+          <div className={styles.tutorialDemoPattern}>
+            <PatternGrid
+              pattern={transformedPattern}
+              size="tutorialPattern"
+              label={`After: ${describePattern(transformedPattern)}`}
+            />
+            <span>After</span>
+          </div>
+        </div>
+
+        <div className={styles.tutorialCue}>
+          <TransformCue transform={transform} />
+        </div>
+        <p className={styles.tutorialModalHint}>
+          Watch the whole loop, then try it yourself.
+        </p>
+        <button
+          className={styles.primaryButton}
+          type="button"
+          ref={continueRef}
+          onClick={onContinue}
+        >
+          Got it <span aria-hidden="true">→</span>
+        </button>
+      </section>
+    </div>
+  );
+}
+
 function ghostTransformCss(transform: PuzzleTransform) {
   if (transform.kind === "rotation") {
     return `rotate(${transform.angleDegrees}deg)`;
@@ -410,6 +524,8 @@ export default function TransformationMatchPage() {
   const [redemptionTotal, setRedemptionTotal] = useState(0);
   const [reviewLevelId, setReviewLevelId] =
     useState<CampaignLevelId | null>(null);
+  const [tutorialTransform, setTutorialTransform] =
+    useState<PuzzleTransform | null>(null);
   const [redeemedMistakeIds, setRedeemedMistakeIds] = useState<
     readonly string[]
   >([]);
@@ -422,6 +538,7 @@ export default function TransformationMatchPage() {
   const optionButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const nextButtonRef = useRef<HTMLButtonElement>(null);
   const levelCompleteButtonRef = useRef<HTMLButtonElement>(null);
+  const tutorialContinueRef = useRef<HTMLButtonElement>(null);
   const resultHeadingRef = useRef<HTMLHeadingElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const flightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -432,6 +549,7 @@ export default function TransformationMatchPage() {
   const retryFocusIndexRef = useRef<number | null>(null);
   const infiniteFingerprintsRef = useRef(new Set<string>());
   const infiniteAdaptiveRef = useRef(initialInfiniteAdaptiveState());
+  const seenTransformTutorialsRef = useRef(new Set<string>());
 
   const isCampaign = sessionMode === "campaign";
   const isInfinite = sessionMode === "infinite";
@@ -516,6 +634,23 @@ export default function TransformationMatchPage() {
     setPhase("idle");
   }, [clearAttemptTimers]);
 
+  const dismissTransformTutorial = useCallback(() => {
+    setTutorialTransform(null);
+    shouldFocusFirstOption.current = true;
+  }, []);
+
+  const maybeShowTransformTutorial = useCallback(
+    (transform: PuzzleTransform) => {
+      const key = transformTutorialKey(transform);
+      if (seenTransformTutorialsRef.current.has(key)) return false;
+
+      seenTransformTutorialsRef.current.add(key);
+      setTutorialTransform(transform);
+      return true;
+    },
+    [],
+  );
+
   const ensureAudioContext = useCallback(() => {
     if (typeof window === "undefined") return null;
 
@@ -574,6 +709,7 @@ export default function TransformationMatchPage() {
         inputLockedRef.current ||
         phase !== "idle" ||
         complete ||
+        tutorialTransform !== null ||
         !started ||
         (isCampaign && activeCampaignLevelComplete) ||
         !activeSessionRound
@@ -706,12 +842,14 @@ export default function TransformationMatchPage() {
       playFeedbackSound,
       round,
       started,
+      tutorialTransform,
     ],
   );
 
   const startCampaign = useCallback(() => {
     resumeAudio();
     infiniteFingerprintsRef.current.clear();
+    seenTransformTutorialsRef.current.clear();
     const initialAdaptive = initialInfiniteAdaptiveState();
     infiniteAdaptiveRef.current = initialAdaptive;
     setSessionMode("campaign");
@@ -726,17 +864,21 @@ export default function TransformationMatchPage() {
     setMistakes([]);
     setRedemptionTotal(0);
     setReviewLevelId(null);
+    setTutorialTransform(null);
     setRedeemedMistakeIds([]);
     setRedemptionMistakeIds([]);
     setStarted(true);
     setComplete(false);
     resetAttemptState();
-    shouldFocusFirstOption.current = true;
-  }, [resetAttemptState, resumeAudio]);
+    shouldFocusFirstOption.current = !maybeShowTransformTutorial(
+      campaignRounds("starter")[0].transform,
+    );
+  }, [maybeShowTransformTutorial, resetAttemptState, resumeAudio]);
 
   const startInfinite = useCallback(() => {
     resumeAudio();
     infiniteFingerprintsRef.current.clear();
+    seenTransformTutorialsRef.current.clear();
     const initialAdaptive = initialInfiniteAdaptiveState();
     infiniteAdaptiveRef.current = initialAdaptive;
     const firstRound = buildInfiniteSessionRound(
@@ -753,19 +895,23 @@ export default function TransformationMatchPage() {
     setMistakes([]);
     setRedemptionTotal(0);
     setReviewLevelId(null);
+    setTutorialTransform(null);
     setRedeemedMistakeIds([]);
     setRedemptionMistakeIds([]);
     setStarted(true);
     setComplete(false);
     resetAttemptState();
-    shouldFocusFirstOption.current = true;
-  }, [resetAttemptState, resumeAudio]);
+    shouldFocusFirstOption.current =
+      firstRound.round.difficulty === "Wizard" ||
+      !maybeShowTransformTutorial(firstRound.round.transform);
+  }, [maybeShowTransformTutorial, resetAttemptState, resumeAudio]);
 
   const selectCampaignLevel = useCallback(
     (levelId: CampaignLevelId) => {
       if (
         !isCampaign ||
         phase !== "idle" ||
+        tutorialTransform !== null ||
         levelId === activeCampaignLevel
       ) {
         return;
@@ -773,22 +919,29 @@ export default function TransformationMatchPage() {
 
       resetAttemptState();
       setActiveCampaignLevel(levelId);
-      shouldFocusFirstOption.current = !isCampaignLevelComplete(
-        campaignProgress,
-        levelId,
-      );
+      const levelComplete = isCampaignLevelComplete(campaignProgress, levelId);
+      shouldFocusFirstOption.current = !levelComplete;
+      if (!levelComplete) {
+        const nextRound = campaignRounds(levelId)[0];
+        shouldFocusFirstOption.current =
+          nextRound.difficulty === "Wizard" ||
+          !maybeShowTransformTutorial(nextRound.transform);
+      }
     },
     [
       activeCampaignLevel,
       campaignProgress,
       isCampaign,
+      maybeShowTransformTutorial,
       phase,
       resetAttemptState,
+      tutorialTransform,
     ],
   );
 
   const startRedemption = useCallback(() => {
     if (visibleMistakes.length === 0) return;
+    setTutorialTransform(null);
     const redemptionQueue = visibleMistakes.map(({ sessionRound }, index) => ({
       ...sessionRound,
       id: `redemption-${index}-${sessionRound.id}`,
@@ -814,7 +967,12 @@ export default function TransformationMatchPage() {
       resetAttemptState();
 
       if (campaignProblemIndex < CAMPAIGN_PROBLEMS_PER_LEVEL - 1) {
-        shouldFocusFirstOption.current = true;
+        const nextRound = campaignRounds(activeCampaignLevel)[
+          campaignProblemIndex + 1
+        ];
+        shouldFocusFirstOption.current =
+          nextRound.difficulty === "Wizard" ||
+          !maybeShowTransformTutorial(nextRound.transform);
         setCampaignCursors((current) => ({
           ...current,
           [activeCampaignLevel]: campaignProblemIndex + 1,
@@ -833,7 +991,9 @@ export default function TransformationMatchPage() {
         infiniteFingerprintsRef.current,
         infiniteAdaptiveRef.current.targetDifficulty,
       );
-      shouldFocusFirstOption.current = true;
+      shouldFocusFirstOption.current =
+        nextRound.round.difficulty === "Wizard" ||
+        !maybeShowTransformTutorial(nextRound.round.transform);
       resetAttemptState();
       setRoundQueue((current) => [...current, nextRound]);
       setRoundCursor((current) => current + 1);
@@ -875,6 +1035,7 @@ export default function TransformationMatchPage() {
     isCampaign,
     isInfinite,
     isLastRedemptionRound,
+    maybeShowTransformTutorial,
     phase,
     redemptionMistakeIds,
     reviewLevelId,
@@ -910,6 +1071,22 @@ export default function TransformationMatchPage() {
   }, []);
 
   useEffect(() => {
+    if (tutorialTransform === null) return;
+
+    tutorialContinueRef.current?.focus();
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        dismissTransformTutorial();
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [dismissTransformTutorial, tutorialTransform]);
+
+  useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       const target = event.target;
       const isEditing =
@@ -920,6 +1097,7 @@ export default function TransformationMatchPage() {
       if (
         !started ||
         complete ||
+        tutorialTransform !== null ||
         phase !== "idle" ||
         isEditing ||
         event.altKey ||
@@ -938,14 +1116,19 @@ export default function TransformationMatchPage() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [chooseOption, complete, phase, started]);
+  }, [chooseOption, complete, phase, started, tutorialTransform]);
 
   useEffect(() => {
     if (phase === "answered") nextButtonRef.current?.focus();
   }, [phase]);
 
   useEffect(() => {
-    if (shouldFocusFirstOption.current && started && !complete) {
+    if (
+      shouldFocusFirstOption.current &&
+      started &&
+      !complete &&
+      tutorialTransform === null
+    ) {
       optionButtonRefs.current[0]?.focus();
       shouldFocusFirstOption.current = false;
     }
@@ -956,6 +1139,7 @@ export default function TransformationMatchPage() {
     roundCursor,
     sessionMode,
     started,
+    tutorialTransform,
   ]);
 
   useEffect(() => {
@@ -1637,6 +1821,13 @@ export default function TransformationMatchPage() {
         )}
       </main>
 
+      {tutorialTransform ? (
+        <TransformTutorialModal
+          transform={tutorialTransform}
+          continueRef={tutorialContinueRef}
+          onContinue={dismissTransformTutorial}
+        />
+      ) : null}
       {ghostPortal}
     </div>
   );
