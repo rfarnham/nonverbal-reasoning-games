@@ -17,6 +17,7 @@ There is no account, download, backend, or analytics.
 | --- | --- | --- |
 | [Transformation Match](https://rfarnham.github.io/nonverbal-reasoning-games/games/rotation-match/) | Mental rotation and reflection control | Playable |
 | [Pattern Matrix](https://rfarnham.github.io/nonverbal-reasoning-games/games/pattern-matrix/) | Visual rule finding and pattern completion | Playable |
+| [Libra](https://rfarnham.github.io/nonverbal-reasoning-games/games/libra/) | Relational reasoning and visual equivalence | Playable |
 | Shape Fold | Spatial folding and working memory | Planned |
 
 ## Project shape
@@ -29,6 +30,7 @@ keeping the runtime entirely in the browser.
 ```text
 app/
   games/
+    libra/            # route, catalog metadata, and shelf icon
     pattern-matrix/   # route, catalog metadata, and shelf icon
     rotation-match/   # route, catalog metadata, and shelf icon
   page.tsx            # auto-discovered game catalog

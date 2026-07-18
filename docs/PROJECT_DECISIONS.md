@@ -10,8 +10,8 @@ change. They are product decisions, not permanent constraints.
 | Audience | Teens and adults, with plain instructions | A useful baseline without pretending the games are age-normed assessments |
 | Session style | Short, untimed rounds | Encourages reasoning before speed and works for casual practice |
 | Feedback | Immediate, non-color-only feedback | Makes each answer a learning moment and stays accessible |
-| Difficulty | Starter, Junior, Expert, and Wizard levels in authored Campaign and adaptive Infinite modes | Keeps progression and adaptation consistent across games |
-| Roadmap | Transformation Match and Pattern Matrix establish the initial suite; the next reasoning skill is still open | Establishes transformation and rule-finding games before expanding the suite |
+| Difficulty | Starter, Junior, Expert, and Wizard levels in authored Campaign and adaptive Infinite modes | Gives every game a deliberate learning path and an unbounded practice mode with the same verified rules |
+| Roadmap | Transformation Match, Pattern Matrix, and Libra establish the initial suite; the next reasoning skill is still open | Establishes transformation, rule-finding, and relational-reasoning games before expanding the suite |
 | Progress | Session-only; no account | Keeps the launch private and frictionless |
 | Devices | Phone, tablet, and desktop | The public link should be useful wherever it is opened |
 | Input | Keyboard, touch, and mouse | A basic accessibility and usability requirement |
@@ -22,6 +22,20 @@ change. They are product decisions, not permanent constraints.
 
 The site name is **Spatial Gym**; the repository remains descriptively named
 `nonverbal-reasoning-games`.
+
+## Libra strategy coverage
+
+Libra treats the route to an answer as authored puzzle data, not just an
+incidental solver outcome. Later Junior rounds introduce cross-scale addition
+and subtraction; Expert and Wizard deliberately cover substitution, adding
+balances, subtracting balances, and creating repeated target groups that must
+be divided evenly. Infinite generation samples the same archetypes.
+
+Every Libra round stores an exact integer derivation. Its signed relation
+multipliers and final normalization factor must algebraically reproduce the
+question target and answer. This certificate drives the post-answer teaching
+cue and prevents family labels from overstating the reasoning a puzzle really
+requires.
 
 ## Good next decisions
 
