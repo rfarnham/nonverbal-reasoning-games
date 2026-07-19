@@ -1,5 +1,25 @@
 export const SOUND_PREFERENCE_KEY = "spatial-gym-sound";
 
+/** Creates a browser audio context without making sound a runtime dependency. */
+export function createGameAudioContext(): AudioContext | null {
+  if (typeof window === "undefined") return null;
+
+  const AudioContextConstructor =
+    window.AudioContext ??
+    (
+      window as typeof window & {
+        webkitAudioContext?: typeof AudioContext;
+      }
+    ).webkitAudioContext;
+
+  if (!AudioContextConstructor) return null;
+  try {
+    return new AudioContextConstructor();
+  } catch {
+    return null;
+  }
+}
+
 function scheduleTone(
   context: AudioContext,
   frequency: number,
