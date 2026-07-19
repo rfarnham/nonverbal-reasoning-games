@@ -6,7 +6,7 @@ import type {
 export const gameInfo = {
   title: "Shape Fold",
   description:
-    "Track each fold, then predict the exact pattern a single punch makes when the sheet opens.",
+    "Track each fold, then predict the exact pattern your punches make when the sheet opens.",
   skills: ["Spatial folding", "Visual prediction"],
   estimatedMinutes: 10,
   shelfOrder: 40,
