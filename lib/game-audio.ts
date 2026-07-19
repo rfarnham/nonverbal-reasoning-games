@@ -22,8 +22,12 @@ function scheduleTone(
   oscillator.addEventListener(
     "ended",
     () => {
-      oscillator.disconnect();
-      gain.disconnect();
+      try {
+        oscillator.disconnect();
+        gain.disconnect();
+      } catch {
+        // A disappearing audio destination must not affect gameplay.
+      }
     },
     { once: true },
   );

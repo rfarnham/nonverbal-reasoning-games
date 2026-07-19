@@ -19,7 +19,7 @@ There is no account, download, backend, or analytics.
 | [Pattern Matrix](https://rfarnham.github.io/nonverbal-reasoning-games/games/pattern-matrix/) | Visual rule finding and pattern completion | Playable |
 | [Libra](https://rfarnham.github.io/nonverbal-reasoning-games/games/libra/) | Relational reasoning and visual equivalence | Playable |
 | [Whose Left?](https://rfarnham.github.io/nonverbal-reasoning-games/games/whose-left/) | Spatial perspective and direction tracking | Playable |
-| Shape Fold | Spatial folding and working memory | Planned |
+| [Shape Fold](https://rfarnham.github.io/nonverbal-reasoning-games/games/shape-fold/) | Spatial folding and visual prediction | Playable |
 
 ## Project shape
 
@@ -34,6 +34,7 @@ app/
     libra/            # route, catalog metadata, and shelf icon
     pattern-matrix/   # route, catalog metadata, and shelf icon
     rotation-match/   # route, catalog metadata, and shelf icon
+    shape-fold/       # route, catalog metadata, and shelf icon
     whose-left/       # route, catalog metadata, and shelf icon
   page.tsx            # auto-discovered game catalog
 lib/

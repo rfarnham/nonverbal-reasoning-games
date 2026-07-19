@@ -73,3 +73,44 @@ test("earcon failures never escape into gameplay", () => {
 
   assert.doesNotThrow(() => playFeedbackEarcon(unavailableContext, true));
 });
+
+test("late audio cleanup failures never escape into gameplay", () => {
+  const endedCallbacks = [];
+  const context = {
+    currentTime: 0,
+    destination: {},
+    createOscillator() {
+      return {
+        type: "sine",
+        frequency: { setValueAtTime() {} },
+        connect() {},
+        disconnect() {
+          throw new Error("destination disappeared");
+        },
+        start() {},
+        stop() {},
+        addEventListener(_name, callback) {
+          endedCallbacks.push(callback);
+        },
+      };
+    },
+    createGain() {
+      return {
+        gain: {
+          setValueAtTime() {},
+          exponentialRampToValueAtTime() {},
+        },
+        connect() {},
+        disconnect() {
+          throw new Error("destination disappeared");
+        },
+      };
+    },
+  };
+
+  playFeedbackEarcon(context, true);
+  assert.equal(endedCallbacks.length, 2);
+  for (const callback of endedCallbacks) {
+    assert.doesNotThrow(callback);
+  }
+});
