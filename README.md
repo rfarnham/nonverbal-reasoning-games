@@ -22,6 +22,7 @@ There is no account, download, backend, or analytics.
 | [Whose Left?](https://rfarnham.github.io/nonverbal-reasoning-games/games/whose-left/) | Spatial perspective and direction tracking | Playable |
 | [Shape Fold](https://rfarnham.github.io/nonverbal-reasoning-games/games/shape-fold/) | Spatial folding and visual prediction | Playable |
 | [Domino Twist](https://rfarnham.github.io/nonverbal-reasoning-games/games/domino-twist/) | Spatial composition and part-whole reasoning | Playable |
+| [Bracelet Search](https://rfarnham.github.io/nonverbal-reasoning-games/games/bracelet-search/) | Sequence search and mental reversal | Playable |
 
 ## Project shape
 
@@ -33,6 +34,7 @@ keeping the runtime entirely in the browser.
 ```text
 app/
   games/
+    bracelet-search/  # route, catalog metadata, and shelf icon
     braids/           # route, catalog metadata, and shelf icon
     domino-twist/     # route, catalog metadata, and shelf icon
     libra/            # route, catalog metadata, and shelf icon
