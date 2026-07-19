@@ -27,6 +27,38 @@ export function ShelfIcon({ style, ...props }: ShelfIconProps) {
       style={{ backgroundColor: "#dcefe9", ...style }}
     >
       <rect width="320" height="186" rx="13" fill="#dcefe9" />
+      <defs>
+        <marker
+          id="braids-orbit-arrow"
+          markerWidth="12"
+          markerHeight="12"
+          refX="10"
+          refY="6"
+          orient="auto"
+          markerUnits="userSpaceOnUse"
+        >
+          <path d="M0 0 12 6 0 12Z" fill="#657087" />
+        </marker>
+      </defs>
+      <path
+        d="M286 105C301 62 271 34 224 37 190 40 169 30 160 14"
+        fill="none"
+        stroke="#657087"
+        strokeDasharray="7 7"
+        strokeLinecap="round"
+        strokeWidth="4"
+        markerEnd="url(#braids-orbit-arrow)"
+      />
+      <rect
+        x="56"
+        y="25"
+        width="224"
+        height="150"
+        rx="17"
+        fill="#b8ddd3"
+        stroke="#17213d"
+        strokeWidth="3"
+      />
       <rect
         x="48"
         y="18"
@@ -71,21 +103,20 @@ export function ShelfIcon({ style, ...props }: ShelfIconProps) {
       </g>
 
       <path
-        d="M35 61c-17 13-17 50 2 64"
+        d="M173 174C238 178 296 151 286 105"
         fill="none"
         stroke="#17213d"
         strokeLinecap="round"
         strokeWidth="4"
       />
-      <path d="m28 122 11 5-2-12Z" fill="#17213d" />
       <path
-        d="M285 125c17-13 17-50-2-64"
-        fill="none"
+        d="M146 174q12-10 24 0-12 10-24 0Z"
+        fill="#fffdf8"
         stroke="#17213d"
-        strokeLinecap="round"
-        strokeWidth="4"
+        strokeLinejoin="round"
+        strokeWidth="3"
       />
-      <path d="m292 64-11-5 2 12Z" fill="#17213d" />
+      <circle cx="158" cy="174" r="3.5" fill="#17213d" />
     </svg>
   );
 }
