@@ -20,6 +20,7 @@ import {
   EXAMPLE,
   generateInfiniteRound,
   questionForRound,
+  routeCrossings,
   roundFingerprint,
   type AnswerSequence,
   type Difficulty,
@@ -293,6 +294,11 @@ export default function WhoseLeftPage() {
     ? campaignSessionRound
     : (roundQueue[roundCursor] ?? roundQueue[0]);
   const round = activeSessionRound?.round ?? CAMPAIGN_ROUNDS[0];
+  const crossingCount = routeCrossings(round.route).length;
+  const routeComplexityLabel =
+    crossingCount === 0
+      ? "No crossings yet"
+      : `${crossingCount} ${crossingCount === 1 ? "bridge" : "bridges"}`;
   const historicalSessionRound = campaignReviewSelection
     ? buildCampaignSessionRound(
         campaignReviewSelection.levelId,
@@ -946,7 +952,8 @@ export default function WhoseLeftPage() {
               <p className={styles.kicker}>Example</p>
               <h1 id="tutorial-title">Your left turns with you.</h1>
               <p className={styles.tutorialLede}>
-                Walk from <b>S</b> to <b>F</b>. Keep your side as the path bends.
+                Walk from <b>S</b> to <b>F</b>. Keep your side as the path bends;
+                Campaign adds windings and marked bridges step by step.
               </p>
             </div>
 
@@ -1372,8 +1379,8 @@ export default function WhoseLeftPage() {
                 <div className={styles.questionRow}>
                   <p className={styles.kicker}>
                     {round.difficulty === "Wizard"
-                      ? "Start and finish are your compass"
-                      : `${round.route.segments.length} path sections`}
+                      ? `One direction cue · ${routeComplexityLabel}`
+                      : `${round.route.segments.length} sections · ${routeComplexityLabel}`}
                   </p>
                   <h1>{questionForRound(round)}</h1>
                 </div>

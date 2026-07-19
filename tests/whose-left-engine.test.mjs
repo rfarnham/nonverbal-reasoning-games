@@ -15,8 +15,11 @@ import {
   peopleOnSide,
   questionForRound,
   relativeSideOfSegment,
+  routeCrossings,
   roundFingerprint,
+  routeTopology,
   validateCampaign,
+  validateRoute,
   validateRound,
 } from "../app/games/whose-left/game-engine.ts";
 
@@ -34,6 +37,51 @@ function opposite(side) {
 
 function cloned(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function routeFromPoints(points) {
+  const segments = points.slice(0, -1).map((from, index) => {
+    const to = points[index + 1];
+    const direction =
+      from.x === to.x
+        ? to.y < from.y
+          ? "north"
+          : "south"
+        : to.x < from.x
+          ? "west"
+          : "east";
+    return {
+      index,
+      from,
+      to,
+      direction,
+      length: Math.hypot(to.x - from.x, to.y - from.y),
+    };
+  });
+  return {
+    points,
+    segments,
+    viewBox: { minX: -20, minY: -20, width: 40, height: 40 },
+  };
+}
+
+function distanceToSegment(point, segment) {
+  const dx = segment.to.x - segment.from.x;
+  const dy = segment.to.y - segment.from.y;
+  const squaredLength = dx * dx + dy * dy;
+  const progress = Math.max(
+    0,
+    Math.min(
+      1,
+      ((point.x - segment.from.x) * dx +
+        (point.y - segment.from.y) * dy) /
+        squaredLength,
+    ),
+  );
+  return Math.hypot(
+    point.x - (segment.from.x + dx * progress),
+    point.y - (segment.from.y + dy * progress),
+  );
 }
 
 test("Campaign contains 12 deterministic, frozen rounds at every level", () => {
@@ -216,6 +264,120 @@ test("difficulty increases path load while Wizard removes repeated cues", () => 
   }
 });
 
+test("Campaign scaffolds bends, windings, and overpass loops in order", () => {
+  const byDifficulty = Object.fromEntries(
+    DIFFICULTIES.map((difficulty) => [
+      difficulty,
+      CAMPAIGN_ROUNDS.filter((round) => round.difficulty === difficulty),
+    ]),
+  );
+
+  const starter = byDifficulty.Starter.map(({ route }) => routeTopology(route));
+  assert.deepEqual(starter.map(({ crossingCount }) => crossingCount), Array(12).fill(0));
+  assert.ok(starter.slice(0, 4).every(({ headingReversals }) => headingReversals === 0));
+  assert.ok(starter.slice(4, 8).every(({ headingReversals }) => headingReversals >= 1));
+  assert.ok(starter.slice(8).every(({ headingReversals }) => headingReversals >= 2));
+
+  const junior = byDifficulty.Junior.map(({ route }) => routeTopology(route));
+  assert.deepEqual(junior.slice(0, 4).map(({ crossingCount }) => crossingCount), [0, 0, 0, 0]);
+  assert.ok(junior.slice(4).every(({ crossingCount }) => crossingCount === 1));
+  assert.ok(junior.slice(8).every(({ headingReversals }) => headingReversals >= 3));
+
+  for (const difficulty of ["Expert", "Wizard"]) {
+    const topologies = byDifficulty[difficulty].map(({ route }) =>
+      routeTopology(route),
+    );
+    assert.deepEqual(
+      topologies.map(({ crossingCount }) => crossingCount),
+      [1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2],
+      difficulty,
+    );
+  }
+  assert.deepEqual(
+    byDifficulty.Expert.map(({ route }) => routeTopology(route).crossingCount),
+    byDifficulty.Wizard.map(({ route }) => routeTopology(route).crossingCount),
+  );
+});
+
+test("crossings are straight-through bridges, never touches or junctions", () => {
+  const properCrossing = routeFromPoints([
+    { x: 0, y: 0 },
+    { x: 12, y: 0 },
+    { x: 12, y: -8 },
+    { x: 4, y: -8 },
+    { x: 4, y: 4 },
+  ]);
+  assert.deepEqual(validateRoute(properCrossing).errors, []);
+  assert.deepEqual(routeCrossings(properCrossing), [
+    {
+      point: { x: 4, y: 0 },
+      underSegmentIndex: 0,
+      overSegmentIndex: 3,
+    },
+  ]);
+
+  const endpointTouch = routeFromPoints([
+    { x: 0, y: 0 },
+    { x: 12, y: 0 },
+    { x: 12, y: -8 },
+    { x: 4, y: -8 },
+    { x: 4, y: 0 },
+  ]);
+  assert.match(validateRoute(endpointTouch).errors.join(" "), /ambiguous/);
+
+  const closedJunction = routeFromPoints([
+    { x: 0, y: 0 },
+    { x: 8, y: 0 },
+    { x: 8, y: -8 },
+    { x: 0, y: -8 },
+    { x: 0, y: 0 },
+  ]);
+  assert.equal(validateRoute(closedJunction).valid, false);
+
+  const overlap = routeFromPoints([
+    { x: 0, y: 0 },
+    { x: 12, y: 0 },
+    { x: 12, y: -8 },
+    { x: 4, y: -8 },
+    { x: 4, y: 0 },
+    { x: 10, y: 0 },
+  ]);
+  assert.match(validateRoute(overlap).errors.join(" "), /overlap/);
+});
+
+test("landmarks stay clear of every winding strand and answers follow traversal", () => {
+  const crossedRounds = CAMPAIGN_ROUNDS.filter(
+    ({ route }) => routeCrossings(route).length > 0,
+  );
+  assert.ok(crossedRounds.length > 0);
+
+  for (const round of crossedRounds) {
+    for (const person of round.people) {
+      assert.ok(
+        round.route.segments.every(
+          (segment) => distanceToSegment(person.position, segment) >= 2.4 - 1e-9,
+        ),
+        `${round.id}:${person.id}`,
+      );
+    }
+    const encounterIndexes = peopleOnSide(round, round.querySide).map(
+      ({ segmentIndex }) => segmentIndex,
+    );
+    assert.deepEqual(encounterIndexes, [...encounterIndexes].sort((a, b) => a - b));
+  }
+
+  assert.ok(
+    crossedRounds.some((round) => {
+      const people = peopleOnSide(round, round.querySide);
+      const xOrder = [...people].sort(
+        (first, second) => first.position.x - second.position.x,
+      );
+      return sequenceKey(people.map(({ id }) => id)) !== sequenceKey(xOrder.map(({ id }) => id));
+    }),
+    "At least one crossing puzzle must make screen order differ from route order.",
+  );
+});
+
 test("fingerprints ignore answer order and route translation", () => {
   const round = CAMPAIGN_ROUNDS[9];
   const reordered = {
@@ -279,6 +441,8 @@ test("1,600 seeded Infinite rounds are valid, reproducible, varied, and unique",
     const querySides = new Set();
     const answerPositions = new Set();
     const startingDirections = new Set();
+    const crossingCounts = new Set();
+    const turnSequences = new Set();
 
     for (let seed = 0; seed < 400; seed += 1) {
       const first = generateInfiniteRound(
@@ -301,11 +465,24 @@ test("1,600 seeded Infinite rounds are valid, reproducible, varied, and unique",
         4,
         `${difficulty}:${seed}`,
       );
+      const topology = routeTopology(first.route);
+      const rules = DIFFICULTY_RULES[difficulty];
+      assert.ok(
+        topology.crossingCount >= rules.minCrossings &&
+          topology.crossingCount <= rules.maxCrossings,
+        `${difficulty}:${seed}`,
+      );
+      assert.ok(
+        topology.headingReversals >= rules.minHeadingReversals,
+        `${difficulty}:${seed}`,
+      );
 
       fingerprints.add(roundFingerprint(first));
       querySides.add(first.querySide);
       answerPositions.add(first.correctIndex);
       startingDirections.add(first.route.segments[0].direction);
+      crossingCounts.add(topology.crossingCount);
+      turnSequences.add(topology.turnSequence);
     }
 
     assert.equal(fingerprints.size, 400, difficulty);
@@ -316,6 +493,18 @@ test("1,600 seeded Infinite rounds are valid, reproducible, varied, and unique",
       ["east", "north", "south", "west"],
       difficulty,
     );
+    const expectedCrossingCounts = {
+      Starter: [0],
+      Junior: [0, 1],
+      Expert: [1, 2],
+      Wizard: [1, 2],
+    };
+    assert.deepEqual(
+      [...crossingCounts].sort((a, b) => a - b),
+      expectedCrossingCounts[difficulty],
+      difficulty,
+    );
+    assert.ok(turnSequences.size >= 4, difficulty);
   }
 });
 
@@ -341,13 +530,15 @@ test("hostile random sources fail clearly within the attempt bound", () => {
     );
   }
 
+  const deterministic = generateInfiniteRound("Wizard", () => 0);
+  const excluded = new Set([roundFingerprint(deterministic)]);
   let calls = 0;
   assert.throws(
     () =>
       generateInfiniteRound("Wizard", () => {
         calls += 1;
         return 0;
-      }),
+      }, excluded),
     new RegExp(
       `Unable to generate a valid Wizard round after ${GENERATOR_MAX_ATTEMPTS} attempts`,
     ),

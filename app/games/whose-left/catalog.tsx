@@ -6,7 +6,7 @@ import type {
 export const gameInfo = {
   title: "Whose Left?",
   description:
-    "Follow a turning path and keep left and right anchored to the walker, not the page.",
+    "Follow winding, crossing paths and keep left and right anchored to the walker, not the page.",
   skills: ["Spatial perspective", "Direction tracking"],
   estimatedMinutes: 10,
   shelfOrder: 40,
@@ -21,18 +21,46 @@ export function ShelfIcon({ style, ...props }: ShelfIconProps) {
     >
       <rect width="320" height="186" rx="13" fill="#f1eadc" />
       <path
-        d="M58 104h130V42h-82"
+        d="M52 132h162V50H96v54h154"
+        fill="none"
+        stroke="#d8d1c3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="19"
+      />
+      <path
+        d="M52 132h162V50H96v54h154"
         fill="none"
         stroke="#17213d"
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="9"
       />
-      <path d="m183 60 19-18-19-18Z" fill="#17213d" />
-      <circle cx="58" cy="104" r="17" fill="#17213d" />
+      <path
+        d="M201 104h26"
+        fill="none"
+        stroke="#f1eadc"
+        strokeLinecap="round"
+        strokeWidth="23"
+      />
+      <path
+        d="M201 104h26"
+        fill="none"
+        stroke="#d8d1c3"
+        strokeLinecap="round"
+        strokeWidth="19"
+      />
+      <path
+        d="M201 104h26"
+        fill="none"
+        stroke="#17213d"
+        strokeLinecap="round"
+        strokeWidth="9"
+      />
+      <circle cx="52" cy="132" r="17" fill="#17213d" />
       <text
-        x="58"
-        y="110"
+        x="52"
+        y="138"
         fill="#fffdf8"
         fontFamily="ui-monospace, monospace"
         fontSize="15"
@@ -42,16 +70,16 @@ export function ShelfIcon({ style, ...props }: ShelfIconProps) {
         S
       </text>
       <circle
-        cx="106"
-        cy="42"
+        cx="250"
+        cy="104"
         r="17"
         fill="#fffdf8"
         stroke="#17213d"
         strokeWidth="3"
       />
       <text
-        x="106"
-        y="48"
+        x="250"
+        y="110"
         fill="#17213d"
         fontFamily="ui-monospace, monospace"
         fontSize="15"
@@ -61,8 +89,8 @@ export function ShelfIcon({ style, ...props }: ShelfIconProps) {
         F
       </text>
       <g stroke="#17213d" strokeWidth="3">
-        <circle cx="119" cy="133" r="19" fill="#f06f5f" />
-        <circle cx="226" cy="72" r="19" fill="#35a999" />
+        <circle cx="126" cy="155" r="19" fill="#f06f5f" />
+        <circle cx="72" cy="76" r="19" fill="#35a999" />
       </g>
       <g
         fill="#17213d"
@@ -71,11 +99,11 @@ export function ShelfIcon({ style, ...props }: ShelfIconProps) {
         fontWeight="900"
         textAnchor="middle"
       >
-        <text x="119" y="139">A</text>
-        <text x="226" y="78">B</text>
+        <text x="126" y="161">A</text>
+        <text x="72" y="82">B</text>
       </g>
       <path
-        d="M159 91h22m-8-8 8 8-8 8"
+        d="M146 104h22m-8-8 8 8-8 8"
         fill="none"
         stroke="#fffdf8"
         strokeLinecap="round"

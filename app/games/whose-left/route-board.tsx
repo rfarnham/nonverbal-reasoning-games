@@ -2,9 +2,12 @@ import type { CSSProperties } from "react";
 
 import {
   namesForSequence,
+  routeCrossings,
   type AnswerSequence,
   type Person,
+  type Point,
   type Round,
+  type RouteCrossing,
 } from "./game-engine";
 import styles from "./whose-left.module.css";
 
@@ -62,6 +65,116 @@ function segmentPosition(
     x: segment.from.x + (segment.to.x - segment.from.x) * progress,
     y: segment.from.y + (segment.to.y - segment.from.y) * progress,
   };
+}
+
+function pointProjectionOnSegment(
+  round: Round,
+  person: Person,
+): Point {
+  const segment = round.route.segments[person.segmentIndex];
+  if (!segment) return person.position;
+  const dx = segment.to.x - segment.from.x;
+  const dy = segment.to.y - segment.from.y;
+  const squaredLength = dx * dx + dy * dy;
+  const progress =
+    ((person.position.x - segment.from.x) * dx +
+      (person.position.y - segment.from.y) * dy) /
+    squaredLength;
+  return {
+    x: segment.from.x + dx * progress,
+    y: segment.from.y + dy * progress,
+  };
+}
+
+function visitBadgePosition(round: Round, person: Person): Point {
+  const anchor = pointProjectionOnSegment(round, person);
+  const segment = round.route.segments[person.segmentIndex];
+  if (!segment) return person.position;
+  const outwardX = person.position.x - anchor.x;
+  const outwardY = person.position.y - anchor.y;
+  const outwardLength = Math.hypot(outwardX, outwardY) || 1;
+  const segmentLength = segment.length || 1;
+  return {
+    x:
+      person.position.x +
+      (outwardX / outwardLength) * 1.45 +
+      ((segment.to.x - segment.from.x) / segmentLength) * 1.1,
+    y:
+      person.position.y +
+      (outwardY / outwardLength) * 1.45 +
+      ((segment.to.y - segment.from.y) / segmentLength) * 1.1,
+  };
+}
+
+function crossingBridgeLine(
+  round: Round,
+  crossing: RouteCrossing,
+): Readonly<{ x1: number; y1: number; x2: number; y2: number }> {
+  const segment = round.route.segments[crossing.overSegmentIndex];
+  const halfSpan = 1.8;
+  const dx = (segment.to.x - segment.from.x) / segment.length;
+  const dy = (segment.to.y - segment.from.y) / segment.length;
+  return {
+    x1: crossing.point.x - dx * halfSpan,
+    y1: crossing.point.y - dy * halfSpan,
+    x2: crossing.point.x + dx * halfSpan,
+    y2: crossing.point.y + dy * halfSpan,
+  };
+}
+
+function chevronPosition(
+  round: Round,
+  segmentIndex: number,
+  crossings: readonly RouteCrossing[],
+): Point {
+  const candidates = [0.58, 0.3, 0.7].map((progress) =>
+    segmentPosition(round, segmentIndex, progress),
+  );
+  const relevantCrossings = crossings.filter(
+    ({ underSegmentIndex, overSegmentIndex }) =>
+      underSegmentIndex === segmentIndex || overSegmentIndex === segmentIndex,
+  );
+  if (relevantCrossings.length === 0) return candidates[0];
+  return [...candidates].sort((first, second) => {
+    const firstClearance = Math.min(
+      ...relevantCrossings.map(({ point }) =>
+        Math.hypot(first.x - point.x, first.y - point.y),
+      ),
+    );
+    const secondClearance = Math.min(
+      ...relevantCrossings.map(({ point }) =>
+        Math.hypot(second.x - point.x, second.y - point.y),
+      ),
+    );
+    return secondClearance - firstClearance;
+  })[0];
+}
+
+function CrossingBridge({
+  round,
+  crossing,
+  trace = false,
+}: {
+  round: Round;
+  crossing: RouteCrossing;
+  trace?: boolean;
+}) {
+  const line = crossingBridgeLine(round, crossing);
+  return (
+    <g
+      className={`${styles.crossingBridge} ${
+        trace ? styles.traceCrossingBridge : ""
+      }`}
+      aria-hidden="true"
+    >
+      <line className={styles.crossingGap} {...line} />
+      <line className={styles.crossingUnderlay} {...line} />
+      <line
+        className={trace ? styles.crossingTrace : styles.crossingLine}
+        {...line}
+      />
+    </g>
+  );
 }
 
 export function sequenceAccessibleLabel(
@@ -127,18 +240,25 @@ export function RouteBoard({
   className?: string;
 }) {
   const pathPoints = routePoints(round);
+  const crossings = routeCrossings(round.route);
   const targetOrder = new Map(
     round.correctSequence.map((personId, index) => [personId, index + 1]),
   );
   const finalPoint = round.route.points.at(-1) ?? round.route.points[0];
   const { minX, minY, width, height } = round.route.viewBox;
+  const crossingDescription =
+    crossings.length === 0
+      ? ""
+      : ` The route crosses over itself ${crossings.length} ${
+          crossings.length === 1 ? "time" : "times"
+        }; at each bridge gap, continue straight along the same strand.`;
   const boardLabel = completed
     ? `Completed visual route from Start to Finish. The highlighted ${
         round.querySide
       } side passes ${namesForSequence(round, round.correctSequence).join(
         ", then ",
-      )}.`
-    : `Visual route from Start to Finish with ${round.people.length} people beside successive path sections. Track the walker's changing ${round.querySide}; the answer is intentionally not encoded in this description.`;
+      )}.${crossingDescription}`
+    : `Visual route from Start to Finish with ${round.people.length} people beside successive path sections. Track the walker's changing ${round.querySide}; the answer is intentionally not encoded in this description.${crossingDescription}`;
 
   return (
     <figure
@@ -163,6 +283,29 @@ export function RouteBoard({
         role="img"
         aria-label={boardLabel}
       >
+        {revealSide
+          ? round.people.map((person) => {
+              const order = targetOrder.get(person.id);
+              if (order === undefined) return null;
+              const anchor = pointProjectionOnSegment(round, person);
+              const linkStyle = {
+                "--visit-delay": `${Math.max(0, order - 1) * 90}ms`,
+              } as CustomProperties;
+              return (
+                <line
+                  className={styles.sideLink}
+                  style={linkStyle}
+                  x1={anchor.x}
+                  y1={anchor.y}
+                  x2={person.position.x}
+                  y2={person.position.y}
+                  vectorEffect="non-scaling-stroke"
+                  aria-hidden="true"
+                  key={`link-${person.id}`}
+                />
+              );
+            })
+          : null}
         <polyline
           className={styles.routeUnderlay}
           points={pathPoints}
@@ -175,18 +318,35 @@ export function RouteBoard({
           fill="none"
           vectorEffect="non-scaling-stroke"
         />
-        {revealSide ? (
-          <polyline
-            className={styles.routeTrace}
-            points={pathPoints}
-            fill="none"
-            pathLength={1}
-            vectorEffect="non-scaling-stroke"
+        {crossings.map((crossing) => (
+          <CrossingBridge
+            round={round}
+            crossing={crossing}
+            key={`bridge-${crossing.underSegmentIndex}-${crossing.overSegmentIndex}`}
           />
+        ))}
+        {revealSide ? (
+          <>
+            <polyline
+              className={styles.routeTrace}
+              points={pathPoints}
+              fill="none"
+              pathLength={1}
+              vectorEffect="non-scaling-stroke"
+            />
+            {crossings.map((crossing) => (
+              <CrossingBridge
+                round={round}
+                crossing={crossing}
+                trace
+                key={`trace-bridge-${crossing.underSegmentIndex}-${crossing.overSegmentIndex}`}
+              />
+            ))}
+          </>
         ) : null}
 
         {round.scaffold.directionCueSegmentIndexes.map((segmentIndex) => {
-          const position = segmentPosition(round, segmentIndex);
+          const position = chevronPosition(round, segmentIndex, crossings);
           return (
             <g
               className={styles.routeChevron}
@@ -204,9 +364,9 @@ export function RouteBoard({
 
         {round.people.map((person) => {
           const segment = round.route.segments[person.segmentIndex];
-          const midpoint = segmentPosition(round, person.segmentIndex, 0.5);
           const order = targetOrder.get(person.id);
           const isTarget = order !== undefined;
+          const badgePosition = visitBadgePosition(round, person);
           const visitStyle = {
             "--visit-delay": `${Math.max(0, (order ?? 1) - 1) * 90}ms`,
           } as CustomProperties;
@@ -218,16 +378,6 @@ export function RouteBoard({
               aria-hidden="true"
               key={person.id}
             >
-              {isTarget && revealSide ? (
-                <line
-                  className={styles.sideLink}
-                  x1={midpoint.x}
-                  y1={midpoint.y}
-                  x2={person.position.x}
-                  y2={person.position.y}
-                  vectorEffect="non-scaling-stroke"
-                />
-              ) : null}
               <circle
                 className={`${styles.personToken} ${personColorClass(person)}`}
                 cx={person.position.x}
@@ -247,14 +397,14 @@ export function RouteBoard({
               {isTarget && revealSide ? (
                 <g className={styles.visitBadge}>
                   <circle
-                    cx={person.position.x + 1.65}
-                    cy={person.position.y - 1.65}
+                    cx={badgePosition.x}
+                    cy={badgePosition.y}
                     r={0.92}
                     vectorEffect="non-scaling-stroke"
                   />
                   <text
-                    x={person.position.x + 1.65}
-                    y={person.position.y - 1.65}
+                    x={badgePosition.x}
+                    y={badgePosition.y}
                     textAnchor="middle"
                     dominantBaseline="central"
                   >
@@ -308,6 +458,9 @@ export function RouteBoard({
       <div className={styles.endpointKey} aria-hidden="true">
         <span><b>S</b> Start</span>
         <span><b>F</b> Finish</span>
+        {crossings.length > 0 ? (
+          <span className={styles.bridgeNote}>At bridges, keep straight</span>
+        ) : null}
         {!round.scaffold.showIntermediateChevrons ? (
           <span className={styles.singleCueNote}>One direction cue</span>
         ) : null}

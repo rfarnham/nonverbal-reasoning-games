@@ -20,6 +20,12 @@ export type RouteSegment = Readonly<{
   length: number;
 }>;
 
+export type RouteCrossing = Readonly<{
+  point: Point;
+  underSegmentIndex: number;
+  overSegmentIndex: number;
+}>;
+
 export type Person = Readonly<{
   id: string;
   name: string;
@@ -67,6 +73,9 @@ export type DifficultyRule = Readonly<{
   peoplePerSide: number;
   minSegmentLength: number;
   maxSegmentLength: number;
+  minCrossings: number;
+  maxCrossings: number;
+  minHeadingReversals: number;
   showIntermediateChevrons: boolean;
 }>;
 
@@ -77,10 +86,16 @@ export type ValidationResult = Readonly<{
 
 type PersonIdentity = (typeof PERSON_POOL)[number];
 
-type AuthoredSpec = Readonly<{
-  verticalSigns: string;
+type RouteTemplate = Readonly<{
+  id: string;
+  turns: string;
   lengths: readonly number[];
+}>;
+
+type AuthoredSpec = Readonly<{
+  template: RouteTemplate;
   quarterTurns: number;
+  reflected: boolean;
   sides: string;
   querySide: Side;
   correctIndex: number;
@@ -90,10 +105,13 @@ type AuthoredSpec = Readonly<{
 }>;
 
 const EPSILON = 1e-9;
-const LANDMARK_OFFSET = 2.5;
+const LANDMARK_OFFSET = 2.75;
 const LANDMARK_PATH_CLEARANCE = 2.4;
-const LANDMARK_SEPARATION = 2;
-const VIEWBOX_PADDING = 4;
+const LANDMARK_SEPARATION = 3.7;
+const ENDPOINT_LANDMARK_SEPARATION = 3.5;
+const CROSSING_CORNER_CLEARANCE = 3;
+const CROSSING_SEPARATION = 5;
+const VIEWBOX_PADDING = 5;
 
 export const GENERATOR_MAX_ATTEMPTS = 128;
 
@@ -110,27 +128,39 @@ export const DIFFICULTY_RULES: Readonly<Record<Difficulty, DifficultyRule>> = {
     peoplePerSide: 2,
     minSegmentLength: 8,
     maxSegmentLength: 12,
+    minCrossings: 0,
+    maxCrossings: 0,
+    minHeadingReversals: 0,
     showIntermediateChevrons: true,
   },
   Junior: {
     segmentCount: 6,
     peoplePerSide: 3,
     minSegmentLength: 8,
-    maxSegmentLength: 12,
+    maxSegmentLength: 16,
+    minCrossings: 0,
+    maxCrossings: 1,
+    minHeadingReversals: 1,
     showIntermediateChevrons: true,
   },
   Expert: {
     segmentCount: 8,
     peoplePerSide: 4,
     minSegmentLength: 8,
-    maxSegmentLength: 12,
+    maxSegmentLength: 18,
+    minCrossings: 1,
+    maxCrossings: 2,
+    minHeadingReversals: 2,
     showIntermediateChevrons: true,
   },
   Wizard: {
     segmentCount: 8,
     peoplePerSide: 4,
     minSegmentLength: 8,
-    maxSegmentLength: 12,
+    maxSegmentLength: 18,
+    minCrossings: 1,
+    maxCrossings: 2,
+    minHeadingReversals: 2,
     showIntermediateChevrons: false,
   },
 };
@@ -164,35 +194,139 @@ const PERSON_POOL = [
   { id: "zane", name: "Zane", initial: "Z" },
 ] as const;
 
-const LENGTH_PATTERNS = [
-  [8, 10, 8, 12, 10, 8, 12, 10],
-  [10, 8, 12, 8, 10, 12, 8, 10],
-  [12, 10, 8, 10, 8, 12, 10, 8],
-  [8, 12, 10, 8, 12, 10, 8, 12],
-  [10, 12, 8, 10, 8, 10, 12, 8],
-  [12, 8, 10, 12, 10, 8, 10, 12],
-  [8, 10, 12, 10, 12, 8, 10, 8],
-  [10, 8, 10, 12, 8, 12, 8, 10],
-  [12, 10, 12, 8, 10, 8, 12, 10],
-  [8, 12, 8, 10, 12, 10, 8, 12],
-  [10, 12, 10, 8, 10, 12, 10, 8],
-  [12, 8, 12, 10, 8, 10, 12, 10],
-] as const;
+const STARTER_ROUTE_TEMPLATES = [
+  { id: "starter-bends-1", turns: "LRL", lengths: [8, 10, 8, 10] },
+  { id: "starter-bends-2", turns: "RLR", lengths: [10, 8, 10, 12] },
+  { id: "starter-bends-3", turns: "LRL", lengths: [12, 8, 10, 8] },
+  { id: "starter-bends-4", turns: "RLR", lengths: [8, 12, 10, 10] },
+  { id: "starter-hairpin-1", turns: "LLR", lengths: [8, 10, 8, 12] },
+  { id: "starter-hairpin-2", turns: "RRL", lengths: [10, 8, 8, 10] },
+  { id: "starter-hairpin-3", turns: "LLR", lengths: [12, 10, 8, 8] },
+  { id: "starter-hairpin-4", turns: "RRL", lengths: [8, 12, 10, 8] },
+  { id: "starter-open-loop-1", turns: "LLL", lengths: [12, 12, 8, 8] },
+  { id: "starter-open-loop-2", turns: "RRR", lengths: [12, 12, 8, 10] },
+  { id: "starter-open-loop-3", turns: "LLL", lengths: [12, 10, 8, 8] },
+  { id: "starter-open-loop-4", turns: "RRR", lengths: [10, 12, 8, 8] },
+] as const satisfies readonly RouteTemplate[];
 
-const VERTICAL_PATTERNS = [
-  "-+-+",
-  "+-+-",
-  "-++-",
-  "+--+",
-  "-+--",
-  "+-++",
-  "-+++",
-  "+---",
-  "-+-+",
-  "+-+-",
-  "-++-",
-  "+--+",
-] as const;
+const JUNIOR_ROUTE_TEMPLATES = [
+  { id: "junior-wind-1", turns: "LLRLR", lengths: [8, 8, 8, 8, 8, 8] },
+  { id: "junior-wind-2", turns: "RRLRL", lengths: [8, 10, 8, 8, 8, 10] },
+  { id: "junior-wind-3", turns: "LLRLL", lengths: [8, 8, 8, 8, 8, 8] },
+  { id: "junior-wind-4", turns: "RRLRR", lengths: [10, 8, 8, 8, 10, 8] },
+  {
+    id: "junior-cross-1",
+    turns: "LLLRL",
+    lengths: [16, 10, 10, 16, 10, 10],
+  },
+  {
+    id: "junior-cross-2",
+    turns: "RRRLR",
+    lengths: [16, 10, 10, 16, 10, 12],
+  },
+  {
+    id: "junior-cross-3",
+    turns: "LLLRL",
+    lengths: [16, 12, 10, 16, 10, 10],
+  },
+  {
+    id: "junior-cross-4",
+    turns: "RRRLR",
+    lengths: [16, 12, 10, 16, 10, 12],
+  },
+  {
+    id: "junior-loop-1",
+    turns: "LLLRR",
+    lengths: [16, 10, 10, 16, 10, 10],
+  },
+  {
+    id: "junior-loop-2",
+    turns: "RRRLL",
+    lengths: [16, 10, 10, 16, 10, 12],
+  },
+  {
+    id: "junior-loop-3",
+    turns: "LLLRR",
+    lengths: [16, 12, 10, 16, 10, 10],
+  },
+  {
+    id: "junior-loop-4",
+    turns: "RRRLL",
+    lengths: [16, 12, 10, 16, 10, 12],
+  },
+] as const satisfies readonly RouteTemplate[];
+
+const EXPERT_ROUTE_TEMPLATES = [
+  {
+    id: "expert-cross-1",
+    turns: "LLLRLRL",
+    lengths: [12, 8, 8, 12, 8, 8, 8, 8],
+  },
+  {
+    id: "expert-cross-2",
+    turns: "RRRLRLR",
+    lengths: [12, 8, 8, 12, 8, 8, 8, 10],
+  },
+  {
+    id: "expert-cross-3",
+    turns: "LLLRLLL",
+    lengths: [8, 8, 10, 10, 12, 8, 8, 12],
+  },
+  {
+    id: "expert-cross-4",
+    turns: "RRRLRRR",
+    lengths: [8, 8, 10, 10, 12, 8, 8, 12],
+  },
+  {
+    id: "expert-double-1",
+    turns: "LRRRLRR",
+    lengths: [10, 14, 12, 10, 16, 16, 10, 10],
+  },
+  {
+    id: "expert-double-2",
+    turns: "RLLLRLL",
+    lengths: [10, 14, 12, 10, 16, 16, 10, 12],
+  },
+  {
+    id: "expert-double-3",
+    turns: "LRRRLRR",
+    lengths: [10, 14, 12, 10, 16, 16, 10, 14],
+  },
+  {
+    id: "expert-double-4",
+    turns: "RLLLRLL",
+    lengths: [10, 14, 12, 10, 16, 16, 10, 16],
+  },
+  {
+    id: "expert-double-5",
+    turns: "LRRRLRR",
+    lengths: [10, 14, 12, 10, 16, 16, 10, 18],
+  },
+  {
+    id: "expert-double-6",
+    turns: "RLLLRLL",
+    lengths: [10, 14, 12, 10, 16, 16, 12, 10],
+  },
+  {
+    id: "expert-double-7",
+    turns: "LRRRLRR",
+    lengths: [10, 14, 12, 10, 16, 16, 12, 12],
+  },
+  {
+    id: "expert-double-8",
+    turns: "RLLLRLL",
+    lengths: [10, 14, 12, 10, 16, 16, 12, 14],
+  },
+] as const satisfies readonly RouteTemplate[];
+
+const ROUTE_TEMPLATES: Readonly<
+  Record<Difficulty, readonly RouteTemplate[]>
+> = {
+  Starter: STARTER_ROUTE_TEMPLATES,
+  Junior: JUNIOR_ROUTE_TEMPLATES,
+  Expert: EXPERT_ROUTE_TEMPLATES,
+  Wizard: EXPERT_ROUTE_TEMPLATES,
+};
 
 const SIDE_PATTERNS: Readonly<Record<Difficulty, readonly string[]>> = {
   Starter: [
@@ -331,30 +465,49 @@ function makeSegments(points: readonly Point[]): readonly RouteSegment[] {
   });
 }
 
-function buildMonotonePoints(
-  lengths: readonly number[],
-  verticalSigns: string,
+function buildTemplatePoints(
+  template: RouteTemplate,
   quarterTurns: number,
+  reflected: boolean,
 ): readonly Point[] {
   const points: Point[] = [{ x: 0, y: 0 }];
-  let verticalIndex = 0;
+  const vectors = [
+    { x: 1, y: 0 },
+    { x: 0, y: 1 },
+    { x: -1, y: 0 },
+    { x: 0, y: -1 },
+  ] as const;
+  let directionIndex = 0;
 
-  for (const [segmentIndex, length] of lengths.entries()) {
+  if (template.turns.length !== template.lengths.length - 1) {
+    throw new Error(`${template.id} needs one turn between every route segment.`);
+  }
+
+  for (const [segmentIndex, length] of template.lengths.entries()) {
+    if (segmentIndex > 0) {
+      const turn = template.turns[segmentIndex - 1];
+      if (turn !== "L" && turn !== "R") {
+        throw new Error(`${template.id} contains an unknown turn.`);
+      }
+      directionIndex =
+        (directionIndex + (turn === "R" ? 1 : 3)) % vectors.length;
+    }
     const previous = points[points.length - 1];
-    const delta =
-      segmentIndex % 2 === 0
-        ? { x: length, y: 0 }
-        : {
-            x: 0,
-            y: verticalSigns[verticalIndex++] === "+" ? length : -length,
-          };
+    const vector = vectors[directionIndex];
+    const delta = { x: vector.x * length, y: vector.y * length };
     points.push(add(previous, delta));
   }
 
-  return points.map((point) => rotatePoint(point, quarterTurns));
+  return points.map((point) =>
+    rotatePoint(reflected ? { x: -point.x, y: point.y } : point, quarterTurns),
+  );
 }
 
-function personPosition(segment: RouteSegment, side: Side): Point {
+function positionBesideSegment(
+  segment: RouteSegment,
+  side: Side,
+  progress: number,
+): Point {
   const dx = segment.to.x - segment.from.x;
   const dy = segment.to.y - segment.from.y;
   const length = Math.hypot(dx, dy);
@@ -362,12 +515,82 @@ function personPosition(segment: RouteSegment, side: Side): Point {
   const leftNormal = { x: dy / length, y: -dx / length };
   return {
     x:
-      (segment.from.x + segment.to.x) / 2 +
+      segment.from.x +
+      dx * progress +
       leftNormal.x * LANDMARK_OFFSET * sideMultiplier,
     y:
-      (segment.from.y + segment.to.y) / 2 +
+      segment.from.y +
+      dy * progress +
       leftNormal.y * LANDMARK_OFFSET * sideMultiplier,
   };
+}
+
+function personPositionCandidates(
+  segment: RouteSegment,
+  side: Side,
+  allSegments: readonly RouteSegment[],
+  routeEndpoints: readonly Point[],
+): readonly Point[] {
+  const progressSlots =
+    segment.index % 2 === 0
+      ? [0.3, 0.5, 0.7, 0.4, 0.6]
+      : [0.7, 0.5, 0.3, 0.6, 0.4];
+
+  return progressSlots.flatMap((progress) => {
+    const position = positionBesideSegment(segment, side, progress);
+    const clearsEveryPath = allSegments.every(
+      (candidate) =>
+        distanceToSegment(position, candidate) >=
+        LANDMARK_PATH_CLEARANCE - EPSILON,
+    );
+    const clearsEndpoints = routeEndpoints.every(
+      (endpoint) =>
+        distance(position, endpoint) >=
+        ENDPOINT_LANDMARK_SEPARATION - EPSILON,
+    );
+    return clearsEveryPath && clearsEndpoints ? [position] : [];
+  });
+}
+
+function placePeople(
+  segments: readonly RouteSegment[],
+  sides: readonly Side[],
+  identities: readonly PersonIdentity[],
+  routeEndpoints: readonly Point[],
+): readonly Person[] {
+  const placed: Person[] = [];
+
+  function place(segmentIndex: number): boolean {
+    if (segmentIndex === segments.length) return true;
+    const segment = segments[segmentIndex];
+    const side = sides[segmentIndex];
+    const identity = identities[segmentIndex];
+    for (const position of personPositionCandidates(
+      segment,
+      side,
+      segments,
+      routeEndpoints,
+    )) {
+      if (
+        placed.some(
+          (person) =>
+            distance(position, person.position) <
+            LANDMARK_SEPARATION - EPSILON,
+        )
+      ) {
+        continue;
+      }
+      placed.push({ ...identity, segmentIndex, position, side });
+      if (place(segmentIndex + 1)) return true;
+      placed.pop();
+    }
+    return false;
+  }
+
+  if (!place(0)) {
+    throw new Error("No collision-free arrangement exists for the landmarks.");
+  }
+  return placed;
 }
 
 function makeViewBox(
@@ -508,16 +731,8 @@ function makeRound({
   distractorRotation: number;
 }): Round {
   const segments = makeSegments(points);
-  const people = segments.map((segment, segmentIndex) => {
-    const identity = identities[segmentIndex];
-    const side = sides[segmentIndex];
-    return {
-      ...identity,
-      segmentIndex,
-      position: personPosition(segment, side),
-      side,
-    };
-  });
+  const routeEndpoints = [points[0], points[points.length - 1]];
+  const people = placePeople(segments, sides, identities, routeEndpoints);
   const { options, optionKinds, correctSequence } = assembleOptions(
     people,
     querySide,
@@ -550,11 +765,10 @@ function authoredSpec(
   levelIndex: number,
   roundIndex: number,
 ): AuthoredSpec {
-  const segmentCount = DIFFICULTY_RULES[difficulty].segmentCount;
   return {
-    verticalSigns: VERTICAL_PATTERNS[roundIndex].slice(0, segmentCount / 2),
-    lengths: LENGTH_PATTERNS[roundIndex].slice(0, segmentCount),
+    template: ROUTE_TEMPLATES[difficulty][roundIndex],
     quarterTurns: (roundIndex + levelIndex * 2) % 4,
+    reflected: (roundIndex + levelIndex) % 3 === 1,
     sides: SIDE_PATTERNS[difficulty][roundIndex],
     querySide: (roundIndex + levelIndex) % 2 === 0 ? "left" : "right",
     correctIndex: ANSWER_POSITION_SCHEDULES[difficulty][roundIndex],
@@ -564,68 +778,255 @@ function authoredSpec(
   };
 }
 
+function balancedSideAssignments(
+  segmentCount: number,
+  leftCount: number,
+): readonly (readonly Side[])[] {
+  const assignments: Side[][] = [];
+
+  function build(index: number, remainingLeft: number, sides: Side[]): void {
+    if (index === segmentCount) {
+      if (remainingLeft === 0) assignments.push([...sides]);
+      return;
+    }
+    const remainingSlots = segmentCount - index;
+    if (remainingLeft > 0) {
+      sides.push("left");
+      build(index + 1, remainingLeft - 1, sides);
+      sides.pop();
+    }
+    if (remainingSlots > remainingLeft) {
+      sides.push("right");
+      build(index + 1, remainingLeft, sides);
+      sides.pop();
+    }
+  }
+
+  build(0, leftCount, []);
+  return assignments;
+}
+
 function buildAuthoredRound(
   difficulty: Difficulty,
   levelIndex: number,
   roundIndex: number,
 ): Round {
   const spec = authoredSpec(difficulty, levelIndex, roundIndex);
-  const sides = [...spec.sides].map((side) =>
+  const preferredSides = [...spec.sides].map((side) =>
     side === "L" ? "left" : "right",
   );
-  const points = buildMonotonePoints(
-    spec.lengths,
-    spec.verticalSigns,
+  const points = buildTemplatePoints(
+    spec.template,
     spec.quarterTurns,
+    spec.reflected,
   );
-  return makeRound({
-    id: `${difficulty.toLowerCase()}-${String(roundIndex + 1).padStart(2, "0")}`,
-    difficulty,
-    points,
-    sides,
-    querySide: spec.querySide,
-    identities: identitiesFromOffset(spec.lengths.length, spec.nameOffset),
-    correctIndex: spec.correctIndex,
-    nearMissSalt: spec.nearMissSalt,
-    distractorRotation: spec.distractorRotation,
+  const sideCandidates = [
+    ...balancedSideAssignments(
+      spec.template.lengths.length,
+      DIFFICULTY_RULES[difficulty].peoplePerSide,
+    ),
+  ].sort((first, second) => {
+    const firstDifference = first.filter(
+      (side, index) => side !== preferredSides[index],
+    ).length;
+    const secondDifference = second.filter(
+      (side, index) => side !== preferredSides[index],
+    ).length;
+    const firstKey = first.join("");
+    const secondKey = second.join("");
+    return (
+      firstDifference - secondDifference ||
+      (firstKey < secondKey ? -1 : firstKey > secondKey ? 1 : 0)
+    );
   });
+  let lastError: unknown;
+
+  for (const sides of sideCandidates) {
+    try {
+      return makeRound({
+        id: `${difficulty.toLowerCase()}-${String(roundIndex + 1).padStart(2, "0")}`,
+        difficulty,
+        points,
+        sides,
+        querySide: spec.querySide,
+        identities: identitiesFromOffset(
+          spec.template.lengths.length,
+          spec.nameOffset,
+        ),
+        correctIndex: spec.correctIndex,
+        nearMissSalt: spec.nearMissSalt,
+        distractorRotation: spec.distractorRotation,
+      });
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw new Error(
+    `Unable to build ${difficulty} problem ${roundIndex + 1} from ${
+      spec.template.id
+    }: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+  );
 }
 
 function orientation(a: Point, b: Point, c: Point): number {
   return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 }
 
-function pointOnSegment(point: Point, segment: RouteSegment): boolean {
+type SegmentContact =
+  | Readonly<{ kind: "none" }>
+  | Readonly<{ kind: "proper-crossing"; point: Point }>
+  | Readonly<{ kind: "endpoint-touch"; point: Point }>
+  | Readonly<{ kind: "overlap" }>;
+
+function isHorizontal(segment: RouteSegment): boolean {
+  return Math.abs(segment.from.y - segment.to.y) < EPSILON;
+}
+
+function liesBetween(value: number, first: number, second: number): boolean {
   return (
-    Math.abs(orientation(segment.from, segment.to, point)) < EPSILON &&
-    point.x >= Math.min(segment.from.x, segment.to.x) - EPSILON &&
-    point.x <= Math.max(segment.from.x, segment.to.x) + EPSILON &&
-    point.y >= Math.min(segment.from.y, segment.to.y) - EPSILON &&
-    point.y <= Math.max(segment.from.y, segment.to.y) + EPSILON
+    value >= Math.min(first, second) - EPSILON &&
+    value <= Math.max(first, second) + EPSILON
   );
 }
 
-function segmentsIntersect(a: RouteSegment, b: RouteSegment): boolean {
-  const o1 = orientation(a.from, a.to, b.from);
-  const o2 = orientation(a.from, a.to, b.to);
-  const o3 = orientation(b.from, b.to, a.from);
-  const o4 = orientation(b.from, b.to, a.to);
+function liesStrictlyBetween(
+  value: number,
+  first: number,
+  second: number,
+): boolean {
+  return (
+    value > Math.min(first, second) + EPSILON &&
+    value < Math.max(first, second) - EPSILON
+  );
+}
 
-  if (
-    ((o1 > EPSILON && o2 < -EPSILON) ||
-      (o1 < -EPSILON && o2 > EPSILON)) &&
-    ((o3 > EPSILON && o4 < -EPSILON) ||
-      (o3 < -EPSILON && o4 > EPSILON))
-  ) {
-    return true;
+function classifySegmentContact(
+  first: RouteSegment,
+  second: RouteSegment,
+): SegmentContact {
+  const firstHorizontal = isHorizontal(first);
+  const secondHorizontal = isHorizontal(second);
+
+  if (firstHorizontal !== secondHorizontal) {
+    const horizontal = firstHorizontal ? first : second;
+    const vertical = firstHorizontal ? second : first;
+    const point = { x: vertical.from.x, y: horizontal.from.y };
+    if (
+      !liesBetween(point.x, horizontal.from.x, horizontal.to.x) ||
+      !liesBetween(point.y, vertical.from.y, vertical.to.y)
+    ) {
+      return { kind: "none" };
+    }
+    if (
+      liesStrictlyBetween(point.x, horizontal.from.x, horizontal.to.x) &&
+      liesStrictlyBetween(point.y, vertical.from.y, vertical.to.y)
+    ) {
+      return { kind: "proper-crossing", point };
+    }
+    return { kind: "endpoint-touch", point };
   }
 
-  return (
-    (Math.abs(o1) < EPSILON && pointOnSegment(b.from, a)) ||
-    (Math.abs(o2) < EPSILON && pointOnSegment(b.to, a)) ||
-    (Math.abs(o3) < EPSILON && pointOnSegment(a.from, b)) ||
-    (Math.abs(o4) < EPSILON && pointOnSegment(a.to, b))
+  const fixedCoordinateMatches = firstHorizontal
+    ? Math.abs(first.from.y - second.from.y) < EPSILON
+    : Math.abs(first.from.x - second.from.x) < EPSILON;
+  if (!fixedCoordinateMatches) return { kind: "none" };
+
+  const firstStart = firstHorizontal ? first.from.x : first.from.y;
+  const firstEnd = firstHorizontal ? first.to.x : first.to.y;
+  const secondStart = firstHorizontal ? second.from.x : second.from.y;
+  const secondEnd = firstHorizontal ? second.to.x : second.to.y;
+  const overlapStart = Math.max(
+    Math.min(firstStart, firstEnd),
+    Math.min(secondStart, secondEnd),
   );
+  const overlapEnd = Math.min(
+    Math.max(firstStart, firstEnd),
+    Math.max(secondStart, secondEnd),
+  );
+  if (overlapStart > overlapEnd + EPSILON) return { kind: "none" };
+  if (Math.abs(overlapStart - overlapEnd) < EPSILON) {
+    return {
+      kind: "endpoint-touch",
+      point: firstHorizontal
+        ? { x: overlapStart, y: first.from.y }
+        : { x: first.from.x, y: overlapStart },
+    };
+  }
+  return { kind: "overlap" };
+}
+
+/** Finds unambiguous interior crossings; the later strand is drawn on top. */
+export function routeCrossings(
+  route: Pick<Route, "segments">,
+): readonly RouteCrossing[] {
+  const crossings: RouteCrossing[] = [];
+  for (let first = 0; first < route.segments.length; first += 1) {
+    for (let second = first + 2; second < route.segments.length; second += 1) {
+      const contact = classifySegmentContact(
+        route.segments[first],
+        route.segments[second],
+      );
+      if (contact.kind === "proper-crossing") {
+        crossings.push({
+          point: contact.point,
+          underSegmentIndex: first,
+          overSegmentIndex: second,
+        });
+      }
+    }
+  }
+  return crossings;
+}
+
+function routeTurnSequence(route: Pick<Route, "segments">): string {
+  const directionIndexes: Readonly<Record<Direction, number>> = {
+    east: 0,
+    south: 1,
+    west: 2,
+    north: 3,
+  };
+  let turns = "";
+  for (let index = 1; index < route.segments.length; index += 1) {
+    const previous = directionIndexes[route.segments[index - 1].direction];
+    const current = directionIndexes[route.segments[index].direction];
+    const difference = (current - previous + 4) % 4;
+    if (difference === 1) turns += "R";
+    if (difference === 3) turns += "L";
+  }
+  return turns;
+}
+
+/** Summarizes the structural winding used by curriculum and corpus tests. */
+export function routeTopology(route: Pick<Route, "segments">): Readonly<{
+  crossingCount: number;
+  headingReversals: number;
+  longestWinding: number;
+  turnSequence: string;
+}> {
+  const turnSequence = routeTurnSequence(route);
+  let headingReversals = 0;
+  let longestWinding = 0;
+  let currentRun = 0;
+  let previousTurn = "";
+
+  for (const turn of turnSequence) {
+    if (turn === previousTurn) {
+      headingReversals += 1;
+      currentRun += 1;
+    } else {
+      currentRun = 1;
+      previousTurn = turn;
+    }
+    longestWinding = Math.max(longestWinding, currentRun);
+  }
+
+  return {
+    crossingCount: routeCrossings(route).length,
+    headingReversals,
+    longestWinding,
+    turnSequence,
+  };
 }
 
 function distanceToSegment(point: Point, segment: RouteSegment): number {
@@ -720,11 +1121,67 @@ export function validateRoute(route: Route): ValidationResult {
     }
   }
 
+  const crossings: RouteCrossing[] = [];
   for (let first = 0; first < route.segments.length; first += 1) {
     for (let second = first + 2; second < route.segments.length; second += 1) {
-      if (segmentsIntersect(route.segments[first], route.segments[second])) {
-        errors.push(`Segments ${first} and ${second} self-intersect.`);
+      const contact = classifySegmentContact(
+        route.segments[first],
+        route.segments[second],
+      );
+      if (contact.kind === "endpoint-touch") {
+        errors.push(
+          `Segments ${first} and ${second} meet at an ambiguous nonadjacent endpoint.`,
+        );
       }
+      if (contact.kind === "overlap") {
+        errors.push(`Segments ${first} and ${second} overlap.`);
+      }
+      if (contact.kind === "proper-crossing") {
+        const endpointClearance = Math.min(
+          distance(contact.point, route.segments[first].from),
+          distance(contact.point, route.segments[first].to),
+          distance(contact.point, route.segments[second].from),
+          distance(contact.point, route.segments[second].to),
+        );
+        if (endpointClearance < CROSSING_CORNER_CLEARANCE - EPSILON) {
+          errors.push(
+            `Crossing between segments ${first} and ${second} is too close to a corner.`,
+          );
+        }
+        crossings.push({
+          point: contact.point,
+          underSegmentIndex: first,
+          overSegmentIndex: second,
+        });
+      }
+    }
+  }
+
+  for (let first = 0; first < crossings.length; first += 1) {
+    for (let second = first + 1; second < crossings.length; second += 1) {
+      if (samePoint(crossings[first].point, crossings[second].point)) {
+        errors.push("Three or more strands cannot share one crossing point.");
+      } else if (
+        distance(crossings[first].point, crossings[second].point) <
+        CROSSING_SEPARATION - EPSILON
+      ) {
+        errors.push("Route crossings are too close together.");
+      }
+    }
+  }
+
+  const crossingUses = new Map<number, number>();
+  for (const crossing of crossings) {
+    for (const segmentIndex of [
+      crossing.underSegmentIndex,
+      crossing.overSegmentIndex,
+    ]) {
+      crossingUses.set(segmentIndex, (crossingUses.get(segmentIndex) ?? 0) + 1);
+    }
+  }
+  for (const [segmentIndex, count] of crossingUses) {
+    if (count > 1) {
+      errors.push(`Segment ${segmentIndex} passes through too many crossings.`);
     }
   }
 
@@ -762,6 +1219,20 @@ export function validateRound(round: Round): ValidationResult {
     ) {
       errors.push(`Segment ${segment.index} is outside the difficulty length range.`);
     }
+  }
+  const topology = routeTopology(round.route);
+  if (
+    topology.crossingCount < rules.minCrossings ||
+    topology.crossingCount > rules.maxCrossings
+  ) {
+    errors.push(
+      `${round.difficulty} must have ${rules.minCrossings}–${rules.maxCrossings} proper crossings.`,
+    );
+  }
+  if (topology.headingReversals < rules.minHeadingReversals) {
+    errors.push(
+      `${round.difficulty} needs at least ${rules.minHeadingReversals} winding reversals.`,
+    );
   }
   if (round.people.length !== rules.segmentCount) {
     errors.push("There must be exactly one person for every route segment.");
@@ -801,27 +1272,25 @@ export function validateRound(round: Round): ValidationResult {
     if (nearestPathDistance < LANDMARK_PATH_CLEARANCE - EPSILON) {
       errors.push(`${person.name} collides with the route.`);
     }
-    if (!pointOnSegment(person.position, {
-      ...segment,
-      from: {
-        x: segment.from.x + (segment.to.x - segment.from.x) * 0.2,
-        y: segment.from.y + (segment.to.y - segment.from.y) * 0.2,
-      },
-      to: {
-        x: segment.from.x + (segment.to.x - segment.from.x) * 0.8,
-        y: segment.from.y + (segment.to.y - segment.from.y) * 0.8,
-      },
-    })) {
-      const dx = segment.to.x - segment.from.x;
-      const dy = segment.to.y - segment.from.y;
-      const squaredLength = dx * dx + dy * dy;
-      const projection =
-        ((person.position.x - segment.from.x) * dx +
-          (person.position.y - segment.from.y) * dy) /
-        squaredLength;
-      if (projection < 0.2 - EPSILON || projection > 0.8 + EPSILON) {
-        errors.push(`${person.name} is too close to a route corner.`);
-      }
+    const dx = segment.to.x - segment.from.x;
+    const dy = segment.to.y - segment.from.y;
+    const squaredLength = dx * dx + dy * dy;
+    const projection =
+      ((person.position.x - segment.from.x) * dx +
+        (person.position.y - segment.from.y) * dy) /
+      squaredLength;
+    if (projection < 0.2 - EPSILON || projection > 0.8 + EPSILON) {
+      errors.push(`${person.name} is too close to a route corner.`);
+    }
+    const start = round.route.points[0];
+    const finish = round.route.points[round.route.points.length - 1];
+    if (
+      distance(person.position, start) <
+        ENDPOINT_LANDMARK_SEPARATION - EPSILON ||
+      distance(person.position, finish) <
+        ENDPOINT_LANDMARK_SEPARATION - EPSILON
+    ) {
+      errors.push(`${person.name} is too close to Start or Finish.`);
     }
   }
 
@@ -1038,6 +1507,51 @@ export function validateCampaign(rounds: readonly Round[]): ValidationResult {
     if (positions.slice(4).every((position, index) => position === positions[index])) {
       errors.push(`${difficulty} cannot repeat one four-position cycle.`);
     }
+
+    const topologies = levelRounds.map(({ route }) => routeTopology(route));
+    const crossingCounts = topologies.map(({ crossingCount }) => crossingCount);
+    if (
+      difficulty === "Starter" &&
+      (crossingCounts.some((count) => count !== 0) ||
+        topologies.slice(0, 4).some(({ headingReversals }) => headingReversals !== 0) ||
+        topologies.slice(4, 8).some(({ headingReversals }) => headingReversals < 1) ||
+        topologies.slice(8).some(({ headingReversals }) => headingReversals < 2))
+    ) {
+      errors.push(
+        "Starter must progress from simple bends to hairpins and open loops without crossings.",
+      );
+    }
+    if (
+      difficulty === "Junior" &&
+      (crossingCounts.slice(0, 4).some((count) => count !== 0) ||
+        crossingCounts.slice(4).some((count) => count !== 1) ||
+        topologies.slice(0, 4).some(({ headingReversals }) => headingReversals < 1) ||
+        topologies.slice(4, 8).some(({ headingReversals }) => headingReversals < 2) ||
+        topologies.slice(8).some(({ headingReversals }) => headingReversals < 3))
+    ) {
+      errors.push(
+        "Junior must teach broad windings before one-crossing loops.",
+      );
+    }
+    if (
+      (difficulty === "Expert" || difficulty === "Wizard") &&
+      (crossingCounts.slice(0, 4).some((count) => count !== 1) ||
+        crossingCounts.slice(4).some((count) => count !== 2))
+    ) {
+      errors.push(
+        `${difficulty} must progress from one crossing to two crossings.`,
+      );
+    }
+  }
+
+  const expertTopology = rounds
+    .filter(({ difficulty }) => difficulty === "Expert")
+    .map(({ route }) => routeTopology(route).crossingCount);
+  const wizardTopology = rounds
+    .filter(({ difficulty }) => difficulty === "Wizard")
+    .map(({ route }) => routeTopology(route).crossingCount);
+  if (sequenceKey(expertTopology.map(String)) !== sequenceKey(wizardTopology.map(String))) {
+    errors.push("Wizard must match Expert route density and remove only its scaffold.");
   }
 
   const expectedOrder = DIFFICULTIES.flatMap((difficulty) =>
@@ -1095,6 +1609,21 @@ function samplePeople(
   return available.slice(0, count);
 }
 
+function sampleBalancedSides(
+  rules: DifficultyRule,
+  random: () => number,
+): readonly Side[] {
+  const sides: Side[] = [
+    ...Array<Side>(rules.peoplePerSide).fill("left"),
+    ...Array<Side>(rules.peoplePerSide).fill("right"),
+  ];
+  for (let index = 0; index < sides.length; index += 1) {
+    const selected = index + randomInteger(random, sides.length - index);
+    [sides[index], sides[selected]] = [sides[selected], sides[index]];
+  }
+  return sides;
+}
+
 function stableHash(value: string): string {
   let hash = 2_166_136_261;
   for (let index = 0; index < value.length; index += 1) {
@@ -1126,38 +1655,21 @@ export function generateInfiniteRound(
     throw new Error(`Unknown difficulty: ${difficulty}`);
   }
   const rules = DIFFICULTY_RULES[difficulty];
+  const templates = ROUTE_TEMPLATES[difficulty];
 
   for (let attempt = 0; attempt < GENERATOR_MAX_ATTEMPTS; attempt += 1) {
+    const template = templates[randomInteger(random, templates.length)];
     const quarterTurns = randomInteger(random, 4);
-    const lengths = Array.from(
-      { length: rules.segmentCount },
-      () => 8 + randomInteger(random, 3) * 2,
-    );
-    const verticalSigns = Array.from(
-      { length: rules.segmentCount / 2 },
-      () => (randomValue(random) < 0.5 ? "-" : "+"),
-    ).join("");
-    const sides = Array.from(
-      { length: rules.segmentCount },
-      () => (randomValue(random) < 0.5 ? "left" : "right") as Side,
-    );
-
-    if (
-      !verticalSigns.includes("-") ||
-      !verticalSigns.includes("+") ||
-      sides.filter((side) => side === "left").length !== rules.peoplePerSide
-    ) {
-      continue;
-    }
-
+    const reflected = randomValue(random) < 0.5;
+    const sides = sampleBalancedSides(rules, random);
     const querySide: Side = randomValue(random) < 0.5 ? "left" : "right";
     const correctIndex = randomInteger(random, 4);
     const nearMissSalt = randomInteger(random, 1_000_000);
     const distractorRotation = randomInteger(random, 3);
-    const points = buildMonotonePoints(
-      lengths,
-      verticalSigns,
+    const points = buildTemplatePoints(
+      template,
       quarterTurns,
+      reflected,
     );
     let round: Round;
     try {
@@ -1189,7 +1701,7 @@ export function generateInfiniteRound(
 
 export const CAMPAIGN_ROUNDS = buildCampaignRounds();
 
-const examplePoints = buildMonotonePoints([10, 8, 10, 8], "-+", 0);
+const examplePoints = buildTemplatePoints(STARTER_ROUTE_TEMPLATES[0], 0, false);
 const exampleRound = makeRound({
   id: "whose-left-example",
   difficulty: "Starter",

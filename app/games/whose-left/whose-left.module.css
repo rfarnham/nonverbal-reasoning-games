@@ -814,9 +814,15 @@
 
 .routeUnderlay,
 .routeLine,
-.routeTrace {
+.routeTrace,
+.crossingBridge line {
+  fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.crossingBridge line {
+  vector-effect: non-scaling-stroke;
 }
 
 .routeUnderlay {
@@ -839,6 +845,31 @@
 .routeAnimating .routeTrace {
   stroke-dashoffset: 1;
   animation: traceRoute 900ms cubic-bezier(0.2, 0.75, 0.25, 1) forwards;
+}
+
+.crossingGap {
+  stroke: var(--panel);
+  stroke-width: 18px;
+}
+
+.crossingUnderlay {
+  stroke: #d8d1c3;
+  stroke-width: 14px;
+}
+
+.crossingLine {
+  stroke: var(--ink);
+  stroke-width: 4px;
+}
+
+.crossingTrace {
+  stroke: var(--side-accent);
+  stroke-width: 6px;
+}
+
+.routeAnimating .traceCrossingBridge .crossingTrace {
+  opacity: 0;
+  animation: revealBridge 120ms ease-out 780ms forwards;
 }
 
 .routeChevron path {
@@ -938,6 +969,7 @@
 .endpointKey {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   justify-self: end;
   color: var(--muted);
@@ -970,6 +1002,11 @@
 }
 
 .singleCueNote {
+  border-left: 1px solid var(--line);
+  padding-left: 10px;
+}
+
+.bridgeNote {
   border-left: 1px solid var(--line);
   padding-left: 10px;
 }
@@ -1299,6 +1336,12 @@
 @keyframes traceRoute {
   to {
     stroke-dashoffset: 0;
+  }
+}
+
+@keyframes revealBridge {
+  to {
+    opacity: 1;
   }
 }
 
@@ -1660,6 +1703,11 @@
 
   .routeAnimating .routeTrace {
     animation-duration: 140ms;
+  }
+
+  .routeAnimating .traceCrossingBridge .crossingTrace {
+    opacity: 1;
+    animation: none;
   }
 
   .routeAnimating .sideLink,
