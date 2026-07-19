@@ -8,6 +8,8 @@ import type {
   Expression,
   Round,
 } from "./game-engine";
+import { BALANCE_TOKENS, BALANCE_TOKEN_NAMES } from "./game-engine";
+import type { StrategyId } from "./strategy-curriculum";
 import styles from "./libra.module.css";
 
 const TOKEN_COLORS: Readonly<Record<Creature, string>> = {
@@ -200,6 +202,21 @@ function MysteryLoad() {
     </span>
   );
 }
+
+export type ProofState = "hidden" | "animating" | "settled";
+
+type ProofTerm = {
+  creature: BalanceToken;
+  count: number;
+};
+
+type ProofArithmetic = {
+  expandedLeft: readonly ProofTerm[];
+  expandedRight: readonly ProofTerm[];
+  cancellation: Readonly<Partial<Record<BalanceToken, number>>>;
+  reducedLeft: readonly ProofTerm[];
+  reducedRight: readonly ProofTerm[];
+};
 
 function flattenedExpression(expression: Expression) {
   return expression.flatMap(({ creature, count }) =>
@@ -400,26 +417,686 @@ export function BalanceScale({
   );
 }
 
+function mergeProofTerms(expressions: readonly Expression[]): readonly ProofTerm[] {
+  const counts = new Map<BalanceToken, number>();
+  for (const expression of expressions) {
+    for (const term of expression) {
+      counts.set(term.creature, (counts.get(term.creature) ?? 0) + term.count);
+    }
+  }
+  return BALANCE_TOKENS.flatMap((creature) => {
+    const count = counts.get(creature) ?? 0;
+    return count > 0 ? [{ creature, count }] : [];
+  });
+}
+
+function subtractCancelledTerms(
+  terms: readonly ProofTerm[],
+  cancellation: Readonly<Partial<Record<BalanceToken, number>>>,
+): readonly ProofTerm[] {
+  return terms.flatMap((term) => {
+    const count = term.count - (cancellation[term.creature] ?? 0);
+    return count > 0 ? [{ ...term, count }] : [];
+  });
+}
+
+function buildProofArithmetic(round: Round): ProofArithmetic {
+  const leftExpressions: Expression[] = [];
+  const rightExpressions: Expression[] = [];
+
+  round.solutionDerivation.equationMultipliers.forEach(
+    (multiplier, equationIndex) => {
+      const equation = round.equations[equationIndex];
+      if (!equation) return;
+      const copies = Math.abs(multiplier);
+      const left = multiplier > 0 ? equation.left : equation.right;
+      const right = multiplier > 0 ? equation.right : equation.left;
+      for (let copyIndex = 0; copyIndex < copies; copyIndex += 1) {
+        leftExpressions.push(left);
+        rightExpressions.push(right);
+      }
+    },
+  );
+
+  const expandedLeft = mergeProofTerms(leftExpressions);
+  const expandedRight = mergeProofTerms(rightExpressions);
+  const leftCounts = new Map(
+    expandedLeft.map((term) => [term.creature, term.count]),
+  );
+  const rightCounts = new Map(
+    expandedRight.map((term) => [term.creature, term.count]),
+  );
+  const cancellation = Object.fromEntries(
+    BALANCE_TOKENS.flatMap((creature) => {
+      const count = Math.min(
+        leftCounts.get(creature) ?? 0,
+        rightCounts.get(creature) ?? 0,
+      );
+      return count > 0 ? [[creature, count]] : [];
+    }),
+  ) as Readonly<Partial<Record<BalanceToken, number>>>;
+
+  return {
+    expandedLeft,
+    expandedRight,
+    cancellation,
+    reducedLeft: subtractCancelledTerms(expandedLeft, cancellation),
+    reducedRight: subtractCancelledTerms(expandedRight, cancellation),
+  };
+}
+
+function ProofToken({
+  creature,
+  accentMap,
+}: {
+  creature: BalanceToken;
+  accentMap?: AccentMap;
+}) {
+  return creature === "mystery" ? (
+    <MysteryLoad />
+  ) : (
+    <CreatureToken creature={creature} accent={accentMap?.[creature]} />
+  );
+}
+
+function ProofTokenRun({
+  creature,
+  count,
+  cancelled = false,
+  accentMap,
+}: {
+  creature: BalanceToken;
+  count: number;
+  cancelled?: boolean;
+  accentMap?: AccentMap;
+}) {
+  if (count <= 0) return null;
+  const shownCount = count > 3 ? 1 : count;
+  return (
+    <span
+      className={`${styles.proofTokenRun} ${
+        cancelled ? styles.proofTokenRunCancelled : ""
+      }`}
+    >
+      {count > 3 ? <span className={styles.proofCount}>{count}×</span> : null}
+      {Array.from({ length: shownCount }, (_, tokenIndex) => (
+        <ProofToken
+          creature={creature}
+          accentMap={accentMap}
+          key={`${creature}-${tokenIndex}`}
+        />
+      ))}
+      {cancelled ? <span className={styles.proofStrike} /> : null}
+    </span>
+  );
+}
+
+function ProofExpression({
+  expression,
+  cancellation,
+  accentMap,
+}: {
+  expression: readonly ProofTerm[];
+  cancellation?: Readonly<Partial<Record<BalanceToken, number>>>;
+  accentMap?: AccentMap;
+}) {
+  const hasTerms = expression.some(({ count }) => count > 0);
+  return (
+    <span className={styles.proofExpression}>
+      {hasTerms ? (
+        expression.map((term, termIndex) => {
+          const cancelledCount = Math.min(
+            term.count,
+            cancellation?.[term.creature] ?? 0,
+          );
+          return (
+            <span className={styles.proofTerm} key={term.creature}>
+              {termIndex > 0 ? (
+                <span className={styles.proofPlus}>+</span>
+              ) : null}
+              <ProofTokenRun
+                creature={term.creature}
+                count={cancelledCount}
+                cancelled
+                accentMap={accentMap}
+              />
+              <ProofTokenRun
+                creature={term.creature}
+                count={term.count - cancelledCount}
+                accentMap={accentMap}
+              />
+            </span>
+          );
+        })
+      ) : (
+        <span className={styles.proofNothing}>0</span>
+      )}
+    </span>
+  );
+}
+
+function ProofEquation({
+  left,
+  right,
+  cancellation,
+  accentMap,
+}: {
+  left: readonly ProofTerm[];
+  right: readonly ProofTerm[];
+  cancellation?: Readonly<Partial<Record<BalanceToken, number>>>;
+  accentMap?: AccentMap;
+}) {
+  return (
+    <span className={styles.proofEquation}>
+      <ProofExpression
+        expression={left}
+        cancellation={cancellation}
+        accentMap={accentMap}
+      />
+      <span className={styles.proofEquals}>=</span>
+      <ProofExpression
+        expression={right}
+        cancellation={cancellation}
+        accentMap={accentMap}
+      />
+    </span>
+  );
+}
+
+function operationWord(multiplier: number, index: number): string {
+  const copies = Math.abs(multiplier);
+  const repeat = copies > 1 ? `${copies} copies of ` : "";
+  if (index === 0 && multiplier > 0) return `Use ${repeat}scale 1`;
+  return `${multiplier < 0 ? "Subtract" : "Add"} ${repeat}scale ${index + 1}`;
+}
+
+function proofNarration(round: Round, arithmetic: ProofArithmetic): string {
+  const selections = round.solutionDerivation.equationMultipliers
+    .flatMap((multiplier, equationIndex) =>
+      multiplier === 0 ? [] : [operationWord(multiplier, equationIndex)],
+    )
+    .join(", then ");
+  const cancelledNames = BALANCE_TOKENS.flatMap((token) => {
+    const count = arithmetic.cancellation[token] ?? 0;
+    if (count === 0) return [];
+    return [`${count} ${BALANCE_TOKEN_NAMES[token]}${count === 1 ? "" : "s"}`];
+  });
+  const cancellation =
+    cancelledNames.length > 0
+      ? ` Cancel matching ${cancelledNames.join(" and ")} from both sides.`
+      : "";
+  const normalize = round.solutionDerivation.normalizeBy;
+  const division =
+    normalize > 1
+      ? ` Regroup the left side into ${normalize} identical target groups and divide both sides by ${normalize}.`
+      : "";
+  return `${selections}.${cancellation}${division} The target balances ${round.answer} ${
+    BALANCE_TOKEN_NAMES[round.question.unit]
+  }${round.answer === 1 ? "" : "s"}.`;
+}
+
+function SourceEquation({
+  equation,
+  multiplier,
+  equationIndex,
+  accentMap,
+}: {
+  equation: BalanceEquation;
+  multiplier: number;
+  equationIndex: number;
+  accentMap?: AccentMap;
+}) {
+  const symbol =
+    equationIndex === 0 && multiplier > 0 ? "●" : multiplier < 0 ? "−" : "+";
+  return (
+    <div
+      className={`${styles.proofSourceEquation} ${
+        multiplier < 0 ? styles.proofSourceSubtract : styles.proofSourceAdd
+      }`}
+    >
+      <span className={styles.proofOperationSymbol}>{symbol}</span>
+      <span className={styles.proofSourceBody}>
+        <span className={styles.proofSourceLabel}>
+          {operationWord(multiplier, equationIndex)}
+        </span>
+        <ProofEquation
+          left={equation.left}
+          right={equation.right}
+          accentMap={accentMap}
+        />
+      </span>
+      {Math.abs(multiplier) > 1 ? (
+        <span className={styles.proofCopies}>{Math.abs(multiplier)}×</span>
+      ) : null}
+    </div>
+  );
+}
+
+function targetComboGroups(round: Round, accentMap?: AccentMap) {
+  return (
+    <span className={styles.proofComboGroups}>
+      {Array.from(
+        { length: round.solutionDerivation.normalizeBy },
+        (_, groupIndex) => (
+          <span className={styles.proofComboGroup} key={groupIndex}>
+            <ProofExpression
+              expression={round.question.target}
+              accentMap={accentMap}
+            />
+          </span>
+        ),
+      )}
+    </span>
+  );
+}
+
+export function SolutionProofVisual({
+  round,
+  proofState,
+  accentMap = buildRoundAccentMap(round),
+}: {
+  round: Round;
+  proofState: Exclude<ProofState, "hidden">;
+  accentMap?: AccentMap;
+}) {
+  const arithmetic = buildProofArithmetic(round);
+  const hasCancellation = BALANCE_TOKENS.some(
+    (token) => (arithmetic.cancellation[token] ?? 0) > 0,
+  );
+  const normalizeBy = round.solutionDerivation.normalizeBy;
+  const finalRight: readonly ProofTerm[] = [
+    { creature: round.question.unit, count: round.answer },
+  ];
+
+  return (
+    <section
+      className={styles.solutionProof}
+      data-proof-state={proofState}
+      role="img"
+      aria-label={proofNarration(round, arithmetic)}
+    >
+      <div className={styles.solutionProofInner} aria-hidden="true">
+        <div className={styles.proofSources}>
+          {round.solutionDerivation.equationMultipliers.map(
+            (multiplier, equationIndex) => {
+              const equation = round.equations[equationIndex];
+              return equation && multiplier !== 0 ? (
+                <SourceEquation
+                  equation={equation}
+                  multiplier={multiplier}
+                  equationIndex={equationIndex}
+                  accentMap={accentMap}
+                  key={`${equationIndex}-${multiplier}`}
+                />
+              ) : null;
+            },
+          )}
+        </div>
+
+        <span className={styles.proofFlowArrow}>↓</span>
+
+        <div className={`${styles.proofStage} ${styles.proofCombineStage}`}>
+          <span className={styles.proofStageLabel}>
+            {hasCancellation ? "Line up matching loads" : "Combine the scales"}
+          </span>
+          <ProofEquation
+            left={arithmetic.expandedLeft}
+            right={arithmetic.expandedRight}
+            cancellation={hasCancellation ? arithmetic.cancellation : undefined}
+            accentMap={accentMap}
+          />
+        </div>
+
+        {hasCancellation ? (
+          <>
+            <span className={styles.proofFlowArrow}>↓</span>
+            <div className={`${styles.proofStage} ${styles.proofCancelStage}`}>
+              <span className={styles.proofStageLabel}>Cancel the same load</span>
+              <ProofEquation
+                left={arithmetic.reducedLeft}
+                right={arithmetic.reducedRight}
+                accentMap={accentMap}
+              />
+            </div>
+          </>
+        ) : null}
+
+        {normalizeBy > 1 ? (
+          <>
+            <span className={styles.proofFlowArrow}>↓</span>
+            <div className={`${styles.proofStage} ${styles.proofRegroupStage}`}>
+              <span className={styles.proofStageLabel}>
+                Regroup into {normalizeBy} matching combos
+              </span>
+              <span className={styles.proofEquation}>
+                {targetComboGroups(round, accentMap)}
+                <span className={styles.proofEquals}>=</span>
+                <ProofExpression
+                  expression={arithmetic.reducedRight}
+                  accentMap={accentMap}
+                />
+              </span>
+              <span className={styles.proofDivideBadge}>÷ {normalizeBy} on both sides</span>
+            </div>
+          </>
+        ) : null}
+
+        <span className={styles.proofFlowArrow}>↓</span>
+        <div className={`${styles.proofStage} ${styles.proofFinalStage}`}>
+          <span className={styles.proofStageLabel}>
+            {normalizeBy > 1 ? "One combo" : "Balanced"}
+          </span>
+          <ProofEquation
+            left={round.question.target}
+            right={finalRight}
+            accentMap={accentMap}
+          />
+          <span className={styles.proofCheck}>✓</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const LESSON_ACCENTS: AccentMap = {
+  rabbit: 0,
+  fox: 0,
+  cat: 3,
+  bear: 2,
+  chick: 1,
+  beetle: 1,
+};
+
+function lessonTerms(
+  ...entries: readonly (readonly [BalanceToken, number])[]
+): readonly ProofTerm[] {
+  return entries.map(([creature, count]) => ({ creature, count }));
+}
+
+function LessonEquation({
+  left,
+  right,
+  cancellation,
+}: {
+  left: readonly ProofTerm[];
+  right: readonly ProofTerm[];
+  cancellation?: Readonly<Partial<Record<BalanceToken, number>>>;
+}) {
+  return (
+    <span className={styles.lessonEquation}>
+      <ProofEquation
+        left={left}
+        right={right}
+        cancellation={cancellation}
+        accentMap={LESSON_ACCENTS}
+      />
+    </span>
+  );
+}
+
+function LessonFlow({
+  label,
+  symbol,
+}: {
+  label: string;
+  symbol: string;
+}) {
+  return (
+    <span className={styles.lessonFlow}>
+      <span className={styles.lessonFlowLine} />
+      <span className={styles.lessonOperator}>{symbol}</span>
+      <span className={styles.lessonFlowLabel}>{label}</span>
+      <span className={styles.lessonFlowArrow}>→</span>
+    </span>
+  );
+}
+
+function SplitEvenlyLesson() {
+  return (
+    <>
+      <div className={styles.lessonBefore}>
+        <span className={styles.lessonStageLabel}>Before</span>
+        <LessonEquation
+          left={lessonTerms(["rabbit", 2])}
+          right={lessonTerms(["chick", 4])}
+        />
+      </div>
+      <LessonFlow label="Split both sides evenly" symbol="÷2" />
+      <div className={styles.lessonAfter}>
+        <span className={styles.lessonStageLabel}>Each half</span>
+        <LessonEquation
+          left={lessonTerms(["rabbit", 1])}
+          right={lessonTerms(["chick", 2])}
+        />
+      </div>
+    </>
+  );
+}
+
+function CancelMatchesLesson() {
+  const cancellation = { fox: 1 } as const;
+  return (
+    <>
+      <div className={styles.lessonBefore}>
+        <span className={styles.lessonStageLabel}>Same fox on both sides</span>
+        <LessonEquation
+          left={lessonTerms(["cat", 1], ["fox", 1])}
+          right={lessonTerms(["fox", 1], ["chick", 3])}
+          cancellation={cancellation}
+        />
+      </div>
+      <LessonFlow label="Remove the same load" symbol="×" />
+      <div className={styles.lessonAfter}>
+        <span className={styles.lessonStageLabel}>Balance stays true</span>
+        <LessonEquation
+          left={lessonTerms(["cat", 1])}
+          right={lessonTerms(["chick", 3])}
+        />
+      </div>
+    </>
+  );
+}
+
+function SubstitutionLesson() {
+  return (
+    <>
+      <div className={`${styles.lessonBefore} ${styles.lessonSourceStack}`}>
+        <span className={styles.lessonStageLabel}>Equal loads</span>
+        <LessonEquation
+          left={lessonTerms(["fox", 1])}
+          right={lessonTerms(["chick", 2])}
+        />
+        <LessonEquation
+          left={lessonTerms(["rabbit", 1])}
+          right={lessonTerms(["fox", 2])}
+        />
+      </div>
+      <LessonFlow label="Swap equal loads" symbol="⇄" />
+      <div className={styles.lessonAfter}>
+        <span className={styles.lessonStageLabel}>Foxes become chicks</span>
+        <LessonEquation
+          left={lessonTerms(["rabbit", 1])}
+          right={lessonTerms(["chick", 4])}
+        />
+      </div>
+    </>
+  );
+}
+
+function AddScalesLesson() {
+  return (
+    <>
+      <div className={`${styles.lessonBefore} ${styles.lessonSourceStack}`}>
+        <span className={styles.lessonStageLabel}>Stack both balances</span>
+        <LessonEquation
+          left={lessonTerms(["cat", 2], ["bear", 1])}
+          right={lessonTerms(["beetle", 6])}
+        />
+        <span className={styles.lessonInlineOperator}>+</span>
+        <LessonEquation
+          left={lessonTerms(["cat", 1], ["bear", 2])}
+          right={lessonTerms(["beetle", 9])}
+        />
+      </div>
+      <LessonFlow label="Add left to left, right to right" symbol="+" />
+      <div className={styles.lessonAfter}>
+        <span className={styles.lessonStageLabel}>One larger balance</span>
+        <LessonEquation
+          left={lessonTerms(["cat", 3], ["bear", 3])}
+          right={lessonTerms(["beetle", 15])}
+        />
+      </div>
+    </>
+  );
+}
+
+function CreateComboLesson() {
+  const combo = lessonTerms(["cat", 1], ["bear", 1]);
+  return (
+    <>
+      <div className={styles.lessonBefore}>
+        <span className={styles.lessonStageLabel}>Matching coefficients</span>
+        <LessonEquation
+          left={lessonTerms(["cat", 3], ["bear", 3])}
+          right={lessonTerms(["beetle", 15])}
+        />
+      </div>
+      <LessonFlow label="Circle identical combos" symbol="[ ]" />
+      <div className={`${styles.lessonAfter} ${styles.lessonComboAfter}`}>
+        <span className={styles.lessonStageLabel}>Three copies of cat + bear</span>
+        <span className={styles.proofEquation}>
+          <span className={styles.proofComboGroups}>
+            {Array.from({ length: 3 }, (_, index) => (
+              <span className={styles.proofComboGroup} key={index}>
+                <ProofExpression expression={combo} accentMap={LESSON_ACCENTS} />
+              </span>
+            ))}
+          </span>
+          <span className={styles.proofEquals}>=</span>
+          <ProofExpression
+            expression={lessonTerms(["beetle", 15])}
+            accentMap={LESSON_ACCENTS}
+          />
+        </span>
+        <span className={styles.lessonMiniDivide}>÷3</span>
+        <LessonEquation
+          left={combo}
+          right={lessonTerms(["beetle", 5])}
+        />
+      </div>
+    </>
+  );
+}
+
+function SubtractScalesLesson() {
+  return (
+    <>
+      <div className={`${styles.lessonBefore} ${styles.lessonSourceStack}`}>
+        <span className={styles.lessonStageLabel}>Line up both balances</span>
+        <LessonEquation
+          left={lessonTerms(["cat", 3], ["bear", 4])}
+          right={lessonTerms(["beetle", 7])}
+        />
+        <span className={styles.lessonInlineOperator}>−</span>
+        <LessonEquation
+          left={lessonTerms(["cat", 1], ["bear", 2])}
+          right={lessonTerms(["beetle", 3])}
+        />
+      </div>
+      <LessonFlow label="Subtract matching columns" symbol="−" />
+      <div className={styles.lessonAfter}>
+        <span className={styles.lessonStageLabel}>What remains</span>
+        <LessonEquation
+          left={lessonTerms(["cat", 2], ["bear", 2])}
+          right={lessonTerms(["beetle", 4])}
+        />
+      </div>
+    </>
+  );
+}
+
+const STRATEGY_LESSON_LABELS: Readonly<Record<StrategyId, string>> = {
+  "split-evenly":
+    "Two rabbits balance four chicks. Divide both sides by two. One rabbit balances two chicks.",
+  "cancel-matches":
+    "A fox appears on both sides of one balance. Cross out one fox from each side. The remaining cat balances three chicks.",
+  substitution:
+    "One fox balances two chicks, and one rabbit balances two foxes. Replace the foxes with equal chick loads. One rabbit balances four chicks.",
+  "add-scales":
+    "Add two balances, left side to left side and right side to right side, to make one larger true balance.",
+  "create-combo":
+    "Three cats and three bears regroup into three identical cat and bear combos. Divide both sides by three to find one combo.",
+  "subtract-scales":
+    "Subtract the second balance from the first, matching each animal column. The remaining loads still balance.",
+};
+
+function lessonForStrategy(strategy: StrategyId) {
+  switch (strategy) {
+    case "split-evenly":
+      return <SplitEvenlyLesson />;
+    case "cancel-matches":
+      return <CancelMatchesLesson />;
+    case "substitution":
+      return <SubstitutionLesson />;
+    case "add-scales":
+      return <AddScalesLesson />;
+    case "create-combo":
+      return <CreateComboLesson />;
+    case "subtract-scales":
+      return <SubtractScalesLesson />;
+  }
+}
+
+export function StrategyLessonVisual({
+  strategy,
+  replayKey = 0,
+}: {
+  strategy: StrategyId;
+  replayKey?: string | number;
+}) {
+  return (
+    <div
+      className={styles.strategyLessonVisual}
+      data-strategy={strategy}
+      role="img"
+      aria-label={STRATEGY_LESSON_LABELS[strategy]}
+    >
+      <div
+        className={styles.strategyLessonTimeline}
+        aria-hidden="true"
+        key={replayKey}
+      >
+        {lessonForStrategy(strategy)}
+      </div>
+    </div>
+  );
+}
+
 export function PuzzleVisual({
   round,
   candidate,
   outcome,
   teaching = false,
+  proofState,
   revealDifferences = false,
 }: {
   round: Round;
   candidate?: AnswerOption;
   outcome?: "correct" | "wrong";
   teaching?: boolean;
+  proofState?: ProofState;
   revealDifferences?: boolean;
 }) {
   const accentMap = buildRoundAccentMap(round);
+  const resolvedProofState = proofState ?? (teaching ? "animating" : "hidden");
 
   return (
     <div
-      className={`${styles.puzzleVisual} ${teaching ? styles.teaching : ""}`}
+      className={`${styles.puzzleVisual} ${
+        resolvedProofState !== "hidden" ? styles.teaching : ""
+      }`}
       data-family={round.family}
-      role="img"
+      role={resolvedProofState === "hidden" ? "img" : "group"}
       aria-label={
         round.difficulty === "Wizard"
           ? "A visual balance puzzle with level picture scales and one unfinished scale. The same sealed load appears in two clues. Compare the pictured loads and choose the load that completes the unfinished scale."
@@ -450,45 +1127,12 @@ export function PuzzleVisual({
           ) : null,
         )}
       </div>
-      {teaching ? (
-        <div className={styles.strategyProof} aria-hidden="true">
-          {round.solutionDerivation.equationMultipliers.map(
-            (multiplier, equationIndex) => (
-              <span
-                className={
-                  multiplier < 0
-                    ? styles.strategyProofSubtract
-                    : styles.strategyProofAdd
-                }
-                key={`${equationIndex}-${multiplier}`}
-              >
-                {equationIndex === 0
-                  ? multiplier < 0
-                    ? "− "
-                    : ""
-                  : multiplier < 0
-                    ? "− "
-                    : "+ "}
-                {Math.abs(multiplier) > 1
-                  ? `${Math.abs(multiplier)}× `
-                  : ""}
-                scale {equationIndex + 1}
-              </span>
-            ),
-          )}
-          {round.solutionDerivation.normalizeBy > 1 ? (
-            <>
-              <span className={styles.strategyProofArrow}>→</span>
-              <span className={styles.strategyProofCombo}>
-                {round.solutionDerivation.normalizeBy} matching groups
-              </span>
-              <span className={styles.strategyProofArrow}>→</span>
-              <span className={styles.strategyProofDivide}>
-                ÷ {round.solutionDerivation.normalizeBy}
-              </span>
-            </>
-          ) : null}
-        </div>
+      {resolvedProofState !== "hidden" ? (
+        <SolutionProofVisual
+          round={round}
+          proofState={resolvedProofState}
+          accentMap={accentMap}
+        />
       ) : null}
       <div className={styles.goalDivider} aria-hidden="true">
         <span />

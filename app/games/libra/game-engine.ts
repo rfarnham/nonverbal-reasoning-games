@@ -83,6 +83,7 @@ export type RuleFamily =
   | "cancellation"
   | "chain"
   | "offset-chain"
+  | "combo-primer"
   | "add-combo"
   | "subtract-combo"
   | "fork"
@@ -103,6 +104,26 @@ export const SOLUTION_STRATEGIES = [
 ] as const;
 
 export type SolutionStrategy = (typeof SOLUTION_STRATEGIES)[number];
+
+export const FOUNDATIONAL_STRATEGIES = [
+  "split-evenly",
+  "cancel-matches",
+] as const;
+
+export type FoundationalStrategy = (typeof FOUNDATIONAL_STRATEGIES)[number];
+
+/**
+ * Starter rounds teach these concrete balance moves before the four multi-scale
+ * solution archetypes. `Round.solutionStrategies` stays API-compatible with
+ * the established four-strategy union; curriculum UI should use this mapping
+ * for Starter instead of presenting those rounds as substitution.
+ */
+export const FOUNDATIONAL_STRATEGY_BY_FAMILY: Readonly<
+  Partial<Record<RuleFamily, FoundationalStrategy>>
+> = {
+  direct: "split-evenly",
+  cancellation: "cancel-matches",
+};
 
 export type SolutionDerivation = {
   equationMultipliers: readonly number[];
@@ -196,6 +217,16 @@ type JuniorSpec =
       bridgeWeight: number;
       multiplier: number;
       offset: number;
+      correctIndex: number;
+    }
+  | {
+      difficulty: "Junior";
+      family: "combo-primer";
+      creatures: readonly [Creature, Creature, Creature];
+      firstWeight: number;
+      secondWeight: number;
+      coefficient: number;
+      checkCoefficients: readonly [number, number];
       correctIndex: number;
     }
   | {
@@ -511,27 +542,30 @@ const JUNIOR_SPECS: readonly JuniorBlueprint[] = [
   },
   {
     difficulty: "Junior",
-    family: "offset-chain",
-    creatures: ["goose", "cat", "frog"],
-    bridgeWeight: 3,
-    multiplier: 3,
-    offset: 2,
+    family: "combo-primer",
+    creatures: ["cat", "bear", "beetle"],
+    firstWeight: 2,
+    secondWeight: 2,
+    coefficient: 2,
+    checkCoefficients: [1, 2],
   },
   {
     difficulty: "Junior",
-    family: "offset-chain",
-    creatures: ["owl", "fox", "turtle"],
-    bridgeWeight: 3,
-    multiplier: 3,
-    offset: 1,
+    family: "combo-primer",
+    creatures: ["goose", "fox", "chick"],
+    firstWeight: 1,
+    secondWeight: 1,
+    coefficient: 3,
+    checkCoefficients: [1, 3],
   },
   {
     difficulty: "Junior",
-    family: "offset-chain",
-    creatures: ["bear", "rabbit", "chick"],
-    bridgeWeight: 2,
-    multiplier: 2,
-    offset: 1,
+    family: "combo-primer",
+    creatures: ["rabbit", "turtle", "frog"],
+    firstWeight: 1,
+    secondWeight: 1,
+    coefficient: 4,
+    checkCoefficients: [3, 1],
   },
   {
     difficulty: "Junior",
@@ -1194,6 +1228,49 @@ function makeStarterTemplate(spec: StarterSpec): TemplateResult {
 
 function makeJuniorTemplate(spec: JuniorSpec): TemplateResult {
   const [target, bridge, unit] = spec.creatures;
+
+  if (spec.family === "combo-primer") {
+    const comboTotal =
+      spec.coefficient * (spec.firstWeight + spec.secondWeight);
+    const [targetCheckCount, bridgeCheckCount] = spec.checkCoefficients;
+    const checkTotal =
+      targetCheckCount * spec.firstWeight +
+      bridgeCheckCount * spec.secondWeight;
+    return {
+      family: spec.family,
+      equations: [
+        makeEquation(
+          makeExpression(
+            [target, spec.coefficient],
+            [bridge, spec.coefficient],
+          ),
+          makeExpression([unit, comboTotal]),
+        ),
+        makeEquation(
+          makeExpression(
+            [target, targetCheckCount],
+            [bridge, bridgeCheckCount],
+          ),
+          makeExpression([unit, checkTotal]),
+        ),
+      ],
+      question: {
+        target: makeExpression([target, 1], [bridge, 1]),
+        unit,
+      },
+      equationOrder: [0, 1],
+      solutionStrategies: ["create-combo"],
+      solutionDerivation: {
+        equationMultipliers: [1, 0],
+        normalizeBy: spec.coefficient,
+      },
+      mistakes: [
+        { count: comboTotal, kind: "forgot-to-divide" },
+        { count: checkTotal, kind: "used-one-scale" },
+        { count: spec.coefficient, kind: "forgot-to-normalize" },
+      ],
+    };
+  }
 
   if (spec.family === "add-combo") {
     const firstTotal =
@@ -2001,8 +2078,9 @@ export function solutionDerivationMatchesRound(round: Round): boolean {
     equationMultipliers.length !== round.equations.length ||
     equationMultipliers.some(
       (multiplier) =>
-        !Number.isSafeInteger(multiplier) || multiplier === 0,
+        !Number.isSafeInteger(multiplier),
     ) ||
+    !equationMultipliers.some((multiplier) => multiplier !== 0) ||
     !Number.isSafeInteger(normalizeBy) ||
     normalizeBy <= 0
   ) {
@@ -2637,12 +2715,19 @@ export function describeEquation(equation: BalanceEquation): string {
 
 export function solutionStrategyFeedback(round: Round): string {
   const strategies = new Set(round.solutionStrategies);
+  const foundationalStrategy = FOUNDATIONAL_STRATEGY_BY_FAMILY[round.family];
   const repeatedScale = round.solutionDerivation.equationMultipliers.some(
     (multiplier) => Math.abs(multiplier) > 1,
   );
   const steps: string[] = [];
 
-  if (
+  if (foundationalStrategy === "split-evenly") {
+    steps.push(
+      `Split both pans into ${round.solutionDerivation.normalizeBy} equal groups.`,
+    );
+  } else if (foundationalStrategy === "cancel-matches") {
+    steps.push("Remove the matching unit loads from both pans.");
+  } else if (
     strategies.has("add-scales") &&
     strategies.has("subtract-scales")
   ) {

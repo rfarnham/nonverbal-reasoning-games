@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   DIFFICULTIES,
+  FOUNDATIONAL_STRATEGY_BY_FAMILY,
   GENERATOR_MAX_ATTEMPTS,
   MYSTERY_TOKEN,
   ROUNDS,
@@ -60,6 +61,17 @@ const EXPECTED_FAMILIES = {
     "sealed-cancellation",
     "sealed-sum",
     "sealed-difference",
+  ]),
+};
+
+const EXPECTED_AUTHORED_FAMILIES = {
+  ...EXPECTED_FAMILIES,
+  Junior: new Set([
+    "chain",
+    "offset-chain",
+    "combo-primer",
+    "add-combo",
+    "subtract-combo",
   ]),
 };
 
@@ -245,7 +257,7 @@ test("the authored ladder adds relations and covers its intended rule families",
     assert.equal(rounds.length, 12);
     assert.deepEqual(
       new Set(rounds.map(({ family }) => family)),
-      EXPECTED_FAMILIES[difficulty],
+      EXPECTED_AUTHORED_FAMILIES[difficulty],
       `${difficulty} family coverage`,
     );
   }
@@ -266,10 +278,103 @@ test("the authored ladder adds relations and covers its intended rule families",
   }
 });
 
-test("authored strategy archetypes progress from substitution to scale algebra", () => {
+test("authored strategy archetypes progress from foundations to scale algebra", () => {
+  const starter = ROUNDS.filter(({ difficulty }) => difficulty === "Starter");
+  assert.ok(starter.every(({ family }) => family in FOUNDATIONAL_STRATEGY_BY_FAMILY));
+  assert.deepEqual(
+    new Set(
+      starter
+        .filter(({ family }) => family === "direct")
+        .map(({ family }) => FOUNDATIONAL_STRATEGY_BY_FAMILY[family]),
+    ),
+    new Set(["split-evenly"]),
+  );
+  assert.deepEqual(
+    new Set(
+      starter
+        .filter(({ family }) => family === "cancellation")
+        .map(({ family }) => FOUNDATIONAL_STRATEGY_BY_FAMILY[family]),
+    ),
+    new Set(["cancel-matches"]),
+  );
+
   const junior = ROUNDS.filter(({ difficulty }) => difficulty === "Junior");
+  const comboPrimers = junior.slice(7, 10);
   const juniorAdd = junior.at(-2);
   const juniorSubtract = junior.at(-1);
+
+  assert.deepEqual(
+    comboPrimers.map(({ family }) => family),
+    ["combo-primer", "combo-primer", "combo-primer"],
+  );
+  assert.deepEqual(
+    comboPrimers.map(({ correctIndex }) => correctIndex),
+    [0, 2, 0],
+  );
+  assert.deepEqual(
+    comboPrimers.map(({ solutionStrategies }) => solutionStrategies),
+    [["create-combo"], ["create-combo"], ["create-combo"]],
+  );
+  assert.deepEqual(
+    comboPrimers.map(({ solutionDerivation }) => solutionDerivation),
+    [
+      { equationMultipliers: [1, 0], normalizeBy: 2 },
+      { equationMultipliers: [1, 0], normalizeBy: 3 },
+      { equationMultipliers: [1, 0], normalizeBy: 4 },
+    ],
+  );
+
+  const expectedComboPrimerEquations = [
+    {
+      comboLeft: "cat:2+bear:2",
+      comboRight: "beetle:8",
+      checkLeft: "cat:1+bear:2",
+      checkRight: "beetle:6",
+      target: "cat:1+bear:1",
+      answer: 4,
+    },
+    {
+      comboLeft: "goose:3+fox:3",
+      comboRight: "chick:6",
+      checkLeft: "goose:1+fox:3",
+      checkRight: "chick:4",
+      target: "goose:1+fox:1",
+      answer: 2,
+    },
+    {
+      comboLeft: "rabbit:4+turtle:4",
+      comboRight: "frog:8",
+      checkLeft: "rabbit:3+turtle:1",
+      checkRight: "frog:4",
+      target: "rabbit:1+turtle:1",
+      answer: 2,
+    },
+  ];
+  for (const [index, round] of comboPrimers.entries()) {
+    const expected = expectedComboPrimerEquations[index];
+    assert.deepEqual(
+      {
+        comboLeft: expressionKey(round.equations[0].left),
+        comboRight: expressionKey(round.equations[0].right),
+        checkLeft: expressionKey(round.equations[1].left),
+        checkRight: expressionKey(round.equations[1].right),
+        target: expressionKey(round.question.target),
+        answer: round.answer,
+      },
+      expected,
+      `Junior combo primer ${index + 1}`,
+    );
+    assert.equal(
+      calculateAnswer([round.equations[0]], round.question),
+      round.answer,
+      `Junior combo primer ${index + 1} is solved by regrouping its repeated combo`,
+    );
+    assert.equal(
+      calculateAnswer([round.equations[1]], round.question),
+      null,
+      `Junior combo primer ${index + 1} check scale does not expose the target`,
+    );
+  }
 
   assert.deepEqual(juniorAdd.solutionStrategies, [
     "add-scales",
@@ -326,6 +431,11 @@ test("authored strategy archetypes progress from substitution to scale algebra",
   }
 
   const wizard = ROUNDS.filter(({ difficulty }) => difficulty === "Wizard");
+  const strategiesSeenBeforeWizard = new Set(
+    ROUNDS.filter(({ difficulty }) => difficulty !== "Wizard").flatMap(
+      ({ solutionStrategies }) => solutionStrategies,
+    ),
+  );
   for (const strategy of [
     "substitution",
     "add-scales",
@@ -337,6 +447,12 @@ test("authored strategy archetypes progress from substitution to scale algebra",
       `Wizard ${strategy} coverage`,
     );
   }
+  assert.ok(
+    wizard
+      .flatMap(({ solutionStrategies }) => solutionStrategies)
+      .every((strategy) => strategiesSeenBeforeWizard.has(strategy)),
+    "Wizard introduces no new solution strategy",
+  );
 
   for (const round of [juniorAdd, juniorSubtract, ...expert]) {
     for (
@@ -761,9 +877,19 @@ test("generation retries rejected repeats and fails safely on hostile sources", 
 test("tutorial and feedback copy preserve the hidden Wizard inference", () => {
   assertValidRound(TUTORIAL, "tutorial");
   assert.match(optionFeedback(TUTORIAL, TUTORIAL.correctIndex), /balances/);
-  assert.match(solutionStrategyFeedback(TUTORIAL), /Replace equal loads/);
+  assert.match(solutionStrategyFeedback(TUTORIAL), /Split both pans/);
   const tutorialWrongIndex = TUTORIAL.correctIndex === 0 ? 1 : 0;
   assert.match(optionFeedback(TUTORIAL, tutorialWrongIndex), /too (heavy|light)/);
+
+  const starterCancellation = ROUNDS.find(
+    ({ difficulty, family }) =>
+      difficulty === "Starter" && family === "cancellation",
+  );
+  assert.ok(starterCancellation);
+  assert.match(
+    solutionStrategyFeedback(starterCancellation),
+    /Remove the matching unit loads/,
+  );
 
   const wizard = ROUNDS.find(({ difficulty }) => difficulty === "Wizard");
   assert.ok(wizard);

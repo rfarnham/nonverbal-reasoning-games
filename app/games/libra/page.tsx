@@ -20,6 +20,7 @@ import {
   BalanceScale,
   ExampleVisual,
   PuzzleVisual,
+  StrategyLessonVisual,
   buildRoundAccentMap,
 } from "./balance-visual";
 import {
@@ -40,6 +41,17 @@ import {
   initialInfiniteAdaptiveState,
   recordInfiniteFirstAttempt,
 } from "./infinite-progression";
+import {
+  STRATEGY_CATALOGUE,
+  STRATEGY_CATALOGUE_BY_ID,
+  STRATEGY_SECTIONS,
+  canOpenHistoricalReview,
+  discoveredStrategyIdsAfterLesson,
+  orderedStrategyIdsForRound,
+  preRoundStrategyIds,
+  unseenStrategyIds,
+  type StrategyId,
+} from "./strategy-curriculum";
 import styles from "./libra.module.css";
 
 type GamePhase = "idle" | "animating" | "wrong-review" | "answered";
@@ -74,6 +86,14 @@ type CampaignProgress = Readonly<
 
 type CampaignCursors = Record<CampaignLevelId, number>;
 type CustomProperties = CSSProperties & Record<`--${string}`, string>;
+type StrategyLesson = {
+  strategyId: StrategyId;
+  focusTarget: "answers" | "next";
+};
+type CampaignReviewSelection = {
+  levelId: CampaignLevelId;
+  problemIndex: number;
+};
 
 const CORRECT_FEEDBACK_MS = 900;
 const WRONG_APPROACH_MS = 540;
@@ -234,15 +254,43 @@ export default function LibraPage() {
     readonly string[]
   >([]);
   const [generationError, setGenerationError] = useState(false);
+  const [discoveredStrategyIds, setDiscoveredStrategyIds] = useState<
+    readonly StrategyId[]
+  >([]);
+  const [pendingLessons, setPendingLessons] = useState<
+    readonly StrategyLesson[]
+  >([]);
+  const [replayStrategyId, setReplayStrategyId] =
+    useState<StrategyId | null>(null);
+  const [lessonReplayKey, setLessonReplayKey] = useState(0);
+  const [proofReplayKey, setProofReplayKey] = useState(0);
+  const [proofReplaying, setProofReplaying] = useState(false);
+  const [catalogueExpanded, setCatalogueExpanded] = useState(false);
+  const [campaignReviewSelection, setCampaignReviewSelection] =
+    useState<CampaignReviewSelection | null>(null);
 
   const optionButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const nextButtonRef = useRef<HTMLButtonElement>(null);
   const levelCompleteButtonRef = useRef<HTMLButtonElement>(null);
   const resultHeadingRef = useRef<HTMLHeadingElement>(null);
   const generationRetryRef = useRef<HTMLButtonElement>(null);
+  const lessonDialogRef = useRef<HTMLDialogElement>(null);
+  const lessonPrimaryButtonRef = useRef<HTMLButtonElement>(null);
+  const historicalReviewHeadingRef = useRef<HTMLHeadingElement>(null);
+  const campaignMarkerRefs = useRef<
+    Record<string, HTMLButtonElement | null>
+  >({});
+  const catalogueButtonRefs = useRef<
+    Partial<Record<StrategyId, HTMLButtonElement | null>>
+  >({});
+  const reviewOriginIdRef = useRef<string | null>(null);
+  const replayOriginIdRef = useRef<StrategyId | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const proofReplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const animationTokenRef = useRef(0);
   const inputLockedRef = useRef(false);
   const shouldFocusFirstOption = useRef(false);
@@ -262,6 +310,28 @@ export default function LibraPage() {
     ? campaignSessionRound
     : (roundQueue[roundCursor] ?? null);
   const round = activeSessionRound?.round ?? null;
+  const activeLesson = pendingLessons[0] ?? null;
+  const activeLessonStrategyId =
+    replayStrategyId ?? activeLesson?.strategyId ?? null;
+  const activeLessonStrategy = activeLessonStrategyId
+    ? STRATEGY_CATALOGUE_BY_ID[activeLessonStrategyId]
+    : null;
+  const discoveredStrategyIdSet = new Set(discoveredStrategyIds);
+  const historicalSessionRound = campaignReviewSelection
+    ? buildCampaignSessionRound(
+        campaignReviewSelection.levelId,
+        campaignReviewSelection.problemIndex,
+      )
+    : null;
+  const historicalProgress = historicalSessionRound
+    ? campaignProgress[historicalSessionRound.id]
+    : undefined;
+  const historicalMistake = historicalSessionRound
+    ? mistakes.find(
+        ({ sessionRound }) =>
+          sessionRound.id === historicalSessionRound.id,
+      )
+    : undefined;
   const sessionLength = roundQueue.length;
   const selectedCorrect =
     selectedIndex !== null &&
@@ -280,7 +350,10 @@ export default function LibraPage() {
     activeCampaignLevel,
   );
   const showCampaignLevelComplete =
-    isCampaign && activeCampaignLevelComplete && phase === "idle";
+    isCampaign &&
+    activeCampaignLevelComplete &&
+    phase === "idle" &&
+    campaignReviewSelection === null;
   const nextCampaignLevel = nextIncompleteCampaignLevel(
     campaignProgress,
     activeCampaignLevel,
@@ -325,12 +398,115 @@ export default function LibraPage() {
   const resetAttemptState = useCallback(() => {
     animationTokenRef.current += 1;
     clearAttemptTimers();
+    if (proofReplayTimerRef.current) {
+      clearTimeout(proofReplayTimerRef.current);
+      proofReplayTimerRef.current = null;
+    }
     inputLockedRef.current = false;
     retryFocusIndexRef.current = null;
     setSelectedIndex(null);
     setRetryReady(false);
+    setProofReplaying(false);
     setPhase("idle");
   }, [clearAttemptTimers]);
+
+  const queueStrategyLessons = useCallback(
+    (
+      strategyIds: readonly StrategyId[],
+      focusTarget: StrategyLesson["focusTarget"],
+    ) => {
+      setPendingLessons((current) => {
+        const additions = unseenStrategyIds(
+          discoveredStrategyIds,
+          current.map(({ strategyId }) => strategyId),
+          strategyIds,
+        ).map((strategyId) => ({ strategyId, focusTarget }));
+        return additions.length > 0 ? [...current, ...additions] : current;
+      });
+    },
+    [discoveredStrategyIds],
+  );
+
+  const closeActiveLesson = useCallback(() => {
+    if (replayStrategyId) {
+      const originId = replayOriginIdRef.current;
+      setReplayStrategyId(null);
+      window.requestAnimationFrame(() => {
+        if (originId) catalogueButtonRefs.current[originId]?.focus();
+      });
+      return;
+    }
+
+    if (!activeLesson) return;
+    setDiscoveredStrategyIds((current) =>
+      discoveredStrategyIdsAfterLesson(current, activeLesson.strategyId),
+    );
+    setPendingLessons((current) => current.slice(1));
+  }, [activeLesson, replayStrategyId]);
+
+  const replayStrategyLesson = useCallback((strategyId: StrategyId) => {
+    if (
+      phase === "animating" ||
+      phase === "wrong-review" ||
+      pendingLessons.length > 0
+    ) {
+      return;
+    }
+    replayOriginIdRef.current = strategyId;
+    setLessonReplayKey((current) => current + 1);
+    setReplayStrategyId(strategyId);
+  }, [pendingLessons.length, phase]);
+
+  const openCampaignReview = useCallback(
+    (levelId: CampaignLevelId, problemIndex: number) => {
+      const id = campaignRoundId(levelId, problemIndex);
+      if (
+        !canOpenHistoricalReview({
+          isIdle: phase === "idle",
+          isSolved: Boolean(campaignProgress[id]?.solved),
+          hasPendingLessons: pendingLessons.length > 0,
+          isReplayingLesson: replayStrategyId !== null,
+        })
+      ) {
+        return;
+      }
+      reviewOriginIdRef.current = id;
+      setCampaignReviewSelection({ levelId, problemIndex });
+      setProofReplayKey((current) => current + 1);
+    },
+    [
+      campaignProgress,
+      pendingLessons.length,
+      phase,
+      replayStrategyId,
+    ],
+  );
+
+  const closeCampaignReview = useCallback(() => {
+    const originId = reviewOriginIdRef.current;
+    setCampaignReviewSelection(null);
+    window.requestAnimationFrame(() => {
+      if (originId) campaignMarkerRefs.current[originId]?.focus();
+    });
+  }, []);
+
+  const replayProof = useCallback(() => {
+    if (proofReplayTimerRef.current) {
+      clearTimeout(proofReplayTimerRef.current);
+    }
+    const reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    setProofReplayKey((current) => current + 1);
+    setProofReplaying(true);
+    proofReplayTimerRef.current = setTimeout(
+      () => {
+        setProofReplaying(false);
+        proofReplayTimerRef.current = null;
+      },
+      reducedMotion ? REDUCED_FEEDBACK_MS : 1500,
+    );
+  }, []);
 
   const ensureAudioContext = useCallback(() => {
     if (typeof window === "undefined") return null;
@@ -392,6 +568,8 @@ export default function LibraPage() {
         generationError ||
         !round ||
         !activeSessionRound ||
+        activeLessonStrategyId !== null ||
+        campaignReviewSelection !== null ||
         (isCampaign && activeCampaignLevelComplete)
       ) {
         return;
@@ -479,6 +657,10 @@ export default function LibraPage() {
 
         if (isCorrect) {
           setPhase("answered");
+          queueStrategyLessons(
+            orderedStrategyIdsForRound(round),
+            "next",
+          );
           return;
         }
 
@@ -498,7 +680,9 @@ export default function LibraPage() {
     },
     [
       activeCampaignLevelComplete,
+      activeLessonStrategyId,
       activeSessionRound,
+      campaignReviewSelection,
       clearAttemptTimers,
       complete,
       generationError,
@@ -508,6 +692,7 @@ export default function LibraPage() {
       mistakes,
       phase,
       playFeedbackSound,
+      queueStrategyLessons,
       round,
       started,
     ],
@@ -517,6 +702,7 @@ export default function LibraPage() {
     resumeAudio();
     infiniteFingerprintsRef.current.clear();
     const initialAdaptive = initialInfiniteAdaptiveState();
+    const initialRound = buildCampaignSessionRound("starter", 0)?.round;
     infiniteAdaptiveRef.current = initialAdaptive;
     setSessionMode("campaign");
     setRoundQueue([]);
@@ -533,6 +719,18 @@ export default function LibraPage() {
     setRedeemedMistakeIds([]);
     setRedemptionMistakeIds([]);
     setGenerationError(false);
+    setDiscoveredStrategyIds([]);
+    setPendingLessons(
+      initialRound
+        ? preRoundStrategyIds(initialRound).map((strategyId) => ({
+            strategyId,
+            focusTarget: "answers" as const,
+          }))
+        : [],
+    );
+    setReplayStrategyId(null);
+    setCatalogueExpanded(false);
+    setCampaignReviewSelection(null);
     setStarted(true);
     setComplete(false);
     resetAttemptState();
@@ -564,6 +762,20 @@ export default function LibraPage() {
     setRedeemedMistakeIds([]);
     setRedemptionMistakeIds([]);
     setGenerationError(!generated);
+    setDiscoveredStrategyIds([]);
+    setPendingLessons(
+      generated
+        ? preRoundStrategyIds(generated.sessionRound.round).map(
+            (strategyId) => ({
+              strategyId,
+              focusTarget: "answers" as const,
+            }),
+          )
+        : [],
+    );
+    setReplayStrategyId(null);
+    setCatalogueExpanded(false);
+    setCampaignReviewSelection(null);
     setStarted(true);
     setComplete(false);
     resetAttemptState();
@@ -575,23 +787,42 @@ export default function LibraPage() {
       if (
         !isCampaign ||
         phase !== "idle" ||
-        levelId === activeCampaignLevel
+        levelId === activeCampaignLevel ||
+        activeLessonStrategyId !== null ||
+        campaignReviewSelection !== null
       ) {
         return;
       }
 
       resetAttemptState();
       setActiveCampaignLevel(levelId);
-      shouldFocusFirstOption.current = !isCampaignLevelComplete(
+      const levelIsComplete = isCampaignLevelComplete(
         campaignProgress,
         levelId,
       );
+      if (!levelIsComplete) {
+        const nextRound = buildCampaignSessionRound(
+          levelId,
+          campaignCursors[levelId],
+        );
+        if (nextRound) {
+          queueStrategyLessons(
+            preRoundStrategyIds(nextRound.round),
+            "answers",
+          );
+        }
+      }
+      shouldFocusFirstOption.current = !levelIsComplete;
     },
     [
+      activeLessonStrategyId,
       activeCampaignLevel,
+      campaignCursors,
       campaignProgress,
+      campaignReviewSelection,
       isCampaign,
       phase,
+      queueStrategyLessons,
       resetAttemptState,
     ],
   );
@@ -618,15 +849,32 @@ export default function LibraPage() {
   }, [resetAttemptState, visibleMistakes]);
 
   const goNext = useCallback(() => {
-    if (phase !== "answered") return;
+    if (
+      phase !== "answered" ||
+      activeLessonStrategyId !== null ||
+      campaignReviewSelection !== null
+    ) {
+      return;
+    }
 
     if (isCampaign) {
       resetAttemptState();
       if (campaignProblemIndex < CAMPAIGN_PROBLEMS_PER_LEVEL - 1) {
+        const nextProblemIndex = campaignProblemIndex + 1;
+        const nextRound = buildCampaignSessionRound(
+          activeCampaignLevel,
+          nextProblemIndex,
+        );
+        if (nextRound) {
+          queueStrategyLessons(
+            preRoundStrategyIds(nextRound.round),
+            "answers",
+          );
+        }
         shouldFocusFirstOption.current = true;
         setCampaignCursors((current) => ({
           ...current,
-          [activeCampaignLevel]: campaignProblemIndex + 1,
+          [activeCampaignLevel]: nextProblemIndex,
         }));
       } else {
         shouldFocusFirstOption.current = false;
@@ -648,6 +896,10 @@ export default function LibraPage() {
         return;
       }
       infiniteFingerprintsRef.current.add(generated.fingerprint);
+      queueStrategyLessons(
+        preRoundStrategyIds(generated.sessionRound.round),
+        "answers",
+      );
       shouldFocusFirstOption.current = true;
       resetAttemptState();
       setRoundQueue((current) => [...current, generated.sessionRound]);
@@ -684,7 +936,9 @@ export default function LibraPage() {
     setRoundCursor((current) => current + 1);
   }, [
     activeCampaignLevel,
+    activeLessonStrategyId,
     activeSessionRound?.ordinal,
+    campaignReviewSelection,
     campaignProblemIndex,
     isCampaign,
     isInfinite,
@@ -692,6 +946,7 @@ export default function LibraPage() {
     phase,
     redemptionMistakeIds,
     reviewLevelId,
+    queueStrategyLessons,
     resetAttemptState,
     roundQueue.length,
   ]);
@@ -706,6 +961,10 @@ export default function LibraPage() {
     if (!generated) return;
 
     infiniteFingerprintsRef.current.add(generated.fingerprint);
+    queueStrategyLessons(
+      preRoundStrategyIds(generated.sessionRound.round),
+      "answers",
+    );
     setGenerationError(false);
     resetAttemptState();
     if (roundQueue.length === 0) {
@@ -716,21 +975,28 @@ export default function LibraPage() {
       setRoundCursor((current) => current + 1);
     }
     shouldFocusFirstOption.current = true;
-  }, [resetAttemptState, roundQueue.length]);
+  }, [queueStrategyLessons, resetAttemptState, roundQueue.length]);
 
   const endInfinite = useCallback(() => {
     if (
       !isInfinite ||
       completedCount === 0 ||
       phase === "animating" ||
-      phase === "wrong-review"
+      phase === "wrong-review" ||
+      activeLessonStrategyId !== null
     ) {
       return;
     }
     resetAttemptState();
     setGenerationError(false);
     setComplete(true);
-  }, [completedCount, isInfinite, phase, resetAttemptState]);
+  }, [
+    activeLessonStrategyId,
+    completedCount,
+    isInfinite,
+    phase,
+    resetAttemptState,
+  ]);
 
   const toggleSound = useCallback(() => {
     const next = !soundEnabled;
@@ -752,6 +1018,8 @@ export default function LibraPage() {
         !started ||
         complete ||
         phase !== "idle" ||
+        activeLessonStrategyId !== null ||
+        campaignReviewSelection !== null ||
         isEditableShortcutTarget(event.target) ||
         event.altKey ||
         event.ctrlKey ||
@@ -769,24 +1037,43 @@ export default function LibraPage() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [chooseOption, complete, phase, started]);
+  }, [
+    activeLessonStrategyId,
+    campaignReviewSelection,
+    chooseOption,
+    complete,
+    phase,
+    started,
+  ]);
 
   useEffect(() => {
-    if (phase === "answered") nextButtonRef.current?.focus();
-  }, [phase]);
+    if (phase === "answered" && activeLessonStrategyId === null) {
+      const frame = window.requestAnimationFrame(() => {
+        nextButtonRef.current?.focus();
+      });
+      return () => window.cancelAnimationFrame(frame);
+    }
+  }, [activeLessonStrategyId, phase]);
 
   useEffect(() => {
     if (
       shouldFocusFirstOption.current &&
       started &&
       !complete &&
-      !generationError
+      !generationError &&
+      activeLessonStrategyId === null &&
+      campaignReviewSelection === null
     ) {
-      optionButtonRefs.current[0]?.focus();
-      shouldFocusFirstOption.current = false;
+      const frame = window.requestAnimationFrame(() => {
+        optionButtonRefs.current[0]?.focus();
+        shouldFocusFirstOption.current = false;
+      });
+      return () => window.cancelAnimationFrame(frame);
     }
   }, [
     activeCampaignLevel,
+    activeLessonStrategyId,
+    campaignReviewSelection,
     campaignProblemIndex,
     complete,
     generationError,
@@ -796,23 +1083,58 @@ export default function LibraPage() {
   ]);
 
   useEffect(() => {
-    if (phase === "idle" && retryReady && retryFocusIndexRef.current !== null) {
+    if (
+      phase === "idle" &&
+      retryReady &&
+      retryFocusIndexRef.current !== null &&
+      activeLessonStrategyId === null
+    ) {
       optionButtonRefs.current[retryFocusIndexRef.current]?.focus();
       retryFocusIndexRef.current = null;
     }
-  }, [phase, retryReady]);
+  }, [activeLessonStrategyId, phase, retryReady]);
 
   useEffect(() => {
     if (complete) resultHeadingRef.current?.focus();
   }, [complete]);
 
   useEffect(() => {
-    if (showCampaignLevelComplete) levelCompleteButtonRef.current?.focus();
-  }, [showCampaignLevelComplete]);
+    if (
+      showCampaignLevelComplete &&
+      activeLessonStrategyId === null
+    ) {
+      levelCompleteButtonRef.current?.focus();
+    }
+  }, [activeLessonStrategyId, showCampaignLevelComplete]);
 
   useEffect(() => {
     if (generationError) generationRetryRef.current?.focus();
   }, [generationError]);
+
+  useEffect(() => {
+    const dialog = lessonDialogRef.current;
+    if (!dialog) return;
+
+    if (activeLessonStrategyId && !dialog.open) {
+      try {
+        dialog.showModal();
+      } catch {
+        dialog.setAttribute("open", "");
+      }
+      const frame = window.requestAnimationFrame(() => {
+        lessonPrimaryButtonRef.current?.focus();
+      });
+      return () => window.cancelAnimationFrame(frame);
+    } else if (!activeLessonStrategyId && dialog.open) {
+      dialog.close();
+    }
+  }, [activeLessonStrategyId]);
+
+  useEffect(() => {
+    if (campaignReviewSelection) {
+      historicalReviewHeadingRef.current?.focus();
+    }
+  }, [campaignReviewSelection]);
 
   useEffect(() => {
     function finishFeedback() {
@@ -823,6 +1145,12 @@ export default function LibraPage() {
         clearAttemptTimers();
         if (selectedCorrect) {
           setPhase("answered");
+          if (round) {
+            queueStrategyLessons(
+              orderedStrategyIdsForRound(round),
+              "next",
+            );
+          }
         } else {
           retryFocusIndexRef.current = selectedIndex;
           inputLockedRef.current = false;
@@ -850,6 +1178,8 @@ export default function LibraPage() {
   }, [
     clearAttemptTimers,
     phase,
+    queueStrategyLessons,
+    round,
     selectedCorrect,
     selectedIndex,
   ]);
@@ -858,6 +1188,9 @@ export default function LibraPage() {
     return () => {
       animationTokenRef.current += 1;
       clearAttemptTimers();
+      if (proofReplayTimerRef.current) {
+        clearTimeout(proofReplayTimerRef.current);
+      }
       const context = audioContextRef.current;
       if (context && context.state !== "closed") {
         void context.close().catch(() => undefined);
@@ -919,6 +1252,21 @@ export default function LibraPage() {
     round && selectedIndex !== null && !selectedCorrect
       ? optionFeedback(round, selectedIndex)
       : "";
+  const activeStrategyIds = round
+    ? orderedStrategyIdsForRound(round)
+    : [];
+  const activeRoundWasMissed = activeSessionRound
+    ? mistakes.some(
+        ({ sessionRound }) => sessionRound.id === activeSessionRound.id,
+      )
+    : false;
+  const visibleActiveStrategyIds =
+    round &&
+    (round.difficulty === "Starter" ||
+      round.difficulty === "Junior" ||
+      (round.difficulty === "Expert" && activeRoundWasMissed))
+      ? activeStrategyIds
+      : [];
 
   const soundButton = (
     <button
@@ -1025,7 +1373,11 @@ export default function LibraPage() {
                           aria-pressed={activeCampaignLevel === level.id}
                           aria-controls="libra-play-area"
                           aria-label={`${level.label}, ${levelState}`}
-                          disabled={phase !== "idle"}
+                          disabled={
+                            phase !== "idle" ||
+                            activeLessonStrategyId !== null ||
+                            campaignReviewSelection !== null
+                          }
                           onClick={() => selectCampaignLevel(level.id)}
                           key={level.id}
                         >
@@ -1036,7 +1388,7 @@ export default function LibraPage() {
                   </div>
                   <div
                     className={styles.campaignProblems}
-                    role="list"
+                    role="group"
                     aria-label={`${campaignLevel(activeCampaignLevel).label} problems`}
                   >
                     {Array.from(
@@ -1053,9 +1405,18 @@ export default function LibraPage() {
                         const isCurrent =
                           !activeCampaignLevelComplete &&
                           problemIndex === campaignProblemIndex;
+                        const problemId = campaignRoundId(
+                          activeCampaignLevel,
+                          problemIndex,
+                        );
+                        const isReviewing =
+                          campaignReviewSelection?.levelId ===
+                            activeCampaignLevel &&
+                          campaignReviewSelection.problemIndex ===
+                            problemIndex;
 
                         return (
-                          <span
+                          <button
                             className={`${styles.campaignProblem} ${
                               marker === "correct"
                                 ? styles.campaignProblemCorrect
@@ -1065,11 +1426,32 @@ export default function LibraPage() {
                             } ${
                               isCurrent ? styles.campaignProblemCurrent : ""
                             }`}
-                            role="listitem"
+                            type="button"
                             aria-label={`${campaignLevel(activeCampaignLevel).label} problem ${
                               problemIndex + 1
-                            }: ${marker === "not-done" ? "not done" : marker}`}
+                            }: ${
+                              marker === "not-done"
+                                ? "not done"
+                                : problem?.solved
+                                  ? `${marker}; review completed problem`
+                                  : `${marker}; finish problem before review`
+                            }`}
                             aria-current={isCurrent ? "step" : undefined}
+                            aria-pressed={isReviewing}
+                            disabled={
+                              !problem?.solved ||
+                              phase !== "idle" ||
+                              activeLessonStrategyId !== null
+                            }
+                            onClick={() =>
+                              openCampaignReview(
+                                activeCampaignLevel,
+                                problemIndex,
+                              )
+                            }
+                            ref={(node) => {
+                              campaignMarkerRefs.current[problemId] = node;
+                            }}
                             key={problemIndex}
                           />
                         );
@@ -1165,7 +1547,8 @@ export default function LibraPage() {
                   disabled={
                     completedCount === 0 ||
                     phase === "animating" ||
-                    phase === "wrong-review"
+                    phase === "wrong-review" ||
+                    activeLessonStrategyId !== null
                   }
                 >
                   End
@@ -1173,6 +1556,94 @@ export default function LibraPage() {
               ) : null}
             </div>
 
+            <div className={styles.playWithToolbox}>
+              <aside
+                className={`${styles.strategyCatalogue} ${
+                  catalogueExpanded
+                    ? styles.strategyCatalogueExpanded
+                    : ""
+                }`}
+                aria-label="Discovered solution strategy toolbox"
+              >
+                <button
+                  className={styles.catalogueToggle}
+                  type="button"
+                  aria-expanded={catalogueExpanded}
+                  aria-controls="libra-strategy-catalogue"
+                  disabled={activeLessonStrategyId !== null}
+                  onClick={() =>
+                    setCatalogueExpanded((current) => !current)
+                  }
+                >
+                  <span aria-hidden="true">⌘</span>
+                  <strong>Tools</strong>
+                  <small>
+                    {discoveredStrategyIds.length}/{STRATEGY_CATALOGUE.length}
+                  </small>
+                </button>
+                <div
+                  className={styles.catalogueContents}
+                  id="libra-strategy-catalogue"
+                  aria-hidden={!catalogueExpanded}
+                >
+                  {STRATEGY_SECTIONS.map((section) => {
+                    const discovered = STRATEGY_CATALOGUE.filter(
+                      (strategy) =>
+                        strategy.section === section.id &&
+                        discoveredStrategyIdSet.has(strategy.id),
+                    );
+
+                    return (
+                      <section
+                        className={styles.catalogueSection}
+                        key={section.id}
+                      >
+                        <h2>{section.name}</h2>
+                        <p>{section.description}</p>
+                        {discovered.length > 0 ? (
+                          <ul className={styles.catalogueList}>
+                            {discovered.map((strategy) => (
+                              <li key={strategy.id}>
+                                <button
+                                  className={styles.catalogueCard}
+                                  type="button"
+                                  tabIndex={catalogueExpanded ? 0 : -1}
+                                  disabled={
+                                    phase === "animating" ||
+                                    phase === "wrong-review" ||
+                                    pendingLessons.length > 0 ||
+                                    campaignReviewSelection !== null
+                                  }
+                                  aria-label={`Replay ${strategy.name} lesson`}
+                                  onClick={() =>
+                                    replayStrategyLesson(strategy.id)
+                                  }
+                                  ref={(node) => {
+                                    catalogueButtonRefs.current[strategy.id] =
+                                      node;
+                                  }}
+                                >
+                                  <span aria-hidden="true">
+                                    {strategy.symbol}
+                                  </span>
+                                  <strong>{strategy.shortName}</strong>
+                                  <small>Replay</small>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className={styles.catalogueEmpty}>
+                            Solve a new kind of balance to add a tool.
+                          </p>
+                        )}
+                      </section>
+                    );
+                  })}
+                </div>
+              </aside>
+
+              <div className={styles.playSurface}>
             {generationError ? (
               <section
                 className={styles.recoveryCard}
@@ -1235,25 +1706,155 @@ export default function LibraPage() {
                   <span aria-hidden="true">→</span>
                 </button>
               </section>
+            ) : historicalSessionRound && historicalProgress ? (
+              <section
+                className={styles.historicalReview}
+                id="libra-play-area"
+                aria-labelledby="historical-review-title"
+              >
+                <div className={styles.historicalReviewHeader}>
+                  <div>
+                    <p className={styles.kicker}>Completed problem</p>
+                    <h2
+                      id="historical-review-title"
+                      ref={historicalReviewHeadingRef}
+                      tabIndex={-1}
+                    >
+                      {historicalSessionRound.campaign?.levelLabel} · Problem{" "}
+                      {(historicalSessionRound.campaign?.problemIndex ?? 0) + 1}
+                    </h2>
+                    <p className={styles.historicalOutcome}>
+                      {historicalProgress.firstAttempt === "correct"
+                        ? "✓ Correct on the first try"
+                        : "× Missed on the first try, then solved"}
+                    </p>
+                  </div>
+                  <button
+                    className={styles.modeButton}
+                    type="button"
+                    onClick={closeCampaignReview}
+                  >
+                    Back to current problem
+                  </button>
+                </div>
+
+                <div className={styles.historicalReviewBody}>
+                  <div className={styles.historicalPuzzle}>
+                    <PuzzleVisual
+                      round={historicalSessionRound.round}
+                      candidate={
+                        historicalSessionRound.round.options[
+                          historicalSessionRound.round.correctIndex
+                        ]
+                      }
+                      outcome="correct"
+                      proofState={
+                        proofReplaying ? "animating" : "settled"
+                      }
+                      key={`historical-proof-${proofReplayKey}`}
+                    />
+                  </div>
+                  <div className={styles.historicalProofCopy}>
+                    <p>
+                      {solutionStrategyFeedback(
+                        historicalSessionRound.round,
+                      )}
+                    </p>
+                    <button
+                      className={styles.replayButton}
+                      type="button"
+                      onClick={replayProof}
+                    >
+                      <span aria-hidden="true">↻</span>
+                      Replay proof
+                    </button>
+                  </div>
+                  {historicalMistake ? (
+                    <div className={styles.historicalWrongAnswer}>
+                      <span>Your first answer</span>
+                      <AnswerLoad
+                        option={
+                          historicalSessionRound.round.options[
+                            historicalMistake.chosenIndex
+                          ]
+                        }
+                        expectedCount={historicalSessionRound.round.answer}
+                        revealDifferences={
+                          historicalSessionRound.round.feedbackPolicy !==
+                          "preserve-inference"
+                        }
+                        accentMap={buildRoundAccentMap(
+                          historicalSessionRound.round,
+                        )}
+                      />
+                      <strong aria-hidden="true">×</strong>
+                    </div>
+                  ) : null}
+                </div>
+              </section>
             ) : round ? (
               <>
                 <div
                   className={styles.gameBoard}
                   id="libra-play-area"
                   aria-busy={
-                    phase === "animating" || phase === "wrong-review"
+                    phase === "animating" ||
+                    phase === "wrong-review" ||
+                    proofReplaying
                   }
                 >
                   <section
                     className={styles.cluePanel}
                     aria-label="Balance puzzle"
                   >
+                    {visibleActiveStrategyIds.length > 0 ? (
+                      <div
+                        className={styles.activeTools}
+                        aria-label="Helpful tools for this puzzle"
+                      >
+                        <span>Try</span>
+                        {visibleActiveStrategyIds.map((strategyId) => {
+                          const strategy =
+                            STRATEGY_CATALOGUE_BY_ID[strategyId];
+                          return (
+                            <button
+                              className={styles.activeTool}
+                              type="button"
+                              disabled={
+                                !discoveredStrategyIdSet.has(strategyId) ||
+                                phase === "animating" ||
+                                phase === "wrong-review"
+                              }
+                              onClick={() =>
+                                replayStrategyLesson(strategyId)
+                              }
+                              aria-label={`Review ${strategy.name}`}
+                              key={strategyId}
+                            >
+                              <span aria-hidden="true">
+                                {strategy.symbol}
+                              </span>
+                              {strategy.shortName}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
                     <PuzzleVisual
                       round={round}
                       candidate={candidateOnGoal}
                       outcome={answerOutcome}
-                      teaching={selectedCorrect && phase !== "idle"}
+                      proofState={
+                        selectedCorrect &&
+                        (phase === "animating" ||
+                          phase === "answered")
+                          ? phase === "animating" || proofReplaying
+                            ? "animating"
+                            : "settled"
+                          : "hidden"
+                      }
                       revealDifferences={phase === "wrong-review"}
+                      key={`live-proof-${proofReplayKey}`}
                     />
                   </section>
                   <section
@@ -1300,7 +1901,10 @@ export default function LibraPage() {
                             }`}
                             type="button"
                             onClick={() => chooseOption(optionIndex)}
-                            disabled={phase !== "idle"}
+                            disabled={
+                              phase !== "idle" ||
+                              activeLessonStrategyId !== null
+                            }
                             aria-label={`Option ${optionIndex + 1}: ${
                               option.count
                             } ${creatureName}${
@@ -1367,6 +1971,14 @@ export default function LibraPage() {
                         </span>
                       </span>
                       <button
+                        className={styles.replayButton}
+                        type="button"
+                        onClick={replayProof}
+                      >
+                        <span aria-hidden="true">↻</span>
+                        Replay proof
+                      </button>
+                      <button
                         className={styles.nextButton}
                         type="button"
                         onClick={goNext}
@@ -1398,6 +2010,8 @@ export default function LibraPage() {
                 </Link>
               </section>
             )}
+              </div>
+            </div>
           </>
         ) : (
           <section
@@ -1515,6 +2129,73 @@ export default function LibraPage() {
           </section>
         )}
       </main>
+
+      <dialog
+        className={styles.strategyLessonDialog}
+        ref={lessonDialogRef}
+        aria-labelledby="strategy-lesson-title"
+        aria-describedby="strategy-lesson-description"
+        onCancel={(event) => {
+          event.preventDefault();
+          closeActiveLesson();
+        }}
+      >
+        {activeLessonStrategy && activeLessonStrategyId ? (
+          <div className={styles.strategyLessonCard}>
+            <div className={styles.lessonHeading}>
+              <span
+                className={styles.lessonSymbol}
+                aria-hidden="true"
+              >
+                {activeLessonStrategy.symbol}
+              </span>
+              <div>
+                <p className={styles.kicker}>
+                  {replayStrategyId
+                    ? "Toolbox replay"
+                    : "New balance tool"}
+                </p>
+                <h2 id="strategy-lesson-title">
+                  {activeLessonStrategy.name}
+                </h2>
+                <p id="strategy-lesson-description">
+                  {activeLessonStrategy.description}
+                </p>
+              </div>
+            </div>
+            <StrategyLessonVisual
+              strategy={activeLessonStrategyId}
+              replayKey={lessonReplayKey}
+            />
+            <div className={styles.lessonActions}>
+              <button
+                className={styles.replayButton}
+                type="button"
+                onClick={() =>
+                  setLessonReplayKey((current) => current + 1)
+                }
+              >
+                <span aria-hidden="true">↻</span>
+                Replay
+              </button>
+              <button
+                className={styles.primaryButton}
+                type="button"
+                autoFocus
+                ref={lessonPrimaryButtonRef}
+                onClick={closeActiveLesson}
+              >
+                {replayStrategyId
+                  ? "Back to puzzle"
+                  : pendingLessons.length > 1
+                    ? "Next tool"
+                    : "Try it"}
+                <span aria-hidden="true">→</span>
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </dialog>
     </div>
   );
 }

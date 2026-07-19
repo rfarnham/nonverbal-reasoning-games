@@ -725,6 +725,612 @@
   }
 }
 
+.solutionProof {
+  width: min(100%, 470px);
+  margin: 7px auto 9px;
+  padding: 10px;
+  overflow: hidden;
+  border: 1px solid #c9c3b7;
+  border-radius: 16px;
+  background: rgb(255 253 248 / 84%);
+}
+
+.solutionProofInner {
+  display: grid;
+  justify-items: stretch;
+  gap: 4px;
+}
+
+.proofSources {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 6px;
+}
+
+.proofSourceEquation {
+  min-width: 0;
+  position: relative;
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+  padding: 6px 7px 7px 5px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--panel);
+}
+
+.proofSourceAdd {
+  border-color: rgb(22 131 107 / 42%);
+}
+
+.proofSourceSubtract {
+  border-color: rgb(191 73 62 / 48%);
+}
+
+.proofOperationSymbol {
+  width: 25px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(22 131 107 / 12%);
+  color: var(--correct);
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.proofSourceSubtract .proofOperationSymbol {
+  background: rgb(191 73 62 / 11%);
+  color: var(--wrong);
+}
+
+.proofSourceBody {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.proofSourceLabel,
+.proofStageLabel,
+.lessonStageLabel {
+  color: var(--muted);
+  font-size: 0.57rem;
+  font-weight: 860;
+  letter-spacing: 0.07em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.proofCopies {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: white;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.53rem;
+  font-weight: 900;
+}
+
+.proofEquation {
+  --token-size: 20px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.proofExpression {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.proofTerm,
+.proofTokenRun {
+  min-width: 0;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.proofTerm {
+  gap: 2px;
+}
+
+.proofTokenRun {
+  gap: 0;
+}
+
+.proofTokenRun .creatureToken,
+.proofTokenRun .mysteryLoad {
+  flex: 0 0 var(--token-size);
+}
+
+.proofTokenRun .creatureToken + .creatureToken,
+.proofTokenRun .mysteryLoad + .mysteryLoad {
+  margin-left: -3px;
+}
+
+.proofPlus,
+.proofEquals,
+.proofNothing {
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.proofCount {
+  margin-right: 2px;
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.57rem;
+  font-weight: 900;
+}
+
+.proofStrike {
+  height: 3px;
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  top: 50%;
+  border-radius: 999px;
+  background: var(--wrong);
+  box-shadow: 0 0 0 1px var(--panel);
+  transform: rotate(-12deg);
+  transform-origin: left center;
+}
+
+.proofTokenRunCancelled {
+  opacity: 0.42;
+}
+
+.proofFlowArrow {
+  height: 13px;
+  display: grid;
+  place-items: center;
+  color: #91897b;
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.proofStage {
+  min-width: 0;
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--panel);
+}
+
+.proofCombineStage {
+  border-color: rgb(119 103 215 / 35%);
+}
+
+.proofCancelStage {
+  border-color: rgb(191 73 62 / 33%);
+}
+
+.proofRegroupStage {
+  border-color: rgb(243 189 78 / 68%);
+  background: rgb(243 189 78 / 8%);
+}
+
+.proofFinalStage {
+  padding-right: 35px;
+  border-color: rgb(22 131 107 / 55%);
+  background: rgb(22 131 107 / 7%);
+}
+
+.proofComboGroups {
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.proofComboGroup {
+  --token-size: 18px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 4px 7px;
+  border: 2px solid var(--gold);
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
+  background: rgb(255 253 248 / 78%);
+}
+
+.proofComboGroup::before,
+.proofComboGroup::after {
+  content: "";
+  width: 2px;
+  height: 7px;
+  position: absolute;
+  top: 0;
+  background: var(--gold);
+}
+
+.proofComboGroup::before {
+  left: 0;
+}
+
+.proofComboGroup::after {
+  right: 0;
+}
+
+.proofDivideBadge {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border: 1px solid rgb(22 121 210 / 48%);
+  border-radius: 999px;
+  background: rgb(22 121 210 / 7%);
+  color: #0d65ae;
+  font-size: 0.63rem;
+  font-weight: 900;
+}
+
+.proofCheck {
+  width: 25px;
+  height: 25px;
+  position: absolute;
+  right: 7px;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--correct);
+  color: white;
+  font-family: Arial, sans-serif;
+  font-size: 0.76rem;
+  font-weight: 900;
+  transform: translateY(-50%);
+}
+
+.solutionProof[data-proof-state="animating"] .proofSourceEquation {
+  animation: proofSourceSelect 280ms ease both;
+}
+
+.solutionProof[data-proof-state="animating"] .proofSourceEquation:nth-child(2) {
+  animation-delay: 80ms;
+}
+
+.solutionProof[data-proof-state="animating"] .proofSourceEquation:nth-child(3) {
+  animation-delay: 160ms;
+}
+
+.solutionProof[data-proof-state="animating"] .proofCombineStage {
+  animation: proofStageReveal 260ms 230ms ease both;
+}
+
+.solutionProof[data-proof-state="animating"] .proofStrike {
+  animation: proofStrikeAcross 280ms 370ms ease both;
+}
+
+.solutionProof[data-proof-state="animating"] .proofCancelStage {
+  animation: proofStageReveal 250ms 480ms ease both;
+}
+
+.solutionProof[data-proof-state="animating"] .proofRegroupStage {
+  animation: proofStageReveal 260ms 610ms ease both;
+}
+
+.solutionProof[data-proof-state="animating"] .proofComboGroup {
+  animation: proofGroupSettle 280ms 680ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.solutionProof[data-proof-state="animating"] .proofFinalStage {
+  animation: proofFinalReveal 280ms 780ms ease both;
+}
+
+@keyframes proofSourceSelect {
+  from {
+    opacity: 0.38;
+    transform: translateY(-5px);
+  }
+
+  60% {
+    border-color: var(--gold);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes proofStageReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-7px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes proofStrikeAcross {
+  from {
+    opacity: 0;
+    transform: rotate(-12deg) scaleX(0);
+  }
+
+  to {
+    opacity: 1;
+    transform: rotate(-12deg) scaleX(1);
+  }
+}
+
+@keyframes proofGroupSettle {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes proofFinalReveal {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+
+  70% {
+    border-color: var(--correct);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.strategyLessonVisual {
+  width: min(100%, 720px);
+  margin-inline: auto;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #f2eee5;
+}
+
+.strategyLessonTimeline {
+  min-height: 230px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 118px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 10px;
+  padding: 18px;
+}
+
+.lessonBefore,
+.lessonAfter {
+  min-width: 0;
+  display: grid;
+  place-content: center;
+  justify-items: stretch;
+  gap: 8px;
+  padding: 12px 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.lessonAfter {
+  border-color: rgb(22 131 107 / 48%);
+  background: rgb(22 131 107 / 6%);
+}
+
+.lessonEquation {
+  --token-size: clamp(20px, 4.7vw, 30px);
+  min-width: 0;
+  min-height: 48px;
+  display: grid;
+  place-items: center;
+  padding: 7px 5px;
+  border-bottom: 3px solid var(--ink);
+}
+
+.lessonEquation .proofEquation,
+.lessonComboAfter > .proofEquation {
+  --token-size: clamp(20px, 4.7vw, 30px);
+}
+
+.lessonSourceStack {
+  align-content: center;
+  gap: 5px;
+}
+
+.lessonSourceStack .lessonEquation + .lessonEquation {
+  border-bottom-color: var(--teal);
+}
+
+.lessonInlineOperator {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  margin-block: -3px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: white;
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+.lessonFlow {
+  min-width: 0;
+  position: relative;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.lessonFlowLine {
+  width: 100%;
+  height: 2px;
+  position: absolute;
+  left: 0;
+  top: 50%;
+  background: #aaa396;
+}
+
+.lessonOperator {
+  min-width: 50px;
+  min-height: 50px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  padding: 5px;
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+  background: var(--gold);
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 1.1rem;
+  font-weight: 950;
+  box-shadow: 0 0 0 5px #f2eee5;
+}
+
+.lessonFlowLabel {
+  z-index: 1;
+  padding: 3px 5px;
+  background: #f2eee5;
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 820;
+  line-height: 1.25;
+}
+
+.lessonFlowArrow {
+  z-index: 1;
+  position: absolute;
+  right: -2px;
+  top: calc(50% - 13px);
+  padding-left: 2px;
+  background: #f2eee5;
+  color: var(--ink);
+  font-size: 1.15rem;
+  font-weight: 900;
+}
+
+.lessonComboAfter {
+  align-content: center;
+}
+
+.lessonMiniDivide {
+  min-height: 27px;
+  display: inline-flex;
+  align-items: center;
+  justify-self: center;
+  padding: 3px 10px;
+  border: 1px solid rgb(22 121 210 / 48%);
+  border-radius: 999px;
+  background: var(--panel);
+  color: #0d65ae;
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.strategyLessonTimeline .lessonBefore {
+  animation: lessonBeforeIn 250ms ease both;
+}
+
+.strategyLessonTimeline .lessonFlow {
+  animation: lessonFlowIn 320ms 230ms ease both;
+}
+
+.strategyLessonTimeline .lessonOperator {
+  animation: lessonOperatorAct 360ms 350ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.strategyLessonTimeline .proofStrike {
+  animation: proofStrikeAcross 300ms 430ms ease both;
+}
+
+.strategyLessonTimeline .lessonAfter {
+  animation: lessonAfterIn 360ms 510ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.strategyLessonTimeline .lessonAfter .proofComboGroup {
+  animation: proofGroupSettle 300ms 610ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+@keyframes lessonBeforeIn {
+  from {
+    opacity: 0.32;
+    transform: translateX(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes lessonFlowIn {
+  from {
+    opacity: 0;
+    transform: scaleX(0.3);
+  }
+
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes lessonOperatorAct {
+  from {
+    transform: scale(0.76) rotate(-7deg);
+  }
+
+  70% {
+    transform: scale(1.08) rotate(2deg);
+  }
+
+  to {
+    transform: scale(1) rotate(0);
+  }
+}
+
+@keyframes lessonAfterIn {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 .answerLoad {
   --token-size: clamp(24px, 4.2vw, 33px);
   width: min(100%, 168px);
@@ -1534,6 +2140,64 @@
     min-height: 16px;
   }
 
+  .solutionProof {
+    padding: 8px;
+  }
+
+  .proofSources {
+    grid-template-columns: 1fr;
+  }
+
+  .proofSourceEquation {
+    grid-template-columns: 25px minmax(0, 1fr);
+  }
+
+  .proofEquation {
+    --token-size: 18px;
+    gap: 4px;
+  }
+
+  .proofComboGroup {
+    --token-size: 16px;
+    padding-inline: 3px;
+  }
+
+  .strategyLessonTimeline {
+    min-height: 0;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .lessonBefore,
+  .lessonAfter {
+    min-height: 116px;
+    padding: 10px;
+  }
+
+  .lessonFlow {
+    min-height: 78px;
+  }
+
+  .lessonFlowLine {
+    width: 2px;
+    height: 100%;
+    left: 50%;
+    top: 0;
+  }
+
+  .lessonFlowArrow {
+    right: auto;
+    top: auto;
+    bottom: -6px;
+    padding: 0 3px;
+    transform: rotate(90deg);
+  }
+
+  .lessonFlowLabel {
+    max-width: 160px;
+  }
+
   .optionGrid {
     gap: 9px;
   }
@@ -1647,6 +2311,39 @@
     min-height: 10px;
   }
 
+  .solutionProof {
+    margin-block: 4px 6px;
+    border-radius: 13px;
+  }
+
+  .proofStage {
+    padding-inline: 5px;
+  }
+
+  .proofEquation {
+    --token-size: 16px;
+  }
+
+  .proofSourceLabel,
+  .proofStageLabel,
+  .lessonStageLabel {
+    font-size: 0.52rem;
+  }
+
+  .proofComboGroup {
+    --token-size: 15px;
+  }
+
+  .strategyLessonTimeline {
+    padding: 9px;
+  }
+
+  .lessonEquation,
+  .lessonEquation .proofEquation,
+  .lessonComboAfter > .proofEquation {
+    --token-size: 22px;
+  }
+
   .optionButton {
     min-height: 132px;
   }
@@ -1681,8 +2378,25 @@
   .teaching .clueScaleWrap,
   .teaching .mysteryLoad,
   .strategyProof,
+  .solutionProof *,
+  .strategyLessonTimeline *,
   .infiniteSupercharged .energyTrack {
     animation: none;
+  }
+
+  .solutionProof[data-proof-state="animating"] .proofSourceEquation,
+  .solutionProof[data-proof-state="animating"] .proofCombineStage,
+  .solutionProof[data-proof-state="animating"] .proofCancelStage,
+  .solutionProof[data-proof-state="animating"] .proofRegroupStage,
+  .solutionProof[data-proof-state="animating"] .proofFinalStage,
+  .solutionProof[data-proof-state="animating"] .proofStrike,
+  .strategyLessonTimeline .lessonBefore,
+  .strategyLessonTimeline .lessonFlow,
+  .strategyLessonTimeline .lessonOperator,
+  .strategyLessonTimeline .lessonAfter,
+  .strategyLessonTimeline .proofStrike {
+    opacity: 1;
+    transform: none;
   }
 
   .teaching .clueScaleWrap {
@@ -1694,5 +2408,640 @@
     outline: 3px solid rgb(243 189 78 / 75%);
     outline-offset: 3px;
     transform: scale(0.82);
+  }
+}
+
+/* Strategy curriculum shell */
+
+.playWithToolbox {
+  min-width: 0;
+  position: relative;
+  padding-left: 64px;
+}
+
+.playSurface {
+  min-width: 0;
+}
+
+.strategyCatalogue {
+  width: 56px;
+  min-height: 580px;
+  position: absolute;
+  z-index: 8;
+  left: 0;
+  top: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: 0 12px 30px rgb(23 33 61 / 8%);
+  transition:
+    width 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.strategyCatalogueExpanded {
+  width: min(286px, calc(100% - 8px));
+  box-shadow: 0 18px 44px rgb(23 33 61 / 18%);
+}
+
+.catalogueToggle {
+  width: 56px;
+  min-height: 578px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+}
+
+.catalogueToggle > span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--gold);
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.catalogueToggle strong {
+  writing-mode: vertical-rl;
+  color: var(--ink);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.catalogueToggle small {
+  min-width: 34px;
+  padding: 5px 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.58rem;
+  font-weight: 850;
+}
+
+.catalogueToggle:disabled {
+  cursor: default;
+}
+
+.catalogueContents {
+  width: 228px;
+  position: absolute;
+  left: 56px;
+  top: 0;
+  display: grid;
+  gap: 22px;
+  padding: 20px 16px 24px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(-8px);
+  transition:
+    opacity 140ms ease,
+    transform 180ms ease,
+    visibility 0s linear 180ms;
+}
+
+.strategyCatalogueExpanded .catalogueContents {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: none;
+  transition-delay: 30ms, 0ms, 0ms;
+}
+
+.catalogueSection h2 {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.catalogueSection > p {
+  margin: 5px 0 12px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.catalogueList {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.catalogueCard {
+  width: 100%;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #f7f3ea;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.catalogueCard:not(:disabled):hover {
+  border-color: var(--ink);
+  transform: translateY(-2px);
+}
+
+.catalogueCard > span {
+  display: grid;
+  place-items: center;
+  min-height: 34px;
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--violet);
+  font-size: 0.93rem;
+  font-weight: 900;
+}
+
+.catalogueCard strong {
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.catalogueCard small {
+  color: var(--muted);
+  font-size: 0.58rem;
+  font-weight: 800;
+}
+
+.catalogueEmpty {
+  padding: 10px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: #fbf8f0;
+}
+
+.activeTools {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0 0 10px;
+}
+
+.activeTools > span {
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.activeTool,
+.replayButton {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 820;
+}
+
+.activeTool > span {
+  color: var(--violet);
+  font-size: 0.96rem;
+  font-weight: 900;
+}
+
+.activeTool:disabled,
+.replayButton:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.replayButton:not(:disabled):hover,
+.activeTool:not(:disabled):hover {
+  border-color: var(--ink);
+  transform: translateY(-2px);
+}
+
+/* The visible marker stays compact while the real button remains 44px. */
+
+.campaignProblem,
+.campaignProblemCorrect,
+.campaignProblemIncorrect,
+.campaignProblemNotDone {
+  --problem-marker: #c9c5bb;
+  height: 44px;
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  transform: none;
+}
+
+.campaignProblemCorrect {
+  --problem-marker: var(--correct);
+}
+
+.campaignProblemIncorrect {
+  --problem-marker: var(--wrong);
+}
+
+.campaignProblem::before {
+  content: "";
+  width: 100%;
+  min-width: 12px;
+  height: 13px;
+  position: absolute;
+  left: 0;
+  top: 50%;
+  border-radius: 999px;
+  background: var(--problem-marker);
+  transform: translateY(-50%);
+  transition: transform 140ms ease;
+}
+
+.campaignProblem::after {
+  position: relative;
+  z-index: 1;
+}
+
+.campaignProblem:not(:disabled):hover::before {
+  transform: translateY(-50%) scaleY(1.35);
+}
+
+.campaignProblemCurrent {
+  outline: 0;
+}
+
+.campaignProblemCurrent::before {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  transform: translateY(-50%) scaleY(1.18);
+}
+
+.campaignProblem:disabled {
+  cursor: default;
+}
+
+/* Read-only history */
+
+.historicalReview {
+  min-height: 580px;
+  overflow: hidden;
+  padding: clamp(20px, 3.5vw, 38px);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--panel);
+}
+
+.historicalReviewHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.historicalReviewHeader h2 {
+  margin: 0;
+  font-size: clamp(1.55rem, 4vw, 2.5rem);
+  font-weight: 860;
+  letter-spacing: -0.045em;
+}
+
+.historicalOutcome {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 780;
+}
+
+.historicalReviewBody {
+  display: grid;
+  gap: 18px;
+  padding-top: 24px;
+}
+
+.historicalPuzzle {
+  padding: clamp(12px, 2.5vw, 24px);
+  border-radius: 17px;
+  background: #f2eee5;
+}
+
+.historicalPuzzle .puzzleVisual {
+  width: min(760px, 100%);
+  margin-inline: auto;
+}
+
+.historicalProofCopy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.historicalProofCopy p {
+  max-width: 720px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.historicalWrongAnswer {
+  width: min(240px, 100%);
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 12px;
+  border: 2px solid var(--wrong);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.historicalWrongAnswer > span {
+  color: var(--wrong);
+  font-size: 0.67rem;
+  font-weight: 850;
+}
+
+.historicalWrongAnswer > strong {
+  width: 24px;
+  height: 24px;
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--wrong);
+  color: white;
+}
+
+/* Native strategy lesson modal */
+
+.strategyLessonDialog {
+  width: min(840px, calc(100vw - 32px));
+  max-height: min(92vh, 840px);
+  overflow: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 24px;
+  background: transparent;
+  color: var(--ink);
+  box-shadow: 0 28px 80px rgb(23 33 61 / 34%);
+}
+
+.strategyLessonDialog::backdrop {
+  background: rgb(23 33 61 / 54%);
+  backdrop-filter: blur(5px);
+}
+
+.strategyLessonCard {
+  padding: clamp(20px, 4vw, 36px);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--panel);
+}
+
+.lessonHeading {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.lessonHeading h2 {
+  margin: 0;
+  font-size: clamp(1.8rem, 5vw, 3.3rem);
+  font-weight: 880;
+  letter-spacing: -0.055em;
+  line-height: 1;
+}
+
+.lessonHeading p:last-child {
+  max-width: 600px;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.lessonSymbol {
+  width: 66px;
+  height: 66px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: var(--gold);
+  color: var(--ink);
+  font-size: 1.35rem;
+  font-weight: 900;
+}
+
+.lessonActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 18px;
+}
+
+.catalogueToggle:focus-visible,
+.catalogueCard:focus-visible,
+.activeTool:focus-visible,
+.replayButton:focus-visible,
+.campaignProblem:focus-visible,
+.historicalReview h2:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 4px;
+}
+
+@media (max-width: 900px) {
+  .playWithToolbox {
+    display: grid;
+    gap: 10px;
+    padding-left: 0;
+  }
+
+  .strategyCatalogue,
+  .strategyCatalogueExpanded {
+    width: 100%;
+    min-height: 0;
+    position: relative;
+    border-radius: 14px;
+  }
+
+  .catalogueToggle {
+    width: 100%;
+    min-height: 52px;
+    justify-content: flex-start;
+    flex-direction: row;
+    padding: 8px 12px;
+  }
+
+  .catalogueToggle strong {
+    writing-mode: horizontal-tb;
+  }
+
+  .catalogueToggle small {
+    margin-left: auto;
+  }
+
+  .catalogueContents {
+    width: 100%;
+    max-height: 0;
+    position: static;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: hidden;
+    padding: 0 14px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-6px);
+    transition:
+      max-height 180ms ease,
+      padding 180ms ease,
+      opacity 140ms ease,
+      transform 180ms ease,
+      visibility 0s linear 180ms;
+  }
+
+  .strategyCatalogueExpanded .catalogueContents {
+    max-height: 620px;
+    overflow-y: auto;
+    padding: 8px 14px 16px;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .lessonFlow {
+    min-height: 96px;
+  }
+
+  .lessonFlowArrow {
+    position: static;
+    right: auto;
+    top: auto;
+    bottom: auto;
+    transform: rotate(90deg);
+  }
+
+  .campaignProblems {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0 4px;
+  }
+
+  .catalogueContents {
+    grid-template-columns: 1fr;
+  }
+
+  .strategyCatalogueExpanded .catalogueContents {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .historicalReviewHeader,
+  .historicalProofCopy {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .historicalReviewHeader .modeButton,
+  .historicalProofCopy .replayButton {
+    width: 100%;
+  }
+
+  .activeTools {
+    padding-inline: 2px;
+  }
+
+  .strategyLessonDialog {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+    border-radius: 18px;
+  }
+
+  .strategyLessonCard {
+    padding: 18px 14px;
+    border-radius: 18px;
+  }
+
+  .lessonHeading {
+    grid-template-columns: 50px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .lessonSymbol {
+    width: 50px;
+    height: 50px;
+    border-radius: 13px;
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 390px) {
+  .lessonActions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .lessonActions > button {
+    width: 100%;
+  }
+
+  .activeTools {
+    gap: 5px;
+  }
+
+  .activeTool {
+    padding-inline: 10px;
+    font-size: 0.67rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .strategyCatalogue,
+  .catalogueContents,
+  .catalogueCard,
+  .activeTool,
+  .replayButton,
+  .campaignProblem::before {
+    transition: none;
   }
 }
