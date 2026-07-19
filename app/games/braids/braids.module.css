@@ -304,8 +304,7 @@
 }
 
 .ribbonOutline,
-.ribbonBody,
-.crossingBreak {
+.ribbonBody {
   fill: none;
   stroke-linecap: round;
 }
@@ -317,11 +316,6 @@
 
 .ribbonBody {
   stroke-width: 13;
-}
-
-.crossingBreak {
-  stroke: var(--pane, #f4f0e7);
-  stroke-width: 25;
 }
 
 .ribbonCoral {

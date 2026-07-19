@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -106,6 +107,7 @@ const WIZARD_WRONG_FEEDBACK_MS = 180;
 const WRONG_REVIEW_MS = 2200;
 const REDUCED_WRONG_REVIEW_MS = 1300;
 const CAMPAIGN_PROBLEMS_PER_LEVEL = 12;
+const UNDERPASS_GAP = 26;
 
 const CAMPAIGN_LEVELS: ReadonlyArray<{
   id: CampaignLevelId;
@@ -261,6 +263,8 @@ function WeaveDiagram({
   diagramRef?: Ref<SVGSVGElement>;
   differences?: WeaveDifferences;
 }) {
+  const diagramId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
+  const maskPrefix = `braids-${diagramId}`;
   const xPositions = positions(weave.verticalRibbons.length, 68, 172);
   const yPositions = positions(weave.horizontalRibbons.length, 58, 132);
   const crossingDifferences = new Set(differences?.crossingIndexes ?? []);
@@ -280,48 +284,102 @@ function WeaveDiagram({
       aria-hidden={hidden || undefined}
       ref={diagramRef}
     >
+      <defs>
+        {weave.verticalRibbons.map((_, column) => (
+          <mask
+            id={`${maskPrefix}-vertical-${column}`}
+            x="0"
+            y="0"
+            width="240"
+            height="190"
+            maskUnits="userSpaceOnUse"
+            key={`vertical-mask-${column}`}
+          >
+            <rect x="0" y="0" width="240" height="190" fill="white" />
+            {yPositions.map((y, row) =>
+              weave.crossings[
+                row * weave.verticalRibbons.length + column
+              ] === "horizontal" ? (
+                <rect
+                  x={xPositions[column] - UNDERPASS_GAP / 2}
+                  y={y - UNDERPASS_GAP / 2}
+                  width={UNDERPASS_GAP}
+                  height={UNDERPASS_GAP}
+                  fill="black"
+                  key={`vertical-gap-${row}-${column}`}
+                />
+              ) : null,
+            )}
+          </mask>
+        ))}
+        {weave.horizontalRibbons.map((_, row) => (
+          <mask
+            id={`${maskPrefix}-horizontal-${row}`}
+            x="0"
+            y="0"
+            width="240"
+            height="190"
+            maskUnits="userSpaceOnUse"
+            key={`horizontal-mask-${row}`}
+          >
+            <rect x="0" y="0" width="240" height="190" fill="white" />
+            {xPositions.map((x, column) =>
+              weave.crossings[
+                row * weave.verticalRibbons.length + column
+              ] === "vertical" ? (
+                <rect
+                  x={x - UNDERPASS_GAP / 2}
+                  y={yPositions[row] - UNDERPASS_GAP / 2}
+                  width={UNDERPASS_GAP}
+                  height={UNDERPASS_GAP}
+                  fill="black"
+                  key={`horizontal-gap-${row}-${column}`}
+                />
+              ) : null,
+            )}
+          </mask>
+        ))}
+      </defs>
       <rect className={styles.pane} x="11" y="11" width="218" height="168" rx="13" />
       <path className={styles.paneNotch} d="M17 87h8v16h-8" aria-hidden="true" />
 
       <g aria-hidden="true">
         {weave.verticalRibbons.map((ribbon, index) => (
-          <g key={`vertical-base-${index}-${ribbon.color}-${ribbon.motif}`}>
+          <g
+            mask={`url(#${maskPrefix}-vertical-${index})`}
+            key={`vertical-base-${index}-${ribbon.color}-${ribbon.motif}`}
+          >
             <line className={styles.ribbonOutline} x1={xPositions[index]} y1="20" x2={xPositions[index]} y2="170" />
             <line className={`${styles.ribbonBody} ${RIBBON_CLASS[ribbon.color]}`} x1={xPositions[index]} y1="20" x2={xPositions[index]} y2="170" />
           </g>
         ))}
         {weave.horizontalRibbons.map((ribbon, index) => (
-          <g key={`horizontal-base-${index}-${ribbon.color}-${ribbon.motif}`}>
+          <g
+            mask={`url(#${maskPrefix}-horizontal-${index})`}
+            key={`horizontal-base-${index}-${ribbon.color}-${ribbon.motif}`}
+          >
             <line className={styles.ribbonOutline} x1="31" y1={yPositions[index]} x2="209" y2={yPositions[index]} />
             <line className={`${styles.ribbonBody} ${RIBBON_CLASS[ribbon.color]}`} x1="31" y1={yPositions[index]} x2="209" y2={yPositions[index]} />
           </g>
         ))}
 
-        {weave.crossings.map((crossing, crossingIndex) => {
+        {weave.crossings.map((_, crossingIndex) => {
+          if (!crossingDifferences.has(crossingIndex)) return null;
           const column = crossingIndex % weave.verticalRibbons.length;
           const row = Math.floor(
             crossingIndex / weave.verticalRibbons.length,
           );
           const x = xPositions[column];
           const y = yPositions[row];
-          const ribbon =
-            crossing === "vertical"
-              ? weave.verticalRibbons[column]
-              : weave.horizontalRibbons[row];
-          const lineProps =
-            crossing === "vertical"
-              ? { x1: x, y1: y - 18, x2: x, y2: y + 18 }
-              : { x1: x - 18, y1: y, x2: x + 18, y2: y };
 
           return (
-            <g key={`crossing-${crossingIndex}-${crossing}`}>
-              <line className={styles.crossingBreak} {...lineProps} />
-              <line className={styles.ribbonOutline} {...lineProps} />
-              <line className={`${styles.ribbonBody} ${RIBBON_CLASS[ribbon.color]}`} {...lineProps} />
-              {crossingDifferences.has(crossingIndex) ? (
-                <circle className={styles.differenceRing} cx={x} cy={y} r="16" />
-              ) : null}
-            </g>
+            <circle
+              className={styles.differenceRing}
+              cx={x}
+              cy={y}
+              r="16"
+              key={`crossing-difference-${crossingIndex}`}
+            />
           );
         })}
 
