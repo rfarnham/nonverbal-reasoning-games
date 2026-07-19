@@ -1,0 +1,1428 @@
+export type Difficulty = "Starter" | "Junior" | "Expert" | "Wizard";
+
+/**
+ * A 3x3 pip field stored as a nine-bit row-major mask. Bit zero is the
+ * top-left dot and bit eight is the bottom-right dot.
+ */
+export type PipMask = number;
+
+export type DominoPiece = {
+  id: string;
+  first: PipMask;
+  second: PipMask;
+};
+
+export type LayoutId =
+  | "2x2-rows"
+  | "2x2-columns"
+  | "2x3-columns"
+  | "2x3-left-stack"
+  | "2x3-right-stack";
+
+export type TilingLayout = {
+  id: LayoutId;
+  rows: 2;
+  columns: 2 | 3;
+  pairs: readonly (readonly [number, number])[];
+};
+
+export type PlacedDomino = {
+  pieceId: string;
+  /** Cell holding the piece's `first` half after rotation. */
+  fromCell: number;
+  /** Cell holding the piece's `second` half after rotation. */
+  toCell: number;
+  /** Clockwise quarter turns applied to the source domino. */
+  quarterTurns: 0 | 1 | 2 | 3;
+};
+
+export type BuildWitness = {
+  layoutId: LayoutId;
+  placements: readonly PlacedDomino[];
+};
+
+export type DominoDesign = {
+  cells: readonly PipMask[];
+};
+
+export type MismatchKind =
+  | "seam-trap"
+  | "twisted-half"
+  | "broken-pair";
+
+export type MismatchAnalysis = {
+  kind: MismatchKind;
+  /** The smallest local edit that would turn this into a buildable design. */
+  differingCells: readonly number[];
+  matchedPieces: number;
+  closestBuildable: DominoDesign;
+  closestWitness: BuildWitness;
+  message: string;
+};
+
+export type DominoOption = {
+  design: DominoDesign;
+  buildable: boolean;
+  kind: "buildable" | MismatchKind;
+  witness: BuildWitness | null;
+  mismatch: MismatchAnalysis | null;
+};
+
+export type DominoRound = {
+  id: string;
+  difficulty: Difficulty;
+  pieces: readonly DominoPiece[];
+  rows: 2;
+  columns: 2 | 3;
+  /** Null means the seams are hidden and every legal tiling is allowed. */
+  layoutId: LayoutId | null;
+  seamsVisible: boolean;
+  options: readonly DominoOption[];
+  /** The one option that cannot be built. */
+  correctIndex: number;
+  prompt: "Which design cannot be built?";
+};
+
+export type ReachableDesign = {
+  design: DominoDesign;
+  witnesses: readonly BuildWitness[];
+};
+
+export type DifficultyRule = {
+  rows: 2;
+  columns: 2 | 3;
+  pieceCount: 2 | 3;
+  seamsVisible: boolean;
+  minDirectionalHalves: number;
+  maxDirectionalHalves: number;
+  minDistinctHalves: number;
+  minReachableDesigns: number;
+};
+
+const bit = (row: number, column: number) => 1 << (row * 3 + column);
+
+/**
+ * The simple family is quarter-turn invariant. Directional patterns change
+ * visibly when their domino turns, so the rendered motion remains truthful.
+ */
+export const PIP_PATTERNS = {
+  center: bit(1, 1),
+  corners: bit(0, 0) | bit(0, 2) | bit(2, 0) | bit(2, 2),
+  edges: bit(0, 1) | bit(1, 0) | bit(1, 2) | bit(2, 1),
+  "center-corners":
+    bit(1, 1) | bit(0, 0) | bit(0, 2) | bit(2, 0) | bit(2, 2),
+  "center-edges":
+    bit(1, 1) | bit(0, 1) | bit(1, 0) | bit(1, 2) | bit(2, 1),
+  ring:
+    bit(0, 0) |
+    bit(0, 1) |
+    bit(0, 2) |
+    bit(1, 0) |
+    bit(1, 2) |
+    bit(2, 0) |
+    bit(2, 1) |
+    bit(2, 2),
+  all: (1 << 9) - 1,
+  "diag-two": bit(0, 0) | bit(2, 2),
+  "diag-three": bit(0, 0) | bit(1, 1) | bit(2, 2),
+  "top-pair": bit(0, 0) | bit(0, 2),
+  "corner-l": bit(0, 0) | bit(0, 1) | bit(1, 0),
+  "edge-single": bit(0, 1),
+  "corner-single": bit(0, 0),
+  "top-bar": bit(0, 0) | bit(0, 1) | bit(0, 2),
+  six:
+    bit(0, 0) |
+    bit(0, 2) |
+    bit(1, 0) |
+    bit(1, 2) |
+    bit(2, 0) |
+    bit(2, 2),
+} as const;
+
+export type PipPatternName = keyof typeof PIP_PATTERNS;
+
+const SIMPLE_PATTERN_NAMES = [
+  "center",
+  "corners",
+  "edges",
+  "center-corners",
+  "center-edges",
+  "ring",
+  "all",
+] as const satisfies readonly PipPatternName[];
+
+const DIRECTIONAL_PATTERN_NAMES = [
+  "diag-two",
+  "diag-three",
+  "top-pair",
+  "corner-l",
+  "edge-single",
+  "corner-single",
+  "top-bar",
+  "six",
+] as const satisfies readonly PipPatternName[];
+
+export const TILING_LAYOUTS: Readonly<Record<LayoutId, TilingLayout>> = {
+  "2x2-rows": {
+    id: "2x2-rows",
+    rows: 2,
+    columns: 2,
+    pairs: [
+      [0, 1],
+      [2, 3],
+    ],
+  },
+  "2x2-columns": {
+    id: "2x2-columns",
+    rows: 2,
+    columns: 2,
+    pairs: [
+      [0, 2],
+      [1, 3],
+    ],
+  },
+  "2x3-columns": {
+    id: "2x3-columns",
+    rows: 2,
+    columns: 3,
+    pairs: [
+      [0, 3],
+      [1, 4],
+      [2, 5],
+    ],
+  },
+  "2x3-left-stack": {
+    id: "2x3-left-stack",
+    rows: 2,
+    columns: 3,
+    pairs: [
+      [0, 1],
+      [3, 4],
+      [2, 5],
+    ],
+  },
+  "2x3-right-stack": {
+    id: "2x3-right-stack",
+    rows: 2,
+    columns: 3,
+    pairs: [
+      [0, 3],
+      [1, 2],
+      [4, 5],
+    ],
+  },
+};
+
+export const DIFFICULTY_RULES: Readonly<
+  Record<Difficulty, DifficultyRule>
+> = {
+  Starter: {
+    rows: 2,
+    columns: 2,
+    pieceCount: 2,
+    seamsVisible: true,
+    minDirectionalHalves: 0,
+    maxDirectionalHalves: 0,
+    minDistinctHalves: 4,
+    minReachableDesigns: 6,
+  },
+  Junior: {
+    rows: 2,
+    columns: 2,
+    pieceCount: 2,
+    seamsVisible: false,
+    minDirectionalHalves: 2,
+    maxDirectionalHalves: 2,
+    minDistinctHalves: 4,
+    minReachableDesigns: 10,
+  },
+  Expert: {
+    rows: 2,
+    columns: 3,
+    pieceCount: 3,
+    seamsVisible: true,
+    minDirectionalHalves: 4,
+    maxDirectionalHalves: 4,
+    minDistinctHalves: 5,
+    minReachableDesigns: 24,
+  },
+  Wizard: {
+    rows: 2,
+    columns: 3,
+    pieceCount: 3,
+    seamsVisible: false,
+    minDirectionalHalves: 4,
+    maxDirectionalHalves: 4,
+    minDistinctHalves: 5,
+    minReachableDesigns: 72,
+  },
+};
+
+export const GENERATOR_MAX_ATTEMPTS = 128;
+
+function normalizeQuarterTurns(turns: number): 0 | 1 | 2 | 3 {
+  return (((turns % 4) + 4) % 4) as 0 | 1 | 2 | 3;
+}
+
+export function isPipMask(value: number): value is PipMask {
+  return Number.isInteger(value) && value >= 0 && value < 1 << 9;
+}
+
+export function pipDotIndexes(mask: PipMask): readonly number[] {
+  if (!isPipMask(mask)) throw new Error(`Invalid pip mask: ${mask}`);
+  return Array.from({ length: 9 }, (_, index) => index).filter(
+    (index) => (mask & (1 << index)) !== 0,
+  );
+}
+
+export function pipCount(mask: PipMask): number {
+  return pipDotIndexes(mask).length;
+}
+
+export function rotatePipMask(mask: PipMask, quarterTurns: number): PipMask {
+  if (!isPipMask(mask)) throw new Error(`Invalid pip mask: ${mask}`);
+  let result = mask;
+  const turns = normalizeQuarterTurns(quarterTurns);
+
+  for (let turn = 0; turn < turns; turn += 1) {
+    let rotated = 0;
+    for (let row = 0; row < 3; row += 1) {
+      for (let column = 0; column < 3; column += 1) {
+        const sourceBit = 1 << (row * 3 + column);
+        if ((result & sourceBit) === 0) continue;
+        const targetRow = column;
+        const targetColumn = 2 - row;
+        rotated |= 1 << (targetRow * 3 + targetColumn);
+      }
+    }
+    result = rotated;
+  }
+
+  return result;
+}
+
+export function isDirectionalPipMask(mask: PipMask): boolean {
+  return rotatePipMask(mask, 1) !== mask;
+}
+
+function layoutsForBoard(rows: 2, columns: 2 | 3): readonly TilingLayout[] {
+  return Object.values(TILING_LAYOUTS).filter(
+    (layout) => layout.rows === rows && layout.columns === columns,
+  );
+}
+
+export function legalLayoutIds(
+  rows: 2,
+  columns: 2 | 3,
+): readonly LayoutId[] {
+  return layoutsForBoard(rows, columns).map(({ id }) => id);
+}
+
+function checkedLayouts(
+  rows: 2,
+  columns: 2 | 3,
+  layoutId: LayoutId | null,
+): readonly TilingLayout[] {
+  if (layoutId === null) return layoutsForBoard(rows, columns);
+  const layout = TILING_LAYOUTS[layoutId];
+  if (!layout || layout.rows !== rows || layout.columns !== columns) {
+    throw new Error(
+      `Layout ${layoutId} does not tile a ${rows}x${columns} board.`,
+    );
+  }
+  return [layout];
+}
+
+function permutations<T>(values: readonly T[]): T[][] {
+  if (values.length <= 1) return [[...values]];
+  return values.flatMap((value, index) =>
+    permutations([...values.slice(0, index), ...values.slice(index + 1)]).map(
+      (rest) => [value, ...rest],
+    ),
+  );
+}
+
+function directionQuarterTurns(
+  fromCell: number,
+  toCell: number,
+  columns: number,
+): 0 | 1 | 2 | 3 {
+  const fromRow = Math.floor(fromCell / columns);
+  const fromColumn = fromCell % columns;
+  const toRow = Math.floor(toCell / columns);
+  const toColumn = toCell % columns;
+  if (toRow === fromRow && toColumn === fromColumn + 1) return 0;
+  if (toRow === fromRow + 1 && toColumn === fromColumn) return 1;
+  if (toRow === fromRow && toColumn === fromColumn - 1) return 2;
+  if (toRow === fromRow - 1 && toColumn === fromColumn) return 3;
+  throw new Error(`Cells ${fromCell} and ${toCell} are not adjacent.`);
+}
+
+function assertUsablePieces(
+  pieces: readonly DominoPiece[],
+  expectedCount?: number,
+): void {
+  if (expectedCount !== undefined && pieces.length !== expectedCount) {
+    throw new Error(`Expected ${expectedCount} domino pieces.`);
+  }
+  if (new Set(pieces.map(({ id }) => id)).size !== pieces.length) {
+    throw new Error("Domino piece IDs must be unique.");
+  }
+  for (const piece of pieces) {
+    if (!isPipMask(piece.first) || !isPipMask(piece.second)) {
+      throw new Error(`Domino ${piece.id} has an invalid pip mask.`);
+    }
+  }
+}
+
+export function designKey(design: DominoDesign): string {
+  return design.cells.map((mask) => mask.toString(16).padStart(3, "0")).join(".");
+}
+
+export function differingCellIndexes(
+  candidate: DominoDesign,
+  expected: DominoDesign,
+): readonly number[] {
+  if (candidate.cells.length !== expected.cells.length) {
+    throw new Error("Designs must have the same number of cells.");
+  }
+  return candidate.cells.flatMap((mask, index) =>
+    mask === expected.cells[index] ? [] : [index],
+  );
+}
+
+function renderAssignment(
+  pieces: readonly DominoPiece[],
+  layout: TilingLayout,
+  flippedBits: number,
+): { design: DominoDesign; witness: BuildWitness } {
+  const cells = Array.from(
+    { length: layout.rows * layout.columns },
+    () => -1,
+  );
+  const placements: PlacedDomino[] = [];
+
+  for (const [slotIndex, pair] of layout.pairs.entries()) {
+    const piece = pieces[slotIndex];
+    const reversed = (flippedBits & (1 << slotIndex)) !== 0;
+    const fromCell = reversed ? pair[1] : pair[0];
+    const toCell = reversed ? pair[0] : pair[1];
+    const quarterTurns = directionQuarterTurns(
+      fromCell,
+      toCell,
+      layout.columns,
+    );
+    cells[fromCell] = rotatePipMask(piece.first, quarterTurns);
+    cells[toCell] = rotatePipMask(piece.second, quarterTurns);
+    placements.push({
+      pieceId: piece.id,
+      fromCell,
+      toCell,
+      quarterTurns,
+    });
+  }
+
+  if (cells.some((mask) => !isPipMask(mask))) {
+    throw new Error(`Layout ${layout.id} did not cover every board cell.`);
+  }
+
+  return {
+    design: { cells },
+    witness: { layoutId: layout.id, placements },
+  };
+}
+
+/**
+ * Exhaustively enumerates every board obtainable by assigning every source
+ * domino exactly once, rotating whole pieces but never flipping a half alone.
+ */
+export function enumerateBuildableDesigns(
+  pieces: readonly DominoPiece[],
+  rows: 2,
+  columns: 2 | 3,
+  layoutId: LayoutId | null = null,
+): readonly ReachableDesign[] {
+  const layouts = checkedLayouts(rows, columns, layoutId);
+  assertUsablePieces(pieces, (rows * columns) / 2);
+  const byKey = new Map<
+    string,
+    { design: DominoDesign; witnesses: BuildWitness[] }
+  >();
+
+  for (const layout of layouts) {
+    for (const assignedPieces of permutations(pieces)) {
+      for (
+        let flippedBits = 0;
+        flippedBits < 1 << pieces.length;
+        flippedBits += 1
+      ) {
+        const rendered = renderAssignment(
+          assignedPieces,
+          layout,
+          flippedBits,
+        );
+        const key = designKey(rendered.design);
+        const existing = byKey.get(key);
+        if (existing) {
+          const witnessKey = witnessFingerprint(rendered.witness);
+          if (
+            !existing.witnesses.some(
+              (witness) => witnessFingerprint(witness) === witnessKey,
+            )
+          ) {
+            existing.witnesses.push(rendered.witness);
+          }
+        } else {
+          byKey.set(key, {
+            design: rendered.design,
+            witnesses: [rendered.witness],
+          });
+        }
+      }
+    }
+  }
+
+  return [...byKey.values()].sort((left, right) =>
+    designKey(left.design).localeCompare(designKey(right.design)),
+  );
+}
+
+function witnessFingerprint(witness: BuildWitness): string {
+  return `${witness.layoutId}:${witness.placements
+    .map(
+      ({ pieceId, fromCell, toCell, quarterTurns }) =>
+        `${pieceId}:${fromCell}>${toCell}@${quarterTurns}`,
+    )
+    .sort()
+    .join("|")}`;
+}
+
+export function renderWitness(
+  pieces: readonly DominoPiece[],
+  rows: 2,
+  columns: 2 | 3,
+  witness: BuildWitness,
+): DominoDesign {
+  assertUsablePieces(pieces, (rows * columns) / 2);
+  const layout = checkedLayouts(rows, columns, witness.layoutId)[0];
+  const byId = new Map(pieces.map((piece) => [piece.id, piece]));
+  const usedPieces = new Set<string>();
+  const usedCells = new Set<number>();
+  const cells = Array.from({ length: rows * columns }, () => -1);
+
+  if (witness.placements.length !== pieces.length) {
+    throw new Error("A build witness must place every domino exactly once.");
+  }
+
+  for (const placement of witness.placements) {
+    const piece = byId.get(placement.pieceId);
+    if (!piece || usedPieces.has(piece.id)) {
+      throw new Error("A build witness uses an unknown or repeated domino.");
+    }
+    if (
+      !layout.pairs.some(
+        ([first, second]) =>
+          (first === placement.fromCell && second === placement.toCell) ||
+          (first === placement.toCell && second === placement.fromCell),
+      )
+    ) {
+      throw new Error("A build witness crosses its tiling layout.");
+    }
+    const turns = directionQuarterTurns(
+      placement.fromCell,
+      placement.toCell,
+      columns,
+    );
+    if (turns !== placement.quarterTurns) {
+      throw new Error("A build witness reports an incorrect rotation.");
+    }
+    if (
+      usedCells.has(placement.fromCell) ||
+      usedCells.has(placement.toCell)
+    ) {
+      throw new Error("A build witness overlaps dominoes.");
+    }
+    cells[placement.fromCell] = rotatePipMask(piece.first, turns);
+    cells[placement.toCell] = rotatePipMask(piece.second, turns);
+    usedPieces.add(piece.id);
+    usedCells.add(placement.fromCell);
+    usedCells.add(placement.toCell);
+  }
+
+  if (cells.some((mask) => !isPipMask(mask))) {
+    throw new Error("A build witness leaves an uncovered cell.");
+  }
+  return { cells };
+}
+
+export function findBuildWitnesses(
+  pieces: readonly DominoPiece[],
+  design: DominoDesign,
+  rows: 2,
+  columns: 2 | 3,
+  layoutId: LayoutId | null = null,
+): readonly BuildWitness[] {
+  if (design.cells.length !== rows * columns) return [];
+  const key = designKey(design);
+  return (
+    enumerateBuildableDesigns(pieces, rows, columns, layoutId).find(
+      (reachable) => designKey(reachable.design) === key,
+    )?.witnesses ?? []
+  );
+}
+
+export function isDesignBuildable(
+  pieces: readonly DominoPiece[],
+  design: DominoDesign,
+  rows: 2,
+  columns: 2 | 3,
+  layoutId: LayoutId | null = null,
+): boolean {
+  return findBuildWitnesses(pieces, design, rows, columns, layoutId).length > 0;
+}
+
+function nearestReachable(
+  design: DominoDesign,
+  reachable: readonly ReachableDesign[],
+): {
+  reachable: ReachableDesign;
+  differences: readonly number[];
+} {
+  if (reachable.length === 0) {
+    throw new Error("Cannot analyze a design without a buildable comparison.");
+  }
+  return reachable
+    .map((candidate) => ({
+      reachable: candidate,
+      differences: differingCellIndexes(design, candidate.design),
+    }))
+    .sort(
+      (left, right) =>
+        left.differences.length - right.differences.length ||
+        designKey(left.reachable.design).localeCompare(
+          designKey(right.reachable.design),
+        ),
+    )[0];
+}
+
+export function analyzeImpossibleDesign(
+  pieces: readonly DominoPiece[],
+  design: DominoDesign,
+  rows: 2,
+  columns: 2 | 3,
+  layoutId: LayoutId | null,
+): MismatchAnalysis {
+  const allowed = enumerateBuildableDesigns(pieces, rows, columns, layoutId);
+  if (
+    allowed.some(
+      (reachable) => designKey(reachable.design) === designKey(design),
+    )
+  ) {
+    throw new Error("A buildable design does not have an impossible mismatch.");
+  }
+  const nearest = nearestReachable(design, allowed);
+  const closestWitness = nearest.reachable.witnesses[0];
+  const renderedClosest = renderWitness(
+    pieces,
+    rows,
+    columns,
+    closestWitness,
+  );
+  const matchedPieces = closestWitness.placements.filter(
+    ({ fromCell, toCell }) =>
+      design.cells[fromCell] === renderedClosest.cells[fromCell] &&
+      design.cells[toCell] === renderedClosest.cells[toCell],
+  ).length;
+  const buildableWithHiddenSeams =
+    layoutId !== null &&
+    isDesignBuildable(pieces, design, rows, columns, null);
+  const kind: MismatchKind = buildableWithHiddenSeams
+    ? "seam-trap"
+    : nearest.differences.length === 1
+      ? "twisted-half"
+      : "broken-pair";
+  const message =
+    kind === "seam-trap"
+      ? "Those halves can pair only by crossing one of the shown seams."
+      : kind === "twisted-half"
+        ? "One half is turned away from every whole-domino match."
+        : "The unmatched neighboring halves never belong to the same domino.";
+
+  return {
+    kind,
+    differingCells: nearest.differences,
+    matchedPieces,
+    closestBuildable: nearest.reachable.design,
+    closestWitness,
+    message,
+  };
+}
+
+function physicalPieceKey(piece: Pick<DominoPiece, "first" | "second">): string {
+  const forward = `${piece.first.toString(16)}:${piece.second.toString(16)}`;
+  const reversed = `${rotatePipMask(piece.second, 2).toString(16)}:${rotatePipMask(
+    piece.first,
+    2,
+  ).toString(16)}`;
+  return forward < reversed ? forward : reversed;
+}
+
+function tokenMask(token: string): PipMask {
+  const [name, turnsText] = token.split("@");
+  if (!(name in PIP_PATTERNS)) {
+    throw new Error(`Unknown pip pattern: ${name}`);
+  }
+  const turns =
+    turnsText === undefined ? 0 : Number.parseInt(turnsText, 10);
+  if (!Number.isInteger(turns)) {
+    throw new Error(`Invalid pip rotation in token: ${token}`);
+  }
+  return rotatePipMask(PIP_PATTERNS[name as PipPatternName], turns);
+}
+
+type AuthoredSpec = {
+  pieces: readonly [
+    readonly [string, string],
+    readonly [string, string],
+    ...(readonly [string, string])[],
+  ];
+  layoutId: LayoutId | null;
+  salt: number;
+};
+
+const STARTER_SPECS: readonly AuthoredSpec[] = [
+  { pieces: [["center", "corners"], ["edges", "center-corners"]], layoutId: "2x2-rows", salt: 11 },
+  { pieces: [["center", "edges"], ["corners", "center-edges"]], layoutId: "2x2-columns", salt: 23 },
+  { pieces: [["center", "center-corners"], ["edges", "ring"]], layoutId: "2x2-rows", salt: 37 },
+  { pieces: [["center", "center-edges"], ["corners", "ring"]], layoutId: "2x2-columns", salt: 41 },
+  { pieces: [["center", "ring"], ["center-corners", "all"]], layoutId: "2x2-rows", salt: 53 },
+  { pieces: [["corners", "edges"], ["center-edges", "all"]], layoutId: "2x2-columns", salt: 67 },
+  { pieces: [["corners", "center-corners"], ["edges", "all"]], layoutId: "2x2-rows", salt: 71 },
+  { pieces: [["corners", "center-edges"], ["center-corners", "ring"]], layoutId: "2x2-columns", salt: 83 },
+  { pieces: [["edges", "center-corners"], ["center-edges", "ring"]], layoutId: "2x2-rows", salt: 97 },
+  { pieces: [["edges", "center-edges"], ["corners", "all"]], layoutId: "2x2-columns", salt: 101 },
+  { pieces: [["center-corners", "center-edges"], ["center", "all"]], layoutId: "2x2-rows", salt: 113 },
+  { pieces: [["center-edges", "ring"], ["edges", "all"]], layoutId: "2x2-columns", salt: 127 },
+];
+
+const JUNIOR_SPECS: readonly AuthoredSpec[] = [
+  { pieces: [["diag-two", "center"], ["diag-three", "corners"]], layoutId: null, salt: 139 },
+  { pieces: [["top-pair", "edges"], ["corner-l", "center-corners"]], layoutId: null, salt: 149 },
+  { pieces: [["edge-single", "center-edges"], ["corner-single", "ring"]], layoutId: null, salt: 157 },
+  { pieces: [["top-bar", "all"], ["six", "center"]], layoutId: null, salt: 167 },
+  { pieces: [["diag-two@1", "corners"], ["top-pair@2", "edges"]], layoutId: null, salt: 179 },
+  { pieces: [["diag-three@1", "center-corners"], ["corner-l@2", "center-edges"]], layoutId: null, salt: 191 },
+  { pieces: [["edge-single@1", "ring"], ["corner-single@2", "all"]], layoutId: null, salt: 197 },
+  { pieces: [["top-bar@1", "center"], ["six@1", "corners"]], layoutId: null, salt: 211 },
+  { pieces: [["diag-two", "edges"], ["corner-l@1", "ring"]], layoutId: null, salt: 223 },
+  { pieces: [["diag-three@1", "center-edges"], ["edge-single@2", "center-corners"]], layoutId: null, salt: 227 },
+  { pieces: [["top-pair@3", "all"], ["corner-single@1", "edges"]], layoutId: null, salt: 239 },
+  { pieces: [["top-bar@2", "corners"], ["six@1", "center-edges"]], layoutId: null, salt: 251 },
+];
+
+const EXPERT_SPECS: readonly AuthoredSpec[] = [
+  { pieces: [["diag-two", "center"], ["diag-three", "corners"], ["top-pair", "corner-l"]], layoutId: "2x3-columns", salt: 263 },
+  { pieces: [["edge-single", "edges"], ["corner-single", "center-corners"], ["top-bar", "six"]], layoutId: "2x3-left-stack", salt: 271 },
+  { pieces: [["diag-two@1", "center-edges"], ["top-pair@1", "ring"], ["corner-l@2", "edge-single@2"]], layoutId: "2x3-right-stack", salt: 283 },
+  { pieces: [["diag-three@1", "all"], ["corner-single@1", "center"], ["top-bar@1", "six@1"]], layoutId: "2x3-columns", salt: 293 },
+  { pieces: [["diag-two", "corners"], ["corner-l@1", "edges"], ["edge-single@3", "top-bar@2"]], layoutId: "2x3-left-stack", salt: 307 },
+  { pieces: [["diag-three@1", "center-corners"], ["top-pair@2", "center-edges"], ["corner-single@2", "six@1"]], layoutId: "2x3-right-stack", salt: 311 },
+  { pieces: [["edge-single@1", "ring"], ["top-bar@3", "all"], ["diag-two@1", "corner-l@3"]], layoutId: "2x3-columns", salt: 331 },
+  { pieces: [["corner-single@3", "center"], ["six", "corners"], ["diag-three", "top-pair@1"]], layoutId: "2x3-left-stack", salt: 347 },
+  { pieces: [["top-bar@2", "edges"], ["corner-l", "center-corners"], ["edge-single@2", "diag-two"]], layoutId: "2x3-right-stack", salt: 353 },
+  { pieces: [["six@1", "center-edges"], ["diag-three@1", "ring"], ["top-pair@3", "corner-single"]], layoutId: "2x3-columns", salt: 367 },
+  { pieces: [["diag-two@1", "all"], ["edge-single@3", "center"], ["corner-l@2", "top-bar@1"]], layoutId: "2x3-left-stack", salt: 379 },
+  { pieces: [["diag-three", "corners"], ["six@1", "edges"], ["corner-single@1", "top-pair@2"]], layoutId: "2x3-right-stack", salt: 389 },
+];
+
+const WIZARD_SPECS: readonly AuthoredSpec[] = [
+  { pieces: [["diag-two@1", "center"], ["corner-l@1", "corners"], ["edge-single@1", "top-bar@1"]], layoutId: null, salt: 401 },
+  { pieces: [["diag-three@1", "edges"], ["top-pair@1", "center-corners"], ["corner-single@1", "six@1"]], layoutId: null, salt: 419 },
+  { pieces: [["edge-single@2", "center-edges"], ["top-bar@2", "ring"], ["diag-two", "corner-l@2"]], layoutId: null, salt: 431 },
+  { pieces: [["corner-single@2", "all"], ["six", "center"], ["diag-three", "top-pair@2"]], layoutId: null, salt: 443 },
+  { pieces: [["top-bar@3", "corners"], ["corner-l@3", "edges"], ["edge-single@3", "diag-two@1"]], layoutId: null, salt: 457 },
+  { pieces: [["six@1", "center-corners"], ["diag-three@1", "center-edges"], ["top-pair@3", "corner-single@3"]], layoutId: null, salt: 463 },
+  { pieces: [["diag-two", "ring"], ["edge-single", "all"], ["corner-l@1", "top-bar"]], layoutId: null, salt: 479 },
+  { pieces: [["diag-three", "center"], ["corner-single", "corners"], ["six", "top-pair@1"]], layoutId: null, salt: 487 },
+  { pieces: [["top-bar@1", "edges"], ["corner-l@2", "center-corners"], ["edge-single@2", "diag-two@1"]], layoutId: null, salt: 499 },
+  { pieces: [["six", "center-edges"], ["diag-three@1", "ring"], ["top-pair@2", "corner-single@1"]], layoutId: null, salt: 509 },
+  { pieces: [["diag-two", "all"], ["edge-single@1", "center"], ["corner-l@3", "top-bar@2"]], layoutId: null, salt: 521 },
+  { pieces: [["diag-three@1", "corners"], ["six", "edges"], ["corner-single@2", "top-pair@3"]], layoutId: null, salt: 541 },
+];
+
+const AUTHORED_SPECS: Readonly<Record<Difficulty, readonly AuthoredSpec[]>> = {
+  Starter: STARTER_SPECS,
+  Junior: JUNIOR_SPECS,
+  Expert: EXPERT_SPECS,
+  Wizard: WIZARD_SPECS,
+};
+
+const ANSWER_SEQUENCES: Readonly<Record<Difficulty, readonly number[]>> = {
+  Starter: [2, 0, 3, 1, 2, 1, 3, 0, 1, 3, 0, 2],
+  Junior: [2, 1, 3, 0, 1, 3, 0, 2, 3, 1, 2, 0],
+  Expert: [3, 0, 2, 1, 2, 0, 1, 3, 1, 3, 0, 2],
+  Wizard: [0, 2, 1, 3, 2, 0, 3, 1, 2, 0, 1, 3],
+};
+
+function piecesFromSpec(spec: AuthoredSpec): readonly DominoPiece[] {
+  return spec.pieces.map(([first, second], index) => ({
+    id: String.fromCharCode(65 + index),
+    first: tokenMask(first),
+    second: tokenMask(second),
+  }));
+}
+
+function distanceToReachable(
+  design: DominoDesign,
+  reachable: readonly ReachableDesign[],
+): number {
+  return Math.min(
+    ...reachable.map(
+      (candidate) => differingCellIndexes(design, candidate.design).length,
+    ),
+  );
+}
+
+function usesGenerousAlternatives(difficulty: Difficulty): boolean {
+  return difficulty === "Starter" || difficulty === "Junior";
+}
+
+function rotatedValues<T>(values: readonly T[], salt: number): T[] {
+  if (values.length === 0) return [];
+  const offset = ((salt % values.length) + values.length) % values.length;
+  return [...values.slice(offset), ...values.slice(0, offset)];
+}
+
+function selectBuildableOptions(
+  reachable: readonly ReachableDesign[],
+  rows: 2,
+  columns: 2 | 3,
+  layoutId: LayoutId | null,
+  salt: number,
+  impossibleDesign: DominoDesign,
+  minimumDistance: number,
+): readonly { design: DominoDesign; witness: BuildWitness }[] {
+  const allowedLayoutIds =
+    layoutId === null ? legalLayoutIds(rows, columns) : [layoutId];
+  const targetLayoutIds = rotatedValues(allowedLayoutIds, salt);
+  type SelectedBuildable = {
+    design: DominoDesign;
+    witness: BuildWitness;
+  };
+
+  function search(
+    selected: readonly SelectedBuildable[],
+  ): readonly SelectedBuildable[] | null {
+    if (selected.length === 3) return selected;
+    const targetLayoutId = targetLayoutIds[selected.length];
+    const candidates = rotatedValues(
+      reachable,
+      targetLayoutId
+        ? salt + selected.length * 7
+        : salt * 3 + selected.length + 1,
+    );
+
+    for (const candidate of candidates) {
+      const candidateKey = designKey(candidate.design);
+      if (
+        selected.some(({ design }) => designKey(design) === candidateKey)
+      ) {
+        continue;
+      }
+      const comparisons = [
+        impossibleDesign,
+        ...selected.map(({ design }) => design),
+      ];
+      if (
+        comparisons.some(
+          (design) =>
+            differingCellIndexes(candidate.design, design).length <
+            minimumDistance,
+        )
+      ) {
+        continue;
+      }
+      const witness = targetLayoutId
+        ? candidate.witnesses.find(
+            (candidateWitness) =>
+              candidateWitness.layoutId === targetLayoutId,
+          )
+        : candidate.witnesses[0];
+      if (!witness) continue;
+
+      const result = search([
+        ...selected,
+        { design: candidate.design, witness },
+      ]);
+      if (result) return result;
+    }
+    return null;
+  }
+
+  const selected = search([]);
+  if (!selected) {
+    throw new Error(
+      "A round needs three distinct, meaningfully separated buildable designs.",
+    );
+  }
+  return selected;
+}
+
+function swappedCandidates(
+  reachable: readonly ReachableDesign[],
+  salt: number,
+): DominoDesign[] {
+  const candidates: DominoDesign[] = [];
+  for (const item of rotatedValues(reachable, salt)) {
+    for (let first = 0; first < item.design.cells.length; first += 1) {
+      for (
+        let second = first + 1;
+        second < item.design.cells.length;
+        second += 1
+      ) {
+        if (item.design.cells[first] === item.design.cells[second]) continue;
+        const cells = [...item.design.cells];
+        [cells[first], cells[second]] = [cells[second], cells[first]];
+        candidates.push({ cells });
+      }
+    }
+  }
+  return rotatedValues(candidates, salt * 5 + 3);
+}
+
+function twistedCandidates(
+  reachable: readonly ReachableDesign[],
+  salt: number,
+): DominoDesign[] {
+  const candidates: DominoDesign[] = [];
+  for (const item of rotatedValues(reachable, salt * 2 + 1)) {
+    for (let cell = 0; cell < item.design.cells.length; cell += 1) {
+      for (const turns of [1, 2, 3] as const) {
+        const rotated = rotatePipMask(item.design.cells[cell], turns);
+        if (rotated === item.design.cells[cell]) continue;
+        const cells = [...item.design.cells];
+        cells[cell] = rotated;
+        candidates.push({ cells });
+      }
+    }
+  }
+  return rotatedValues(candidates, salt * 7 + 5);
+}
+
+function chooseImpossibleDesign(
+  pieces: readonly DominoPiece[],
+  reachable: readonly ReachableDesign[],
+  rows: 2,
+  columns: 2 | 3,
+  layoutId: LayoutId | null,
+  salt: number,
+  difficulty: Difficulty,
+  isUsable: (design: DominoDesign) => boolean,
+): DominoDesign {
+  const reachableKeys = new Set(
+    reachable.map((item) => designKey(item.design)),
+  );
+  const candidates: DominoDesign[] = [];
+
+  if (layoutId !== null) {
+    const seamTraps = enumerateBuildableDesigns(
+      pieces,
+      rows,
+      columns,
+      null,
+    )
+      .map(({ design }) => design)
+      .filter((design) => !reachableKeys.has(designKey(design)))
+      .sort(
+        (left, right) =>
+          distanceToReachable(left, reachable) -
+            distanceToReachable(right, reachable) ||
+          designKey(left).localeCompare(designKey(right)),
+      );
+    candidates.push(...rotatedValues(seamTraps, salt));
+  }
+
+  const localFamilies =
+    salt % 2 === 0
+      ? [swappedCandidates(reachable, salt), twistedCandidates(reachable, salt)]
+      : [twistedCandidates(reachable, salt), swappedCandidates(reachable, salt)];
+  candidates.push(...localFamilies.flat());
+
+  const seen = new Set<string>();
+  const closeCandidate = candidates.find((candidate) => {
+    const key = designKey(candidate);
+    if (seen.has(key) || reachableKeys.has(key)) return false;
+    seen.add(key);
+    const distance = distanceToReachable(candidate, reachable);
+    const distanceIsSuitable = usesGenerousAlternatives(difficulty)
+      ? distance === 2
+      : distance >= 1 && distance <= 2;
+    return distanceIsSuitable && isUsable(candidate);
+  });
+  if (!closeCandidate) {
+    throw new Error("Unable to construct a close impossible design.");
+  }
+  return closeCandidate;
+}
+
+function isInterestingPieceSet(
+  pieces: readonly DominoPiece[],
+  difficulty: Difficulty,
+): boolean {
+  const rules = DIFFICULTY_RULES[difficulty];
+  if (pieces.length !== rules.pieceCount) return false;
+  const halves = pieces.flatMap(({ first, second }) => [first, second]);
+  const directionalCount = halves.filter(isDirectionalPipMask).length;
+  if (
+    directionalCount < rules.minDirectionalHalves ||
+    directionalCount > rules.maxDirectionalHalves ||
+    new Set(halves).size < rules.minDistinctHalves ||
+    new Set(pieces.map(physicalPieceKey)).size !== pieces.length
+  ) {
+    return false;
+  }
+  const layoutId = rules.seamsVisible
+    ? legalLayoutIds(rules.rows, rules.columns)[0]
+    : null;
+  return (
+    enumerateBuildableDesigns(
+      pieces,
+      rules.rows,
+      rules.columns,
+      layoutId,
+    ).length >= rules.minReachableDesigns
+  );
+}
+
+function assembleRound(
+  id: string,
+  difficulty: Difficulty,
+  pieces: readonly DominoPiece[],
+  layoutId: LayoutId | null,
+  correctIndex: number,
+  salt: number,
+): DominoRound {
+  const rules = DIFFICULTY_RULES[difficulty];
+  if (!Number.isInteger(correctIndex) || correctIndex < 0 || correctIndex > 3) {
+    throw new Error("The impossible option index must be between 0 and 3.");
+  }
+  if (rules.seamsVisible !== (layoutId !== null)) {
+    throw new Error(`${difficulty} has an inconsistent seam scaffold.`);
+  }
+  if (!isInterestingPieceSet(pieces, difficulty)) {
+    throw new Error(`${difficulty} uses an uninteresting domino set.`);
+  }
+  if (layoutId !== null) {
+    checkedLayouts(rules.rows, rules.columns, layoutId);
+  }
+  const reachable = enumerateBuildableDesigns(
+    pieces,
+    rules.rows,
+    rules.columns,
+    layoutId,
+  );
+  const minimumOptionDistance = usesGenerousAlternatives(difficulty) ? 2 : 1;
+  const impossibleDesign = chooseImpossibleDesign(
+    pieces,
+    reachable,
+    rules.rows,
+    rules.columns,
+    layoutId,
+    salt,
+    difficulty,
+    (candidate) => {
+      try {
+        selectBuildableOptions(
+          reachable,
+          rules.rows,
+          rules.columns,
+          layoutId,
+          salt,
+          candidate,
+          minimumOptionDistance,
+        );
+        return true;
+      } catch {
+        return false;
+      }
+    },
+  );
+  const possibleOptions = selectBuildableOptions(
+    reachable,
+    rules.rows,
+    rules.columns,
+    layoutId,
+    salt,
+    impossibleDesign,
+    minimumOptionDistance,
+  ).map<DominoOption>(({ design, witness }) => ({
+    design,
+    buildable: true,
+    kind: "buildable",
+    witness,
+    mismatch: null,
+  }));
+  const mismatch = analyzeImpossibleDesign(
+    pieces,
+    impossibleDesign,
+    rules.rows,
+    rules.columns,
+    layoutId,
+  );
+  const impossibleOption: DominoOption = {
+    design: impossibleDesign,
+    buildable: false,
+    kind: mismatch.kind,
+    witness: null,
+    mismatch,
+  };
+  const options = [...possibleOptions];
+  options.splice(correctIndex, 0, impossibleOption);
+
+  const round: DominoRound = {
+    id,
+    difficulty,
+    pieces,
+    rows: rules.rows,
+    columns: rules.columns,
+    layoutId,
+    seamsVisible: rules.seamsVisible,
+    options,
+    correctIndex,
+    prompt: "Which design cannot be built?",
+  };
+  const errors = validateRound(round);
+  if (errors.length > 0) {
+    throw new Error(`Invalid ${id}: ${errors.join(" ")}`);
+  }
+  return round;
+}
+
+function answerSequenceErrors(
+  difficulty: Difficulty,
+  indexes: readonly number[],
+): string[] {
+  const errors: string[] = [];
+  const counts = [0, 1, 2, 3].map(
+    (index) => indexes.filter((value) => value === index).length,
+  );
+  if (counts.some((count) => count !== 3)) {
+    errors.push(`${difficulty} answer positions are not balanced 3/3/3/3.`);
+  }
+  if (indexes.some((value, index) => index > 0 && value === indexes[index - 1])) {
+    errors.push(`${difficulty} repeats adjacent answer positions.`);
+  }
+  if (
+    indexes.length === 12 &&
+    indexes.slice(0, 4).every(
+      (value, index) =>
+        value === indexes[index + 4] && value === indexes[index + 8],
+    )
+  ) {
+    errors.push(`${difficulty} repeats one four-position cycle.`);
+  }
+  return errors;
+}
+
+export function validateRound(round: DominoRound): readonly string[] {
+  const errors: string[] = [];
+  const rules = DIFFICULTY_RULES[round.difficulty];
+  if (!rules) return [`Unknown difficulty: ${round.difficulty}`];
+  if (
+    round.rows !== rules.rows ||
+    round.columns !== rules.columns ||
+    round.pieces.length !== rules.pieceCount
+  ) {
+    errors.push("Board dimensions or piece count do not match the difficulty.");
+  }
+  if (
+    round.seamsVisible !== rules.seamsVisible ||
+    round.seamsVisible !== (round.layoutId !== null)
+  ) {
+    errors.push("Seam visibility does not match the difficulty.");
+  }
+  if (round.options.length !== 4) errors.push("A round must have four options.");
+  if (
+    !Number.isInteger(round.correctIndex) ||
+    round.correctIndex < 0 ||
+    round.correctIndex >= round.options.length
+  ) {
+    errors.push("The correct option index is out of range.");
+    return errors;
+  }
+  if (
+    new Set(round.options.map(({ design }) => designKey(design))).size !==
+    round.options.length
+  ) {
+    errors.push("Answer designs must be distinct.");
+  }
+  const optionCellCountsAreValid = round.options.every(
+    ({ design }) => design.cells.length === round.rows * round.columns,
+  );
+  if (!optionCellCountsAreValid) {
+    errors.push("Every answer design must fill the complete board.");
+  }
+  if (
+    usesGenerousAlternatives(round.difficulty) &&
+    optionCellCountsAreValid
+  ) {
+    for (let first = 0; first < round.options.length; first += 1) {
+      for (let second = first + 1; second < round.options.length; second += 1) {
+        if (
+          differingCellIndexes(
+            round.options[first].design,
+            round.options[second].design,
+          ).length < 2
+        ) {
+          errors.push(
+            "Starter and Junior answer designs must differ in at least two cells.",
+          );
+        }
+      }
+    }
+  }
+
+  const actualBuildability = round.options.map(({ design }) =>
+    isDesignBuildable(
+      round.pieces,
+      design,
+      round.rows,
+      round.columns,
+      round.layoutId,
+    ),
+  );
+  const impossibleIndexes = actualBuildability.flatMap((buildable, index) =>
+    buildable ? [] : [index],
+  );
+  if (
+    impossibleIndexes.length !== 1 ||
+    impossibleIndexes[0] !== round.correctIndex
+  ) {
+    errors.push("Exactly one option must be impossible and marked correct.");
+  }
+
+  for (const [index, option] of round.options.entries()) {
+    if (option.buildable !== actualBuildability[index]) {
+      errors.push(`Option ${index + 1} has a false buildability label.`);
+    }
+    if (actualBuildability[index]) {
+      if (!option.witness || option.mismatch || option.kind !== "buildable") {
+        errors.push(`Option ${index + 1} needs one clean build witness.`);
+        continue;
+      }
+      try {
+        if (
+          designKey(
+            renderWitness(
+              round.pieces,
+              round.rows,
+              round.columns,
+              option.witness,
+            ),
+          ) !== designKey(option.design)
+        ) {
+          errors.push(`Option ${index + 1} has an incorrect build witness.`);
+        }
+      } catch {
+        errors.push(`Option ${index + 1} has an invalid build witness.`);
+      }
+    } else if (
+      option.witness ||
+      !option.mismatch ||
+      option.kind === "buildable" ||
+      option.mismatch.differingCells.length <
+        (usesGenerousAlternatives(round.difficulty) ? 2 : 1) ||
+      option.mismatch.differingCells.length > 2
+    ) {
+      errors.push(`Option ${index + 1} needs a local impossible explanation.`);
+    }
+  }
+  return errors;
+}
+
+export function buildCampaignRounds(): readonly DominoRound[] {
+  const rounds = (
+    ["Starter", "Junior", "Expert", "Wizard"] as const
+  ).flatMap((difficulty) => {
+    const specs = AUTHORED_SPECS[difficulty];
+    const answers = ANSWER_SEQUENCES[difficulty];
+    if (specs.length !== 12 || answers.length !== 12) {
+      throw new Error(`${difficulty} must contain exactly 12 authored rounds.`);
+    }
+    const sequenceErrors = answerSequenceErrors(difficulty, answers);
+    if (sequenceErrors.length > 0) {
+      throw new Error(sequenceErrors.join(" "));
+    }
+    return specs.map((spec, index) =>
+      assembleRound(
+        `domino-${difficulty.toLowerCase()}-${String(index + 1).padStart(2, "0")}`,
+        difficulty,
+        piecesFromSpec(spec),
+        spec.layoutId,
+        answers[index],
+        spec.salt,
+      ),
+    );
+  });
+  if (new Set(rounds.map(roundFingerprint)).size !== rounds.length) {
+    throw new Error("Authored Domino Twist fingerprints must be unique.");
+  }
+  return rounds;
+}
+
+function unitRandom(random: () => number): number {
+  const value = random();
+  if (!Number.isFinite(value) || value < 0 || value >= 1) {
+    throw new Error("Random source must return a finite number from 0 up to 1.");
+  }
+  return value;
+}
+
+function randomInteger(random: () => number, exclusiveMaximum: number): number {
+  return Math.floor(unitRandom(random) * exclusiveMaximum);
+}
+
+function shuffled<T>(values: readonly T[], random: () => number): T[] {
+  const result = [...values];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swapIndex = randomInteger(random, index + 1);
+    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+  }
+  return result;
+}
+
+function makeGeneratedPieces(
+  difficulty: Difficulty,
+  random: () => number,
+): readonly DominoPiece[] {
+  const rules = DIFFICULTY_RULES[difficulty];
+  const halfCount = rules.pieceCount * 2;
+  const directionalCount =
+    rules.minDirectionalHalves +
+    randomInteger(
+      random,
+      rules.maxDirectionalHalves - rules.minDirectionalHalves + 1,
+    );
+  const categories = shuffled(
+    [
+      ...Array.from({ length: directionalCount }, () => true),
+      ...Array.from({ length: halfCount - directionalCount }, () => false),
+    ],
+    random,
+  );
+  const halves = categories.map((directional) => {
+    const names = directional
+      ? DIRECTIONAL_PATTERN_NAMES
+      : SIMPLE_PATTERN_NAMES;
+    const name = names[randomInteger(random, names.length)];
+    const turns = directional ? randomInteger(random, 4) : 0;
+    return rotatePipMask(PIP_PATTERNS[name], turns);
+  });
+  return Array.from({ length: rules.pieceCount }, (_, index) => ({
+    id: String.fromCharCode(65 + index),
+    first: halves[index * 2],
+    second: halves[index * 2 + 1],
+  }));
+}
+
+function isDifficulty(value: string): value is Difficulty {
+  return (
+    value === "Starter" ||
+    value === "Junior" ||
+    value === "Expert" ||
+    value === "Wizard"
+  );
+}
+
+/**
+ * Generates a validated Infinite round. Pass the current session fingerprint
+ * set to guarantee that a challenge is not repeated in that session.
+ */
+export function generateInfiniteRound(
+  difficulty: Difficulty,
+  random: () => number = Math.random,
+  excludedFingerprints: ReadonlySet<string> = new Set(),
+): DominoRound {
+  if (!isDifficulty(difficulty)) {
+    throw new Error(`Unknown difficulty: ${difficulty}`);
+  }
+  const rules = DIFFICULTY_RULES[difficulty];
+  const layoutIds = legalLayoutIds(rules.rows, rules.columns);
+
+  for (let attempt = 0; attempt < GENERATOR_MAX_ATTEMPTS; attempt += 1) {
+    const pieces = makeGeneratedPieces(difficulty, random);
+    if (!isInterestingPieceSet(pieces, difficulty)) continue;
+    const layoutId = rules.seamsVisible
+      ? layoutIds[randomInteger(random, layoutIds.length)]
+      : null;
+    const correctIndex = randomInteger(random, 4);
+    const salt = randomInteger(random, 1_000_000);
+    let round: DominoRound;
+    try {
+      round = assembleRound(
+        `infinite-${difficulty.toLowerCase()}-${salt.toString(36)}`,
+        difficulty,
+        pieces,
+        layoutId,
+        correctIndex,
+        salt,
+      );
+    } catch {
+      continue;
+    }
+    if (!excludedFingerprints.has(roundFingerprint(round))) return round;
+  }
+
+  throw new Error(
+    `Unable to generate a valid ${difficulty} round after ${GENERATOR_MAX_ATTEMPTS} attempts.`,
+  );
+}
+
+/** A tiny deterministic source for saved or testable Infinite sessions. */
+export function makeSeededRandom(seed: number): () => number {
+  if (!Number.isFinite(seed)) throw new Error("Seed must be finite.");
+  let state = seed >>> 0;
+  return () => {
+    state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
+    return state / 4_294_967_296;
+  };
+}
+
+/**
+ * Canonicalizes source piece order, 180-degree source presentation, and answer
+ * order while retaining the exact four-design challenge.
+ */
+export function roundFingerprint(round: DominoRound): string {
+  const pieces = round.pieces.map(physicalPieceKey).sort().join("|");
+  const options = round.options
+    .map(({ design }) => designKey(design))
+    .sort()
+    .join("|");
+  const impossible = designKey(round.options[round.correctIndex].design);
+  return `${round.difficulty}:${round.rows}x${round.columns}:${
+    round.layoutId ?? "any-layout"
+  }:${pieces}:${options}:!${impossible}`;
+}
+
+export const ROUNDS = buildCampaignRounds();
+export const CAMPAIGN_ROUNDS = ROUNDS;
+
+const tutorialRound = ROUNDS[0];
+const tutorialPossible = tutorialRound.options.find(
+  ({ buildable }) => buildable,
+);
+if (!tutorialPossible?.witness) {
+  throw new Error("The Domino Twist tutorial needs a buildable example.");
+}
+
+export const TUTORIAL = {
+  pieces: tutorialRound.pieces,
+  rows: tutorialRound.rows,
+  columns: tutorialRound.columns,
+  layoutId: tutorialRound.layoutId,
+  possible: tutorialPossible.design,
+  witness: tutorialPossible.witness,
+  nearMiss: tutorialRound.options[tutorialRound.correctIndex].design,
+  nearMissReason:
+    tutorialRound.options[tutorialRound.correctIndex].mismatch?.message ?? "",
+} as const;

@@ -21,6 +21,7 @@ There is no account, download, backend, or analytics.
 | [Braids](https://rfarnham.github.io/nonverbal-reasoning-games/games/braids/) | Spatial perspective and depth tracking | Playable |
 | [Whose Left?](https://rfarnham.github.io/nonverbal-reasoning-games/games/whose-left/) | Spatial perspective and direction tracking | Playable |
 | [Shape Fold](https://rfarnham.github.io/nonverbal-reasoning-games/games/shape-fold/) | Spatial folding and visual prediction | Playable |
+| [Domino Twist](https://rfarnham.github.io/nonverbal-reasoning-games/games/domino-twist/) | Spatial composition and part-whole reasoning | Playable |
 
 ## Project shape
 
@@ -33,6 +34,7 @@ keeping the runtime entirely in the browser.
 app/
   games/
     braids/           # route, catalog metadata, and shelf icon
+    domino-twist/     # route, catalog metadata, and shelf icon
     libra/            # route, catalog metadata, and shelf icon
     pattern-matrix/   # route, catalog metadata, and shelf icon
     rotation-match/   # route, catalog metadata, and shelf icon

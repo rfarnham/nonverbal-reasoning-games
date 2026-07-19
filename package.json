@@ -11,7 +11,7 @@
     "generate:games": "node scripts/generate-game-registry.mjs",
     "dev": "npm run generate:games && next dev",
     "build": "npm run generate:games && next build",
-    "build:pages": "npm run generate:games && NEXT_PUBLIC_BASE_PATH=/nonverbal-reasoning-games next build",
+    "build:pages": "npm run generate:games && NEXT_PUBLIC_BASE_PATH=/nonverbal-reasoning-games next build --webpack",
     "start": "next start",
     "test": "npm run generate:games && node --test tests/*.test.mjs",
     "lint": "npm run generate:games && eslint .",
