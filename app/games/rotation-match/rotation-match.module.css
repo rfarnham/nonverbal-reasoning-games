@@ -245,6 +245,7 @@
   min-width: 72px;
   height: clamp(112px, 16vw, 150px);
   position: relative;
+  isolation: isolate;
   display: grid;
   place-items: center;
   border-top: 1px dashed var(--line);
@@ -275,13 +276,39 @@
   place-items: center;
   transform-origin: center;
   transform-style: preserve-3d;
+  backface-visibility: visible;
   opacity: 0.38;
   animation: tutorialTransformLoop 5200ms cubic-bezier(0.42, 0, 0.58, 1)
     infinite alternate;
 }
 
+.tutorialDiagonalMotion {
+  perspective: 620px;
+  perspective-origin: 50% 42%;
+}
+
+.tutorialDiagonalGuide {
+  width: clamp(102px, 16vw, 136px);
+  height: 2px;
+  position: absolute;
+  z-index: 2;
+  border-radius: 999px;
+  background: #1679d2;
+  box-shadow: 0 0 0 1px rgb(255 253 248 / 78%);
+  opacity: 0.72;
+  pointer-events: none;
+  transform: rotate(var(--tutorial-guide-turn));
+  transform-origin: center;
+}
+
+.tutorialDiagonalMover {
+  animation: tutorialDiagonalFoldLoop 6400ms
+    cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+}
+
 .tutorialDemoMover .pattern {
   --pattern-size: clamp(82px, 13vw, 112px);
+  backface-visibility: visible;
   box-shadow: 0 10px 25px rgb(23 33 61 / 15%);
 }
 
@@ -334,6 +361,20 @@
   100% {
     opacity: 0.86;
     transform: var(--tutorial-transform);
+  }
+}
+
+@keyframes tutorialDiagonalFoldLoop {
+  0%,
+  18% {
+    opacity: 0.38;
+    transform: rotate3d(1, var(--tutorial-axis-y), 0, 0deg);
+  }
+
+  78%,
+  100% {
+    opacity: 0.86;
+    transform: rotate3d(1, var(--tutorial-axis-y), 0, 180deg);
   }
 }
 
