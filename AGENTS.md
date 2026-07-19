@@ -189,7 +189,7 @@ or whole-matrix compositions. The default conceptual order is:
 3. exclusive or;
 4. set difference;
 5. rotation and other single-pattern sequences;
-6. complements such as equivalence and complement of union;
+6. complements such as agreement (the biconditional) and complement of union;
 7. chained and whole-matrix rules.
 
 An authored Starter campaign MUST repeat each newly introduced atomic rule for

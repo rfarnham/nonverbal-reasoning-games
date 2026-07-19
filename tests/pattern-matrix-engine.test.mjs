@@ -490,6 +490,28 @@ test("every catalogue rule part has metadata", () => {
   }
 });
 
+test("agreement metadata explains the biconditional in child-friendly language", () => {
+  const agreement = RULE_CATALOGUE.find(
+    ({ id }) => id === "combine:match",
+  );
+
+  assert.deepEqual(
+    {
+      name: agreement?.name,
+      shortName: agreement?.shortName,
+      symbol: agreement?.symbol,
+      description: agreement?.description,
+    },
+    {
+      name: "Agreement",
+      shortName: "Same state",
+      symbol: "↔",
+      description:
+        "A ↔ B marks positions where both inputs agree: both occupied or both empty.",
+    },
+  );
+});
+
 test("rule symbols are stable, mathematical, and shared with the catalogue", () => {
   const expectedOperations = {
     join: "∪",
@@ -497,7 +519,7 @@ test("rule symbols are stable, mathematical, and shared with the catalogue", () 
     cancel: "⊕",
     "left-minus-right": "A∖B",
     "right-minus-left": "B∖A",
-    match: "≡",
+    match: "↔",
     neither: "∪ᶜ",
   };
   const expectedTransforms = {
@@ -847,7 +869,7 @@ test("Campaign is a balanced, unique, fully validated 48-round curriculum", () =
     ["outline", "solid", "striped"],
   );
   assert.deepEqual([...patternScales].sort(), [0, 1, 2]);
-  assert.ok(operations.has("match"), "Campaign needs XNOR complement");
+  assert.ok(operations.has("match"), "Campaign needs the agreement rule");
   assert.ok(operations.has("neither"), "Campaign needs NOR complement");
 });
 

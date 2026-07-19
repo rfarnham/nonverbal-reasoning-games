@@ -287,7 +287,7 @@ const OPERATION_LABELS: Record<Operation, string> = {
   cancel: "Exclusive or",
   "left-minus-right": "Set difference A minus B",
   "right-minus-left": "Set difference B minus A",
-  match: "Equivalence",
+  match: "Agreement",
   neither: "Complement of union",
 };
 
@@ -297,7 +297,7 @@ const OPERATION_SHORT_LABELS: Record<Operation, string> = {
   cancel: "XOR",
   "left-minus-right": "A minus B",
   "right-minus-left": "B minus A",
-  match: "XNOR",
+  match: "Same state",
   neither: "NOR",
 };
 
@@ -307,7 +307,7 @@ const OPERATION_DESCRIPTIONS: Record<Operation, string> = {
   cancel: "A ⊕ B keeps positions occupied in exactly one input.",
   "left-minus-right": "A ∖ B removes B’s occupied positions from A.",
   "right-minus-left": "B ∖ A removes A’s occupied positions from B.",
-  match: "¬(A ⊕ B) keeps positions where both inputs agree.",
+  match: "A ↔ B marks positions where both inputs agree: both occupied or both empty.",
   neither: "(A ∪ B)ᶜ keeps positions left empty by both inputs.",
 };
 
@@ -317,7 +317,7 @@ const OPERATION_SYMBOLS: Record<Operation, string> = {
   cancel: "⊕",
   "left-minus-right": "A∖B",
   "right-minus-left": "B∖A",
-  match: "≡",
+  match: "↔",
   neither: "∪ᶜ",
 };
 

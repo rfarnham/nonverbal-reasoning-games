@@ -1,4 +1,10 @@
-import type { HintPolicy, RulePartId } from "./rule-engine";
+import type {
+  Difficulty,
+  HintPolicy,
+  RulePartId,
+} from "./rule-engine";
+
+export type RuleLessonMoment = "introduction" | "discovery";
 
 /**
  * Pure transitions shared by the React page and its tests. Keeping these
@@ -37,6 +43,35 @@ export function unseenLessonPartIds(
   }
 
   return additions;
+}
+
+export function ruleLessonMomentForDifficulty(
+  difficulty: Difficulty,
+): RuleLessonMoment {
+  return difficulty === "Easy" || difficulty === "Medium"
+    ? "introduction"
+    : "discovery";
+}
+
+export function lessonPartIdsForMoment({
+  difficulty,
+  moment,
+  discoveredPartIds,
+  pendingPartIds,
+  encounteredPartIds,
+}: {
+  difficulty: Difficulty;
+  moment: RuleLessonMoment;
+  discoveredPartIds: readonly RulePartId[];
+  pendingPartIds: readonly RulePartId[];
+  encounteredPartIds: readonly RulePartId[];
+}): readonly RulePartId[] {
+  if (ruleLessonMomentForDifficulty(difficulty) !== moment) return [];
+  return unseenLessonPartIds(
+    discoveredPartIds,
+    pendingPartIds,
+    encounteredPartIds,
+  );
 }
 
 export function discoveredPartIdsAfterLesson(

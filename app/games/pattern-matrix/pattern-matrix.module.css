@@ -290,6 +290,10 @@
   border-radius: 9px;
 }
 
+.lessonTile {
+  --tile-size: 76px;
+}
+
 .dot {
   min-width: 0;
   aspect-ratio: 1;
@@ -718,35 +722,266 @@
 }
 
 .rulePartLessonCue {
-  min-width: min(340px, 100%);
+  width: min(520px, 100%);
   display: grid;
-  grid-template-columns: 140px minmax(0, 1fr);
-  align-items: center;
+  justify-items: center;
   gap: 18px;
   border: 2px solid var(--line);
   border-radius: 18px;
   background: #f7f3ea;
-  padding: 18px;
-  text-align: left;
+  padding: clamp(17px, 4vw, 24px);
 }
 
-.rulePartLessonCue > span {
-  min-width: 140px;
-  min-height: 88px;
-  display: grid;
-  place-items: center;
+.lessonRuleBadge {
+  min-width: min(260px, 100%);
+  min-height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
   border-radius: 14px;
   background: #f7dfaa;
+  padding: 10px 18px;
+}
+
+.lessonRuleBadge > span {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 2rem;
+  font-size: clamp(1.8rem, 7vw, 2.55rem);
   font-weight: 900;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.06em;
+  line-height: 1;
   white-space: nowrap;
 }
 
-.rulePartLessonCue strong {
-  font-size: 1.15rem;
+.lessonRuleBadge strong {
+  font-size: 1rem;
   line-height: 1.2;
+}
+
+.lessonPattern {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.62rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.lessonCombineDemo,
+.lessonTransitionDemo {
+  min-height: 112px;
+  display: grid;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+}
+
+.lessonCombineDemo {
+  grid-template-columns: auto minmax(30px, auto) auto minmax(24px, auto) auto;
+}
+
+.lessonOperator,
+.lessonEquals {
+  min-width: 30px;
+  display: grid;
+  place-items: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 1.55rem;
+  font-weight: 900;
+}
+
+.lessonResultPattern .patternTile {
+  animation: lessonResultLoop 5200ms cubic-bezier(0.42, 0, 0.58, 1)
+    infinite alternate;
+}
+
+.lessonTransitionDemo {
+  grid-template-columns: auto minmax(82px, 1fr) auto;
+  width: min(380px, 100%);
+}
+
+.lessonTransitionTrack {
+  min-width: 82px;
+  height: 100px;
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  border-top: 1px dashed var(--line);
+  border-bottom: 1px dashed var(--line);
+}
+
+.lessonTransitionTrack::before,
+.lessonTransitionTrack::after {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+.lessonTransitionTrack::before {
+  left: -3px;
+}
+
+.lessonTransitionTrack::after {
+  right: -3px;
+}
+
+.lessonTransitionBefore,
+.lessonTransitionAfter {
+  position: absolute;
+  display: grid;
+  place-items: center;
+}
+
+.lessonTransitionBefore {
+  opacity: 0.38;
+  animation: lessonTransitionBeforeLoop 5200ms
+    cubic-bezier(0.42, 0, 0.58, 1) infinite alternate;
+}
+
+.lessonTransitionAfter {
+  opacity: 0;
+  animation: lessonTransitionAfterLoop 5200ms
+    cubic-bezier(0.42, 0, 0.58, 1) infinite alternate;
+}
+
+.lessonTransitionTrack .lessonTile {
+  --tile-size: 64px;
+  box-shadow: 0 9px 22px rgb(23 33 61 / 14%);
+}
+
+.lessonColumnDemo {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+}
+
+.lessonColumnDemo > span {
+  color: var(--focus, #1679d2);
+  font-size: 1.35rem;
+  font-weight: 900;
+  line-height: 1;
+  animation: lessonArrowLoop 1800ms ease-in-out infinite alternate;
+}
+
+.lessonColumnDemo > span:nth-of-type(2) {
+  animation-delay: 240ms;
+}
+
+.lessonCascadeDemo {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 170px);
+  align-items: center;
+  gap: 18px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 720;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.lessonCascadeDemo .reviewMatrix {
+  --matrix-size: 174px;
+}
+
+.lessonCascadeDemo .matrixCell {
+  animation: lessonCascadeLoop 5200ms ease-in-out infinite;
+}
+
+.lessonCascadeDemo .matrixCell:nth-child(2) {
+  animation-delay: 180ms;
+}
+
+.lessonCascadeDemo .matrixCell:nth-child(3),
+.lessonCascadeDemo .matrixCell:nth-child(4) {
+  animation-delay: 360ms;
+}
+
+.lessonCascadeDemo .matrixCell:nth-child(n + 5):nth-child(-n + 7) {
+  animation-delay: 540ms;
+}
+
+.lessonCascadeDemo .matrixCell:nth-child(n + 8) {
+  animation-delay: 720ms;
+}
+
+@keyframes lessonResultLoop {
+  0%,
+  18% {
+    opacity: 0.28;
+    transform: scale(0.94);
+    box-shadow: none;
+  }
+
+  68%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 10px 24px rgb(22 131 107 / 16%);
+  }
+}
+
+@keyframes lessonTransitionBeforeLoop {
+  0%,
+  18% {
+    opacity: 0.38;
+    transform: none;
+  }
+
+  68%,
+  100% {
+    opacity: 0;
+    transform: var(--lesson-motion);
+  }
+}
+
+@keyframes lessonTransitionAfterLoop {
+  0%,
+  32% {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+
+  72%,
+  100% {
+    opacity: 0.86;
+    transform: scale(1);
+  }
+}
+
+@keyframes lessonArrowLoop {
+  from {
+    opacity: 0.35;
+    transform: translateY(-2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(2px);
+  }
+}
+
+@keyframes lessonCascadeLoop {
+  0%,
+  12% {
+    box-shadow: inset 0 0 0 0 rgb(22 121 210 / 0%);
+  }
+
+  22%,
+  42% {
+    box-shadow: inset 0 0 0 3px rgb(22 121 210 / 56%);
+  }
+
+  55%,
+  100% {
+    box-shadow: inset 0 0 0 0 rgb(22 121 210 / 0%);
+  }
 }
 
 .unknownTransform {
@@ -1686,7 +1921,7 @@
 }
 
 .ruleLessonDialog {
-  width: min(560px, calc(100% - 32px));
+  width: min(700px, calc(100% - 32px));
   max-height: calc(100dvh - 32px);
   overflow: auto;
   border: 1px solid var(--line);
@@ -1697,9 +1932,15 @@
   padding: 0;
 }
 
+.ruleLessonDialog[open] {
+  animation: ruleLessonDialogIn 360ms
+    cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
 .ruleLessonDialog::backdrop {
   background: rgb(23 33 61 / 48%);
   backdrop-filter: blur(3px);
+  animation: ruleLessonBackdropIn 240ms ease-out both;
 }
 
 .ruleLessonCard {
@@ -1728,6 +1969,28 @@
 
 .ruleLessonCard .ruleCue {
   margin-block: 5px;
+}
+
+@keyframes ruleLessonBackdropIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ruleLessonDialogIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .ghostFlight {
@@ -2023,6 +2286,54 @@
   .reviewCard {
     padding: 13px;
   }
+
+  .ruleLessonCard {
+    gap: 15px;
+    padding: 25px 16px;
+  }
+
+  .rulePartLessonCue {
+    gap: 14px;
+    padding: 15px 10px;
+  }
+
+  .lessonTile {
+    --tile-size: 58px;
+  }
+
+  .lessonCombineDemo {
+    gap: 5px;
+  }
+
+  .lessonOperator,
+  .lessonEquals {
+    min-width: 22px;
+    font-size: 1.2rem;
+  }
+
+  .lessonTransitionDemo {
+    grid-template-columns: auto minmax(66px, 1fr) auto;
+    gap: 6px;
+  }
+
+  .lessonTransitionTrack {
+    min-width: 66px;
+    height: 82px;
+  }
+
+  .lessonTransitionTrack .lessonTile {
+    --tile-size: 50px;
+  }
+
+  .lessonCascadeDemo {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .lessonCascadeDemo .reviewMatrix {
+    --matrix-size: 154px;
+  }
 }
 
 @media (max-width: 390px) {
@@ -2157,13 +2468,12 @@
   }
 
   .rulePartLessonCue {
-    grid-template-columns: 1fr;
-    justify-items: center;
     text-align: center;
   }
 
-  .rulePartLessonCue > span {
-    width: min(180px, 100%);
+  .lessonRuleBadge {
+    gap: 10px;
+    padding-inline: 12px;
   }
 }
 
@@ -2178,5 +2488,24 @@
   .infiniteSupercharged .energyTrack,
   .matrixComplete .matrixCell:nth-child(n + 7) {
     animation: none;
+  }
+
+  .ruleLessonDialog[open],
+  .ruleLessonDialog::backdrop,
+  .lessonResultPattern .patternTile,
+  .lessonTransitionBefore,
+  .lessonTransitionAfter,
+  .lessonColumnDemo > span,
+  .lessonCascadeDemo .matrixCell {
+    animation: none !important;
+  }
+
+  .lessonTransitionBefore {
+    display: none;
+  }
+
+  .lessonTransitionAfter {
+    opacity: 0.86;
+    transform: none;
   }
 }

@@ -29,7 +29,8 @@ import {
   canOpenHistoricalReview,
   discoveredPartIdsAfterLesson,
   hintRoundIdsAfterMiss,
-  unseenLessonPartIds,
+  lessonPartIdsForMoment,
+  type RuleLessonMoment,
 } from "./learning-state";
 import {
   RULE_CATALOGUE,
@@ -42,7 +43,6 @@ import {
   rulePartIds,
   ruleLabel,
   type Difficulty,
-  type MatrixRule,
   type Pattern,
   type Round,
   type RulePartId,
@@ -68,6 +68,7 @@ type CampaignReviewSelection = {
 };
 type RuleLesson = {
   partId: RulePartId;
+  moment: RuleLessonMoment;
 };
 
 type SessionRound = {
@@ -296,6 +297,7 @@ export default function PatternMatrixPage() {
   const resultHeadingRef = useRef<HTMLHeadingElement>(null);
   const generationRetryButtonRef = useRef<HTMLButtonElement>(null);
   const lessonDialogRef = useRef<HTMLDialogElement>(null);
+  const lessonHeadingRef = useRef<HTMLHeadingElement>(null);
   const historicalReviewHeadingRef = useRef<HTMLHeadingElement>(null);
   const campaignMarkerRefs = useRef<
     Record<string, HTMLButtonElement | null>
@@ -323,6 +325,7 @@ export default function PatternMatrixPage() {
   const activeSessionRound = isCampaign
     ? campaignSessionRound
     : (roundQueue[roundCursor] ?? roundQueue[0]);
+  const activeSessionRoundId = activeSessionRound?.id;
   const round = activeSessionRound?.round ?? CAMPAIGN_ROUNDS[0];
   const activeCueMode = effectiveCueMode(
     round.hintPolicy,
@@ -334,6 +337,18 @@ export default function PatternMatrixPage() {
   const activeLessonPart = activeLesson
     ? RULE_CATALOGUE.find(({ id }) => id === activeLesson.partId)
     : undefined;
+  const unqueuedIntroductionPartIds = activeSessionRound
+    ? lessonPartIdsForMoment({
+        difficulty: round.difficulty,
+        moment: "introduction",
+        discoveredPartIds: discoveredRulePartIds,
+        pendingPartIds: pendingLessons.map(({ partId }) => partId),
+        encounteredPartIds: rulePartIds(round.rule),
+      })
+    : [];
+  const hasBlockingRuleLesson =
+    pendingLessons.length > 0 ||
+    (started && unqueuedIntroductionPartIds.length > 0);
   const discoveredPartIdSet = new Set(discoveredRulePartIds);
   const historicalSessionRound = campaignReviewSelection
     ? buildCampaignSessionRound(
@@ -432,15 +447,16 @@ export default function PatternMatrixPage() {
   }, [clearAttemptTimers]);
 
   const queueRuleLessons = useCallback(
-    (lessonRule: MatrixRule) => {
-      const partIds = rulePartIds(lessonRule);
+    (lessonRound: Round, moment: RuleLessonMoment) => {
+      const partIds = rulePartIds(lessonRound.rule);
       setPendingLessons((current) => {
-        const additions = unseenLessonPartIds(
-          discoveredRulePartIds,
-          current.map(({ partId }) => partId),
-          partIds,
-        )
-          .map((partId) => ({ partId }));
+        const additions = lessonPartIdsForMoment({
+          difficulty: lessonRound.difficulty,
+          moment,
+          discoveredPartIds: discoveredRulePartIds,
+          pendingPartIds: current.map(({ partId }) => partId),
+          encounteredPartIds: partIds,
+        }).map((partId) => ({ partId, moment }));
         return additions.length > 0 ? [...current, ...additions] : current;
       });
     },
@@ -462,7 +478,7 @@ export default function PatternMatrixPage() {
         !canOpenHistoricalReview({
           isIdle: phase === "idle",
           isSolved: Boolean(campaignProgress[id]?.solved),
-          hasPendingLessons: pendingLessons.length > 0,
+          hasPendingLessons: hasBlockingRuleLesson,
         })
       ) {
         return;
@@ -470,7 +486,7 @@ export default function PatternMatrixPage() {
       reviewOriginIdRef.current = id;
       setCampaignReviewSelection({ levelId, problemIndex });
     },
-    [campaignProgress, pendingLessons.length, phase],
+    [campaignProgress, hasBlockingRuleLesson, phase],
   );
 
   const closeCampaignReview = useCallback(() => {
@@ -548,7 +564,7 @@ export default function PatternMatrixPage() {
         !started ||
         (isCampaign && activeCampaignLevelComplete) ||
         campaignReviewSelection !== null ||
-        pendingLessons.length > 0 ||
+        hasBlockingRuleLesson ||
         !activeSessionRound
       ) {
         return;
@@ -654,7 +670,7 @@ export default function PatternMatrixPage() {
           if (isCorrect) {
             setGhost(null);
             setPhase("answered");
-            queueRuleLessons(round.rule);
+            queueRuleLessons(round, "discovery");
             return;
           }
 
@@ -685,7 +701,7 @@ export default function PatternMatrixPage() {
       isCampaign,
       isInfinite,
       isRedemption,
-      pendingLessons.length,
+      hasBlockingRuleLesson,
       phase,
       playFeedbackSound,
       queueRuleLessons,
@@ -822,7 +838,7 @@ export default function PatternMatrixPage() {
   const goNext = useCallback(() => {
     if (
       phase !== "answered" ||
-      pendingLessons.length > 0 ||
+      hasBlockingRuleLesson ||
       campaignReviewSelection !== null
     ) {
       return;
@@ -903,7 +919,7 @@ export default function PatternMatrixPage() {
     isInfinite,
     isLastRedemptionRound,
     phase,
-    pendingLessons.length,
+    hasBlockingRuleLesson,
     redemptionMistakeIds,
     reviewLevelId,
     resetAttemptState,
@@ -977,6 +993,33 @@ export default function PatternMatrixPage() {
   }, []);
 
   useEffect(() => {
+    if (
+      !started ||
+      complete ||
+      generationError ||
+      campaignReviewSelection !== null ||
+      phase !== "idle" ||
+      !activeSessionRoundId
+    ) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      queueRuleLessons(round, "introduction");
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [
+    activeSessionRoundId,
+    campaignReviewSelection,
+    complete,
+    generationError,
+    phase,
+    queueRuleLessons,
+    round,
+    started,
+  ]);
+
+  useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       const target = event.target;
       const isEditable =
@@ -991,7 +1034,7 @@ export default function PatternMatrixPage() {
         complete ||
         generationError ||
         campaignReviewSelection !== null ||
-        pendingLessons.length > 0 ||
+        hasBlockingRuleLesson ||
         phase !== "idle" ||
         event.altKey ||
         event.ctrlKey ||
@@ -1014,16 +1057,21 @@ export default function PatternMatrixPage() {
     chooseOption,
     complete,
     generationError,
-    pendingLessons.length,
+    hasBlockingRuleLesson,
     phase,
     started,
   ]);
 
   useEffect(() => {
-    if (phase === "answered" && pendingLessons.length === 0) {
-      nextButtonRef.current?.focus();
+    if (phase === "answered" && !hasBlockingRuleLesson) {
+      const frame = window.requestAnimationFrame(() => {
+        if (!lessonDialogRef.current?.open) {
+          nextButtonRef.current?.focus();
+        }
+      });
+      return () => window.cancelAnimationFrame(frame);
     }
-  }, [pendingLessons.length, phase]);
+  }, [hasBlockingRuleLesson, phase]);
 
   useEffect(() => {
     if (
@@ -1032,10 +1080,14 @@ export default function PatternMatrixPage() {
       !complete &&
       !generationError &&
       campaignReviewSelection === null &&
-      pendingLessons.length === 0
+      !hasBlockingRuleLesson
     ) {
-      optionButtonRefs.current[0]?.focus();
-      shouldFocusFirstOption.current = false;
+      const frame = window.requestAnimationFrame(() => {
+        if (lessonDialogRef.current?.open) return;
+        optionButtonRefs.current[0]?.focus();
+        shouldFocusFirstOption.current = false;
+      });
+      return () => window.cancelAnimationFrame(frame);
     }
   }, [
     activeCampaignLevel,
@@ -1046,7 +1098,7 @@ export default function PatternMatrixPage() {
     roundCursor,
     sessionMode,
     started,
-    pendingLessons.length,
+    hasBlockingRuleLesson,
   ]);
 
   useEffect(() => {
@@ -1054,12 +1106,21 @@ export default function PatternMatrixPage() {
       phase === "idle" &&
       retryReady &&
       retryFocusIndexRef.current !== null &&
-      pendingLessons.length === 0
+      !hasBlockingRuleLesson
     ) {
-      optionButtonRefs.current[retryFocusIndexRef.current]?.focus();
-      retryFocusIndexRef.current = null;
+      const frame = window.requestAnimationFrame(() => {
+        if (
+          lessonDialogRef.current?.open ||
+          retryFocusIndexRef.current === null
+        ) {
+          return;
+        }
+        optionButtonRefs.current[retryFocusIndexRef.current]?.focus();
+        retryFocusIndexRef.current = null;
+      });
+      return () => window.cancelAnimationFrame(frame);
     }
-  }, [pendingLessons.length, phase, retryReady]);
+  }, [hasBlockingRuleLesson, phase, retryReady]);
 
   useEffect(() => {
     if (complete) resultHeadingRef.current?.focus();
@@ -1082,6 +1143,11 @@ export default function PatternMatrixPage() {
       } catch {
         dialog.setAttribute("open", "");
       }
+    }
+    if (activeLesson) {
+      window.requestAnimationFrame(() => {
+        lessonHeadingRef.current?.focus();
+      });
     } else if (!activeLesson && dialog.open) {
       dialog.close();
     }
@@ -1110,7 +1176,7 @@ export default function PatternMatrixPage() {
         setGhost(null);
         if (selectedCorrect) {
           setPhase("answered");
-          queueRuleLessons(round.rule);
+          queueRuleLessons(round, "discovery");
         } else {
           const optionIndex = selectedIndex;
           const animationToken = animationTokenRef.current;
@@ -1147,7 +1213,7 @@ export default function PatternMatrixPage() {
     clearAttemptTimers,
     phase,
     queueRuleLessons,
-    round.rule,
+    round,
     selectedCorrect,
     selectedIndex,
   ]);
@@ -1364,7 +1430,7 @@ export default function PatternMatrixPage() {
                           disabled={
                             phase !== "idle" ||
                             campaignReviewSelection !== null ||
-                            pendingLessons.length > 0
+                            hasBlockingRuleLesson
                           }
                           onClick={() => selectCampaignLevel(level.id)}
                           key={level.id}
@@ -1428,7 +1494,7 @@ export default function PatternMatrixPage() {
                             disabled={
                               !problem?.solved ||
                               phase !== "idle" ||
-                              pendingLessons.length > 0
+                              hasBlockingRuleLesson
                             }
                             onClick={() =>
                               openCampaignReview(
@@ -1819,7 +1885,10 @@ export default function PatternMatrixPage() {
                             }`}
                             type="button"
                             onClick={() => chooseOption(optionIndex)}
-                            disabled={phase !== "idle"}
+                            disabled={
+                              phase !== "idle" ||
+                              hasBlockingRuleLesson
+                            }
                             aria-label={`Option ${
                               optionIndex + 1
                             }, visual pattern tile${answerState}`}
@@ -2053,6 +2122,7 @@ export default function PatternMatrixPage() {
         className={styles.ruleLessonDialog}
         ref={lessonDialogRef}
         aria-labelledby="rule-lesson-title"
+        aria-describedby="rule-lesson-description"
         onCancel={(event) => {
           event.preventDefault();
           closeActiveLesson();
@@ -2060,16 +2130,36 @@ export default function PatternMatrixPage() {
       >
         {activeLesson && activeLessonPart ? (
           <div className={styles.ruleLessonCard}>
-            <p className={styles.kicker}>New rule discovered</p>
-            <h2 id="rule-lesson-title">{activeLessonPart.name}</h2>
-            <p>{activeLessonPart.description}</p>
-            <RulePartLessonCue part={activeLessonPart} />
+            <p className={styles.kicker}>
+              {activeLesson.moment === "introduction"
+                ? "Meet this rule"
+                : "New rule discovered"}
+            </p>
+            <h2
+              id="rule-lesson-title"
+              ref={lessonHeadingRef}
+              tabIndex={-1}
+            >
+              {activeLessonPart.name}
+            </h2>
+            <p id="rule-lesson-description">
+              {activeLessonPart.description}
+            </p>
+            <RulePartLessonCue
+              part={activeLessonPart}
+              round={round}
+              moment={activeLesson.moment}
+            />
             <button
               className={styles.primaryButton}
               type="button"
               onClick={closeActiveLesson}
             >
-              {pendingLessons.length > 1 ? "Next rule" : "Got it"}
+              {pendingLessons.length > 1
+                ? "Next rule"
+                : activeLesson.moment === "introduction"
+                  ? "Let’s try it"
+                  : "Got it"}
               <span aria-hidden="true">→</span>
             </button>
           </div>

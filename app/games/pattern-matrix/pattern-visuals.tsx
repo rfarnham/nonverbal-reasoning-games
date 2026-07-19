@@ -1,4 +1,5 @@
 import {
+  applySequenceStep,
   combinePatterns,
   dotCount,
   operationLabel,
@@ -7,6 +8,7 @@ import {
   ruleLabel,
   sequenceLabel,
   sequenceSymbol,
+  transformPattern,
   transformSymbol,
   type CueMode,
   type Matrix,
@@ -15,6 +17,7 @@ import {
   type MotifShape,
   type Pattern,
   type RulePart,
+  type Round,
 } from "./rule-engine";
 import styles from "./pattern-matrix.module.css";
 
@@ -24,7 +27,8 @@ export type PatternSize =
   | "optionTile"
   | "reviewTile"
   | "ghostTile"
-  | "cueTile";
+  | "cueTile"
+  | "lessonTile";
 
 export type MatrixSize =
   | "tutorialMatrix"
@@ -263,15 +267,257 @@ function SequenceEquation({
   );
 }
 
-export function RulePartLessonCue({ part }: { part: RulePart }) {
+function LessonPattern({
+  pattern,
+  label,
+  className,
+}: {
+  pattern: Pattern;
+  label: string;
+  className?: string;
+}) {
+  return (
+    <span className={`${styles.lessonPattern} ${className ?? ""}`}>
+      <PatternTile pattern={pattern} size="lessonTile" hidden />
+      <small>{label}</small>
+    </span>
+  );
+}
+
+function lessonTransition(
+  part: RulePart,
+  round: Round,
+  moment: "introduction" | "discovery",
+): { before: Pattern; after: Pattern; motion: string } | null {
+  const { rule } = round;
+
+  if (rule.family === "sequence" && part.id === `change:${rule.step}`) {
+    const [before, shownAfter] = lessonSourcePair(round, moment);
+    const after = applySequenceStep(before, rule.step) ?? shownAfter;
+    const motion =
+      rule.step === "rotate-clockwise"
+        ? "rotate(90deg)"
+        : rule.step === "rotate-counterclockwise"
+          ? "rotate(-90deg)"
+          : "none";
+    return { before, after, motion };
+  }
+
+  if (
+    rule.family === "combine" &&
+    rule.transform !== "none" &&
+    part.id === `change:${rule.transform}`
+  ) {
+    const [left, right] = lessonSourcePair(round, moment);
+    const before = combinePatterns(left, right, rule.operation);
+    if (!before) return null;
+    const after = transformPattern(before, rule.transform);
+    const motion =
+      rule.transform === "rotate-clockwise"
+        ? "rotate(90deg)"
+        : rule.transform === "rotate-counterclockwise"
+          ? "rotate(-90deg)"
+          : "rotate(180deg)";
+    return { before, after, motion };
+  }
+
+  if (
+    rule.family === "grid" &&
+    part.id === `change:${rule.transform}`
+  ) {
+    const before = combinePatterns(
+      round.matrix[0],
+      round.matrix[1],
+      rule.operation,
+    );
+    if (!before) return null;
+    const after = transformPattern(before, rule.transform);
+    return {
+      before,
+      after,
+      motion:
+        rule.transform === "rotate-clockwise"
+          ? "rotate(90deg)"
+          : "rotate(-90deg)",
+    };
+  }
+
+  return null;
+}
+
+function lessonSourcePair(
+  round: Round,
+  moment: "introduction" | "discovery",
+): readonly [Pattern, Pattern] {
+  const { rule } = round;
+  if (rule.family === "grid") {
+    return [round.matrix[0], round.matrix[1]];
+  }
+  if (moment === "discovery") {
+    return rule.axis === "rows"
+      ? [round.matrix[6], round.matrix[7]]
+      : [round.matrix[2], round.matrix[5]];
+  }
+  const [first, second] = evidenceLine(round.matrix, rule.axis);
+  return [first, second];
+}
+
+function LessonRuleBadge({ part }: { part: RulePart }) {
+  return (
+    <span className={styles.lessonRuleBadge} aria-hidden="true">
+      <span>{part.symbol}</span>
+      <strong>{part.shortName}</strong>
+    </span>
+  );
+}
+
+export function RulePartLessonCue({
+  part,
+  round,
+  moment,
+}: {
+  part: RulePart;
+  round: Round;
+  moment: "introduction" | "discovery";
+}) {
+  const transition = lessonTransition(part, round, moment);
+  const lessonStyle = transition
+    ? ({
+        "--lesson-motion": transition.motion,
+      } as React.CSSProperties)
+    : undefined;
+
+  if (part.id === "change:columns") {
+    const patterns = evidenceLine(round.matrix, "columns");
+    return (
+      <div
+        className={styles.rulePartLessonCue}
+        role="img"
+        aria-label="Three puzzle panels arranged vertically with downward arrows."
+      >
+        <LessonRuleBadge part={part} />
+        <div className={styles.lessonColumnDemo} aria-hidden="true">
+          <PatternTile pattern={patterns[0]} size="lessonTile" hidden />
+          <span>↓</span>
+          <PatternTile pattern={patterns[1]} size="lessonTile" hidden />
+          <span>↓</span>
+          <PatternTile pattern={patterns[2]} size="lessonTile" hidden />
+        </div>
+      </div>
+    );
+  }
+
+  if (part.id === "change:grid-cascade") {
+    return (
+      <div
+        className={styles.rulePartLessonCue}
+        role="img"
+        aria-label="The completed puzzle matrix with linked cells highlighted in sequence."
+      >
+        <LessonRuleBadge part={part} />
+        <div className={styles.lessonCascadeDemo} aria-hidden="true">
+          <MatrixBoard
+            matrix={round.matrix}
+            answer={round.correctPattern}
+            size="reviewMatrix"
+            label=""
+          />
+          <span>Link each result into the next pair.</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (part.id.startsWith("combine:")) {
+    const [left, right] = lessonSourcePair(round, moment);
+    const operation = part.id.slice("combine:".length) as Parameters<
+      typeof combinePatterns
+    >[2];
+    const result = combinePatterns(
+      left,
+      right,
+      operation,
+    );
+
+    if (result) {
+      const reverseDifference = operation === "right-minus-left";
+      const equationLeft = reverseDifference ? right : left;
+      const equationRight = reverseDifference ? left : right;
+      const equationOperator =
+        operation === "left-minus-right" || reverseDifference
+          ? "∖"
+          : part.symbol;
+      return (
+        <div
+          className={styles.rulePartLessonCue}
+          role="img"
+          aria-label="Two panels from this puzzle followed by their calculated result."
+        >
+          <LessonRuleBadge part={part} />
+          <div className={styles.lessonCombineDemo} aria-hidden="true">
+            <LessonPattern
+              pattern={equationLeft}
+              label={reverseDifference ? "B" : "A"}
+            />
+            <span className={styles.lessonOperator}>
+              {equationOperator}
+            </span>
+            <LessonPattern
+              pattern={equationRight}
+              label={reverseDifference ? "A" : "B"}
+            />
+            <span className={styles.lessonEquals}>=</span>
+            <LessonPattern
+              pattern={result}
+              label="Result"
+              className={styles.lessonResultPattern}
+            />
+          </div>
+        </div>
+      );
+    }
+  }
+
+  if (transition) {
+    return (
+      <div
+        className={styles.rulePartLessonCue}
+        role="img"
+        aria-label="A before panel, an animated change, and its after panel."
+        style={lessonStyle}
+      >
+        <LessonRuleBadge part={part} />
+        <div className={styles.lessonTransitionDemo} aria-hidden="true">
+          <LessonPattern pattern={transition.before} label="Before" />
+          <span className={styles.lessonTransitionTrack}>
+            <span className={styles.lessonTransitionBefore}>
+              <PatternTile
+                pattern={transition.before}
+                size="lessonTile"
+                hidden
+              />
+            </span>
+            <span className={styles.lessonTransitionAfter}>
+              <PatternTile
+                pattern={transition.after}
+                size="lessonTile"
+                hidden
+              />
+            </span>
+          </span>
+          <LessonPattern pattern={transition.after} label="After" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={styles.rulePartLessonCue}
       role="img"
-      aria-label={`${part.name}. ${part.description}`}
+      aria-label={`Rule symbol ${part.symbol}.`}
     >
-      <span aria-hidden="true">{part.symbol}</span>
-      <strong>{part.shortName}</strong>
+      <LessonRuleBadge part={part} />
     </div>
   );
 }
