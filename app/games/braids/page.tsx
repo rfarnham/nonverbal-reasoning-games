@@ -428,14 +428,22 @@ function OtherSideCue({ compact = false }: { compact?: boolean }) {
     <div
       className={`${styles.sideCue} ${compact ? styles.sideCueCompact : ""}`}
       role="img"
-      aria-label="Walk around the pane to view its other side"
+      aria-label="Pane shown front-on, edge-on, then from its other side"
     >
       <svg viewBox="0 0 84 70" aria-hidden="true">
-        <rect x="35" y="10" width="14" height="49" rx="3" />
-        <path d="M22 16C5 28 7 52 27 59" />
-        <path d="m23 52 5 7-8 2" />
-        <path d="M62 54c17-12 15-36-5-43" />
-        <path d="m61 18-5-7 8-2" />
+        <g className={styles.sideCueFront}>
+          <rect x="2" y="14" width="25" height="42" rx="3" />
+          <path d="M2 30h6v10H2" />
+        </g>
+        <path className={styles.sideCueStep} d="M30 35h10m-4-4 4 4-4 4" />
+        <path
+          className={styles.sideCueEdge}
+          d="M45 10 50 14v42l-5 4Z"
+        />
+        <g className={styles.sideCueBack}>
+          <path d="M50 14 81 20v39l-31-3Z" />
+          <path d="M81 32h-6v10h6" />
+        </g>
       </svg>
       {compact ? null : <span>Other side</span>}
     </div>

@@ -32,3 +32,24 @@ test("the in-game braid uses continuous masked strands instead of crossing capsu
     /\.ribbonOutline,\n\.ribbonBody \{[^}]*stroke-linecap: round;/s,
   );
 });
+
+test("the other-side cue shows a static three-dimensional flip sequence", () => {
+  assert.match(
+    pageSource,
+    /aria-label="Pane shown front-on, edge-on, then from its other side"/,
+  );
+  assert.ok(pageSource.includes("styles.sideCueFront"));
+  assert.ok(pageSource.includes("styles.sideCueEdge"));
+  assert.ok(pageSource.includes("styles.sideCueBack"));
+  assert.equal(pageSource.includes("M22 16C5 28 7 52 27 59"), false);
+  assert.equal(pageSource.includes("M62 54c17-12 15-36-5-43"), false);
+
+  const sideCueRules = [...cssSource.matchAll(/\.sideCue[^{]*\{[^}]*\}/g)]
+    .map(([rule]) => rule)
+    .join("\n");
+  assert.doesNotMatch(sideCueRules, /\b(?:animation|transition)(?:-[\w-]+)?\s*:/);
+  assert.match(cssSource, /\.sideCueFront \{\s*opacity: 0\.52;/);
+  assert.doesNotMatch(cssSource, /\.sideCueCompact \{[^}]*opacity:/s);
+  assert.match(cssSource, /\.reviewVisual \.sideCue \{\s*width: 52px;/);
+  assert.match(cssSource, /\.exampleFlow \.sideCue \{\s*width: 52px;/);
+});

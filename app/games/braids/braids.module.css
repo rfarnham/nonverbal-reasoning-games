@@ -389,6 +389,27 @@
   stroke-width: 2.5;
 }
 
+.sideCueFront {
+  opacity: 0.52;
+}
+
+.sideCueFront rect {
+  stroke-dasharray: 3 3;
+}
+
+.sideCue svg .sideCueStep {
+  stroke-width: 2;
+}
+
+.sideCue svg .sideCueEdge {
+  fill: var(--panel);
+  stroke-width: 2;
+}
+
+.sideCue svg .sideCueBack > path:first-child {
+  fill: var(--panel);
+}
+
 .sideCue span {
   font-size: 0.66rem;
   font-weight: 820;
@@ -396,7 +417,6 @@
 
 .sideCueCompact {
   width: 58px;
-  opacity: 0.76;
 }
 
 .gameStatus {
@@ -1125,7 +1145,7 @@
 }
 
 .reviewVisual .sideCue {
-  width: 42px;
+  width: 52px;
 }
 
 .reviewWrong {
@@ -1508,7 +1528,7 @@
   }
 
   .historicalSolution .sideCue {
-    width: 48px;
+    width: 52px;
   }
 
   .historicalAttempt {
@@ -1534,7 +1554,7 @@
   }
 
   .exampleFlow .sideCue {
-    width: 43px;
+    width: 52px;
   }
 
   .viewLabel,
