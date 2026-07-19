@@ -391,9 +391,9 @@
 .unfoldFlap {
   z-index: 2;
   animation-duration:
-    var(--unfold-flip-duration, 1000ms),
-    var(--unfold-flip-duration, 1000ms);
-  animation-delay: 60ms, 60ms;
+    var(--unfold-flip-duration, 1300ms),
+    var(--unfold-flip-duration, 1300ms);
+  animation-delay: 80ms, 80ms;
   animation-timing-function:
     cubic-bezier(0.45, 0, 0.55, 1),
     ease-in-out;
@@ -541,16 +541,6 @@
   font-family: Arial, sans-serif;
   font-size: 0.8rem;
   font-weight: 900;
-}
-
-.hiddenFoldCard .paperDiagram {
-  border-style: dashed;
-}
-
-.hiddenFoldCard .foldDirection {
-  background: var(--ink);
-  color: white;
-  font-size: 0.92rem;
 }
 
 .punchCard .paperDiagram {

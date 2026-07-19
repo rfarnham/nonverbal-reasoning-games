@@ -95,8 +95,8 @@ const CAMPAIGN_LEVELS: readonly CampaignLevel[] = [
   "Wizard",
 ];
 const CAMPAIGN_PROBLEMS_PER_LEVEL = 12;
-const UNFOLD_FLIP_MS = 1000;
-const UNFOLD_STAGE_MS = 1120;
+const UNFOLD_FLIP_MS = 1300;
+const UNFOLD_STAGE_MS = 1450;
 const REDUCED_UNFOLD_MS = 140;
 const WRONG_REVIEW_MS = 2200;
 const REDUCED_WRONG_REVIEW_MS = 1300;
@@ -199,7 +199,7 @@ function boundsForUnfoldStage(round: Round, stageIndex: number): Bounds {
 function PaperDiagram({
   holes = [],
   bounds = FULL_BOUNDS,
-  punch,
+  punches = [],
   missing = [],
   extra = [],
   size,
@@ -209,7 +209,7 @@ function PaperDiagram({
 }: {
   holes?: HolePattern;
   bounds?: Bounds;
-  punch?: Cell;
+  punches?: HolePattern;
   missing?: readonly Cell[];
   extra?: readonly Cell[];
   size: PaperSize;
@@ -218,6 +218,7 @@ function PaperDiagram({
   paperRef?: Ref<HTMLDivElement>;
 }) {
   const holesSet = new Set(holes.map(cellKey));
+  const punchesSet = new Set(punches.map(cellKey));
   const missingSet = new Set(missing.map(cellKey));
   const extraSet = new Set(extra.map(cellKey));
 
@@ -238,7 +239,7 @@ function PaperDiagram({
           x < bounds.x + bounds.width &&
           y >= bounds.y &&
           y < bounds.y + bounds.height;
-        const isPunch = punch?.x === x && punch.y === y;
+        const isPunch = punchesSet.has(key);
         const hasHole = holesSet.has(key);
         const isMissing = missingSet.has(key);
         const isExtra = extraSet.has(key);
@@ -381,27 +382,24 @@ function UnfoldingPaper({
 function FoldCard({
   step,
   index,
-  hiddenFold,
+  showDirection,
 }: {
   step: FoldStep;
   index: number;
-  hiddenFold: boolean;
+  showDirection: boolean;
 }) {
   return (
-    <div
-      className={`${styles.foldCard} ${
-        hiddenFold ? styles.hiddenFoldCard : ""
-      }`}
-      aria-hidden="true"
-    >
+    <div className={styles.foldCard} aria-hidden="true">
       <span className={styles.stepLabel}>Fold {index + 1}</span>
       <PaperDiagram bounds={step.after} size="sequencePaper" hidden />
-      <span
-        className={styles.foldDirection}
-        aria-label={hiddenFold ? undefined : directionLabel(step.direction)}
-      >
-        {hiddenFold ? "?" : directionArrow(step.direction)}
-      </span>
+      {showDirection ? (
+        <span
+          className={styles.foldDirection}
+          aria-label={directionLabel(step.direction)}
+        >
+          {directionArrow(step.direction)}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -417,13 +415,19 @@ function FoldSequence({
   const finalBounds =
     round.foldSteps[round.foldSteps.length - 1]?.after ??
     FULL_BOUNDS;
-  const accessibleLabel =
-    `${describeFoldSequence(
-      round.folds,
-      round.hiddenFoldIndex,
-    )}, then punch the folded paper at row ${round.punch.y + 1}, column ${
-      round.punch.x + 1
-    } of the original grid`;
+  const hideDirections = round.difficulty === "Wizard";
+  const punchPositions = round.punches
+    .map(
+      (punch) =>
+        `row ${punch.y + 1}, column ${punch.x + 1}`,
+    )
+    .join("; ");
+  const accessibleLabel = `${describeFoldSequence(
+    round.folds,
+    hideDirections,
+  )}, then make ${round.punches.length} ${
+    round.punches.length === 1 ? "punch" : "punches"
+  } in the folded paper at ${punchPositions} of the original grid`;
 
   return (
     <div
@@ -445,7 +449,7 @@ function FoldSequence({
           <FoldCard
             step={step}
             index={index}
-            hiddenFold={round.hiddenFoldIndex === index}
+            showDirection={!hideDirections}
           />
         </div>
       ))}
@@ -457,7 +461,7 @@ function FoldSequence({
           <span className={styles.stepLabel}>Punch</span>
           <PaperDiagram
             bounds={finalBounds}
-            punch={round.punch}
+            punches={round.punches}
             size="sequencePaper"
             hidden
           />
@@ -596,7 +600,7 @@ export default function ShapeFoldPage() {
       : { missing: [] as readonly Cell[], extra: [] as readonly Cell[] };
   const differenceCount = comparison.missing.length + comparison.extra.length;
   const unfoldPatterns = useMemo(
-    () => unfoldStages(round.folds, round.punch),
+    () => unfoldStages(round.folds, round.punches),
     [round],
   );
   const currentUnfoldPattern =
@@ -1708,7 +1712,7 @@ export default function ShapeFoldPage() {
                           (phase === "answered" && !isCorrect) ||
                           (phase === "wrong-review" && !isSelected);
                         const optionComparison =
-                          showWrong && round.hiddenFoldIndex === undefined
+                          showWrong && round.difficulty !== "Wizard"
                             ? compareHolePatterns(
                                 option,
                                 round.correctPattern,
@@ -1720,7 +1724,7 @@ export default function ShapeFoldPage() {
                         const answerState = showCorrect
                           ? ", correct answer"
                           : showWrong
-                            ? round.hiddenFoldIndex === undefined
+                            ? round.difficulty !== "Wizard"
                               ? `, your answer; ${
                                   optionComparison.missing.length
                                 } missing and ${
@@ -1785,7 +1789,7 @@ export default function ShapeFoldPage() {
                     <strong>Opening the paper…</strong>
                   ) : phase === "wrong-review" ? (
                     <strong className={styles.wrongText}>
-                      {round.hiddenFoldIndex !== undefined
+                      {round.difficulty === "Wizard"
                         ? "Not quite · this opening pattern does not match"
                         : `Not quite · ${differenceCount} ${
                             differenceCount === 1
@@ -1859,7 +1863,7 @@ export default function ShapeFoldPage() {
                     const missedRound = missed.round;
                     const wrongPattern = missedRound.options[chosenIndex];
                     const reviewComparison =
-                      missedRound.hiddenFoldIndex === undefined
+                      missedRound.difficulty !== "Wizard"
                         ? compareHolePatterns(
                             wrongPattern,
                             missedRound.correctPattern,

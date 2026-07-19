@@ -11,13 +11,15 @@ import {
   applyFolds,
   buildRounds,
   describePattern,
+  difficultyPunchBounds,
+  foldDirectionCandidates,
   generateInfiniteRound,
-  hiddenDirectionCandidates,
   patternDifference,
   patternKey,
   patternsEqual,
   roundFingerprint,
   unfoldPunch,
+  unfoldPunches,
   unfoldStages,
   validateRound,
 } from "../app/games/shape-fold/game-engine.ts";
@@ -40,7 +42,7 @@ test("the reviewed Campaign source is a frozen 48-round corpus", () => {
     createHash("sha256")
       .update(JSON.stringify(CAMPAIGN_ROUND_SPECS))
       .digest("hex"),
-    "8bc38623786990abe7314d736010d26b6fcad0d9fecf7ea0d119ad7a8a3d3a0e",
+    "63d9759f43a83f440ee58ac333f47dcad3d1b990da633b49d94e848755d5f559",
   );
   for (const spec of CAMPAIGN_ROUND_SPECS) {
     assert.ok(!("foldSteps" in spec));
@@ -81,14 +83,17 @@ test("authored rounds calculate one exact answer with distinct close options", (
   for (const round of ROUNDS) {
     assert.deepEqual(validateRound(round), []);
     assert.equal(new Set(round.options.map(patternKey)).size, 4);
-    const calculated = unfoldPunch(round.folds, round.punch);
+    const calculated = unfoldPunches(round.folds, round.punches);
     assert.ok(patternsEqual(calculated, round.correctPattern));
     assert.equal(
       round.options.filter((option) => patternsEqual(option, calculated))
         .length,
       1,
     );
-    assert.equal(2 ** round.folds.length, round.correctPattern.length);
+    assert.equal(
+      round.punches.length * 2 ** round.folds.length,
+      round.correctPattern.length,
+    );
     assert.ok(
       round.options.some((option, optionIndex) => {
         if (optionIndex === round.correctIndex) return false;
@@ -105,9 +110,15 @@ test("authored fingerprints stay unique across all 48 puzzles", () => {
 
 test("difficulty comes from reasoning depth rather than added clutter", () => {
   for (const difficulty of DIFFICULTIES) {
+    const punchBounds = difficultyPunchBounds(difficulty);
     for (const round of roundsAt(difficulty)) {
       assert.equal(round.folds.length, FOLD_COUNTS[difficulty]);
-      assert.equal(round.correctPattern.length, 2 ** FOLD_COUNTS[difficulty]);
+      assert.ok(round.punches.length >= punchBounds.minimum);
+      assert.ok(round.punches.length <= punchBounds.maximum);
+      assert.equal(
+        round.correctPattern.length,
+        round.punches.length * 2 ** FOLD_COUNTS[difficulty],
+      );
       if (difficulty === "Hard" || difficulty === "Wizard") {
         const axes = new Set(
           round.folds.map((direction) =>
@@ -122,19 +133,26 @@ test("difficulty comes from reasoning depth rather than added clutter", () => {
   }
 });
 
-test("Wizard matches Expert complexity and hides only an inferable cue", () => {
+test("Expert and Wizard share a reviewed 2/3-punch complexity profile", () => {
+  for (const difficulty of ["Hard", "Wizard"]) {
+    const distribution = roundsAt(difficulty).reduce(
+      (counts, round) => {
+        counts[round.punches.length] =
+          (counts[round.punches.length] ?? 0) + 1;
+        return counts;
+      },
+      {},
+    );
+    assert.deepEqual(distribution, { 2: 6, 3: 6 });
+  }
+});
+
+test("every Wizard direction stays inferable while all cues are hidden", () => {
   for (const round of roundsAt("Wizard")) {
     assert.equal(round.folds.length, 3);
-    assert.equal(round.correctPattern.length, 8);
-    assert.ok(Number.isInteger(round.hiddenFoldIndex));
-    assert.deepEqual(hiddenDirectionCandidates(round), [
-      round.folds[round.hiddenFoldIndex],
-    ]);
-  }
-  for (const round of roundsAt("Hard")) {
-    assert.equal(round.folds.length, 3);
-    assert.equal(round.correctPattern.length, 8);
-    assert.equal(round.hiddenFoldIndex, undefined);
+    round.foldSteps.forEach((step) => {
+      assert.deepEqual(foldDirectionCandidates(step), [step.direction]);
+    });
   }
 });
 
@@ -198,8 +216,15 @@ test("validation rejects corrupted prompt geometry and option semantics", () => 
     /folded bounds/,
   );
   assert.match(
-    validateRound({ ...round, punch: { x: -1, y: 2 } }).join("; "),
-    /punch must be an integer cell inside/,
+    validateRound({ ...round, punches: [{ x: -1, y: 2 }] }).join("; "),
+    /punches must be unique integer cells inside/,
+  );
+  assert.match(
+    validateRound({
+      ...round,
+      punches: [round.punches[0], round.punches[0]],
+    }).join("; "),
+    /expected 1 punches|punches must be unique/,
   );
   assert.match(
     validateRound({
@@ -215,23 +240,59 @@ test("validation rejects corrupted prompt geometry and option semantics", () => 
     }).join("; "),
     /integer cells on the paper/,
   );
+
+  const expert = roundsAt("Hard")[0];
+  assert.match(
+    validateRound({ ...expert, punches: [expert.punches[0]] }).join("; "),
+    /expected 2-3 punches/,
+  );
+  assert.match(
+    validateRound({
+      ...expert,
+      punches: [
+        ...expert.punches,
+        { x: expert.foldedBounds.x, y: expert.foldedBounds.y },
+        {
+          x: expert.foldedBounds.x + expert.foldedBounds.width - 1,
+          y: expert.foldedBounds.y + expert.foldedBounds.height - 1,
+        },
+      ],
+    }).join("; "),
+    /expected 2-3 punches/,
+  );
 });
 
 test("unfold stages double the visible openings at every honest reverse fold", () => {
   for (const round of ROUNDS) {
-    const stages = unfoldStages(round.folds, round.punch);
+    const stages = unfoldStages(round.folds, round.punches);
     assert.equal(stages.length, round.folds.length + 1);
     stages.forEach((stage, index) => {
-      assert.equal(stage.length, 2 ** index);
+      assert.equal(stage.length, round.punches.length * 2 ** index);
     });
     assert.ok(patternsEqual(stages.at(-1), round.correctPattern));
   }
 });
 
+test("Expert wrong-punch choices preserve all but one complete punch orbit", () => {
+  for (const difficulty of ["Hard", "Wizard"]) {
+    for (const round of roundsAt(difficulty)) {
+      assert.ok(round.correctPattern.length <= 24);
+      round.options.forEach((option, optionIndex) => {
+        if (round.optionKinds[optionIndex] !== "wrong-punch") return;
+        const difference = patternDifference(option, round.correctPattern);
+        assert.equal(difference.missing.length, 8);
+        assert.equal(difference.extra.length, 8);
+      });
+    }
+  }
+});
+
 test("1,600 seeded generated rounds satisfy all invariants and level bounds", () => {
   for (const difficulty of DIFFICULTIES) {
+    const punchCounts = new Set();
     for (let seed = 0; seed < 400; seed += 1) {
       const round = generateInfiniteRound(difficulty, seed);
+      punchCounts.add(round.punches.length);
       assert.deepEqual(validateRound(round), []);
       assert.equal(round.folds.length, FOLD_COUNTS[difficulty]);
       assert.equal(new Set(round.options.map(patternKey)).size, 4);
@@ -242,6 +303,10 @@ test("1,600 seeded generated rounds satisfy all invariants and level bounds", ()
         1,
       );
     }
+    assert.deepEqual(
+      [...punchCounts].sort(),
+      difficulty === "Hard" || difficulty === "Wizard" ? [2, 3] : [1],
+    );
   }
 });
 
@@ -303,6 +368,21 @@ test("fingerprints ignore answer ordering", () => {
   assert.equal(roundFingerprint(round), roundFingerprint(reversed));
 });
 
+test("fingerprints ignore punch ordering but preserve the punch set", () => {
+  const round = roundsAt("Hard").find(({ punches }) => punches.length === 3);
+  const reversed = {
+    ...round,
+    punches: [...round.punches].reverse(),
+  };
+  assert.equal(roundFingerprint(round), roundFingerprint(reversed));
+
+  const changed = {
+    ...round,
+    punches: round.punches.slice(1),
+  };
+  assert.notEqual(roundFingerprint(round), roundFingerprint(changed));
+});
+
 test("hostile random sources fail at a clear bounded error", () => {
   assert.throws(
     () => generateInfiniteRound("Easy", () => Number.NaN),
@@ -328,7 +408,7 @@ test("hostile random sources fail at a clear bounded error", () => {
       ),
     PuzzleGenerationError,
   );
-  assert.ok(calls > 0 && calls < 1_000);
+  assert.ok(calls > 0 && calls < 10_000);
 });
 
 test("authored rounds build without consulting ambient randomness", () => {

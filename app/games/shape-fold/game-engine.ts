@@ -39,12 +39,11 @@ export type Round = Readonly<{
   folds: readonly FoldDirection[];
   foldSteps: readonly FoldStep[];
   foldedBounds: Bounds;
-  punch: Point;
+  punches: HolePattern;
   correctPattern: HolePattern;
   options: readonly HolePattern[];
   optionKinds: readonly OptionKind[];
   correctIndex: number;
-  hiddenFoldIndex?: number;
 }>;
 
 export type PatternDifference = Readonly<{
@@ -79,6 +78,15 @@ const FOLD_COUNTS: Record<Difficulty, number> = {
   Medium: 2,
   Hard: 3,
   Wizard: 3,
+};
+const PUNCH_COUNT_BOUNDS: Record<
+  Difficulty,
+  Readonly<{ minimum: number; maximum: number }>
+> = {
+  Easy: { minimum: 1, maximum: 1 },
+  Medium: { minimum: 1, maximum: 1 },
+  Hard: { minimum: 2, maximum: 3 },
+  Wizard: { minimum: 2, maximum: 3 },
 };
 
 const DIRECTION_LABELS: Record<FoldDirection, string> = {
@@ -324,10 +332,10 @@ export function applyFolds(
 
 export function unfoldStages(
   folds: readonly FoldDirection[],
-  punch: Point,
+  punches: HolePattern,
 ): readonly HolePattern[] {
   const steps = buildFoldSteps(folds);
-  const stages: HolePattern[] = [normalizePattern([punch])];
+  const stages: HolePattern[] = [normalizePattern(punches)];
   let holes: HolePattern = stages[0];
 
   for (let index = steps.length - 1; index >= 0; index -= 1) {
@@ -341,11 +349,18 @@ export function unfoldStages(
   return stages;
 }
 
+export function unfoldPunches(
+  folds: readonly FoldDirection[],
+  punches: HolePattern,
+): HolePattern {
+  return unfoldStages(folds, punches).at(-1) ?? [];
+}
+
 export function unfoldPunch(
   folds: readonly FoldDirection[],
   punch: Point,
 ): HolePattern {
-  return unfoldStages(folds, punch).at(-1) ?? [];
+  return unfoldPunches(folds, [punch]);
 }
 
 function mulberry32(seed: number): RandomSource {
@@ -409,11 +424,23 @@ function chooseFolds(
   return axes.map((axis) => chooseDirection(axis, random));
 }
 
-function choosePunch(bounds: Bounds, random: RandomSource): Point {
-  return {
-    x: bounds.x + randomInt(random, bounds.width),
-    y: bounds.y + randomInt(random, bounds.height),
-  };
+function choosePunches(
+  bounds: Bounds,
+  count: number,
+  random: RandomSource,
+): HolePattern {
+  const cells: Point[] = [];
+  for (let y = bounds.y; y < bounds.y + bounds.height; y += 1) {
+    for (let x = bounds.x; x < bounds.x + bounds.width; x += 1) {
+      cells.push({ x, y });
+    }
+  }
+
+  for (let index = cells.length - 1; index > 0; index -= 1) {
+    const swapIndex = randomInt(random, index + 1);
+    [cells[index], cells[swapIndex]] = [cells[swapIndex], cells[index]];
+  }
+  return normalizePattern(cells.slice(0, count));
 }
 
 function nearestEmptyPoint(
@@ -482,26 +509,49 @@ function buildNearMiss(
   return null;
 }
 
-function adjacentPunches(bounds: Bounds, punch: Point): readonly Point[] {
-  const candidates = [
-    { x: punch.x + 1, y: punch.y },
-    { x: punch.x, y: punch.y + 1 },
-    { x: punch.x - 1, y: punch.y },
-    { x: punch.x, y: punch.y - 1 },
+function adjacentPunchPatterns(
+  bounds: Bounds,
+  punches: HolePattern,
+): readonly HolePattern[] {
+  const occupied = new Set(punches.map(pointKey));
+  const patterns = new Map<string, HolePattern>();
+  const offsets = [
+    { x: 1, y: 0 },
+    { x: 0, y: 1 },
+    { x: -1, y: 0 },
+    { x: 0, y: -1 },
   ];
-  return candidates.filter(
-    (candidate) =>
-      candidate.x >= bounds.x &&
-      candidate.x < bounds.x + bounds.width &&
-      candidate.y >= bounds.y &&
-      candidate.y < bounds.y + bounds.height,
-  );
+
+  punches.forEach((punch, punchIndex) => {
+    offsets.forEach((offset) => {
+      const replacement = {
+        x: punch.x + offset.x,
+        y: punch.y + offset.y,
+      };
+      if (
+        replacement.x < bounds.x ||
+        replacement.x >= bounds.x + bounds.width ||
+        replacement.y < bounds.y ||
+        replacement.y >= bounds.y + bounds.height ||
+        occupied.has(pointKey(replacement))
+      ) {
+        return;
+      }
+      const pattern = normalizePattern(
+        punches.map((point, index) =>
+          index === punchIndex ? replacement : point,
+        ),
+      );
+      patterns.set(patternKey(pattern), pattern);
+    });
+  });
+  return [...patterns.values()];
 }
 
 function buildDistractors(
   folds: readonly FoldDirection[],
   foldedBounds: Bounds,
-  punch: Point,
+  punches: HolePattern,
   correctPattern: HolePattern,
   salt: number,
 ): readonly Readonly<{ pattern: HolePattern; kind: OptionKind }>[] {
@@ -519,10 +569,10 @@ function buildDistractors(
     break;
   }
 
-  const wrongPunches = adjacentPunches(foldedBounds, punch);
+  const wrongPunches = adjacentPunchPatterns(foldedBounds, punches);
   for (let offset = 0; offset < wrongPunches.length; offset += 1) {
     const candidate = wrongPunches[(offset + salt) % wrongPunches.length];
-    const pattern = unfoldPunch(folds, candidate);
+    const pattern = unfoldPunches(folds, candidate);
     if (seen.has(patternKey(pattern))) continue;
     distractors.push({ pattern, kind: "wrong-punch" });
     seen.add(patternKey(pattern));
@@ -551,13 +601,17 @@ function buildRound(
 ): Round {
   const folds = chooseFolds(difficulty, random);
   const foldedState = applyFolds(folds);
-  const punch = choosePunch(foldedState.bounds, random);
-  const correctPattern = unfoldPunch(folds, punch);
+  const punchBounds = PUNCH_COUNT_BOUNDS[difficulty];
+  const punchCount =
+    punchBounds.minimum +
+    randomInt(random, punchBounds.maximum - punchBounds.minimum + 1);
+  const punches = choosePunches(foldedState.bounds, punchCount, random);
+  const correctPattern = unfoldPunches(folds, punches);
   const salt = randomInt(random, 10_000);
   const distractors = buildDistractors(
     folds,
     foldedState.bounds,
-    punch,
+    punches,
     correctPattern,
     salt,
   );
@@ -584,14 +638,11 @@ function buildRound(
     folds,
     foldSteps: foldedState.steps,
     foldedBounds: foldedState.bounds,
-    punch,
+    punches,
     correctPattern,
     options,
     optionKinds,
     correctIndex,
-    ...(difficulty === "Wizard"
-      ? { hiddenFoldIndex: randomInt(random, folds.length) }
-      : {}),
   };
   const errors = validateRound(round);
   if (errors.length > 0) {
@@ -632,7 +683,9 @@ export function generateInfiniteRound(
   throw new PuzzleGenerationError(difficulty);
 }
 
-function directionCandidatesForStep(step: FoldStep): readonly FoldDirection[] {
+export function foldDirectionCandidates(
+  step: FoldStep,
+): readonly FoldDirection[] {
   const directions: readonly FoldDirection[] = [
     "left",
     "right",
@@ -649,14 +702,6 @@ function directionCandidatesForStep(step: FoldStep): readonly FoldDirection[] {
       candidate.height === step.after.height
     );
   });
-}
-
-export function hiddenDirectionCandidates(
-  round: Round,
-): readonly FoldDirection[] {
-  if (round.hiddenFoldIndex === undefined) return [];
-  const step = round.foldSteps[round.hiddenFoldIndex];
-  return step ? directionCandidatesForStep(step) : [];
 }
 
 function boundsEqual(first: Bounds, second: Bounds): boolean {
@@ -725,6 +770,14 @@ export function validateRound(round: Round): readonly string[] {
   if (round.optionKinds.length !== round.options.length) {
     errors.push("option kinds must align with the options");
   }
+  if (
+    round.optionKinds.filter((kind) => kind === "near-miss").length !== 1 ||
+    round.optionKinds.filter((kind) => kind === "wrong-punch").length !== 2
+  ) {
+    errors.push(
+      "expected one near-miss and two wrong-punch alternatives",
+    );
+  }
   if (new Set(round.options.map(patternKey)).size !== round.options.length) {
     errors.push("options must be distinct");
   }
@@ -733,7 +786,7 @@ export function validateRound(round: Round): readonly string[] {
   let computedCorrect: HolePattern = [];
   try {
     foldedState = applyFolds(round.folds);
-    computedCorrect = unfoldPunch(round.folds, round.punch);
+    computedCorrect = unfoldPunches(round.folds, round.punches);
   } catch {
     errors.push("fold sequence is not geometrically valid");
   }
@@ -745,19 +798,40 @@ export function validateRound(round: Round): readonly string[] {
     if (!boundsEqual(round.foldedBounds, foldedState.bounds)) {
       errors.push("folded bounds do not match the fold sequence");
     }
+    const punchBounds = PUNCH_COUNT_BOUNDS[round.difficulty];
     if (
-      !validBoardPoint(round.punch) ||
-      !pointInsideBounds(round.punch, foldedState.bounds)
+      round.punches.length < punchBounds.minimum ||
+      round.punches.length > punchBounds.maximum
     ) {
-      errors.push("punch must be an integer cell inside the folded paper");
+      errors.push(
+        `expected ${punchBounds.minimum}${
+          punchBounds.minimum === punchBounds.maximum
+            ? ""
+            : `-${punchBounds.maximum}`
+        } punches`,
+      );
     }
-    const punchedLayer = foldedState.layers.find(
-      ({ position }) => pointKey(position) === pointKey(round.punch),
-    );
     if (
-      !punchedLayer ||
-      !patternsEqual(punchedLayer.originals, round.correctPattern)
+      round.punches.some(
+        (punch) =>
+          !validBoardPoint(punch) ||
+          !pointInsideBounds(punch, foldedState.bounds),
+      ) ||
+      new Set(round.punches.map(pointKey)).size !== round.punches.length
     ) {
+      errors.push(
+        "punches must be unique integer cells inside the folded paper",
+      );
+    }
+    const independentPattern = normalizePattern(
+      round.punches.flatMap((punch) => {
+        const layer = foldedState?.layers.find(
+          ({ position }) => pointKey(position) === pointKey(punch),
+        );
+        return layer?.originals ?? [];
+      }),
+    );
+    if (!patternsEqual(independentPattern, round.correctPattern)) {
       errors.push("correct pattern does not match the independent fold stack");
     }
   }
@@ -823,8 +897,8 @@ export function validateRound(round: Round): readonly string[] {
 
   if (foldedState) {
     const legalWrongPunches = new Set(
-      adjacentPunches(foldedState.bounds, round.punch).map((punch) =>
-        patternKey(unfoldPunch(round.folds, punch)),
+      adjacentPunchPatterns(foldedState.bounds, round.punches).map((punches) =>
+        patternKey(unfoldPunches(round.folds, punches)),
       ),
     );
     round.options.forEach((option, index) => {
@@ -837,7 +911,7 @@ export function validateRound(round: Round): readonly string[] {
     });
   }
 
-  const expectedHoleCount = 2 ** round.folds.length;
+  const expectedHoleCount = round.punches.length * 2 ** round.folds.length;
   if (
     round.options.some(
       (option) => normalizePattern(option).length !== expectedHoleCount,
@@ -850,48 +924,38 @@ export function validateRound(round: Round): readonly string[] {
     );
   }
   if (round.difficulty === "Wizard") {
-    if (round.hiddenFoldIndex === undefined) {
-      errors.push("wizard round must hide one fold cue");
-    } else if (
-      !Number.isInteger(round.hiddenFoldIndex) ||
-      round.hiddenFoldIndex < 0 ||
-      round.hiddenFoldIndex >= round.folds.length
+    if (
+      round.foldSteps.some((step) => {
+        const candidates = foldDirectionCandidates(step);
+        return candidates.length !== 1 || candidates[0] !== step.direction;
+      })
     ) {
-      errors.push("hidden fold index must identify a real fold");
-    } else if (hiddenDirectionCandidates(round).length !== 1) {
-      errors.push("hidden fold must remain uniquely inferable");
+      errors.push("wizard folds must remain uniquely inferable");
     }
-  } else if (round.hiddenFoldIndex !== undefined) {
-    errors.push("only wizard rounds hide a fold cue");
   }
   return errors;
 }
 
 export function roundFingerprint(round: Round): string {
   const folds = round.folds.join(",");
-  const hidden =
-    round.hiddenFoldIndex === undefined ? "shown" : round.hiddenFoldIndex;
-  return `${round.difficulty}|${folds}|${pointKey(
-    round.punch,
-  )}|${hidden}|${patternKey(round.correctPattern)}`;
+  return `${round.difficulty}|${folds}|${patternKey(
+    round.punches,
+  )}|${patternKey(round.correctPattern)}`;
 }
 
 function buildCampaignRound(spec: CampaignRoundSpec): Round {
   const foldedState = applyFolds(spec.folds);
-  const correctPattern = unfoldPunch(spec.folds, spec.punch);
+  const correctPattern = unfoldPunches(spec.folds, spec.punches);
   const round: Round = {
     difficulty: spec.difficulty,
     folds: spec.folds,
     foldSteps: foldedState.steps,
     foldedBounds: foldedState.bounds,
-    punch: spec.punch,
+    punches: spec.punches,
     correctPattern,
     options: spec.options,
     optionKinds: spec.optionKinds,
     correctIndex: spec.correctIndex,
-    ...(spec.hiddenFoldIndex === undefined
-      ? {}
-      : { hiddenFoldIndex: spec.hiddenFoldIndex }),
   };
   const errors = validateRound(round);
   if (errors.length > 0) {
@@ -932,14 +996,13 @@ export const TUTORIAL = Object.freeze({
 
 export function describeFoldSequence(
   folds: readonly FoldDirection[],
-  hiddenFoldIndex?: number,
+  hideDirections = false,
 ): string {
+  if (hideDirections) {
+    return `${folds.length} folds are shown without direction arrows; infer each fold from the changing paper position`;
+  }
   return folds
-    .map((direction, index) =>
-      index === hiddenFoldIndex
-        ? `fold ${index + 1} has a hidden arrow; infer it from the paper position`
-        : DIRECTION_LABELS[direction],
-    )
+    .map((direction) => DIRECTION_LABELS[direction])
     .join(", then ");
 }
 
@@ -958,6 +1021,12 @@ export const describePattern = describeHolePattern;
 
 export function difficultyFoldCount(difficulty: Difficulty): number {
   return FOLD_COUNTS[difficulty];
+}
+
+export function difficultyPunchBounds(
+  difficulty: Difficulty,
+): Readonly<{ minimum: number; maximum: number }> {
+  return PUNCH_COUNT_BOUNDS[difficulty];
 }
 
 export function oppositeFoldDirection(
