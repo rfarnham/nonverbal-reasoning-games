@@ -391,8 +391,17 @@ function TransformTutorialModal({
   onContinue: () => void;
 }) {
   const transformedPattern = applyTransform(TUTORIAL.clue, transform);
-  const moverStyle = {
+  const diagonalAxis =
+    transform.kind === "reflection" &&
+    (transform.axis === "main-diagonal" ||
+      transform.axis === "anti-diagonal")
+      ? transform.axis
+      : null;
+  const motionStyle = {
     "--tutorial-transform": ghostTransformCss(transform),
+    "--tutorial-axis-y": diagonalAxis === "anti-diagonal" ? "-1" : "1",
+    "--tutorial-guide-turn":
+      diagonalAxis === "anti-diagonal" ? "-45deg" : "45deg",
   } as CustomProperties;
   const title = transformTutorialTitle(transform);
 
@@ -420,8 +429,21 @@ function TransformTutorialModal({
             />
             <span>Before</span>
           </div>
-          <div className={styles.tutorialDemoMotion} aria-hidden="true">
-            <div className={styles.tutorialDemoMover} style={moverStyle}>
+          <div
+            className={`${styles.tutorialDemoMotion} ${
+              diagonalAxis ? styles.tutorialDiagonalMotion : ""
+            }`}
+            style={motionStyle}
+            aria-hidden="true"
+          >
+            {diagonalAxis ? (
+              <span className={styles.tutorialDiagonalGuide} />
+            ) : null}
+            <div
+              className={`${styles.tutorialDemoMover} ${
+                diagonalAxis ? styles.tutorialDiagonalMover : ""
+              }`}
+            >
               <PatternGrid pattern={TUTORIAL.clue} size="tutorialPattern" hidden />
             </div>
           </div>
@@ -465,9 +487,9 @@ function ghostTransformCss(transform: PuzzleTransform) {
     case "horizontal":
       return "rotateX(180deg)";
     case "main-diagonal":
-      return "rotate(45deg) rotateX(180deg) rotate(-45deg)";
+      return "rotate3d(1, 1, 0, 180deg)";
     case "anti-diagonal":
-      return "rotate(-45deg) rotateX(180deg) rotate(45deg)";
+      return "rotate3d(1, -1, 0, 180deg)";
   }
 }
 
