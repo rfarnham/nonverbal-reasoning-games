@@ -56,7 +56,11 @@ type CampaignReviewSelection = {
   level: CampaignLevel;
   problemIndex: number;
 };
-type PaperSize = "sequencePaper" | "answerPaper" | "tutorialPaper" | "reviewPaper" | "unfoldPaper";
+type PaperSize =
+  | "sequencePaper"
+  | "answerPaper"
+  | "tutorialPaper"
+  | "reviewPaper";
 
 type SessionRound = {
   id: string;
@@ -91,7 +95,9 @@ const CAMPAIGN_LEVELS: readonly CampaignLevel[] = [
   "Wizard",
 ];
 const CAMPAIGN_PROBLEMS_PER_LEVEL = 12;
-const UNFOLD_ANIMATION_MS = 900;
+const UNFOLD_FLIP_MS = 1000;
+const UNFOLD_STAGE_MS = 1120;
+const REDUCED_UNFOLD_MS = 140;
 const WRONG_REVIEW_MS = 2200;
 const REDUCED_WRONG_REVIEW_MS = 1300;
 const FULL_BOUNDS: Bounds = {
@@ -261,6 +267,113 @@ function PaperDiagram({
           </span>
         );
       })}
+    </div>
+  );
+}
+
+function unfoldDirectionClass(direction: FoldDirection): string {
+  switch (direction) {
+    case "left":
+      return styles.unfoldLeft;
+    case "right":
+      return styles.unfoldRight;
+    case "up":
+      return styles.unfoldUp;
+    case "down":
+      return styles.unfoldDown;
+  }
+}
+
+function UnfoldLayer({
+  holes,
+  bounds,
+  className,
+}: {
+  holes: HolePattern;
+  bounds: Bounds;
+  className: string;
+}) {
+  const holesSet = new Set(holes.map(cellKey));
+  const style: CSSProperties = {
+    left: `${(bounds.x / BOARD_SIZE) * 100}%`,
+    top: `${(bounds.y / BOARD_SIZE) * 100}%`,
+    width: `${(bounds.width / BOARD_SIZE) * 100}%`,
+    height: `${(bounds.height / BOARD_SIZE) * 100}%`,
+    gridTemplateColumns: `repeat(${bounds.width}, minmax(0, 1fr))`,
+    gridTemplateRows: `repeat(${bounds.height}, minmax(0, 1fr))`,
+  };
+
+  return (
+    <div
+      className={`${styles.unfoldLayer} ${className}`}
+      style={style}
+      aria-hidden="true"
+    >
+      {Array.from({ length: bounds.width * bounds.height }, (_, index) => {
+        const x = bounds.x + (index % bounds.width);
+        const y = bounds.y + Math.floor(index / bounds.width);
+        const key = `${x},${y}`;
+        return (
+          <span
+            className={`${styles.paperCell} ${styles.activeCell}`}
+            aria-hidden="true"
+            key={key}
+          >
+            {holesSet.has(key) ? <span className={styles.opening} /> : null}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function UnfoldingPaper({
+  round,
+  holes,
+  stageIndex,
+  complete,
+}: {
+  round: Round;
+  holes: HolePattern;
+  stageIndex: number;
+  complete: boolean;
+}) {
+  const bounds = boundsForUnfoldStage(round, stageIndex);
+  const openingStep = complete
+    ? undefined
+    : round.foldSteps[round.foldSteps.length - stageIndex - 1];
+  const foldNumber = Math.min(stageIndex + 1, round.folds.length);
+
+  return (
+    <div
+      className={styles.unfoldScene}
+      style={
+        {
+          "--unfold-flip-duration": `${UNFOLD_FLIP_MS}ms`,
+        } as CustomProperties
+      }
+      role="img"
+      aria-label={
+        complete
+          ? `Paper opened: ${describePattern(holes)}`
+          : `Opening the paper, fold ${foldNumber} of ${round.folds.length}`
+      }
+    >
+      <UnfoldLayer
+        holes={holes}
+        bounds={bounds}
+        className={styles.unfoldBaseLayer}
+      />
+      {openingStep ? (
+        <UnfoldLayer
+          key={`${openingStep.index}-${stageIndex}`}
+          holes={holes}
+          bounds={bounds}
+          className={`${styles.unfoldFlap} ${unfoldDirectionClass(
+            openingStep.direction,
+          )}`}
+        />
+      ) : null}
     </div>
   );
 }
@@ -705,21 +818,28 @@ export default function ShapeFoldPage() {
       if (isCorrect) {
         setPhase("animating");
         const stageCount = Math.max(unfoldPatterns.length, 1);
+        const foldCount = Math.max(stageCount - 1, 0);
+        if (reducedMotion) {
+          setRevealStage(stageCount - 1);
+          attemptTimersRef.current.push(
+            setTimeout(() => {
+              if (animationTokenRef.current !== animationToken) return;
+              setPhase("answered");
+            }, REDUCED_UNFOLD_MS),
+          );
+          return;
+        }
         for (let stage = 1; stage < stageCount; stage += 1) {
-          const delay = reducedMotion
-            ? 35 * stage
-            : Math.round((UNFOLD_ANIMATION_MS * stage) / (stageCount - 1));
           attemptTimersRef.current.push(
             setTimeout(() => {
               if (animationTokenRef.current === animationToken) {
                 setRevealStage(stage);
               }
-            }, delay),
+            }, UNFOLD_STAGE_MS * stage),
           );
         }
-        const finishDelay = reducedMotion
-          ? Math.max(140, 35 * stageCount)
-          : UNFOLD_ANIMATION_MS + 30;
+        const finishDelay =
+          Math.max(UNFOLD_STAGE_MS * foldCount, UNFOLD_FLIP_MS) + 30;
         attemptTimersRef.current.push(
           setTimeout(() => {
             if (animationTokenRef.current !== animationToken) return;
@@ -1545,22 +1665,22 @@ export default function ShapeFoldPage() {
                     (phase === "animating" || phase === "answered") ? (
                       <div
                         className={styles.unfoldReveal}
-                        aria-label={`Opening the paper, step ${
-                          revealStage + 1
-                        } of ${unfoldPatterns.length}`}
                       >
                         <span className={styles.unfoldLabel}>
                           {phase === "answered"
                             ? "Paper opened"
-                            : `Open ${revealStage + 1} / ${
-                                unfoldPatterns.length
+                            : `Opening ${Math.min(
+                                revealStage + 1,
+                                round.folds.length,
+                              )} / ${
+                                round.folds.length
                               }`}
                         </span>
-                        <PaperDiagram
+                        <UnfoldingPaper
+                          round={round}
                           holes={currentUnfoldPattern}
-                          bounds={boundsForUnfoldStage(round, revealStage)}
-                          size="unfoldPaper"
-                          hidden
+                          stageIndex={revealStage}
+                          complete={phase === "answered"}
                         />
                       </div>
                     ) : null}

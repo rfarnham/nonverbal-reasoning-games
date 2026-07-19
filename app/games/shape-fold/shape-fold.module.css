@@ -351,8 +351,125 @@
   --paper-size: 78px;
 }
 
-.unfoldPaper {
+.unfoldScene {
   --paper-size: clamp(190px, 23vw, 248px);
+  width: var(--paper-size);
+  height: var(--paper-size);
+  position: relative;
+  flex: 0 0 auto;
+  isolation: isolate;
+  perspective: calc(var(--paper-size) * 3.2);
+  perspective-origin: center 42%;
+  transform-style: preserve-3d;
+}
+
+.unfoldLayer {
+  position: absolute;
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--ink);
+  border-radius: calc(var(--paper-size) * 0.022);
+  background: var(--panel);
+  box-shadow: 0 2px 0 rgb(23 33 61 / 8%);
+  transform-style: preserve-3d;
+  backface-visibility: visible;
+  -webkit-backface-visibility: visible;
+}
+
+.unfoldLayer .paperCell {
+  transition: none;
+}
+
+.unfoldLayer .opening {
+  animation: none;
+}
+
+.unfoldBaseLayer {
+  z-index: 1;
+}
+
+.unfoldFlap {
+  z-index: 2;
+  animation-duration:
+    var(--unfold-flip-duration, 1000ms),
+    var(--unfold-flip-duration, 1000ms);
+  animation-delay: 60ms, 60ms;
+  animation-timing-function:
+    cubic-bezier(0.45, 0, 0.55, 1),
+    ease-in-out;
+  animation-fill-mode: both;
+  will-change: transform, box-shadow;
+}
+
+.unfoldLeft {
+  transform-origin: left center;
+  animation-name: unfoldLeft, unfoldLift;
+}
+
+.unfoldRight {
+  transform-origin: right center;
+  animation-name: unfoldRight, unfoldLift;
+}
+
+.unfoldUp {
+  transform-origin: center top;
+  animation-name: unfoldUp, unfoldLift;
+}
+
+.unfoldDown {
+  transform-origin: center bottom;
+  animation-name: unfoldDown, unfoldLift;
+}
+
+@keyframes unfoldLeft {
+  from {
+    transform: rotateY(0deg);
+  }
+
+  to {
+    transform: rotateY(-180deg);
+  }
+}
+
+@keyframes unfoldRight {
+  from {
+    transform: rotateY(0deg);
+  }
+
+  to {
+    transform: rotateY(180deg);
+  }
+}
+
+@keyframes unfoldUp {
+  from {
+    transform: rotateX(0deg);
+  }
+
+  to {
+    transform: rotateX(180deg);
+  }
+}
+
+@keyframes unfoldDown {
+  from {
+    transform: rotateX(0deg);
+  }
+
+  to {
+    transform: rotateX(-180deg);
+  }
+}
+
+@keyframes unfoldLift {
+  0%,
+  100% {
+    box-shadow: 0 2px 0 rgb(23 33 61 / 8%);
+  }
+
+  50% {
+    box-shadow: 0 16px 20px rgb(23 33 61 / 18%);
+  }
 }
 
 @keyframes openingReveal {
