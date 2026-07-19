@@ -13,13 +13,6 @@ export const gameInfo = {
 } satisfies GameInfo;
 
 export function ShelfIcon({ style, ...props }: ShelfIconProps) {
-  const crossings = [
-    { x: 120, y: 70, vertical: true, color: "#35a999" },
-    { x: 196, y: 70, vertical: false, color: "#f3bd4e" },
-    { x: 120, y: 116, vertical: false, color: "#7767d7" },
-    { x: 196, y: 116, vertical: true, color: "#f06f5f" },
-  ] as const;
-
   return (
     <svg
       {...props}
@@ -39,6 +32,50 @@ export function ShelfIcon({ style, ...props }: ShelfIconProps) {
         >
           <path d="M0 0 12 6 0 12Z" fill="#657087" />
         </marker>
+        <mask
+          id="braids-teal-strand"
+          x="48"
+          y="18"
+          width="224"
+          height="150"
+          maskUnits="userSpaceOnUse"
+        >
+          <rect x="48" y="18" width="224" height="150" fill="white" />
+          <rect x="106" y="102" width="28" height="28" fill="black" />
+        </mask>
+        <mask
+          id="braids-coral-strand"
+          x="48"
+          y="18"
+          width="224"
+          height="150"
+          maskUnits="userSpaceOnUse"
+        >
+          <rect x="48" y="18" width="224" height="150" fill="white" />
+          <rect x="182" y="56" width="28" height="28" fill="black" />
+        </mask>
+        <mask
+          id="braids-gold-strand"
+          x="48"
+          y="18"
+          width="224"
+          height="150"
+          maskUnits="userSpaceOnUse"
+        >
+          <rect x="48" y="18" width="224" height="150" fill="white" />
+          <rect x="106" y="56" width="28" height="28" fill="black" />
+        </mask>
+        <mask
+          id="braids-violet-strand"
+          x="48"
+          y="18"
+          width="224"
+          height="150"
+          maskUnits="userSpaceOnUse"
+        >
+          <rect x="48" y="18" width="224" height="150" fill="white" />
+          <rect x="182" y="102" width="28" height="28" fill="black" />
+        </mask>
       </defs>
       <path
         d="M286 105C301 62 271 34 224 37 190 40 169 30 160 14"
@@ -79,27 +116,22 @@ export function ShelfIcon({ style, ...props }: ShelfIconProps) {
       />
 
       <g fill="none" strokeLinecap="round">
-        <path d="M120 34v118" stroke="#17213d" strokeWidth="18" />
-        <path d="M120 34v118" stroke="#35a999" strokeWidth="13" />
-        <path d="M196 34v118" stroke="#17213d" strokeWidth="18" />
-        <path d="M196 34v118" stroke="#f06f5f" strokeWidth="13" />
-        <path d="M68 70h184" stroke="#17213d" strokeWidth="18" />
-        <path d="M68 70h184" stroke="#f3bd4e" strokeWidth="13" />
-        <path d="M68 116h184" stroke="#17213d" strokeWidth="18" />
-        <path d="M68 116h184" stroke="#7767d7" strokeWidth="13" />
-
-        {crossings.map(({ x, y, vertical, color }) => {
-          const path = vertical
-            ? `M${x} ${y - 18}v36`
-            : `M${x - 18} ${y}h36`;
-          return (
-            <g key={`${x}-${y}`}>
-              <path d={path} stroke="#fffdf8" strokeWidth="25" />
-              <path d={path} stroke="#17213d" strokeWidth="18" />
-              <path d={path} stroke={color} strokeWidth="13" />
-            </g>
-          );
-        })}
+        <g mask="url(#braids-teal-strand)">
+          <path d="M120 34v118" stroke="#17213d" strokeWidth="18" />
+          <path d="M120 34v118" stroke="#35a999" strokeWidth="13" />
+        </g>
+        <g mask="url(#braids-coral-strand)">
+          <path d="M196 34v118" stroke="#17213d" strokeWidth="18" />
+          <path d="M196 34v118" stroke="#f06f5f" strokeWidth="13" />
+        </g>
+        <g mask="url(#braids-gold-strand)">
+          <path d="M68 70h184" stroke="#17213d" strokeWidth="18" />
+          <path d="M68 70h184" stroke="#f3bd4e" strokeWidth="13" />
+        </g>
+        <g mask="url(#braids-violet-strand)">
+          <path d="M68 116h184" stroke="#17213d" strokeWidth="18" />
+          <path d="M68 116h184" stroke="#7767d7" strokeWidth="13" />
+        </g>
       </g>
 
       <path
