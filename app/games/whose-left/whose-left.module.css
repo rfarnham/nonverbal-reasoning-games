@@ -908,14 +908,14 @@
 .personInitial {
   fill: var(--ink);
   font-family: Inter, ui-sans-serif, sans-serif;
-  font-size: 2.05px;
+  font-size: 1.9px;
   font-weight: 900;
   pointer-events: none;
 }
 
 .routeRevealed .targetPerson .personToken {
   stroke: var(--side-accent);
-  stroke-width: 5px;
+  stroke-width: 4px;
 }
 
 .landmarkTether {
@@ -925,18 +925,19 @@
 .landmarkTetherHalo,
 .landmarkTetherLine {
   fill: none;
+  pointer-events: none;
   stroke-linecap: round;
 }
 
 .landmarkTetherHalo {
   stroke: var(--panel);
-  stroke-width: 5px;
+  stroke-width: 4.5px;
 }
 
 .landmarkTetherLine {
   stroke: var(--muted);
-  stroke-dasharray: 2px 3px;
-  stroke-width: 2px;
+  stroke-dasharray: 1px 2px;
+  stroke-width: 2.25px;
 }
 
 .sideLink {
@@ -1042,6 +1043,10 @@
 .routeCompact .routeSvg {
   height: 150px;
   min-height: 0;
+}
+
+.routeCompact .personInitial {
+  font-size: 2.05px;
 }
 
 .routeCompact .routePrompt {

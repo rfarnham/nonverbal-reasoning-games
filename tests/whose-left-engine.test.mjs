@@ -127,13 +127,18 @@ function assertExactLandmarkLinks(round, context = round.id) {
     context,
   );
 
-  for (const { person, anchor } of links) {
+  for (const { person, anchor, markerPosition } of links) {
     const segment = round.route.segments[person.segmentIndex];
     assert.ok(segment, `${context}:${person.id}`);
     assert.ok(
-      [person.position.x, person.position.y, anchor.x, anchor.y].every(
-        Number.isFinite,
-      ),
+      [
+        person.position.x,
+        person.position.y,
+        anchor.x,
+        anchor.y,
+        markerPosition.x,
+        markerPosition.y,
+      ].every(Number.isFinite),
       `${context}:${person.id}: tether coordinates must be finite`,
     );
     assert.ok(
@@ -153,6 +158,43 @@ function assertExactLandmarkLinks(round, context = round.id) {
       Math.abs(segmentX * tetherX + segmentY * tetherY) < 1e-8,
       `${context}:${person.id}: tether must meet assigned segment perpendicularly`,
     );
+    const renderedTetherX = markerPosition.x - anchor.x;
+    const renderedTetherY = markerPosition.y - anchor.y;
+    const markerExtensionX = markerPosition.x - person.position.x;
+    const markerExtensionY = markerPosition.y - person.position.y;
+    const logicalTetherLength = Math.hypot(tetherX, tetherY);
+    const renderedTetherLength = Math.hypot(
+      renderedTetherX,
+      renderedTetherY,
+    );
+    assert.ok(
+      Math.abs(segmentX * renderedTetherX + segmentY * renderedTetherY) < 1e-8,
+      `${context}:${person.id}: rendered tether must remain perpendicular`,
+    );
+    assert.ok(
+      renderedTetherX * tetherX + renderedTetherY * tetherY > 0,
+      `${context}:${person.id}: marker must extend away from its anchor`,
+    );
+    assert.ok(
+      markerExtensionX * tetherX + markerExtensionY * tetherY > 0,
+      `${context}:${person.id}: visual extension must point outward`,
+    );
+    assert.ok(
+      Math.abs(Math.hypot(markerExtensionX, markerExtensionY) - 0.4) < 1e-9,
+      `${context}:${person.id}: visual extension must have its authored length`,
+    );
+    assert.ok(
+      Math.abs(renderedTetherLength - logicalTetherLength - 0.4) < 1e-9,
+      `${context}:${person.id}: rendered tether must expose its full extension`,
+    );
+    const { minX, minY, width, height } = round.route.viewBox;
+    assert.ok(
+      markerPosition.x - 1.45 >= minX - 1e-9 &&
+        markerPosition.x + 1.45 <= minX + width + 1e-9 &&
+        markerPosition.y - 1.45 >= minY - 1e-9 &&
+        markerPosition.y + 1.45 <= minY + height + 1e-9,
+      `${context}:${person.id}: rendered marker must remain inside the viewBox`,
+    );
     assert.deepEqual(
       round.route.segments
         .filter((candidate) => distanceToSegment(anchor, candidate) < 1e-9)
@@ -160,13 +202,25 @@ function assertExactLandmarkLinks(round, context = round.id) {
       [person.segmentIndex],
       `${context}:${person.id}: anchor cannot sit on a crossing`,
     );
-    const tether = { from: anchor, to: person.position };
+    const tether = { from: anchor, to: markerPosition };
     for (const candidate of round.route.segments) {
       if (candidate.index === person.segmentIndex) continue;
       assert.equal(
         segmentsIntersect(tether, candidate),
         false,
         `${context}:${person.id}: tether cannot cross route section ${candidate.index}`,
+      );
+    }
+  }
+
+  for (const [index, first] of links.entries()) {
+    for (const second of links.slice(index + 1)) {
+      assert.ok(
+        Math.hypot(
+          first.markerPosition.x - second.markerPosition.x,
+          first.markerPosition.y - second.markerPosition.y,
+        ) > 2.9,
+        `${context}:${first.person.id}-${second.person.id}: rendered markers cannot overlap`,
       );
     }
   }

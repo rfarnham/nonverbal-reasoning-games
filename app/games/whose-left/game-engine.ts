@@ -38,6 +38,7 @@ export type Person = Readonly<{
 export type LandmarkLink = Readonly<{
   person: Person;
   anchor: Point;
+  markerPosition: Point;
 }>;
 
 export type ViewBox = Readonly<{
@@ -111,6 +112,7 @@ type AuthoredSpec = Readonly<{
 
 const EPSILON = 1e-9;
 const LANDMARK_OFFSET = 2.75;
+const LANDMARK_RENDER_EXTENSION = 0.4;
 const LANDMARK_PATH_CLEARANCE = 2.4;
 const LANDMARK_SEPARATION = 3.7;
 const ENDPOINT_LANDMARK_SEPARATION = 3.5;
@@ -1115,11 +1117,28 @@ export function landmarkLinksForRound(
           squaredLength,
       ),
     );
+    const anchor = {
+      x: segment.from.x + dx * projection,
+      y: segment.from.y + dy * projection,
+    };
+    const outwardX = person.position.x - anchor.x;
+    const outwardY = person.position.y - anchor.y;
+    const outwardLength = Math.hypot(outwardX, outwardY);
+    if (outwardLength < EPSILON) {
+      throw new Error(
+        `Cannot link ${person.id}: landmark lies on its route section.`,
+      );
+    }
     return {
       person,
-      anchor: {
-        x: segment.from.x + dx * projection,
-        y: segment.from.y + dy * projection,
+      anchor,
+      markerPosition: {
+        x:
+          person.position.x +
+          (outwardX / outwardLength) * LANDMARK_RENDER_EXTENSION,
+        y:
+          person.position.y +
+          (outwardY / outwardLength) * LANDMARK_RENDER_EXTENSION,
       },
     };
   });

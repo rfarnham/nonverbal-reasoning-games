@@ -72,20 +72,21 @@ function visitBadgePosition(
   round: Round,
   person: Person,
   anchor: Point,
+  markerPosition: Point,
 ): Point {
   const segment = round.route.segments[person.segmentIndex];
   if (!segment) return person.position;
-  const outwardX = person.position.x - anchor.x;
-  const outwardY = person.position.y - anchor.y;
+  const outwardX = markerPosition.x - anchor.x;
+  const outwardY = markerPosition.y - anchor.y;
   const outwardLength = Math.hypot(outwardX, outwardY) || 1;
   const segmentLength = segment.length || 1;
   return {
     x:
-      person.position.x +
+      markerPosition.x +
       (outwardX / outwardLength) * 1.45 +
       ((segment.to.x - segment.from.x) / segmentLength) * 1.1,
     y:
-      person.position.y +
+      markerPosition.y +
       (outwardY / outwardLength) * 1.45 +
       ((segment.to.y - segment.from.y) / segmentLength) * 1.1,
   };
@@ -230,6 +231,12 @@ export function RouteBoard({
   const landmarkAnchors = new Map(
     landmarkLinks.map(({ person, anchor }) => [person.id, anchor]),
   );
+  const landmarkMarkerPositions = new Map(
+    landmarkLinks.map(({ person, markerPosition }) => [
+      person.id,
+      markerPosition,
+    ]),
+  );
   const targetOrder = new Map(
     round.correctSequence.map((personId, index) => [personId, index + 1]),
   );
@@ -274,7 +281,25 @@ export function RouteBoard({
         role="img"
         aria-label={boardLabel}
       >
-        {landmarkLinks.map(({ person, anchor }) => {
+        {landmarkLinks.map(({ person, anchor, markerPosition }) => (
+          <line
+            className={styles.landmarkTetherHalo}
+            x1={anchor.x}
+            y1={anchor.y}
+            x2={markerPosition.x}
+            y2={markerPosition.y}
+            vectorEffect="non-scaling-stroke"
+            aria-hidden="true"
+            key={`link-halo-${person.id}`}
+          />
+        ))}
+        <polyline
+          className={styles.routeUnderlay}
+          points={pathPoints}
+          fill="none"
+          vectorEffect="non-scaling-stroke"
+        />
+        {landmarkLinks.map(({ person, anchor, markerPosition }) => {
           const order = targetOrder.get(person.id);
           const linkStyle = {
             "--visit-delay": `${Math.max(0, (order ?? 1) - 1) * 90}ms`,
@@ -287,19 +312,11 @@ export function RouteBoard({
               key={`link-${person.id}`}
             >
               <line
-                className={styles.landmarkTetherHalo}
-                x1={anchor.x}
-                y1={anchor.y}
-                x2={person.position.x}
-                y2={person.position.y}
-                vectorEffect="non-scaling-stroke"
-              />
-              <line
                 className={styles.landmarkTetherLine}
                 x1={anchor.x}
                 y1={anchor.y}
-                x2={person.position.x}
-                y2={person.position.y}
+                x2={markerPosition.x}
+                y2={markerPosition.y}
                 vectorEffect="non-scaling-stroke"
               />
               {revealSide && order !== undefined ? (
@@ -307,20 +324,14 @@ export function RouteBoard({
                   className={styles.sideLink}
                   x1={anchor.x}
                   y1={anchor.y}
-                  x2={person.position.x}
-                  y2={person.position.y}
+                  x2={markerPosition.x}
+                  y2={markerPosition.y}
                   vectorEffect="non-scaling-stroke"
                 />
               ) : null}
             </g>
           );
         })}
-        <polyline
-          className={styles.routeUnderlay}
-          points={pathPoints}
-          fill="none"
-          vectorEffect="non-scaling-stroke"
-        />
         <polyline
           className={styles.routeLine}
           points={pathPoints}
@@ -376,7 +387,14 @@ export function RouteBoard({
           const order = targetOrder.get(person.id);
           const isTarget = order !== undefined;
           const anchor = landmarkAnchors.get(person.id) ?? person.position;
-          const badgePosition = visitBadgePosition(round, person, anchor);
+          const markerPosition =
+            landmarkMarkerPositions.get(person.id) ?? person.position;
+          const badgePosition = visitBadgePosition(
+            round,
+            person,
+            anchor,
+            markerPosition,
+          );
           const visitStyle = {
             "--visit-delay": `${Math.max(0, (order ?? 1) - 1) * 90}ms`,
           } as CustomProperties;
@@ -390,15 +408,15 @@ export function RouteBoard({
             >
               <circle
                 className={`${styles.personToken} ${personColorClass(person)}`}
-                cx={person.position.x}
-                cy={person.position.y}
-                r={1.82}
+                cx={markerPosition.x}
+                cy={markerPosition.y}
+                r={1.45}
                 vectorEffect="non-scaling-stroke"
               />
               <text
                 className={styles.personInitial}
-                x={person.position.x}
-                y={person.position.y}
+                x={markerPosition.x}
+                y={markerPosition.y}
                 textAnchor="middle"
                 dominantBaseline="central"
               >
