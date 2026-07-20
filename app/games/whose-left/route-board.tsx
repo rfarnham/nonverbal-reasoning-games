@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 
 import {
+  landmarkLinksForRound,
   namesForSequence,
   routeCrossings,
   type AnswerSequence,
@@ -67,27 +68,11 @@ function segmentPosition(
   };
 }
 
-function pointProjectionOnSegment(
+function visitBadgePosition(
   round: Round,
   person: Person,
+  anchor: Point,
 ): Point {
-  const segment = round.route.segments[person.segmentIndex];
-  if (!segment) return person.position;
-  const dx = segment.to.x - segment.from.x;
-  const dy = segment.to.y - segment.from.y;
-  const squaredLength = dx * dx + dy * dy;
-  const progress =
-    ((person.position.x - segment.from.x) * dx +
-      (person.position.y - segment.from.y) * dy) /
-    squaredLength;
-  return {
-    x: segment.from.x + dx * progress,
-    y: segment.from.y + dy * progress,
-  };
-}
-
-function visitBadgePosition(round: Round, person: Person): Point {
-  const anchor = pointProjectionOnSegment(round, person);
   const segment = round.route.segments[person.segmentIndex];
   if (!segment) return person.position;
   const outwardX = person.position.x - anchor.x;
@@ -241,6 +226,10 @@ export function RouteBoard({
 }) {
   const pathPoints = routePoints(round);
   const crossings = routeCrossings(round.route);
+  const landmarkLinks = landmarkLinksForRound(round);
+  const landmarkAnchors = new Map(
+    landmarkLinks.map(({ person, anchor }) => [person.id, anchor]),
+  );
   const targetOrder = new Map(
     round.correctSequence.map((personId, index) => [personId, index + 1]),
   );
@@ -252,13 +241,15 @@ export function RouteBoard({
       : ` The route crosses over itself ${crossings.length} ${
           crossings.length === 1 ? "time" : "times"
         }; at each bridge gap, continue straight along the same strand.`;
+  const tetherDescription =
+    " Each letter has a short dotted tether to its assigned path section.";
   const boardLabel = completed
     ? `Completed visual route from Start to Finish. The highlighted ${
         round.querySide
       } side passes ${namesForSequence(round, round.correctSequence).join(
         ", then ",
-      )}.${crossingDescription}`
-    : `Visual route from Start to Finish with ${round.people.length} people beside successive path sections. Track the walker's changing ${round.querySide}; the answer is intentionally not encoded in this description.${crossingDescription}`;
+      )}.${tetherDescription}${crossingDescription}`
+    : `Visual route from Start to Finish with ${round.people.length} people beside successive path sections.${tetherDescription} Track the walker's changing ${round.querySide}; the answer is intentionally not encoded in this description.${crossingDescription}`;
 
   return (
     <figure
@@ -283,29 +274,47 @@ export function RouteBoard({
         role="img"
         aria-label={boardLabel}
       >
-        {revealSide
-          ? round.people.map((person) => {
-              const order = targetOrder.get(person.id);
-              if (order === undefined) return null;
-              const anchor = pointProjectionOnSegment(round, person);
-              const linkStyle = {
-                "--visit-delay": `${Math.max(0, order - 1) * 90}ms`,
-              } as CustomProperties;
-              return (
+        {landmarkLinks.map(({ person, anchor }) => {
+          const order = targetOrder.get(person.id);
+          const linkStyle = {
+            "--visit-delay": `${Math.max(0, (order ?? 1) - 1) * 90}ms`,
+          } as CustomProperties;
+          return (
+            <g
+              className={styles.landmarkTether}
+              style={linkStyle}
+              aria-hidden="true"
+              key={`link-${person.id}`}
+            >
+              <line
+                className={styles.landmarkTetherHalo}
+                x1={anchor.x}
+                y1={anchor.y}
+                x2={person.position.x}
+                y2={person.position.y}
+                vectorEffect="non-scaling-stroke"
+              />
+              <line
+                className={styles.landmarkTetherLine}
+                x1={anchor.x}
+                y1={anchor.y}
+                x2={person.position.x}
+                y2={person.position.y}
+                vectorEffect="non-scaling-stroke"
+              />
+              {revealSide && order !== undefined ? (
                 <line
                   className={styles.sideLink}
-                  style={linkStyle}
                   x1={anchor.x}
                   y1={anchor.y}
                   x2={person.position.x}
                   y2={person.position.y}
                   vectorEffect="non-scaling-stroke"
-                  aria-hidden="true"
-                  key={`link-${person.id}`}
                 />
-              );
-            })
-          : null}
+              ) : null}
+            </g>
+          );
+        })}
         <polyline
           className={styles.routeUnderlay}
           points={pathPoints}
@@ -366,7 +375,8 @@ export function RouteBoard({
           const segment = round.route.segments[person.segmentIndex];
           const order = targetOrder.get(person.id);
           const isTarget = order !== undefined;
-          const badgePosition = visitBadgePosition(round, person);
+          const anchor = landmarkAnchors.get(person.id) ?? person.position;
+          const badgePosition = visitBadgePosition(round, person, anchor);
           const visitStyle = {
             "--visit-delay": `${Math.max(0, (order ?? 1) - 1) * 90}ms`,
           } as CustomProperties;

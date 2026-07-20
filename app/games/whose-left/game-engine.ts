@@ -35,6 +35,11 @@ export type Person = Readonly<{
   side: Side;
 }>;
 
+export type LandmarkLink = Readonly<{
+  person: Person;
+  anchor: Point;
+}>;
+
 export type ViewBox = Readonly<{
   minX: number;
   minY: number;
@@ -1080,6 +1085,44 @@ export function correctSequenceForRound(
   round: Pick<Round, "route" | "people" | "querySide">,
 ): AnswerSequence {
   return peopleOnSide(round, round.querySide).map(({ id }) => id);
+}
+
+/** Connects every landmark to its exact perpendicular anchor on the route. */
+export function landmarkLinksForRound(
+  round: Pick<Round, "route" | "people">,
+): readonly LandmarkLink[] {
+  return round.people.map((person) => {
+    const segment = round.route.segments[person.segmentIndex];
+    if (!segment) {
+      throw new Error(
+        `Cannot link ${person.id}: route section ${person.segmentIndex} is missing.`,
+      );
+    }
+    const dx = segment.to.x - segment.from.x;
+    const dy = segment.to.y - segment.from.y;
+    const squaredLength = dx * dx + dy * dy;
+    if (squaredLength < EPSILON) {
+      throw new Error(
+        `Cannot link ${person.id}: route section ${person.segmentIndex} has no length.`,
+      );
+    }
+    const projection = Math.max(
+      0,
+      Math.min(
+        1,
+        ((person.position.x - segment.from.x) * dx +
+          (person.position.y - segment.from.y) * dy) /
+          squaredLength,
+      ),
+    );
+    return {
+      person,
+      anchor: {
+        x: segment.from.x + dx * projection,
+        y: segment.from.y + dy * projection,
+      },
+    };
+  });
 }
 
 /** Checks route geometry without consulting answer metadata. */

@@ -10,6 +10,7 @@ import {
   buildCampaignRounds,
   correctSequenceForRound,
   generateInfiniteRound,
+  landmarkLinksForRound,
   makeSeededRandom,
   namesForSequence,
   peopleOnSide,
@@ -84,6 +85,93 @@ function distanceToSegment(point, segment) {
   );
 }
 
+function orientation(first, second, third) {
+  return (
+    (second.x - first.x) * (third.y - first.y) -
+    (second.y - first.y) * (third.x - first.x)
+  );
+}
+
+function pointOnSegment(point, segment) {
+  return (
+    Math.abs(orientation(segment.from, segment.to, point)) < 1e-9 &&
+    point.x >= Math.min(segment.from.x, segment.to.x) - 1e-9 &&
+    point.x <= Math.max(segment.from.x, segment.to.x) + 1e-9 &&
+    point.y >= Math.min(segment.from.y, segment.to.y) - 1e-9 &&
+    point.y <= Math.max(segment.from.y, segment.to.y) + 1e-9
+  );
+}
+
+function segmentsIntersect(first, second) {
+  const firstStart = orientation(first.from, first.to, second.from);
+  const firstEnd = orientation(first.from, first.to, second.to);
+  const secondStart = orientation(second.from, second.to, first.from);
+  const secondEnd = orientation(second.from, second.to, first.to);
+  if (firstStart * firstEnd < -1e-9 && secondStart * secondEnd < -1e-9) {
+    return true;
+  }
+  return (
+    pointOnSegment(second.from, first) ||
+    pointOnSegment(second.to, first) ||
+    pointOnSegment(first.from, second) ||
+    pointOnSegment(first.to, second)
+  );
+}
+
+function assertExactLandmarkLinks(round, context = round.id) {
+  const links = landmarkLinksForRound(round);
+  assert.equal(links.length, round.people.length, context);
+  assert.deepEqual(
+    links.map(({ person }) => person.id).sort(),
+    round.people.map(({ id }) => id).sort(),
+    context,
+  );
+
+  for (const { person, anchor } of links) {
+    const segment = round.route.segments[person.segmentIndex];
+    assert.ok(segment, `${context}:${person.id}`);
+    assert.ok(
+      [person.position.x, person.position.y, anchor.x, anchor.y].every(
+        Number.isFinite,
+      ),
+      `${context}:${person.id}: tether coordinates must be finite`,
+    );
+    assert.ok(
+      Math.hypot(person.position.x - anchor.x, person.position.y - anchor.y) >
+        1e-9,
+      `${context}:${person.id}: tether must have visible length`,
+    );
+    assert.ok(
+      distanceToSegment(anchor, segment) < 1e-9,
+      `${context}:${person.id}: anchor must be on assigned segment`,
+    );
+    const segmentX = segment.to.x - segment.from.x;
+    const segmentY = segment.to.y - segment.from.y;
+    const tetherX = person.position.x - anchor.x;
+    const tetherY = person.position.y - anchor.y;
+    assert.ok(
+      Math.abs(segmentX * tetherX + segmentY * tetherY) < 1e-8,
+      `${context}:${person.id}: tether must meet assigned segment perpendicularly`,
+    );
+    assert.deepEqual(
+      round.route.segments
+        .filter((candidate) => distanceToSegment(anchor, candidate) < 1e-9)
+        .map(({ index }) => index),
+      [person.segmentIndex],
+      `${context}:${person.id}: anchor cannot sit on a crossing`,
+    );
+    const tether = { from: anchor, to: person.position };
+    for (const candidate of round.route.segments) {
+      if (candidate.index === person.segmentIndex) continue;
+      assert.equal(
+        segmentsIntersect(tether, candidate),
+        false,
+        `${context}:${person.id}: tether cannot cross route section ${candidate.index}`,
+      );
+    }
+  }
+}
+
 test("Campaign contains 12 deterministic, frozen rounds at every level", () => {
   assert.equal(CAMPAIGN_ROUNDS.length, 48);
   assert.equal(validateCampaign(CAMPAIGN_ROUNDS).valid, true);
@@ -156,6 +244,8 @@ test("every Campaign round calculates one exact answer from valid geometry", () 
         `${round.id}:${person.id}`,
       );
     }
+
+    assertExactLandmarkLinks(round);
 
     fingerprints.add(roundFingerprint(round));
   }
@@ -465,6 +555,7 @@ test("1,600 seeded Infinite rounds are valid, reproducible, varied, and unique",
         4,
         `${difficulty}:${seed}`,
       );
+      assertExactLandmarkLinks(first, `${difficulty}:${seed}`);
       const topology = routeTopology(first.route);
       const rules = DIFFICULTY_RULES[difficulty];
       assert.ok(

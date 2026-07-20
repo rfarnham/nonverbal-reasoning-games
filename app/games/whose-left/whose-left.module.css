@@ -918,6 +918,27 @@
   stroke-width: 5px;
 }
 
+.landmarkTether {
+  pointer-events: none;
+}
+
+.landmarkTetherHalo,
+.landmarkTetherLine {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.landmarkTetherHalo {
+  stroke: var(--panel);
+  stroke-width: 5px;
+}
+
+.landmarkTetherLine {
+  stroke: var(--muted);
+  stroke-dasharray: 2px 3px;
+  stroke-width: 2px;
+}
+
 .sideLink {
   stroke: var(--side-accent);
   stroke-dasharray: 4px 3px;
