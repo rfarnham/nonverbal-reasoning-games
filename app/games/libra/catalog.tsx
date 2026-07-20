@@ -2,6 +2,7 @@ import type {
   GameInfo,
   ShelfIconProps,
 } from "@/lib/game-catalog-types";
+import { progressionMetadata } from "./progression-metadata";
 
 export const gameInfo = {
   title: "Libra",
@@ -9,6 +10,7 @@ export const gameInfo = {
     "Combine, subtract, and regroup balanced animal scales to find the exact load.",
   skills: ["Relational reasoning", "Visual equivalence"],
   estimatedMinutes: 10,
+  progression: progressionMetadata,
   shelfOrder: 30,
 } satisfies GameInfo;
 

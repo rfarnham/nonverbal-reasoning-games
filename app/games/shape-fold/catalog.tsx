@@ -2,6 +2,7 @@ import type {
   GameInfo,
   ShelfIconProps,
 } from "@/lib/game-catalog-types";
+import { progressionMetadata } from "./progression-metadata";
 
 export const gameInfo = {
   title: "Shape Fold",
@@ -9,6 +10,7 @@ export const gameInfo = {
     "Track each fold, then predict the exact pattern your punches make when the sheet opens.",
   skills: ["Spatial folding", "Visual prediction"],
   estimatedMinutes: 10,
+  progression: progressionMetadata,
   shelfOrder: 40,
 } satisfies GameInfo;
 

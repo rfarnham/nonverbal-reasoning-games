@@ -12,6 +12,15 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { ProgressionGameHud } from "@/components/progression/ProgressionGameHud";
+import {
+  ProgressionRecoveryPanel,
+  ProgressionRedemptionIntro,
+} from "@/components/progression/ProgressionSessionPanels";
+import {
+  progressionOptionIndexFromAnswerToken,
+  useProgressionGameSession,
+} from "@/components/progression/useProgressionGameSession";
 import {
   playFeedbackEarcon,
   readSoundPreference,
@@ -42,6 +51,7 @@ import {
   infiniteLevelLabel,
   recordInfiniteFirstAttempt,
 } from "./infinite-progression";
+import { progressionAdapter } from "./progression-adapter";
 import styles from "./rotation-match.module.css";
 
 type PatternSize = "tutorialPattern" | "clue" | "option" | "review" | "ghost";
@@ -519,6 +529,7 @@ function buildInfiniteSessionRound(
 }
 
 export default function TransformationMatchPage() {
+  const progression = useProgressionGameSession(progressionAdapter);
   const [started, setStarted] = useState(false);
   const [sessionMode, setSessionMode] = useState<SessionMode>("campaign");
   const [roundQueue, setRoundQueue] = useState<readonly SessionRound[]>([]);
@@ -573,17 +584,33 @@ export default function TransformationMatchPage() {
   const infiniteAdaptiveRef = useRef(initialInfiniteAdaptiveState());
   const seenTransformTutorialsRef = useRef(new Set<string>());
 
-  const isCampaign = sessionMode === "campaign";
-  const isInfinite = sessionMode === "infinite";
-  const isRedemption = sessionMode === "redemption";
+  const progressionControlled = progression.mode === "controlled";
+  const progressionRound = progressionControlled && progression.current
+    ? {
+        id: progression.current.playId,
+        ordinal: progression.currentQuestionNumber,
+        round: progression.current.round,
+      }
+    : undefined;
+  const gameplayStarted = started || progressionControlled;
+  const isCampaign =
+    !progressionControlled && sessionMode === "campaign";
+  const isInfinite =
+    !progressionControlled && sessionMode === "infinite";
+  const isRedemption =
+    progressionControlled
+      ? progression.isRedemption
+      : sessionMode === "redemption";
   const campaignProblemIndex = campaignCursors[activeCampaignLevel];
   const campaignSessionRound = buildCampaignSessionRound(
     activeCampaignLevel,
     campaignProblemIndex,
   );
-  const activeSessionRound = isCampaign
-    ? campaignSessionRound
-    : (roundQueue[roundCursor] ?? roundQueue[0]);
+  const activeSessionRound = progressionControlled
+    ? progressionRound
+    : isCampaign
+      ? campaignSessionRound
+      : (roundQueue[roundCursor] ?? roundQueue[0]);
   const round = activeSessionRound?.round ?? ROUNDS[0];
   const sessionLength = roundQueue.length;
   const selectedCorrect = selectedIndex === round.correctIndex;
@@ -732,8 +759,10 @@ export default function TransformationMatchPage() {
         phase !== "idle" ||
         complete ||
         tutorialTransform !== null ||
-        !started ||
-        (isCampaign && activeCampaignLevelComplete) ||
+        !gameplayStarted ||
+        (!progressionControlled &&
+          isCampaign &&
+          activeCampaignLevelComplete) ||
         !activeSessionRound
       ) {
         return;
@@ -753,11 +782,17 @@ export default function TransformationMatchPage() {
         "(prefers-reduced-motion: reduce)",
       ).matches;
 
+      if (progressionControlled) {
+        progression.answer({
+          correct: isCorrect,
+          answerToken: `option-${optionIndex}`,
+        });
+      }
       playFeedbackSound(isCorrect);
       setSelectedIndex(optionIndex);
       setPhase("animating");
 
-      if (isCampaign) {
+      if (!progressionControlled && isCampaign) {
         setCampaignProgress((current) => {
           const existing = current[activeSessionRound.id];
           return {
@@ -772,7 +807,7 @@ export default function TransformationMatchPage() {
         });
       }
 
-      if (isInfinite) {
+      if (!progressionControlled && isInfinite) {
         const nextAdaptive = recordInfiniteFirstAttempt(
           infiniteAdaptiveRef.current,
           {
@@ -787,12 +822,16 @@ export default function TransformationMatchPage() {
         }
       }
 
-      if (isCorrect) {
+      if (!progressionControlled && isCorrect) {
         if (!isRedemption && !wasMissed) {
           setScore((current) => current + 1);
         }
         setCompletedCount((current) => current + 1);
-      } else if (!isRedemption) {
+      } else if (
+        !progressionControlled &&
+        !isCorrect &&
+        !isRedemption
+      ) {
         setMistakes((current) =>
           current.some(
             ({ sessionRound }) => sessionRound.id === activeSessionRound.id,
@@ -834,6 +873,7 @@ export default function TransformationMatchPage() {
           reviewTimerRef.current = setTimeout(
             () => {
               if (animationTokenRef.current !== animationToken) return;
+              if (progressionControlled) progression.retry();
               retryFocusIndexRef.current = optionIndex;
               inputLockedRef.current = false;
               setGhost(null);
@@ -862,8 +902,10 @@ export default function TransformationMatchPage() {
       mistakes,
       phase,
       playFeedbackSound,
+      progression,
+      progressionControlled,
       round,
-      started,
+      gameplayStarted,
       tutorialTransform,
     ],
   );
@@ -985,6 +1027,14 @@ export default function TransformationMatchPage() {
   const goNext = useCallback(() => {
     if (phase !== "answered") return;
 
+    if (progressionControlled) {
+      progression.setInteractionState("blocked");
+      progression.advance();
+      resetAttemptState();
+      shouldFocusFirstOption.current = true;
+      return;
+    }
+
     if (isCampaign) {
       resetAttemptState();
 
@@ -1059,6 +1109,8 @@ export default function TransformationMatchPage() {
     isLastRedemptionRound,
     maybeShowTransformTutorial,
     phase,
+    progression,
+    progressionControlled,
     redemptionMistakeIds,
     reviewLevelId,
     resetAttemptState,
@@ -1092,6 +1144,145 @@ export default function TransformationMatchPage() {
     return () => window.clearTimeout(timer);
   }, []);
 
+  const progressionPlayId =
+    progressionControlled && progression.current
+      ? `${progression.attemptId}:${
+          progression.isRedemption ? "redemption" : "main"
+        }:${
+          progression.current.playId
+        }`
+      : null;
+  const hydratedProgressionPlayIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (
+      !progressionControlled ||
+      !progression.current ||
+      !progressionPlayId ||
+      hydratedProgressionPlayIdRef.current === progressionPlayId
+    ) {
+      return;
+    }
+    animationTokenRef.current += 1;
+    clearAttemptTimers();
+    retryFocusIndexRef.current = null;
+    const controlled = progression;
+    const savedOptionIndex = progressionOptionIndexFromAnswerToken(
+      controlled.lastAnswerToken,
+    );
+    const timer = window.setTimeout(() => {
+      hydratedProgressionPlayIdRef.current = progressionPlayId;
+      setGhost(null);
+      setTutorialTransform(null);
+      if (controlled.roundPhase === "solved" && controlled.current) {
+        inputLockedRef.current = true;
+        setSelectedIndex(controlled.current.round.correctIndex);
+        setRetryReady(false);
+        setPhase("answered");
+        shouldFocusFirstOption.current = false;
+      } else if (
+        controlled.roundPhase === "feedback" &&
+        controlled.current &&
+        savedOptionIndex !== null &&
+        savedOptionIndex < controlled.current.round.options.length &&
+        savedOptionIndex !== controlled.current.round.correctIndex
+      ) {
+        inputLockedRef.current = true;
+        setSelectedIndex(savedOptionIndex);
+        setRetryReady(false);
+        setPhase("wrong-review");
+        shouldFocusFirstOption.current = false;
+        const hydrationToken = animationTokenRef.current;
+        const reducedMotion = window.matchMedia(
+          "(prefers-reduced-motion: reduce)",
+        ).matches;
+        reviewTimerRef.current = setTimeout(
+          () => {
+            if (animationTokenRef.current !== hydrationToken) return;
+            controlled.retry();
+            retryFocusIndexRef.current = savedOptionIndex;
+            inputLockedRef.current = false;
+            setSelectedIndex(null);
+            setRetryReady(true);
+            setPhase("idle");
+          },
+          reducedMotion ? REDUCED_WRONG_REVIEW_MS : WRONG_REVIEW_MS,
+        );
+      } else {
+        if (controlled.roundPhase === "feedback") controlled.retry();
+        inputLockedRef.current = false;
+        setSelectedIndex(null);
+        setRetryReady(controlled.currentAttemptCount > 0);
+        setPhase("idle");
+        const showsTutorial =
+          !controlled.isRedemption &&
+          controlled.roundPhase === "answering" &&
+          controlled.currentAttemptCount === 0 &&
+          controlled.current?.round.difficulty !== "Wizard" &&
+          Boolean(
+            controlled.current &&
+              maybeShowTransformTutorial(
+                controlled.current.round.transform,
+              ),
+          );
+        shouldFocusFirstOption.current = !showsTutorial;
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [
+    clearAttemptTimers,
+    maybeShowTransformTutorial,
+    progression,
+    progressionControlled,
+    progressionPlayId,
+  ]);
+
+  useEffect(() => {
+    if (!progressionControlled) return;
+    if (
+      progression.current &&
+      progressionPlayId &&
+      hydratedProgressionPlayIdRef.current !== progressionPlayId
+    ) {
+      return;
+    }
+    const desiredState =
+      !progression.current ||
+      progression.stage === "redemption-ready" ||
+      tutorialTransform !== null
+        ? "blocked"
+        : progression.roundPhase === "feedback"
+          ? "mandatory-feedback"
+          : progression.roundPhase === "solved" ||
+              phase === "answered"
+            ? "blocked"
+            : phase === "idle"
+              ? "answering"
+              : "mandatory-feedback";
+    if (progression.interactionState !== desiredState) {
+      progression.setInteractionState(desiredState);
+    }
+  }, [
+    phase,
+    progression,
+    progressionControlled,
+    progressionPlayId,
+    tutorialTransform,
+  ]);
+
+  useEffect(() => {
+    if (progression.mode !== "redirect") return;
+    const basePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(
+      /\/$/,
+      "",
+    );
+    const query = new URLSearchParams(progression.navigationTarget.query);
+    const suffix = query.size ? `?${query.toString()}` : "";
+    window.location.assign(
+      `${basePath}${progression.navigationTarget.pathname}${suffix}`,
+    );
+  }, [progression]);
+
   useEffect(() => {
     if (tutorialTransform === null) return;
 
@@ -1117,7 +1308,7 @@ export default function TransformationMatchPage() {
           (target instanceof HTMLElement && target.isContentEditable));
 
       if (
-        !started ||
+        !gameplayStarted ||
         complete ||
         tutorialTransform !== null ||
         phase !== "idle" ||
@@ -1138,7 +1329,13 @@ export default function TransformationMatchPage() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [chooseOption, complete, phase, started, tutorialTransform]);
+  }, [
+    chooseOption,
+    complete,
+    gameplayStarted,
+    phase,
+    tutorialTransform,
+  ]);
 
   useEffect(() => {
     if (phase === "answered") nextButtonRef.current?.focus();
@@ -1147,7 +1344,7 @@ export default function TransformationMatchPage() {
   useEffect(() => {
     if (
       shouldFocusFirstOption.current &&
-      started &&
+      gameplayStarted &&
       !complete &&
       tutorialTransform === null
     ) {
@@ -1160,7 +1357,7 @@ export default function TransformationMatchPage() {
     complete,
     roundCursor,
     sessionMode,
-    started,
+    gameplayStarted,
     tutorialTransform,
   ]);
 
@@ -1306,16 +1503,23 @@ export default function TransformationMatchPage() {
   return (
     <div className={styles.pageShell}>
       <header className={styles.topbar}>
-        <Link className={styles.backLink} href="/" aria-label="All games">
+        <Link
+          className={styles.backLink}
+          href={progressionControlled ? "/journey/" : "/"}
+          aria-label={progressionControlled ? "Journey map" : "All games"}
+        >
           <span aria-hidden="true">←</span>
-          <span>Games</span>
+          <span>{progressionControlled ? "Journey" : "Games"}</span>
         </Link>
         <span className={styles.gameTitle}>{transformationMatchGame.title}</span>
         {soundButton}
       </header>
 
       <main className={styles.main}>
-        {!started ? (
+        {progression.mode === "recovery" ||
+        progression.mode === "redirect" ? (
+          <ProgressionRecoveryPanel message={progression.message} />
+        ) : !gameplayStarted ? (
           <section className={styles.tutorial} aria-labelledby="tutorial-title">
             <p className={styles.kicker}>Example</p>
             <h1 id="tutorial-title">Transform it. Find it.</h1>
@@ -1360,6 +1564,7 @@ export default function TransformationMatchPage() {
                 className={styles.primaryButton}
                 type="button"
                 onClick={startCampaign}
+                disabled={progression.mode === "booting"}
               >
                 Campaign
                 <span aria-hidden="true">→</span>
@@ -1368,6 +1573,7 @@ export default function TransformationMatchPage() {
                 className={styles.modeButton}
                 type="button"
                 onClick={startInfinite}
+                disabled={progression.mode === "booting"}
               >
                 <span aria-hidden="true">∞</span>
                 Infinite
@@ -1376,7 +1582,21 @@ export default function TransformationMatchPage() {
           </section>
         ) : !complete ? (
           <>
-            <div
+            {progressionControlled ? (
+              <ProgressionGameHud
+                mode={progression.runKind}
+                levelLabel={
+                  progression.level[0].toUpperCase() +
+                  progression.level.slice(1)
+                }
+                current={progression.currentQuestionNumber}
+                total={progression.totalQuestions}
+                remainingMs={progression.turboRemainingMs ?? undefined}
+                paused={progression.interactionState !== "answering"}
+                redemption={progression.isRedemption}
+              />
+            ) : (
+              <div
               className={`${styles.gameStatus} ${
                 isCampaign ? styles.campaignStatus : ""
               }`}
@@ -1576,9 +1796,16 @@ export default function TransformationMatchPage() {
                   End
                 </button>
               ) : null}
-            </div>
+              </div>
+            )}
 
-            {showCampaignLevelComplete ? (
+            {progressionControlled &&
+            progression.stage === "redemption-ready" ? (
+              <ProgressionRedemptionIntro
+                attempt={progression.attempt}
+                onBegin={progression.beginRedemption}
+              />
+            ) : showCampaignLevelComplete ? (
               <section
                 className={styles.levelCompleteCard}
                 id="campaign-play-area"

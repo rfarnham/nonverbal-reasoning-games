@@ -7,6 +7,10 @@ export type GameInfo = {
   description: string;
   skills: readonly string[];
   estimatedMinutes: number;
+  progression: {
+    contentVersion: string;
+    generatorVersion: string;
+  };
   shelfOrder?: number;
   featured?: boolean;
 };

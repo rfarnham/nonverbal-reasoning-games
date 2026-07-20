@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -16,6 +17,15 @@ import {
   readSoundPreference,
   writeSoundPreference,
 } from "@/lib/game-audio";
+import { ProgressionGameHud } from "@/components/progression/ProgressionGameHud";
+import {
+  ProgressionRecoveryPanel,
+  ProgressionRedemptionIntro,
+} from "@/components/progression/ProgressionSessionPanels";
+import {
+  progressionOptionIndexFromAnswerToken,
+  useProgressionGameSession,
+} from "@/components/progression/useProgressionGameSession";
 import {
   MAX_ENERGY_COMBO,
   comboEnergyPercent,
@@ -45,6 +55,7 @@ import {
 } from "./game-engine";
 import { shapeFoldGame } from "./game-info";
 import { canOpenHistoricalReview } from "./historical-review";
+import { progressionAdapter } from "./progression-adapter";
 import styles from "./shape-fold.module.css";
 
 type GamePhase = "idle" | "animating" | "wrong-review" | "answered";
@@ -106,6 +117,20 @@ const FULL_BOUNDS: Bounds = {
   width: BOARD_SIZE,
   height: BOARD_SIZE,
 };
+
+function progressionTargetHref(
+  target: Readonly<{
+    pathname: string;
+    query?: Readonly<Record<string, string>>;
+  }>,
+): string {
+  const query = new URLSearchParams(target.query).toString();
+  return query ? `${target.pathname}?${query}` : target.pathname;
+}
+
+function progressionLevelLabel(level: string): string {
+  return `${level.charAt(0).toUpperCase()}${level.slice(1)}`;
+}
 
 const ADAPTIVE_FROM_LEVEL: Record<CampaignLevel, AdaptiveDifficulty> = {
   Starter: "Easy",
@@ -509,6 +534,8 @@ function safeInfiniteRound(
 }
 
 export default function ShapeFoldPage() {
+  const router = useRouter();
+  const progression = useProgressionGameSession(progressionAdapter);
   const [started, setStarted] = useState(false);
   const [sessionMode, setSessionMode] = useState<SessionMode>("campaign");
   const [playMode, setPlayMode] = useState<PlayMode>("campaign");
@@ -561,18 +588,37 @@ export default function ShapeFoldPage() {
   const retryFocusIndexRef = useRef<number | null>(null);
   const infiniteFingerprintsRef = useRef(new Set<string>());
   const infiniteAdaptiveRef = useRef(initialInfiniteAdaptiveState());
+  const hydratedProgressionPlayIdRef = useRef<string | null>(null);
 
-  const isCampaign = sessionMode === "campaign";
-  const isInfinite = sessionMode === "infinite";
-  const isRedemption = sessionMode === "redemption";
+  const controlledSession =
+    progression.mode === "controlled" ? progression : null;
+  const progressionBooting = progression.mode === "booting";
+  const hasStarted = controlledSession !== null || started;
+  const isCampaign =
+    controlledSession === null && sessionMode === "campaign";
+  const isInfinite =
+    controlledSession === null && sessionMode === "infinite";
+  const isRedemption =
+    controlledSession?.isRedemption ??
+    (sessionMode === "redemption");
   const campaignProblemIndex = campaignCursors[activeCampaignLevel];
   const campaignSessionRound = buildCampaignSessionRound(
     activeCampaignLevel,
     campaignProblemIndex,
   );
-  const activeSessionRound = isCampaign
-    ? campaignSessionRound
-    : (roundQueue[roundCursor] ?? roundQueue[0]);
+  const controlledSessionRound: SessionRound | null =
+    controlledSession?.current
+      ? {
+          id: controlledSession.current.playId,
+          ordinal: controlledSession.currentQuestionNumber,
+          round: controlledSession.current.round,
+        }
+      : null;
+  const activeSessionRound = controlledSession
+    ? controlledSessionRound
+    : isCampaign
+      ? campaignSessionRound
+      : (roundQueue[roundCursor] ?? roundQueue[0]);
   const historicalSessionRound = campaignReviewSelection
     ? buildCampaignSessionRound(
         campaignReviewSelection.level,
@@ -753,7 +799,7 @@ export default function ShapeFoldPage() {
         inputLockedRef.current ||
         phase !== "idle" ||
         complete ||
-        !started ||
+        !hasStarted ||
         generationExhausted ||
         campaignReviewSelection !== null ||
         (isCampaign && activeCampaignLevelComplete) ||
@@ -765,6 +811,10 @@ export default function ShapeFoldPage() {
       inputLockedRef.current = true;
       setRetryReady(false);
       const isCorrect = optionIndex === round.correctIndex;
+      controlledSession?.answer({
+        correct: isCorrect,
+        answerToken: `option-${optionIndex}`,
+      });
       const wasMissed = mistakes.some(
         ({ sessionRound }) => sessionRound.id === activeSessionRound.id,
       );
@@ -806,13 +856,15 @@ export default function ShapeFoldPage() {
         }
       }
 
-      if (isCorrect) {
-        setCompletedCount((current) => current + 1);
-      } else if (!isRedemption && !wasMissed) {
-        setMistakes((current) => [
-          ...current,
-          { sessionRound: activeSessionRound, chosenIndex: optionIndex },
-        ]);
+      if (!controlledSession) {
+        if (isCorrect) {
+          setCompletedCount((current) => current + 1);
+        } else if (!isRedemption && !wasMissed) {
+          setMistakes((current) => [
+            ...current,
+            { sessionRound: activeSessionRound, chosenIndex: optionIndex },
+          ]);
+        }
       }
 
       const animationToken = animationTokenRef.current + 1;
@@ -864,6 +916,7 @@ export default function ShapeFoldPage() {
             setSelectedIndex(null);
             setRetryReady(true);
             setPhase("idle");
+            controlledSession?.retry();
           },
           reducedMotion ? REDUCED_WRONG_REVIEW_MS : WRONG_REVIEW_MS,
         ),
@@ -875,6 +928,7 @@ export default function ShapeFoldPage() {
       campaignReviewSelection,
       clearAttemptTimers,
       complete,
+      controlledSession,
       generationExhausted,
       isCampaign,
       isInfinite,
@@ -883,7 +937,7 @@ export default function ShapeFoldPage() {
       phase,
       playFeedbackSound,
       round,
-      started,
+      hasStarted,
       unfoldPatterns.length,
     ],
   );
@@ -996,6 +1050,13 @@ export default function ShapeFoldPage() {
   const goNext = useCallback(() => {
     if (phase !== "answered") return;
 
+    if (controlledSession) {
+      resetAttemptState();
+      controlledSession.advance();
+      shouldFocusFirstOption.current = true;
+      return;
+    }
+
     if (isCampaign) {
       resetAttemptState();
       if (campaignProblemIndex < CAMPAIGN_PROBLEMS_PER_LEVEL - 1) {
@@ -1063,6 +1124,7 @@ export default function ShapeFoldPage() {
     activeCampaignLevel,
     activeSessionRound?.ordinal,
     campaignProblemIndex,
+    controlledSession,
     isCampaign,
     isInfinite,
     isLastRedemptionRound,
@@ -1101,10 +1163,127 @@ export default function ShapeFoldPage() {
   }, []);
 
   useEffect(() => {
+    if (progression.mode !== "redirect") return;
+    router.replace(progressionTargetHref(progression.navigationTarget));
+  }, [progression, router]);
+
+  useEffect(() => {
+    if (!controlledSession) {
+      hydratedProgressionPlayIdRef.current = null;
+      return;
+    }
+    if (!controlledSession.current) {
+      hydratedProgressionPlayIdRef.current = null;
+      if (controlledSession.interactionState !== "blocked") {
+        controlledSession.setInteractionState("blocked");
+      }
+      return;
+    }
+    const hydrationKey = `${controlledSession.attemptId}:${
+      controlledSession.isRedemption ? "redemption" : "main"
+    }:${controlledSession.current.playId}`;
+    if (hydratedProgressionPlayIdRef.current === hydrationKey) return;
+
+    const currentRound = controlledSession.current.round;
+    const savedOptionIndex = progressionOptionIndexFromAnswerToken(
+      controlledSession.lastAnswerToken,
+    );
+    const hydrateTimer = window.setTimeout(() => {
+      hydratedProgressionPlayIdRef.current = hydrationKey;
+      resetAttemptState();
+      setGenerationExhausted(false);
+      setCampaignReviewSelection(null);
+      if (controlledSession.roundPhase === "solved") {
+        inputLockedRef.current = true;
+        setSelectedIndex(currentRound.correctIndex);
+        setRevealStage(
+          Math.max(
+            unfoldStages(currentRound.folds, currentRound.punches).length - 1,
+            0,
+          ),
+        );
+        setPhase("answered");
+        return;
+      }
+      if (
+        controlledSession.roundPhase === "feedback" &&
+        savedOptionIndex !== null &&
+        savedOptionIndex < currentRound.options.length
+      ) {
+        const reducedMotion = window.matchMedia(
+          "(prefers-reduced-motion: reduce)",
+        ).matches;
+        const animationToken = animationTokenRef.current;
+        inputLockedRef.current = true;
+        setSelectedIndex(savedOptionIndex);
+        setRetryReady(false);
+        setPhase("wrong-review");
+        attemptTimersRef.current.push(
+          setTimeout(
+            () => {
+              if (animationTokenRef.current !== animationToken) return;
+              retryFocusIndexRef.current = savedOptionIndex;
+              inputLockedRef.current = false;
+              setSelectedIndex(null);
+              setRetryReady(true);
+              setPhase("idle");
+              controlledSession.retry();
+            },
+            reducedMotion ? REDUCED_WRONG_REVIEW_MS : WRONG_REVIEW_MS,
+          ),
+        );
+        return;
+      }
+      if (controlledSession.roundPhase === "feedback") {
+        controlledSession.retry();
+      }
+      shouldFocusFirstOption.current = true;
+      setRetryReady(controlledSession.currentAttemptCount > 0);
+    }, 0);
+    return () => window.clearTimeout(hydrateTimer);
+  }, [
+    controlledSession,
+    resetAttemptState,
+  ]);
+
+  useEffect(() => {
+    if (!controlledSession) return;
+    if (!controlledSession.current) {
+      if (controlledSession.interactionState !== "blocked") {
+        controlledSession.setInteractionState("blocked");
+      }
+      return;
+    }
+    const hydrationKey = `${controlledSession.attemptId}:${
+      controlledSession.isRedemption ? "redemption" : "main"
+    }:${controlledSession.current.playId}`;
+    if (hydratedProgressionPlayIdRef.current !== hydrationKey) return;
+    const nextInteractionState =
+      controlledSession.roundPhase === "solved"
+        ? "blocked"
+        : controlledSession.roundPhase === "feedback"
+          ? "mandatory-feedback"
+          : phase === "idle" &&
+        !inputLockedRef.current &&
+        campaignReviewSelection === null &&
+        !generationExhausted
+            ? "answering"
+            : "mandatory-feedback";
+    if (controlledSession.interactionState !== nextInteractionState) {
+      controlledSession.setInteractionState(nextInteractionState);
+    }
+  }, [
+    campaignReviewSelection,
+    controlledSession,
+    generationExhausted,
+    phase,
+  ]);
+
+  useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       const target = event.target;
       if (
-        !started ||
+        !hasStarted ||
         complete ||
         generationExhausted ||
         campaignReviewSelection !== null ||
@@ -1133,7 +1312,7 @@ export default function ShapeFoldPage() {
     complete,
     generationExhausted,
     phase,
-    started,
+    hasStarted,
   ]);
 
   useEffect(() => {
@@ -1141,7 +1320,7 @@ export default function ShapeFoldPage() {
   }, [phase]);
 
   useEffect(() => {
-    if (shouldFocusFirstOption.current && started && !complete) {
+    if (shouldFocusFirstOption.current && hasStarted && !complete) {
       optionButtonRefs.current[0]?.focus();
       shouldFocusFirstOption.current = false;
     }
@@ -1151,7 +1330,7 @@ export default function ShapeFoldPage() {
     complete,
     roundCursor,
     sessionMode,
-    started,
+    hasStarted,
   ]);
 
   useEffect(() => {
@@ -1231,9 +1410,13 @@ export default function ShapeFoldPage() {
   return (
     <div className={styles.pageShell}>
       <header className={styles.topbar}>
-        <Link className={styles.backLink} href="/" aria-label="All games">
+        <Link
+          className={styles.backLink}
+          href={controlledSession ? "/journey/" : "/"}
+          aria-label={controlledSession ? "Journey map" : "All games"}
+        >
           <span aria-hidden="true">←</span>
-          <span>Games</span>
+          <span>{controlledSession ? "Journey" : "Games"}</span>
         </Link>
         <span className={styles.gameTitle}>{shapeFoldGame.title}</span>
         <button
@@ -1249,7 +1432,16 @@ export default function ShapeFoldPage() {
       </header>
 
       <main className={styles.main}>
-        {!started ? (
+        {progression.mode === "recovery" ? (
+          <ProgressionRecoveryPanel message={progression.message} />
+        ) : progression.mode === "redirect" ? (
+          <ProgressionRecoveryPanel message={progression.message} />
+        ) : controlledSession?.stage === "redemption-ready" ? (
+          <ProgressionRedemptionIntro
+            attempt={controlledSession.attempt}
+            onBegin={controlledSession.beginRedemption}
+          />
+        ) : !hasStarted ? (
           <section className={styles.tutorial} aria-labelledby="tutorial-title">
             <p className={styles.kicker}>Example</p>
             <h1 id="tutorial-title">Fold it. Punch it. Open it.</h1>
@@ -1289,6 +1481,7 @@ export default function ShapeFoldPage() {
                 className={styles.primaryButton}
                 type="button"
                 onClick={startCampaign}
+                disabled={progressionBooting}
               >
                 Campaign
                 <span aria-hidden="true">→</span>
@@ -1297,6 +1490,7 @@ export default function ShapeFoldPage() {
                 className={styles.modeButton}
                 type="button"
                 onClick={startInfinite}
+                disabled={progressionBooting}
               >
                 <span aria-hidden="true">∞</span> Infinite
               </button>
@@ -1304,11 +1498,26 @@ export default function ShapeFoldPage() {
           </section>
         ) : !complete ? (
           <>
-            <div
+            {controlledSession ? (
+              <ProgressionGameHud
+                mode={controlledSession.runKind}
+                levelLabel={progressionLevelLabel(controlledSession.level)}
+                current={controlledSession.currentQuestionNumber}
+                total={controlledSession.totalQuestions}
+                remainingMs={
+                  controlledSession.turboRemainingMs ?? undefined
+                }
+                paused={
+                  controlledSession.interactionState !== "answering"
+                }
+                redemption={controlledSession.isRedemption}
+              />
+            ) : (
+              <div
               className={`${styles.gameStatus} ${
                 isCampaign ? styles.campaignStatus : ""
               }`}
-            >
+              >
               {isCampaign ? (
                 <nav
                   className={styles.campaignNavigator}
@@ -1526,7 +1735,8 @@ export default function ShapeFoldPage() {
                   End
                 </button>
               ) : null}
-            </div>
+              </div>
+            )}
 
             {isInfinite && generationExhausted ? (
               <section

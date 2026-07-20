@@ -2,6 +2,7 @@ import type {
   GameInfo,
   ShelfIconProps,
 } from "@/lib/game-catalog-types";
+import { progressionMetadata } from "./progression-metadata";
 
 export const gameInfo = {
   title: "Domino Twist",
@@ -9,6 +10,7 @@ export const gameInfo = {
     "Turn fixed domino pairs in your mind and spot the pip design they cannot build.",
   skills: ["Spatial composition", "Part-whole reasoning"],
   estimatedMinutes: 10,
+  progression: progressionMetadata,
   shelfOrder: 40,
 } satisfies GameInfo;
 

@@ -2,6 +2,7 @@ import type {
   GameInfo,
   ShelfIconProps,
 } from "@/lib/game-catalog-types";
+import { progressionMetadata } from "./progression-metadata";
 
 export const gameInfo = {
   title: "Bracelet Search",
@@ -9,6 +10,7 @@ export const gameInfo = {
     "Scan a circular bracelet from either side and find the one bead run hidden within it.",
   skills: ["Sequence search", "Mental reversal"],
   estimatedMinutes: 10,
+  progression: progressionMetadata,
   shelfOrder: 50,
 } satisfies GameInfo;
 

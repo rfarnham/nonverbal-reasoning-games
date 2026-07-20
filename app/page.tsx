@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { JourneyHomeCta } from "@/components/progression/JourneyHomeCta";
 import { games, type GameCatalogEntry } from "@/lib/games";
 
 const previewTiles = [
@@ -60,8 +61,6 @@ function GameCardVisual({
 }
 
 export default function Home() {
-  const featuredGame = games.find(({ featured }) => featured) ?? games[0];
-
   return (
     <main>
       <header className="site-header">
@@ -89,14 +88,9 @@ export default function Home() {
             spatial memory, and visual logic. No account. No download.
           </p>
           <div className="hero-actions">
-            {featuredGame ? (
-              <Link className="button button-primary" href={featuredGame.href}>
-                Play {featuredGame.title}
-                <span aria-hidden="true">↗</span>
-              </Link>
-            ) : null}
+            <JourneyHomeCta />
             <a className="button button-secondary" href="#games">
-              Browse the lab
+              Pick a single game
             </a>
           </div>
           <dl className="quick-facts" aria-label="Project highlights">

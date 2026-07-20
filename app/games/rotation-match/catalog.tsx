@@ -2,6 +2,7 @@ import type {
   GameInfo,
   ShelfIconProps,
 } from "@/lib/game-catalog-types";
+import { progressionMetadata } from "./progression-metadata";
 
 export const gameInfo = {
   title: "Transformation Match",
@@ -9,6 +10,7 @@ export const gameInfo = {
     "Apply a rotation or reflection and find the exact transformed pattern.",
   skills: ["Mental transformation", "Visual comparison"],
   estimatedMinutes: 10,
+  progression: progressionMetadata,
   shelfOrder: 10,
   featured: true,
 } satisfies GameInfo;

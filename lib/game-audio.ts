@@ -74,6 +74,18 @@ export function playFeedbackEarcon(
   }
 }
 
+/** Plays a brief coin-like arpeggio when a Journey XP award is claimed. */
+export function playXpJingle(context: AudioContext) {
+  try {
+    const now = context.currentTime + 0.012;
+    scheduleTone(context, 659.25, now, 0.11, 0.044);
+    scheduleTone(context, 783.99, now + 0.07, 0.13, 0.04);
+    scheduleTone(context, 1046.5, now + 0.14, 0.17, 0.036);
+  } catch {
+    // XP remains visible and collectible when audio is unavailable.
+  }
+}
+
 /** Reads the suite preference, falling back to a game's legacy keys. */
 export function readSoundPreference(legacyKeys: readonly string[] = []): boolean {
   try {

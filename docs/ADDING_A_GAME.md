@@ -12,6 +12,8 @@ Add a folder at `app/games/<slug>/` containing:
 layout.tsx        # route metadata
 page.tsx          # game entry point
 catalog.tsx       # shelf metadata and game-owned ShelfIcon
+progression-metadata.ts # Campaign/generator content versions
+progression-adapter.ts  # thin bridge to canonical game logic
 Game.tsx          # optional interactive client component
 game-data.ts      # authored rounds or pure puzzle generation
 game-engine.ts    # optional larger pure puzzle engine
@@ -68,7 +70,34 @@ There is no shared catalog list to edit. Add `catalog.tsx` only when the complet
 game and all checks are ready to ship; an incomplete implemented route fails the
 build rather than disappearing silently.
 
-## 5. Accessibility and input
+## 5. Join the Journey generically
+
+Add `progression-metadata.ts` and `progression-adapter.ts` beside the game.
+Reference the same `progressionMetadata` object from `catalog.tsx` and the
+adapter so Journey can discover each game’s current Campaign and generator
+versions without importing its puzzle engine into the map.
+
+Use
+`defineProgressionGameAdapter` to expose only:
+
+- the canonical Campaign array;
+- the mapping from Starter, Junior, Expert, and Wizard to the engine’s
+  difficulty names;
+- the canonical difficulty and fingerprint readers; and
+- the canonical Infinite generator with its injected random source.
+
+Then call the shared `useProgressionGameSession` hook from the existing game
+page and give a controlled Journey round priority over standalone session
+state. Keep answer validation, rendering, feedback, teaching motion, and retry
+behavior in the game. Do not create a Journey-specific puzzle copy, persist a
+rendered round, or add a slug case to shared progression code.
+
+The discovery-driven adapter test is a release requirement. It verifies all 48
+Campaign refs, seeded generation, current-content migration, and the absence of
+cross-game imports. See `docs/progression-game-bridge.md` for the mechanical
+page integration.
+
+## 6. Accessibility and input
 
 - Use real buttons for answer choices.
 - Provide a visible focus state and meaningful accessible names.
@@ -79,7 +108,7 @@ build rather than disappearing silently.
 - If equivalent screen-reader play would undermine an inherently visual task,
   describe the task honestly instead of leaking the answer through alt text.
 
-## 6. Verify
+## 7. Verify
 
 Run:
 

@@ -2,6 +2,7 @@ import type {
   GameInfo,
   ShelfIconProps,
 } from "@/lib/game-catalog-types";
+import { progressionMetadata } from "./progression-metadata";
 
 export const gameInfo = {
   title: "Braids",
@@ -9,6 +10,7 @@ export const gameInfo = {
     "Track interwoven ribbons through space and find their true view from the other side.",
   skills: ["Spatial perspective", "Depth tracking"],
   estimatedMinutes: 10,
+  progression: progressionMetadata,
   shelfOrder: 40,
 } satisfies GameInfo;
 

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Spatial Gym avatar contact sheet</title>
+    <style>
+      :root {
+        color: #17213d;
+        background: #fbf8f0;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      body {
+        max-width: 70rem;
+        margin: 0 auto;
+        padding: 2.5rem 1.25rem 4rem;
+      }
+
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: clamp(2rem, 5vw, 4rem);
+        letter-spacing: -0.055em;
+      }
+
+      p {
+        color: #657087;
+      }
+
+      ul {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+        gap: 1rem;
+        padding: 0;
+        margin: 2rem 0;
+        list-style: none;
+      }
+
+      li {
+        display: grid;
+        justify-items: center;
+        gap: 0.75rem;
+        padding: 1rem;
+        border: 1px solid #cfcabd;
+        border-radius: 1.25rem;
+        background: #fffdf8;
+        font-weight: 750;
+      }
+
+      img {
+        width: 7rem;
+        height: 7rem;
+        object-fit: contain;
+      }
+
+      a {
+        color: #1679d2;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Choose your training buddy.</h1>
+      <p>Twelve locally bundled, consistently styled animal avatars.</p>
+      <ul>
+        <li><img src="hedgehog.svg" alt="" />Hedgehog</li>
+        <li><img src="fox.svg" alt="" />Fox</li>
+        <li><img src="rabbit.svg" alt="" />Rabbit</li>
+        <li><img src="panda.svg" alt="" />Panda</li>
+        <li><img src="owl.svg" alt="" />Owl</li>
+        <li><img src="penguin.svg" alt="" />Penguin</li>
+        <li><img src="frog.svg" alt="" />Frog</li>
+        <li><img src="monkey.svg" alt="" />Monkey</li>
+        <li><img src="lion.svg" alt="" />Lion</li>
+        <li><img src="elephant.svg" alt="" />Elephant</li>
+        <li><img src="turtle.svg" alt="" />Turtle</li>
+        <li><img src="unicorn.svg" alt="" />Unicorn</li>
+      </ul>
+      <p>
+        Artwork from
+        <a href="https://github.com/microsoft/fluentui-emoji"
+          >Microsoft Fluent Emoji</a
+        >, used under the MIT License.
+      </p>
+    </main>
+  </body>
+</html>

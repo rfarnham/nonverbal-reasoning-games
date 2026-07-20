@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -15,6 +16,16 @@ import {
   readSoundPreference,
   writeSoundPreference,
 } from "@/lib/game-audio";
+import { ProgressionGameHud } from "@/components/progression/ProgressionGameHud";
+import {
+  ProgressionRecoveryPanel,
+  ProgressionRedemptionIntro,
+} from "@/components/progression/ProgressionSessionPanels";
+import {
+  progressionOptionIndexFromAnswerToken,
+  useProgressionGameSession,
+} from "@/components/progression/useProgressionGameSession";
+import { resolveProgressionQuestion } from "@/lib/progression/game-adapter";
 import {
   AnswerLoad,
   BalanceScale,
@@ -52,6 +63,7 @@ import {
   unseenStrategyIds,
   type StrategyId,
 } from "./strategy-curriculum";
+import { progressionAdapter } from "./progression-adapter";
 import styles from "./libra.module.css";
 
 type GamePhase = "idle" | "animating" | "wrong-review" | "answered";
@@ -112,6 +124,20 @@ const CAMPAIGN_LEVELS: ReadonlyArray<{
   { id: "expert", label: "Expert" },
   { id: "wizard", label: "Wizard" },
 ];
+
+function progressionTargetHref(
+  target: Readonly<{
+    pathname: string;
+    query?: Readonly<Record<string, string>>;
+  }>,
+): string {
+  const query = new URLSearchParams(target.query).toString();
+  return query ? `${target.pathname}?${query}` : target.pathname;
+}
+
+function progressionLevelLabel(level: string): string {
+  return `${level.charAt(0).toUpperCase()}${level.slice(1)}`;
+}
 
 function initialCampaignCursors(): CampaignCursors {
   return {
@@ -221,6 +247,8 @@ function tryBuildInfiniteSessionRound(
 }
 
 export default function LibraPage() {
+  const router = useRouter();
+  const progression = useProgressionGameSession(progressionAdapter);
   const [started, setStarted] = useState(false);
   const [sessionMode, setSessionMode] = useState<SessionMode>("campaign");
   const [roundQueue, setRoundQueue] = useState<readonly SessionRound[]>([]);
@@ -297,18 +325,37 @@ export default function LibraPage() {
   const retryFocusIndexRef = useRef<number | null>(null);
   const infiniteFingerprintsRef = useRef(new Set<string>());
   const infiniteAdaptiveRef = useRef(initialInfiniteAdaptiveState());
+  const hydratedProgressionPlayIdRef = useRef<string | null>(null);
 
-  const isCampaign = sessionMode === "campaign";
-  const isInfinite = sessionMode === "infinite";
-  const isRedemption = sessionMode === "redemption";
+  const controlledSession =
+    progression.mode === "controlled" ? progression : null;
+  const progressionBooting = progression.mode === "booting";
+  const hasStarted = controlledSession !== null || started;
+  const isCampaign =
+    controlledSession === null && sessionMode === "campaign";
+  const isInfinite =
+    controlledSession === null && sessionMode === "infinite";
+  const isRedemption =
+    controlledSession?.isRedemption ??
+    (sessionMode === "redemption");
   const campaignProblemIndex = campaignCursors[activeCampaignLevel];
   const campaignSessionRound = buildCampaignSessionRound(
     activeCampaignLevel,
     campaignProblemIndex,
   );
-  const activeSessionRound = isCampaign
-    ? campaignSessionRound
-    : (roundQueue[roundCursor] ?? null);
+  const controlledSessionRound: SessionRound | null =
+    controlledSession?.current
+      ? {
+          id: controlledSession.current.playId,
+          ordinal: controlledSession.currentQuestionNumber,
+          round: controlledSession.current.round,
+        }
+      : null;
+  const activeSessionRound = controlledSession
+    ? controlledSessionRound
+    : isCampaign
+      ? campaignSessionRound
+      : (roundQueue[roundCursor] ?? null);
   const round = activeSessionRound?.round ?? null;
   const activeLesson = pendingLessons[0] ?? null;
   const activeLessonStrategyId =
@@ -564,7 +611,7 @@ export default function LibraPage() {
         inputLockedRef.current ||
         phase !== "idle" ||
         complete ||
-        !started ||
+        !hasStarted ||
         generationError ||
         !round ||
         !activeSessionRound ||
@@ -580,10 +627,13 @@ export default function LibraPage() {
 
       inputLockedRef.current = true;
       setRetryReady(false);
+      const isCorrect = optionIndex === round.correctIndex;
+      controlledSession?.answer({
+        correct: isCorrect,
+        answerToken: `option-${optionIndex}`,
+      });
       setSelectedIndex(optionIndex);
       setPhase("animating");
-
-      const isCorrect = optionIndex === round.correctIndex;
       const wasMissed = mistakes.some(
         ({ sessionRound }) => sessionRound.id === activeSessionRound.id,
       );
@@ -623,22 +673,24 @@ export default function LibraPage() {
         }
       }
 
-      if (isCorrect) {
-        if (!isRedemption && !wasMissed) {
-          setScore((current) => current + 1);
+      if (!controlledSession) {
+        if (isCorrect) {
+          if (!isRedemption && !wasMissed) {
+            setScore((current) => current + 1);
+          }
+          setCompletedCount((current) => current + 1);
+        } else if (!isRedemption) {
+          setMistakes((current) =>
+            current.some(
+              ({ sessionRound }) => sessionRound.id === activeSessionRound.id,
+            )
+              ? current
+              : [
+                  ...current,
+                  { sessionRound: activeSessionRound, chosenIndex: optionIndex },
+                ],
+          );
         }
-        setCompletedCount((current) => current + 1);
-      } else if (!isRedemption) {
-        setMistakes((current) =>
-          current.some(
-            ({ sessionRound }) => sessionRound.id === activeSessionRound.id,
-          )
-            ? current
-            : [
-                ...current,
-                { sessionRound: activeSessionRound, chosenIndex: optionIndex },
-              ],
-        );
       }
 
       const token = animationTokenRef.current + 1;
@@ -673,6 +725,7 @@ export default function LibraPage() {
             setSelectedIndex(null);
             setRetryReady(true);
             setPhase("idle");
+            controlledSession?.retry();
           },
           reducedMotion ? REDUCED_WRONG_REVIEW_MS : WRONG_REVIEW_MS,
         );
@@ -685,6 +738,7 @@ export default function LibraPage() {
       campaignReviewSelection,
       clearAttemptTimers,
       complete,
+      controlledSession,
       generationError,
       isCampaign,
       isInfinite,
@@ -694,7 +748,7 @@ export default function LibraPage() {
       playFeedbackSound,
       queueStrategyLessons,
       round,
-      started,
+      hasStarted,
     ],
   );
 
@@ -857,6 +911,13 @@ export default function LibraPage() {
       return;
     }
 
+    if (controlledSession) {
+      resetAttemptState();
+      controlledSession.advance();
+      shouldFocusFirstOption.current = true;
+      return;
+    }
+
     if (isCampaign) {
       resetAttemptState();
       if (campaignProblemIndex < CAMPAIGN_PROBLEMS_PER_LEVEL - 1) {
@@ -940,6 +1001,7 @@ export default function LibraPage() {
     activeSessionRound?.ordinal,
     campaignReviewSelection,
     campaignProblemIndex,
+    controlledSession,
     isCampaign,
     isInfinite,
     isLastRedemptionRound,
@@ -1013,9 +1075,190 @@ export default function LibraPage() {
   }, []);
 
   useEffect(() => {
+    if (progression.mode !== "redirect") return;
+    router.replace(progressionTargetHref(progression.navigationTarget));
+  }, [progression, router]);
+
+  useEffect(() => {
+    if (!controlledSession) {
+      hydratedProgressionPlayIdRef.current = null;
+      return;
+    }
+    if (!controlledSession.current) {
+      hydratedProgressionPlayIdRef.current = null;
+      if (controlledSession.interactionState !== "blocked") {
+        controlledSession.setInteractionState("blocked");
+      }
+      return;
+    }
+    const hydrationKey = `${controlledSession.attemptId}:${
+      controlledSession.isRedemption ? "redemption" : "main"
+    }:${controlledSession.current.playId}`;
+    if (hydratedProgressionPlayIdRef.current === hydrationKey) return;
+    const currentAttemptRound =
+      controlledSession.attempt.currentRoundIndex === null
+        ? undefined
+        : controlledSession.attempt.rounds[
+            controlledSession.attempt.currentRoundIndex
+          ];
+    const savedOptionIndex = progressionOptionIndexFromAnswerToken(
+      controlledSession.lastAnswerToken,
+    );
+    const reconstructedStrategies = new Set<StrategyId>();
+    for (const [
+      attemptRoundIndex,
+      attemptRound,
+    ] of controlledSession.attempt.rounds.entries()) {
+      if (
+        attemptRound.question.gameSlug !== progressionAdapter.gameSlug ||
+        attemptRound.phase !== "solved" ||
+        (!controlledSession.isRedemption &&
+          controlledSession.roundPhase === "solved" &&
+          attemptRoundIndex ===
+            controlledSession.attempt.currentRoundIndex)
+      ) {
+        continue;
+      }
+      try {
+        const resolved = resolveProgressionQuestion(
+          progressionAdapter,
+          attemptRound.question,
+        );
+        for (const strategyId of orderedStrategyIdsForRound(resolved.round)) {
+          reconstructedStrategies.add(strategyId);
+        }
+      } catch {
+        // Stale-content recovery remains owned by the shared session.
+      }
+    }
+    if (
+      !controlledSession.isRedemption &&
+      currentAttemptRound &&
+      currentAttemptRound.attemptCount > 0
+    ) {
+      for (const strategyId of preRoundStrategyIds(
+        controlledSession.current.round,
+      )) {
+        reconstructedStrategies.add(strategyId);
+      }
+    }
+    const reconstructed = [...reconstructedStrategies];
+    const currentRound = controlledSession.current.round;
+    const hydrateTimer = window.setTimeout(() => {
+      hydratedProgressionPlayIdRef.current = hydrationKey;
+      resetAttemptState();
+      setGenerationError(false);
+      setCampaignReviewSelection(null);
+      setReplayStrategyId(null);
+      setDiscoveredStrategyIds(reconstructed);
+      if (controlledSession.roundPhase === "solved") {
+        setPendingLessons(
+          controlledSession.isRedemption
+            ? []
+            : unseenStrategyIds(
+                reconstructed,
+                [],
+                orderedStrategyIdsForRound(currentRound),
+              ).map((strategyId) => ({
+                strategyId,
+                focusTarget: "next" as const,
+              })),
+        );
+        inputLockedRef.current = true;
+        setSelectedIndex(currentRound.correctIndex);
+        setPhase("answered");
+        return;
+      }
+
+      setPendingLessons(
+        unseenStrategyIds(
+          reconstructed,
+          [],
+          preRoundStrategyIds(currentRound),
+        ).map((strategyId) => ({
+          strategyId,
+          focusTarget: "answers" as const,
+        })),
+      );
+      if (
+        controlledSession.roundPhase === "feedback" &&
+        savedOptionIndex !== null &&
+        savedOptionIndex < currentRound.options.length
+      ) {
+        const reducedMotion = window.matchMedia(
+          "(prefers-reduced-motion: reduce)",
+        ).matches;
+        const animationToken = animationTokenRef.current;
+        inputLockedRef.current = true;
+        setSelectedIndex(savedOptionIndex);
+        setRetryReady(false);
+        setPhase("wrong-review");
+        reviewTimerRef.current = setTimeout(
+          () => {
+            if (animationTokenRef.current !== animationToken) return;
+            retryFocusIndexRef.current = savedOptionIndex;
+            inputLockedRef.current = false;
+            setSelectedIndex(null);
+            setRetryReady(true);
+            setPhase("idle");
+            controlledSession.retry();
+          },
+          reducedMotion ? REDUCED_WRONG_REVIEW_MS : WRONG_REVIEW_MS,
+        );
+        return;
+      }
+      if (controlledSession.roundPhase === "feedback") {
+        controlledSession.retry();
+      }
+      shouldFocusFirstOption.current = true;
+      setRetryReady(controlledSession.currentAttemptCount > 0);
+    }, 0);
+    return () => window.clearTimeout(hydrateTimer);
+  }, [
+    controlledSession,
+    resetAttemptState,
+  ]);
+
+  useEffect(() => {
+    if (!controlledSession) return;
+    if (
+      !controlledSession.current ||
+      activeLessonStrategyId !== null ||
+      campaignReviewSelection !== null ||
+      generationError
+    ) {
+      if (controlledSession.interactionState !== "blocked") {
+        controlledSession.setInteractionState("blocked");
+      }
+      return;
+    }
+    const hydrationKey = `${controlledSession.attemptId}:${
+      controlledSession.isRedemption ? "redemption" : "main"
+    }:${controlledSession.current.playId}`;
+    if (hydratedProgressionPlayIdRef.current !== hydrationKey) return;
+    const nextInteractionState =
+      controlledSession.roundPhase === "solved"
+        ? "blocked"
+        : controlledSession.roundPhase === "feedback"
+          ? "mandatory-feedback"
+          : phase === "idle" && !inputLockedRef.current
+            ? "answering"
+            : "mandatory-feedback";
+    if (controlledSession.interactionState !== nextInteractionState) {
+      controlledSession.setInteractionState(nextInteractionState);
+    }
+  }, [
+    activeLessonStrategyId,
+    campaignReviewSelection,
+    controlledSession,
+    generationError,
+    phase,
+  ]);
+
+  useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (
-        !started ||
+        !hasStarted ||
         complete ||
         phase !== "idle" ||
         activeLessonStrategyId !== null ||
@@ -1043,7 +1286,7 @@ export default function LibraPage() {
     chooseOption,
     complete,
     phase,
-    started,
+    hasStarted,
   ]);
 
   useEffect(() => {
@@ -1058,7 +1301,7 @@ export default function LibraPage() {
   useEffect(() => {
     if (
       shouldFocusFirstOption.current &&
-      started &&
+      hasStarted &&
       !complete &&
       !generationError &&
       activeLessonStrategyId === null &&
@@ -1079,7 +1322,7 @@ export default function LibraPage() {
     generationError,
     roundCursor,
     sessionMode,
-    started,
+    hasStarted,
   ]);
 
   useEffect(() => {
@@ -1157,6 +1400,7 @@ export default function LibraPage() {
           setSelectedIndex(null);
           setRetryReady(true);
           setPhase("idle");
+          controlledSession?.retry();
         }
       } else if (phase === "wrong-review") {
         animationTokenRef.current += 1;
@@ -1166,6 +1410,7 @@ export default function LibraPage() {
         setSelectedIndex(null);
         setRetryReady(true);
         setPhase("idle");
+        controlledSession?.retry();
       }
     }
 
@@ -1177,6 +1422,7 @@ export default function LibraPage() {
     };
   }, [
     clearAttemptTimers,
+    controlledSession,
     phase,
     queueStrategyLessons,
     round,
@@ -1284,16 +1530,29 @@ export default function LibraPage() {
   return (
     <div className={styles.pageShell}>
       <header className={styles.topbar}>
-        <Link className={styles.backLink} href="/" aria-label="All games">
+        <Link
+          className={styles.backLink}
+          href={controlledSession ? "/journey/" : "/"}
+          aria-label={controlledSession ? "Journey map" : "All games"}
+        >
           <span aria-hidden="true">←</span>
-          <span>Games</span>
+          <span>{controlledSession ? "Journey" : "Games"}</span>
         </Link>
         <span className={styles.gameTitle}>{libraGame.title}</span>
         {soundButton}
       </header>
 
       <main className={styles.main}>
-        {!started ? (
+        {progression.mode === "recovery" ? (
+          <ProgressionRecoveryPanel message={progression.message} />
+        ) : progression.mode === "redirect" ? (
+          <ProgressionRecoveryPanel message={progression.message} />
+        ) : controlledSession?.stage === "redemption-ready" ? (
+          <ProgressionRedemptionIntro
+            attempt={controlledSession.attempt}
+            onBegin={controlledSession.beginRedemption}
+          />
+        ) : !hasStarted ? (
           <section className={styles.tutorial} aria-labelledby="tutorial-title">
             <p className={styles.kicker}>Example</p>
             <h1 id="tutorial-title">Follow the balances.</h1>
@@ -1309,6 +1568,7 @@ export default function LibraPage() {
                 className={styles.primaryButton}
                 type="button"
                 onClick={startCampaign}
+                disabled={progressionBooting}
               >
                 Campaign
                 <span aria-hidden="true">→</span>
@@ -1317,6 +1577,7 @@ export default function LibraPage() {
                 className={styles.modeButton}
                 type="button"
                 onClick={startInfinite}
+                disabled={progressionBooting}
               >
                 <span aria-hidden="true">∞</span>
                 Infinite
@@ -1325,11 +1586,26 @@ export default function LibraPage() {
           </section>
         ) : !complete ? (
           <>
-            <div
+            {controlledSession ? (
+              <ProgressionGameHud
+                mode={controlledSession.runKind}
+                levelLabel={progressionLevelLabel(controlledSession.level)}
+                current={controlledSession.currentQuestionNumber}
+                total={controlledSession.totalQuestions}
+                remainingMs={
+                  controlledSession.turboRemainingMs ?? undefined
+                }
+                paused={
+                  controlledSession.interactionState !== "answering"
+                }
+                redemption={controlledSession.isRedemption}
+              />
+            ) : (
+              <div
               className={`${styles.gameStatus} ${
                 isCampaign ? styles.campaignStatus : ""
               }`}
-            >
+              >
               {isCampaign ? (
                 <nav
                   className={styles.campaignNavigator}
@@ -1554,7 +1830,8 @@ export default function LibraPage() {
                   End
                 </button>
               ) : null}
-            </div>
+              </div>
+            )}
 
             <div className={styles.playWithToolbox}>
               <aside

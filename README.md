@@ -11,6 +11,12 @@ There is no account, download, backend, or analytics.
 
 **[Play the games](https://rfarnham.github.io/nonverbal-reasoning-games/)**
 
+The prominent **Journey** path connects every canonical game across Starter,
+Junior, Expert, and Wizard boards, with local player profiles, animal avatars,
+saved stop progress, Turbo Time, redemption, level challenges, and collectible
+XP. The game shelf remains available for standalone Campaign and Infinite play;
+shelf rounds never alter Journey progress.
+
 ## Games
 
 | Game | Trains | Status |
@@ -42,9 +48,13 @@ app/
     rotation-match/   # route, catalog metadata, and shelf icon
     shape-fold/       # route, catalog metadata, and shelf icon
     whose-left/       # route, catalog metadata, and shelf icon
+  journey/            # local profiles, progression board, and summaries
   page.tsx            # auto-discovered game catalog
+components/
+  progression/        # shared Journey bridge and avatar presentation
 lib/
   games.ts            # catalog validation and ordering
+  progression/        # generic path, attempt, adapter, and storage contracts
 scripts/
   generate-game-registry.mjs
 docs/
@@ -87,6 +97,11 @@ The short version:
 The standard development, lint, test, and build commands regenerate the game
 registry. A committed route with `page.tsx` and `catalog.tsx` therefore appears
 on the home shelf without editing a shared list.
+
+Every released game also exposes a thin `progression-adapter.ts`. It delegates
+to that game’s canonical Campaign rounds, fingerprint, and Infinite generator;
+Journey never copies puzzle data or branches on a game slug. Fixes and balance
+changes therefore reach standalone and Journey play through the same engine.
 
 See [Adding a game](docs/ADDING_A_GAME.md) for the full contract.
 

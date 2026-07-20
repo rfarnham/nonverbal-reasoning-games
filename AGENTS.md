@@ -270,6 +270,81 @@ level at a checkpoint.
 
 Redemption is a learning loop, not a score rewrite.
 
+## Journey progression mode
+
+Journey is a suite-wide progression layer over the canonical games. It does
+not replace Campaign or Infinite, and playing a game directly from the shelf
+MUST NOT change Journey progress, XP, or Journey mistake history.
+
+The homepage MUST make **Start Journey** or **Continue Journey** its prominent
+primary action. The game shelf remains available for standalone play.
+
+Journey is generic:
+
+- discover games from the generated catalog rather than a handwritten list;
+- launch the canonical game route with a typed Journey attempt reference;
+- reuse each game's authored Campaign rounds, generator, validator, renderer,
+  feedback, retry, and redemption behavior;
+- never branch on a game slug inside Journey;
+- never copy a game's puzzle data or generation logic into Journey;
+- snapshot the ordered game membership when a profile starts so a later catalog
+  change cannot rearrange earned progress;
+- store compact question references and content versions, not rendered rounds.
+
+Each profile advances through four boards: Starter, Junior, Expert, and Wizard.
+Every board contains eight ordinary stops, four **Turbo Time** stops, and one
+culmination. The cadence is:
+
+`ordinary, ordinary, turbo` repeated four times, then culmination.
+
+An ordinary stop runs the selected game's 12-question Campaign level for the
+board difficulty. One stop contains only one game. Intermediate state MUST be
+saved after every answer and transition so a reload or later visit resumes the
+exact stop, question, first-attempt history, redemption queue, and active
+practice time.
+
+Turbo Time:
+
+- uses the selected game's canonical Infinite generator and adaptive rules;
+- lasts two minutes of active answering;
+- pauses while the document is hidden and during mandatory teaching feedback;
+- never adapts above the avatar's current board difficulty;
+- stops starting new rounds at zero but lets the active puzzle finish;
+- finishes with the same untimed redemption loop as other sessions;
+- requires at least one solved puzzle to be eligible to clear.
+
+A board culmination runs three questions per snapshotted game: one Starter
+Campaign question and two prior missed questions from that game. If there are
+not enough distinct misses, fill from the current Campaign level. Culmination
+sections are sequential and resumable. A non-Wizard culmination advances the
+avatar only after the complete test and redemption are finished; Wizard ends
+with a mastery celebration.
+
+Only first attempts affect Journey accuracy. Always let the player finish and
+redeem the entire stop. Accuracy strictly greater than 70% clears it. A cleared
+stop earns its XP once and unlocks the next node. A result at or below 70%
+receives encouraging feedback, earns no XP, and may retry the stop. Every
+first-attempt miss is retained as a compact, versioned question reference for
+future culminations, whether or not the stop clears.
+
+XP is celebratory, not a gate. Every cleared node on a board awards a constant
+amount: Starter 25, Junior 50, Expert 100, and Wizard 200. Awards MUST be
+idempotent by stop ID. With 13 nodes, board totals are 325, 650, 1300, and 2600.
+Show total XP on the board and pair acquisition with a brief locally
+synthesized jingle when sound is enabled.
+
+After every attempt, show an extremely positive summary with XP earned,
+first-attempt accuracy, and active practice time. Time is informational outside
+Turbo and MUST NOT be praised as a measure of ability.
+
+Journey supports multiple device-local profiles. Prompt for a short display
+name and one of at most 16 bundled, consistently styled animal avatars, including
+a hedgehog or porcupine. Allow creating, switching, renaming, re-avataring, and
+deleting profiles. Store versioned profiles and progress in `localStorage`;
+handle blocked, corrupt, stale, and quota-exceeded storage without crashing.
+There are no accounts, cookies sent to a server, cloud sync, or remote runtime
+assets.
+
 ## Infinite mode
 
 Infinite mode generates puzzles on demand and uses the same Starter, Junior,

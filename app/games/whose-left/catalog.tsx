@@ -2,6 +2,7 @@ import type {
   GameInfo,
   ShelfIconProps,
 } from "@/lib/game-catalog-types";
+import { progressionMetadata } from "./progression-metadata";
 
 export const gameInfo = {
   title: "Whose Left?",
@@ -9,6 +10,7 @@ export const gameInfo = {
     "Follow winding, crossing paths and keep left and right anchored to the walker, not the page.",
   skills: ["Spatial perspective", "Direction tracking"],
   estimatedMinutes: 10,
+  progression: progressionMetadata,
   shelfOrder: 40,
 } satisfies GameInfo;
 

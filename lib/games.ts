@@ -32,6 +32,12 @@ function validateGame(game: GameCatalogEntry): GameCatalogEntry {
     throw new Error(`Game "${game.slug}" has invalid estimated minutes.`);
   }
   if (
+    !game.progression.contentVersion.trim() ||
+    !game.progression.generatorVersion.trim()
+  ) {
+    throw new Error(`Game "${game.slug}" has invalid progression versions.`);
+  }
+  if (
     game.shelfOrder !== undefined &&
     !Number.isFinite(game.shelfOrder)
   ) {

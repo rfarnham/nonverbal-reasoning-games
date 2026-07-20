@@ -202,6 +202,12 @@ a {
   box-shadow: 7px 7px 0 var(--coral);
 }
 
+.journey-home-cta {
+  min-height: 60px;
+  padding-inline: 27px;
+  font-size: 1rem;
+}
+
 .button-secondary {
   background: transparent;
 }

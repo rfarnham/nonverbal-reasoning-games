@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { playFeedbackEarcon } from "../lib/game-audio.ts";
+import {
+  playFeedbackEarcon,
+  playXpJingle,
+} from "../lib/game-audio.ts";
 
 function recordingContext() {
   const frequencies = [];
@@ -72,6 +75,16 @@ test("earcon failures never escape into gameplay", () => {
   };
 
   assert.doesNotThrow(() => playFeedbackEarcon(unavailableContext, true));
+});
+
+test("XP uses a brief ascending three-note jingle", () => {
+  const xp = recordingContext();
+  playXpJingle(xp.context);
+  assert.deepEqual(
+    xp.frequencies.map(({ value }) => value),
+    [659.25, 783.99, 1046.5],
+  );
+  assert.equal(xp.stops.length, 3);
 });
 
 test("late audio cleanup failures never escape into gameplay", () => {

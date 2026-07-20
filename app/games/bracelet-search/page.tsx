@@ -10,6 +10,15 @@ import {
   type CSSProperties,
 } from "react";
 
+import { ProgressionGameHud } from "@/components/progression/ProgressionGameHud";
+import {
+  ProgressionRecoveryPanel,
+  ProgressionRedemptionIntro,
+} from "@/components/progression/ProgressionSessionPanels";
+import {
+  progressionOptionIndexFromAnswerToken,
+  useProgressionGameSession,
+} from "@/components/progression/useProgressionGameSession";
 import {
   playFeedbackEarcon,
   readSoundPreference,
@@ -39,6 +48,7 @@ import {
   type SegmentPattern,
 } from "./game-engine";
 import { braceletSearchGame } from "./game-info";
+import { progressionAdapter } from "./progression-adapter";
 import styles from "./bracelet-search.module.css";
 
 type GamePhase = "idle" | "animating" | "wrong-review" | "answered";
@@ -394,6 +404,7 @@ function isEditableTarget(target: EventTarget | null) {
 }
 
 export default function BraceletSearchPage() {
+  const progression = useProgressionGameSession(progressionAdapter);
   const [started, setStarted] = useState(false);
   const [sessionMode, setSessionMode] = useState<SessionMode>("campaign");
   const [roundQueue, setRoundQueue] = useState<readonly SessionRound[]>([]);
@@ -447,17 +458,33 @@ export default function BraceletSearchPage() {
   const infiniteFingerprintsRef = useRef(new Set<string>());
   const infiniteAdaptiveRef = useRef(initialInfiniteAdaptiveState());
 
-  const isCampaign = sessionMode === "campaign";
-  const isInfinite = sessionMode === "infinite";
-  const isRedemption = sessionMode === "redemption";
+  const progressionControlled = progression.mode === "controlled";
+  const progressionRound = progressionControlled && progression.current
+    ? {
+        id: progression.current.playId,
+        ordinal: progression.currentQuestionNumber,
+        round: progression.current.round,
+      }
+    : undefined;
+  const gameplayStarted = started || progressionControlled;
+  const isCampaign =
+    !progressionControlled && sessionMode === "campaign";
+  const isInfinite =
+    !progressionControlled && sessionMode === "infinite";
+  const isRedemption =
+    progressionControlled
+      ? progression.isRedemption
+      : sessionMode === "redemption";
   const campaignProblemIndex = campaignCursors[activeCampaignLevel];
   const campaignSessionRound = buildCampaignSessionRound(
     activeCampaignLevel,
     campaignProblemIndex,
   );
-  const activeSessionRound = isCampaign
-    ? campaignSessionRound
-    : (roundQueue[roundCursor] ?? roundQueue[0]);
+  const activeSessionRound = progressionControlled
+    ? progressionRound
+    : isCampaign
+      ? campaignSessionRound
+      : (roundQueue[roundCursor] ?? roundQueue[0]);
   const round = activeSessionRound?.round ?? ROUNDS[0];
   const sessionLength = roundQueue.length;
   const progress = roundCursor + (phase === "answered" ? 1 : 0);
@@ -621,9 +648,11 @@ export default function BraceletSearchPage() {
         inputLockedRef.current ||
         phase !== "idle" ||
         complete ||
-        !started ||
+        !gameplayStarted ||
         historicalReview ||
-        (isCampaign && activeCampaignLevelComplete) ||
+        (!progressionControlled &&
+          isCampaign &&
+          activeCampaignLevelComplete) ||
         !activeSessionRound
       ) {
         return;
@@ -642,11 +671,17 @@ export default function BraceletSearchPage() {
         "(prefers-reduced-motion: reduce)",
       ).matches;
 
+      if (progressionControlled) {
+        progression.answer({
+          correct: isCorrect,
+          answerToken: `option-${optionIndex}`,
+        });
+      }
       playFeedbackSound(isCorrect);
       setSelectedIndex(optionIndex);
       setPhase("animating");
 
-      if (isCampaign) {
+      if (!progressionControlled && isCampaign) {
         setCampaignProgress((current) => {
           const existing = current[activeSessionRound.id];
           return {
@@ -662,7 +697,7 @@ export default function BraceletSearchPage() {
         });
       }
 
-      if (isInfinite) {
+      if (!progressionControlled && isInfinite) {
         const nextAdaptive = recordInfiniteFirstAttempt(
           infiniteAdaptiveRef.current,
           {
@@ -677,12 +712,16 @@ export default function BraceletSearchPage() {
         }
       }
 
-      if (isCorrect) {
+      if (!progressionControlled && isCorrect) {
         if (!isRedemption && !alreadyAttempted) {
           setScore((current) => current + 1);
         }
         setCompletedCount((current) => current + 1);
-      } else if (!isRedemption) {
+      } else if (
+        !progressionControlled &&
+        !isCorrect &&
+        !isRedemption
+      ) {
         setMistakes((current) =>
           current.some(
             ({ sessionRound }) => sessionRound.id === activeSessionRound.id,
@@ -732,6 +771,7 @@ export default function BraceletSearchPage() {
           reviewTimerRef.current = setTimeout(
             () => {
               if (attemptTokenRef.current !== attemptToken) return;
+              if (progressionControlled) progression.retry();
               retryFocusIndexRef.current = optionIndex;
               inputLockedRef.current = false;
               setTrace(null);
@@ -762,8 +802,10 @@ export default function BraceletSearchPage() {
       mistakes,
       phase,
       playFeedbackSound,
+      progression,
+      progressionControlled,
       round,
-      started,
+      gameplayStarted,
     ],
   );
 
@@ -883,6 +925,14 @@ export default function BraceletSearchPage() {
   const goNext = useCallback(() => {
     if (phase !== "answered") return;
 
+    if (progressionControlled) {
+      progression.setInteractionState("blocked");
+      progression.advance();
+      resetAttemptState();
+      shouldFocusFirstOption.current = true;
+      return;
+    }
+
     if (isCampaign) {
       resetAttemptState();
 
@@ -956,6 +1006,8 @@ export default function BraceletSearchPage() {
     isInfinite,
     isLastRedemptionRound,
     phase,
+    progression,
+    progressionControlled,
     redemptionMistakeIds,
     reviewLevelId,
     resetAttemptState,
@@ -1020,6 +1072,152 @@ export default function BraceletSearchPage() {
     return () => window.clearTimeout(timer);
   }, []);
 
+  const progressionPlayId =
+    progressionControlled && progression.current
+      ? `${progression.attemptId}:${
+          progression.isRedemption ? "redemption" : "main"
+        }:${
+          progression.current.playId
+        }`
+      : null;
+  const hydratedProgressionPlayIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (
+      !progressionControlled ||
+      !progression.current ||
+      !progressionPlayId ||
+      hydratedProgressionPlayIdRef.current === progressionPlayId
+    ) {
+      return;
+    }
+    attemptTokenRef.current += 1;
+    clearAttemptTimers();
+    retryFocusIndexRef.current = null;
+    const controlled = progression;
+    const savedOptionIndex = progressionOptionIndexFromAnswerToken(
+      controlled.lastAnswerToken,
+    );
+    const timer = window.setTimeout(() => {
+      hydratedProgressionPlayIdRef.current = progressionPlayId;
+      setGenerationError(null);
+      if (controlled.roundPhase === "solved" && controlled.current) {
+        inputLockedRef.current = true;
+        setSelectedIndex(controlled.current.round.correctIndex);
+        setTrace({
+          indexes: occurrenceIndexesInStripOrder(
+            controlled.current.round.occurrence,
+          ),
+          optionMismatchIndexes: [],
+          braceletMismatchIndexes: [],
+          wrong: false,
+        });
+        setRetryReady(false);
+        setPhase("answered");
+        shouldFocusFirstOption.current = false;
+      } else if (
+        controlled.roundPhase === "feedback" &&
+        controlled.current &&
+        savedOptionIndex !== null &&
+        savedOptionIndex < controlled.current.round.options.length &&
+        savedOptionIndex !== controlled.current.round.correctIndex
+      ) {
+        const selectedRound = controlled.current.round;
+        const analysis = analyzeWrongAttempt(selectedRound, savedOptionIndex);
+        inputLockedRef.current = true;
+        setSelectedIndex(savedOptionIndex);
+        setTrace(
+          analysis.kind === "comparison"
+            ? {
+                indexes: occurrenceIndexesInStripOrder(analysis.occurrence),
+                optionMismatchIndexes: analysis.optionIndexes,
+                braceletMismatchIndexes: analysis.braceletIndexes,
+                wrong: true,
+              }
+            : null,
+        );
+        setRetryReady(false);
+        setPhase("wrong-review");
+        shouldFocusFirstOption.current = false;
+        const hydrationToken = attemptTokenRef.current;
+        const reducedMotion = window.matchMedia(
+          "(prefers-reduced-motion: reduce)",
+        ).matches;
+        reviewTimerRef.current = setTimeout(
+          () => {
+            if (attemptTokenRef.current !== hydrationToken) return;
+            controlled.retry();
+            retryFocusIndexRef.current = savedOptionIndex;
+            inputLockedRef.current = false;
+            setTrace(null);
+            setSelectedIndex(null);
+            setRetryReady(true);
+            setPhase("idle");
+          },
+          reducedMotion ? REDUCED_WRONG_REVIEW_MS : WRONG_REVIEW_MS,
+        );
+      } else {
+        if (controlled.roundPhase === "feedback") controlled.retry();
+        inputLockedRef.current = false;
+        setSelectedIndex(null);
+        setTrace(null);
+        setRetryReady(controlled.currentAttemptCount > 0);
+        setPhase("idle");
+        shouldFocusFirstOption.current = true;
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [
+    clearAttemptTimers,
+    progression,
+    progressionControlled,
+    progressionPlayId,
+  ]);
+
+  useEffect(() => {
+    if (!progressionControlled) return;
+    if (
+      progression.current &&
+      progressionPlayId &&
+      hydratedProgressionPlayIdRef.current !== progressionPlayId
+    ) {
+      return;
+    }
+    const desiredState =
+      !progression.current ||
+      progression.stage === "redemption-ready"
+        ? "blocked"
+        : progression.roundPhase === "feedback"
+          ? "mandatory-feedback"
+          : progression.roundPhase === "solved" ||
+              phase === "answered"
+            ? "blocked"
+            : phase === "idle"
+              ? "answering"
+              : "mandatory-feedback";
+    if (progression.interactionState !== desiredState) {
+      progression.setInteractionState(desiredState);
+    }
+  }, [
+    phase,
+    progression,
+    progressionControlled,
+    progressionPlayId,
+  ]);
+
+  useEffect(() => {
+    if (progression.mode !== "redirect") return;
+    const basePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(
+      /\/$/,
+      "",
+    );
+    const query = new URLSearchParams(progression.navigationTarget.query);
+    const suffix = query.size ? `?${query.toString()}` : "";
+    window.location.assign(
+      `${basePath}${progression.navigationTarget.pathname}${suffix}`,
+    );
+  }, [progression]);
+
   useEffect(
     () => () => {
       const context = audioContextRef.current;
@@ -1051,7 +1249,7 @@ export default function BraceletSearchPage() {
       if (
         event.defaultPrevented ||
         isEditableTarget(event.target) ||
-        !started ||
+        !gameplayStarted ||
         complete ||
         phase !== "idle" ||
         event.altKey ||
@@ -1074,9 +1272,9 @@ export default function BraceletSearchPage() {
     chooseOption,
     closeHistoricalReview,
     complete,
+    gameplayStarted,
     historicalReview,
     phase,
-    started,
   ]);
 
   useEffect(() => {
@@ -1084,7 +1282,7 @@ export default function BraceletSearchPage() {
   }, [phase]);
 
   useEffect(() => {
-    if (shouldFocusFirstOption.current && started && !complete) {
+    if (shouldFocusFirstOption.current && gameplayStarted && !complete) {
       optionButtonRefs.current[0]?.focus();
       shouldFocusFirstOption.current = false;
     }
@@ -1094,7 +1292,7 @@ export default function BraceletSearchPage() {
     complete,
     roundCursor,
     sessionMode,
-    started,
+    gameplayStarted,
   ]);
 
   useEffect(() => {
@@ -1170,16 +1368,23 @@ export default function BraceletSearchPage() {
   return (
     <div className={styles.pageShell}>
       <header className={styles.topbar}>
-        <Link className={styles.backLink} href="/" aria-label="All games">
+        <Link
+          className={styles.backLink}
+          href={progressionControlled ? "/journey/" : "/"}
+          aria-label={progressionControlled ? "Journey map" : "All games"}
+        >
           <span aria-hidden="true">←</span>
-          <span>Games</span>
+          <span>{progressionControlled ? "Journey" : "Games"}</span>
         </Link>
         <span className={styles.gameTitle}>{braceletSearchGame.title}</span>
         {soundButton}
       </header>
 
       <main className={styles.main}>
-        {!started ? (
+        {progression.mode === "recovery" ||
+        progression.mode === "redirect" ? (
+          <ProgressionRecoveryPanel message={progression.message} />
+        ) : !gameplayStarted ? (
           <section className={styles.tutorial} aria-labelledby="tutorial-title">
             <p className={styles.kicker}>Example</p>
             <h1 id="tutorial-title">Find the hidden run.</h1>
@@ -1235,6 +1440,7 @@ export default function BraceletSearchPage() {
                 className={styles.primaryButton}
                 type="button"
                 onClick={startCampaign}
+                disabled={progression.mode === "booting"}
               >
                 Campaign
                 <span aria-hidden="true">→</span>
@@ -1243,6 +1449,7 @@ export default function BraceletSearchPage() {
                 className={styles.modeButton}
                 type="button"
                 onClick={startInfinite}
+                disabled={progression.mode === "booting"}
               >
                 <span aria-hidden="true">∞</span>
                 Infinite
@@ -1256,7 +1463,21 @@ export default function BraceletSearchPage() {
           </section>
         ) : !complete ? (
           <>
-            <div
+            {progressionControlled ? (
+              <ProgressionGameHud
+                mode={progression.runKind}
+                levelLabel={
+                  progression.level[0].toUpperCase() +
+                  progression.level.slice(1)
+                }
+                current={progression.currentQuestionNumber}
+                total={progression.totalQuestions}
+                remainingMs={progression.turboRemainingMs ?? undefined}
+                paused={progression.interactionState !== "answering"}
+                redemption={progression.isRedemption}
+              />
+            ) : (
+              <div
               className={`${styles.gameStatus} ${
                 isCampaign ? styles.campaignStatus : ""
               }`}
@@ -1479,9 +1700,16 @@ export default function BraceletSearchPage() {
                   End
                 </button>
               ) : null}
-            </div>
+              </div>
+            )}
 
-            {showCampaignLevelComplete ? (
+            {progressionControlled &&
+            progression.stage === "redemption-ready" ? (
+              <ProgressionRedemptionIntro
+                attempt={progression.attempt}
+                onBegin={progression.beginRedemption}
+              />
+            ) : showCampaignLevelComplete ? (
               <section
                 className={styles.levelCompleteCard}
                 id="campaign-play-area"

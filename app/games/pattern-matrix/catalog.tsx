@@ -2,6 +2,7 @@ import type {
   GameInfo,
   ShelfIconProps,
 } from "@/lib/game-catalog-types";
+import { progressionMetadata } from "./progression-metadata";
 
 const panels = [
   { mask: [true, false, false, false], shape: "triangle", color: "#7767d7" },
@@ -20,6 +21,7 @@ export const gameInfo = {
     "Track visual rules across rows, columns, and the whole grid, then choose the tile that completes the matrix.",
   skills: ["Rule finding", "Pattern completion"],
   estimatedMinutes: 10,
+  progression: progressionMetadata,
   shelfOrder: 20,
 } satisfies GameInfo;
 
