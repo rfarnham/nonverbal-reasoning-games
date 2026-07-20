@@ -307,7 +307,10 @@ Turbo Time:
 
 - uses the selected game's canonical Infinite generator and adaptive rules;
 - lasts two minutes of active answering;
-- pauses while the document is hidden and during mandatory teaching feedback;
+- pauses while the document is hidden and while an explicit explanation or
+  teaching modal is open;
+- keeps running through ordinary answer feedback, teaching animations, solved
+  states, and puzzle-to-puzzle transitions;
 - never adapts above the avatar's current board difficulty;
 - stops starting new rounds at zero but lets the active puzzle finish;
 - finishes with the same untimed redemption loop as other sessions;

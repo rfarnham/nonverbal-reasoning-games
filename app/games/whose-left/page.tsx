@@ -941,6 +941,7 @@ export default function WhoseLeftPage() {
     ) {
       return;
     }
+    progression.setTurboClockPaused(!progression.current);
     const desiredState =
       !progression.current ||
       progression.stage === "redemption-ready"
@@ -1126,10 +1127,9 @@ export default function WhoseLeftPage() {
       </header>
 
       <main className={styles.main}>
-        {progression.mode === "recovery" ||
-        progression.mode === "redirect" ? (
+        {progression.mode === "recovery" ? (
           <ProgressionRecoveryPanel message={progression.message} />
-        ) : !gameplayStarted ? (
+        ) : progression.mode === "redirect" ? null : !gameplayStarted ? (
           <section className={styles.tutorial} aria-labelledby="tutorial-title">
             <div className={styles.tutorialCopy}>
               <p className={styles.kicker}>Example</p>
@@ -1200,7 +1200,7 @@ export default function WhoseLeftPage() {
                 current={progression.currentQuestionNumber}
                 total={progression.totalQuestions}
                 remainingMs={progression.turboRemainingMs ?? undefined}
-                paused={progression.interactionState !== "answering"}
+                paused={progression.turboClockPaused}
                 redemption={progression.isRedemption}
               />
             ) : (

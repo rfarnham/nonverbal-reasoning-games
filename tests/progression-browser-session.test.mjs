@@ -307,7 +307,7 @@ test("browser session preserves first attempts through retry and redemption", ()
   assert.equal(savedAttempt.rounds[0].firstTryCorrect, false);
 });
 
-test("Turbo counts visible practice without charging paused time to its limit", () => {
+test("Turbo charges feedback and solved transitions but not explanation pauses", () => {
   const gameAdapter = adapter();
   const node = buildJourneyPlan(games).boards[0].nodes[2];
   const attempt = createTurboProgressionAttempt({
@@ -337,30 +337,65 @@ test("Turbo counts visible practice without charging paused time to its limit", 
   assert.equal(session.attempt.activeTimeMs, 2_000);
   assert.equal(session.attempt.turboRemainingMs, startingRemaining);
 
+  session = answerProgressionBrowserSession(
+    gameAdapter,
+    attempt.id,
+    { correct: false, answerToken: "1", nowMs: 11 },
+    { storage },
+  );
+  assert.equal(session.attempt.rounds[0].phase, "feedback");
+
   session = addActiveTimeBrowserSession(
     gameAdapter,
     attempt.id,
-    startingRemaining,
+    2_200,
     20,
     { storage },
     { countTowardTurbo: true },
   );
-  assert.equal(session.attempt.turboRemainingMs, 0);
+  assert.equal(
+    session.attempt.turboRemainingMs,
+    startingRemaining - 2_200,
+    "ordinary wrong-answer feedback remains on the clock",
+  );
+
+  session = retryProgressionBrowserSession(
+    gameAdapter,
+    attempt.id,
+    21,
+    { storage },
+  );
 
   session = answerProgressionBrowserSession(
     gameAdapter,
     attempt.id,
-    { correct: true, nowMs: 21 },
+    { correct: true, nowMs: 22 },
     { storage },
   );
+  assert.equal(session.attempt.rounds[0].phase, "solved");
+
+  session = addActiveTimeBrowserSession(
+    gameAdapter,
+    attempt.id,
+    session.attempt.turboRemainingMs,
+    23,
+    { storage },
+    { countTowardTurbo: true },
+  );
+  assert.equal(
+    session.attempt.turboRemainingMs,
+    0,
+    "the solved reveal and Next transition remain on the clock",
+  );
+
   session = advanceProgressionBrowserSession(
     gameAdapter,
     attempt.id,
-    22,
+    24,
     { storage },
   );
-  assert.equal(session.mode, "redirect");
-  assert.equal(session.navigationTarget.pathname, "/journey/summary/");
+  assert.equal(session.mode, "controlled");
+  assert.equal(session.attempt.phase, "redemption-ready");
   assert.equal(
     loadProgressionState(storage).profiles[0].attempts[attempt.id].rounds.length,
     1,

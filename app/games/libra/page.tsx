@@ -1227,6 +1227,7 @@ export default function LibraPage() {
       campaignReviewSelection !== null ||
       generationError
     ) {
+      controlledSession.setTurboClockPaused(true);
       if (controlledSession.interactionState !== "blocked") {
         controlledSession.setInteractionState("blocked");
       }
@@ -1236,6 +1237,7 @@ export default function LibraPage() {
       controlledSession.isRedemption ? "redemption" : "main"
     }:${controlledSession.current.playId}`;
     if (hydratedProgressionPlayIdRef.current !== hydrationKey) return;
+    controlledSession.setTurboClockPaused(false);
     const nextInteractionState =
       controlledSession.roundPhase === "solved"
         ? "blocked"
@@ -1545,9 +1547,8 @@ export default function LibraPage() {
       <main className={styles.main}>
         {progression.mode === "recovery" ? (
           <ProgressionRecoveryPanel message={progression.message} />
-        ) : progression.mode === "redirect" ? (
-          <ProgressionRecoveryPanel message={progression.message} />
-        ) : controlledSession?.stage === "redemption-ready" ? (
+        ) : progression.mode === "redirect" ? null : controlledSession?.stage ===
+          "redemption-ready" ? (
           <ProgressionRedemptionIntro
             attempt={controlledSession.attempt}
             onBegin={controlledSession.beginRedemption}
@@ -1595,9 +1596,7 @@ export default function LibraPage() {
                 remainingMs={
                   controlledSession.turboRemainingMs ?? undefined
                 }
-                paused={
-                  controlledSession.interactionState !== "answering"
-                }
+                paused={controlledSession.turboClockPaused}
                 redemption={controlledSession.isRedemption}
               />
             ) : (

@@ -25,6 +25,10 @@ import type {
   ResolvedProgressionQuestion,
 } from "../../lib/progression/game-adapter.ts";
 import { PROGRESSION_STORAGE_KEY } from "../../lib/progression/persistence.ts";
+import {
+  shouldCountTurboTime,
+  shouldShowTurboPaused,
+} from "../../lib/progression/timer-policy.ts";
 import type {
   AttemptPhase,
   AttemptRoundPhase,
@@ -49,6 +53,7 @@ type SessionActions = Readonly<{
   advance(): void;
   beginRedemption(): void;
   setInteractionState(state: ProgressionInteractionState): void;
+  setTurboClockPaused(paused: boolean): void;
   refresh(): void;
 }>;
 
@@ -72,6 +77,7 @@ export type ProgressionControlledGameSession<Round> = SessionActions &
     currentQuestionNumber: number;
     totalQuestions: number | null;
     turboRemainingMs: number | null;
+    turboClockPaused: boolean;
     navigationTarget: null;
     exitTarget: ProgressionRouteTarget;
   }>;
@@ -144,16 +150,17 @@ function canPracticeClockRun(
 
 function countsTowardTurbo(
   session: BrowserProgressionSession<unknown> | null,
-  interactionState: ProgressionInteractionState,
+  visible: boolean,
+  explanationOpen: boolean,
 ) {
-  return (
-    session?.mode === "controlled" &&
-    session.attempt.kind === "turbo" &&
-    session.attempt.phase === "playing" &&
-    session.current !== null &&
-    interactionState === "answering" &&
-    activeRoundPhase(session) === "answering"
-  );
+  if (session?.mode !== "controlled") return false;
+  return shouldCountTurboTime({
+    visible,
+    attemptKind: session.attempt.kind,
+    attemptPhase: session.attempt.phase,
+    hasCurrentQuestion: session.current !== null,
+    explanationOpen,
+  });
 }
 
 function completedQuestionCount(attempt: ProgressionAttempt): number {
@@ -185,11 +192,13 @@ export function useProgressionGameSession<
     useState<BrowserProgressionSession<Round> | null>(null);
   const [interactionState, setInteractionStateValue] =
     useState<ProgressionInteractionState>("blocked");
+  const [turboClockPauseRequested, setTurboClockPauseRequested] =
+    useState(true);
   const [visible, setVisible] = useState(false);
   const mountedRef = useRef(false);
   const sessionRef = useRef<BrowserProgressionSession<Round> | null>(null);
-  const interactionStateRef =
-    useRef<ProgressionInteractionState>("blocked");
+  const turboClockPauseRequestedRef = useRef(true);
+  const visibleRef = useRef(false);
   const practiceClockStartedAtRef = useRef<number | null>(null);
 
   const applySession = useCallback(
@@ -234,7 +243,8 @@ export function useProgressionGameSession<
         {
           countTowardTurbo: countsTowardTurbo(
             current,
-            interactionStateRef.current,
+            visibleRef.current,
+            turboClockPauseRequestedRef.current,
           ),
         },
       );
@@ -315,8 +325,17 @@ export function useProgressionGameSession<
   const setInteractionState = useCallback(
     (nextState: ProgressionInteractionState) => {
       flushClock(true);
-      interactionStateRef.current = nextState;
       setInteractionStateValue(nextState);
+    },
+    [flushClock],
+  );
+
+  const setTurboClockPaused = useCallback(
+    (paused: boolean) => {
+      if (turboClockPauseRequestedRef.current === paused) return;
+      flushClock(true);
+      turboClockPauseRequestedRef.current = paused;
+      setTurboClockPauseRequested(paused);
     },
     [flushClock],
   );
@@ -325,7 +344,9 @@ export function useProgressionGameSession<
     mountedRef.current = true;
     const initialTimer = window.setTimeout(() => {
       setSearch(window.location.search);
-      setVisible(document.visibilityState === "visible");
+      const initialVisible = document.visibilityState === "visible";
+      visibleRef.current = initialVisible;
+      setVisible(initialVisible);
     }, 0);
     return () => {
       window.clearTimeout(initialTimer);
@@ -360,6 +381,7 @@ export function useProgressionGameSession<
     const handleVisibility = () => {
       const nextVisible = document.visibilityState === "visible";
       if (!nextVisible) flushClock(true);
+      visibleRef.current = nextVisible;
       setVisible(nextVisible);
     };
     const handlePageHide = () => {
@@ -431,12 +453,19 @@ export function useProgressionGameSession<
       totalQuestions,
       turboRemainingMs:
         session.attempt.turboRemainingMs ?? null,
+      turboClockPaused: shouldShowTurboPaused({
+        visible,
+        attemptKind: session.attempt.kind,
+        attemptPhase: session.attempt.phase,
+        explanationOpen: turboClockPauseRequested,
+      }),
       exitTarget: EXIT_TARGET,
       answer,
       retry,
       advance,
       beginRedemption,
       setInteractionState,
+      setTurboClockPaused,
       refresh,
     };
   }, [
@@ -449,5 +478,8 @@ export function useProgressionGameSession<
     search,
     session,
     setInteractionState,
+    setTurboClockPaused,
+    turboClockPauseRequested,
+    visible,
   ]);
 }

@@ -54,12 +54,58 @@ test("every released game uses the same controlled progression hook", async () =
     assert.match(gameSource, /<ProgressionGameHud/);
     assert.match(
       gameSource,
+      /paused=\{(?:controlledSession|progression)\.turboClockPaused\}/,
+      `${slug} must show the shared Turbo clock state`,
+    );
+    assert.match(
+      gameSource,
+      /setTurboClockPaused\(/,
+      `${slug} must explicitly release or pause the Turbo clock`,
+    );
+    assert.match(
+      gameSource,
       /redemption=\{(?:controlledSession|progression)\.isRedemption\}/,
       `${slug} must show question progress during Turbo redemption`,
     );
     assert.match(gameSource, /<ProgressionRedemptionIntro/);
     assert.match(gameSource, /<ProgressionRecoveryPanel/);
+    assert.match(
+      gameSource,
+      /progression\.mode === "redirect" \? null/,
+      `${slug} must not flash recovery UI during a valid redirect`,
+    );
+    assert.doesNotMatch(
+      gameSource,
+      /progression\.mode === "recovery" \|\|[\s\S]{0,80}progression\.mode === "redirect"/,
+      `${slug} must reserve recovery UI for stale or invalid sessions`,
+    );
   }
+});
+
+test("Turbo timing is independent from input locks and pauses for real explanations", async () => {
+  const hook = await source(
+    "components/progression/useProgressionGameSession.ts",
+  );
+  assert.match(hook, /shouldCountTurboTime/);
+  assert.match(hook, /setTurboClockPaused/);
+  assert.doesNotMatch(hook, /interactionState === "answering"/);
+  assert.doesNotMatch(hook, /activeRoundPhase\(session\) === "answering"/);
+
+  const rotation = await source("app/games/rotation-match/page.tsx");
+  const patternMatrix = await source("app/games/pattern-matrix/page.tsx");
+  const libra = await source("app/games/libra/page.tsx");
+  assert.match(
+    rotation,
+    /setTurboClockPaused\([\s\S]{0,100}tutorialTransform !== null/,
+  );
+  assert.match(
+    patternMatrix,
+    /hasBlockingRuleLesson[\s\S]{0,180}setTurboClockPaused\(true\)/,
+  );
+  assert.match(
+    libra,
+    /activeLessonStrategyId !== null[\s\S]{0,180}setTurboClockPaused\(true\)/,
+  );
 });
 
 test("controlled games restore persisted answer and feedback UI before retrying", async () => {

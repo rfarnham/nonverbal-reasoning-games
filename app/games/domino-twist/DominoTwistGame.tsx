@@ -1255,6 +1255,7 @@ export default function DominoTwistGame() {
   useEffect(() => {
     if (!controlledSession) return;
     if (!controlledSession.current) {
+      controlledSession.setTurboClockPaused(true);
       if (controlledSession.interactionState !== "blocked") {
         controlledSession.setInteractionState("blocked");
       }
@@ -1264,6 +1265,9 @@ export default function DominoTwistGame() {
       controlledSession.isRedemption ? "redemption" : "main"
     }:${controlledSession.current.playId}`;
     if (hydratedProgressionPlayIdRef.current !== hydrationKey) return;
+    controlledSession.setTurboClockPaused(
+      campaignReviewSelection !== null || Boolean(generationError),
+    );
     const nextInteractionState =
       controlledSession.roundPhase === "solved"
         ? "blocked"
@@ -1515,9 +1519,8 @@ export default function DominoTwistGame() {
       <main className={styles.main}>
         {progression.mode === "recovery" ? (
           <ProgressionRecoveryPanel message={progression.message} />
-        ) : progression.mode === "redirect" ? (
-          <ProgressionRecoveryPanel message={progression.message} />
-        ) : controlledSession?.stage === "redemption-ready" ? (
+        ) : progression.mode === "redirect" ? null : controlledSession?.stage ===
+          "redemption-ready" ? (
           <ProgressionRedemptionIntro
             attempt={controlledSession.attempt}
             onBegin={controlledSession.beginRedemption}
@@ -1605,9 +1608,7 @@ export default function DominoTwistGame() {
                 remainingMs={
                   controlledSession.turboRemainingMs ?? undefined
                 }
-                paused={
-                  controlledSession.interactionState !== "answering"
-                }
+                paused={controlledSession.turboClockPaused}
                 redemption={controlledSession.isRedemption}
               />
             ) : (

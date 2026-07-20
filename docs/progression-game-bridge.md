@@ -384,6 +384,7 @@ export type ProgressionControlledGameSession<Round> = Readonly<{
   currentQuestionNumber: number;
   totalQuestions: number | null;
   turboRemainingMs: number | null;
+  turboClockPaused: boolean;
   navigationTarget: null;
   exitTarget: ProgressionRouteTarget;
   answer(result: { correct: boolean; answerToken?: string }): void;
@@ -391,6 +392,7 @@ export type ProgressionControlledGameSession<Round> = Readonly<{
   advance(): void;
   beginRedemption(): void;
   setInteractionState(state: ProgressionInteractionState): void;
+  setTurboClockPaused(paused: boolean): void;
   refresh(): void;
 }>;
 ```
@@ -414,9 +416,11 @@ require `useSearchParams`. It listens for `storage` and `popstate`, persists
 every action through the browser session, and exposes normalized progress and
 active-attempt metadata for refresh hydration.
 
-`setInteractionState()` controls timing; it does not change a question from
-`feedback` to `answering`. The game must call `retry()` after its mandatory
-wrong-answer review has finished.
+`setInteractionState()` controls input and feedback safety; it does not change
+a question from `feedback` to `answering` and does not pause Turbo. The game
+must call `retry()` after its mandatory wrong-answer review has finished.
+`setTurboClockPaused()` is deliberately separate and is reserved for explicit
+explanation or teaching modals.
 
 ## Mechanical page integration
 
@@ -460,6 +464,10 @@ component or copy puzzle logic.
      lesson => `answering`;
    - other animations, dialogs, or teaching states =>
      `mandatory-feedback` or `blocked` as appropriate.
+   Separately call `setTurboClockPaused(true)` only while an explicit
+   explanation/teaching modal blocks play, and call it with `false` once the
+   current round is hydrated without such a modal. Ordinary feedback,
+   animations, solved states, and Next transitions remain on the Turbo clock.
 9. Scope controlled hydration to attempt, main/redemption mode, and play ID,
    for example
    `<attemptId>:<main-or-redemption>:<current.playId>`. Mark that key hydrated
@@ -536,10 +544,11 @@ The persisted timer fields are `activeTimeMs` and, for Turbo,
 - `activeTimeMs` accumulates while a controlled attempt is visible and in
   `playing` or `redemption`. It supplies the summary time.
 - `turboRemainingMs` decreases only while the document is visible, the attempt
-  is in main `playing`, the current persisted round is `answering`, and the page
-  reports interaction state `answering`.
-- Wrong feedback, correct feedback, teaching dialogs, recovery, hidden
-  documents, and redemption do not consume the Turbo limit.
+  is in main `playing`, a current puzzle exists, and no explicit explanation or
+  teaching modal is open.
+- Ordinary wrong/correct feedback, teaching animations, solved states, and
+  puzzle transitions consume the Turbo limit. Explicit explanation modals,
+  hidden documents, recovery, and redemption do not.
 
 The hook flushes elapsed time before actions and interaction-state changes, on
 visibility/page lifecycle changes, and on a one-second heartbeat. It starts a

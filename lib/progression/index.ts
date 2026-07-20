@@ -4,5 +4,6 @@ export * from "./persistence.ts";
 export * from "./profiles.ts";
 export * from "./questions.ts";
 export * from "./session-builders.ts";
+export * from "./timer-policy.ts";
 export * from "./types.ts";
 export * from "./validation.ts";
