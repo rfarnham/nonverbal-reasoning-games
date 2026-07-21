@@ -1,6 +1,18 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
+
+import {
+  createGameNarrationPlayer,
+  type GameNarrationPlayer,
+} from "@/lib/game-narration";
 
 import type {
   AnswerOption,
@@ -12,6 +24,13 @@ import type {
 } from "./game-engine";
 import type { StrategyId, TeachingProofStep } from "./strategy-curriculum";
 import { buildTeachingProof } from "./strategy-curriculum";
+import {
+  LIBRA_PROOF_NARRATION,
+  proofNarrationCaption,
+  proofNarrationCueId,
+  proofNarrationCueIds,
+  type LibraProofNarrationCueId,
+} from "./proof-narration.ts";
 import styles from "./libra.module.css";
 
 const TOKEN_COLORS: Readonly<Record<Creature, string>> = {
@@ -552,11 +571,7 @@ type TeachingGroupedEquationValue = Extract<
 >["after"];
 
 type ProofPhaseStyle = CSSProperties & {
-  "--proof-phase-delay": string;
   "--proof-phase-duration": string;
-  "--proof-phase-enter-delay": string;
-  "--proof-phase-enter-duration": string;
-  "--proof-phase-exit-delay": string;
 };
 
 function isGroupedEquation(
@@ -927,39 +942,6 @@ function ProofMorphingBalanceScale({
   );
 }
 
-function ProofCallouts({
-  first,
-  middle,
-  last,
-}: {
-  first: string;
-  middle?: string;
-  last: string;
-}) {
-  return (
-    <div
-      className={styles.proofScaleCallouts}
-      data-proof-callout="sequence"
-      data-callout-count={middle ? "3" : "2"}
-    >
-      <p className={styles.proofScaleCalloutFirst}>
-        <span aria-hidden="true">●</span>
-        {first}
-      </p>
-      {middle ? (
-        <p className={styles.proofScaleCalloutMiddle}>
-          <span aria-hidden="true">→</span>
-          {middle}
-        </p>
-      ) : null}
-      <p className={styles.proofScaleCalloutLast}>
-        <span aria-hidden="true">✓</span>
-        {last}
-      </p>
-    </div>
-  );
-}
-
 function InspectScaleScene({
   step,
   accentMap,
@@ -969,10 +951,6 @@ function InspectScaleScene({
 }) {
   return (
     <div className={styles.proofScaleScene} data-proof-motion="inspect-scales">
-      <ProofCallouts
-        first="Every scale is level."
-        last="So each left tray weighs the same as its right tray."
-      />
       <div className={styles.proofInspectScales}>
         {step.sources.map((source, sourceIndex) => (
           <ProofBalanceScale
@@ -1058,11 +1036,6 @@ function SubstitutionScaleScene({
       className={styles.proofScaleScene}
       data-proof-motion="substitution"
     >
-      <ProofCallouts
-        first="This circled group balances that circled group."
-        middle="Find that circled group on the working scale. Swap it."
-        last="The new animals weigh the same, so it stays balanced!"
-      />
       <div className={styles.proofSubstitutionScales}>
         <ProofMorphingBalanceScale
           before={step.before}
@@ -1131,11 +1104,6 @@ function AddScalesScene({
 
   return (
     <div className={styles.proofScaleScene} data-proof-motion="add-scales">
-      <ProofCallouts
-        first="Both scales are balanced."
-        middle="Left joins left. Right joins right."
-        last="One bigger scale. Still balanced!"
-      />
       <div className={styles.proofOperationScales}>
         <ProofMorphingBalanceScale
           before={receiving.equation}
@@ -1193,11 +1161,6 @@ function SubtractScalesScene({
       className={styles.proofScaleScene}
       data-proof-motion="subtract-scales"
     >
-      <ProofCallouts
-        first="This balanced scale shows what to take away."
-        middle="Match left with left and right with right."
-        last="Both matched groups leave together. What remains still balances!"
-      />
       <div className={styles.proofOperationScales}>
         <ProofMorphingBalanceScale
           before={working.equation}
@@ -1253,11 +1216,6 @@ function CancelScaleScene({
       className={styles.proofScaleScene}
       data-proof-motion="cancel-matches"
     >
-      <ProofCallouts
-        first="The circles show the same group on both trays."
-        middle="Lift both circled loads at the same time."
-        last="Take one matching load from each tray. Still balanced!"
-      />
       <ProofMorphingBalanceScale
         before={step.before}
         after={step.after}
@@ -1301,11 +1259,6 @@ function RegroupScaleScene({
 }) {
   return (
     <div className={styles.proofScaleScene} data-proof-motion="regroup-combos">
-      <ProofCallouts
-        first={`Put the animals into ${step.after.groupCount} matching groups on each tray.`}
-        middle="Now draw an oval around every combo."
-        last="Each oval marks one group."
-      />
       <ProofMorphingBalanceScale
         before={step.before}
         after={step.before}
@@ -1368,11 +1321,6 @@ function SplitScaleScene({
 
   return (
     <div className={styles.proofScaleScene} data-proof-motion="split-groups">
-      <ProofCallouts
-        first={`There are ${step.divisor} equal groups on each tray.`}
-        middle={`÷ ${step.divisor} means look at 1 equal group from each tray.`}
-        last="One left group still balances one right group!"
-      />
       <ProofMorphingBalanceScale
         before={expandedEquation}
         after={step.after}
@@ -1480,7 +1428,7 @@ function TeachingProofPhase({
   step,
   stepIndex,
   stepCount,
-  timing,
+  activeStepIndex,
   previousKind,
   nextKind,
   accentMap,
@@ -1488,29 +1436,14 @@ function TeachingProofPhase({
   step: TeachingProofStep;
   stepIndex: number;
   stepCount: number;
-  timing: { delayMs: number; durationMs: number };
+  activeStepIndex: number;
   previousKind?: TeachingProofStep["kind"];
   nextKind?: TeachingProofStep["kind"];
   accentMap?: AccentMap;
 }) {
-  const crossfadeHalfMs = 240;
-  const isFinal = stepIndex === stepCount - 1;
-  const entersAcrossBoundary = stepIndex > 0 && !isFinal;
-  const exitsAcrossBoundary = stepIndex < stepCount - 2;
-  const enterDelayMs = entersAcrossBoundary
-    ? timing.delayMs - crossfadeHalfMs
-    : timing.delayMs;
-  const enterDurationMs = entersAcrossBoundary
-    ? crossfadeHalfMs * 2
-    : crossfadeHalfMs;
+  const clip = LIBRA_PROOF_NARRATION.clips[proofNarrationCueId(step)];
   const phaseStyle: ProofPhaseStyle = {
-    "--proof-phase-delay": `${timing.delayMs}ms`,
-    "--proof-phase-duration": `${timing.durationMs}ms`,
-    "--proof-phase-enter-delay": `${enterDelayMs}ms`,
-    "--proof-phase-enter-duration": `${enterDurationMs}ms`,
-    "--proof-phase-exit-delay": `${
-      timing.delayMs + timing.durationMs - crossfadeHalfMs
-    }ms`,
+    "--proof-phase-duration": `${clip.minimumVisualMs}ms`,
   };
 
   return (
@@ -1519,9 +1452,15 @@ function TeachingProofPhase({
       data-proof-phase={step.kind}
       data-proof-previous={previousKind}
       data-proof-next={nextKind}
+      data-proof-cue-state={
+        stepIndex === activeStepIndex
+          ? "active"
+          : stepIndex < activeStepIndex
+            ? "past"
+            : "future"
+      }
       data-proof-first={stepIndex === 0 ? "true" : undefined}
       data-proof-final={stepIndex === stepCount - 1 ? "true" : undefined}
-      data-proof-exits={exitsAcrossBoundary ? "true" : undefined}
       data-proof-holds-final={
         stepIndex === stepCount - 2 ? "true" : undefined
       }
@@ -1571,17 +1510,95 @@ export function SolutionProofVisual({
   round,
   proofState,
   accentMap = buildRoundAccentMap(round),
+  narrationEnabled = true,
+  narrationPlayer,
+  onPlaybackComplete,
 }: {
   round: Round;
   proofState: Exclude<ProofState, "hidden">;
   accentMap?: AccentMap;
+  narrationEnabled?: boolean;
+  narrationPlayer?: GameNarrationPlayer<LibraProofNarrationCueId> | null;
+  onPlaybackComplete?: () => void;
 }) {
-  const plan = buildTeachingProof(round);
+  const plan = useMemo(() => buildTeachingProof(round), [round]);
+  const cueIds = useMemo(
+    () => proofNarrationCueIds(plan.steps),
+    [plan.steps],
+  );
+  const [activeStepIndex, setActiveStepIndex] = useState(
+    proofState === "settled" ? plan.steps.length - 1 : 0,
+  );
+  const [playbackStarted, setPlaybackStarted] = useState(false);
+  const narrationEnabledRef = useRef(narrationEnabled);
+  const onPlaybackCompleteRef = useRef(onPlaybackComplete);
+  const narrationPlayerRef = useRef<
+    GameNarrationPlayer<LibraProofNarrationCueId> | null
+  >(null);
+
+  useEffect(() => {
+    narrationEnabledRef.current = narrationEnabled;
+    narrationPlayerRef.current?.setEnabled(narrationEnabled);
+  }, [narrationEnabled]);
+
+  useEffect(() => {
+    onPlaybackCompleteRef.current = onPlaybackComplete;
+  }, [onPlaybackComplete]);
+
+  useEffect(() => {
+    if (proofState === "settled") {
+      return;
+    }
+
+    let current = true;
+    const ownsPlayer = !narrationPlayer;
+    const player =
+      narrationPlayer ??
+      createGameNarrationPlayer(LIBRA_PROOF_NARRATION, {
+        isSoundEnabled: () => narrationEnabledRef.current,
+      });
+    player.setEnabled(narrationEnabledRef.current);
+    narrationPlayerRef.current = player;
+
+    // Let the suite's short correct earcon finish before the narrator begins.
+    const startTimer = window.setTimeout(() => {
+      if (!current) return;
+      setPlaybackStarted(true);
+      void player
+        .play(cueIds, {
+          onCueStart: (_cue, index) => {
+            if (current) setActiveStepIndex(index);
+          },
+        })
+        .then((result) => {
+          if (current && result.status === "completed") {
+            onPlaybackCompleteRef.current?.();
+          }
+        });
+    }, 360);
+
+    return () => {
+      current = false;
+      window.clearTimeout(startTimer);
+      player.cancel();
+      if (ownsPlayer) player.dispose();
+      if (narrationPlayerRef.current === player) {
+        narrationPlayerRef.current = null;
+      }
+    };
+  }, [cueIds, narrationPlayer, plan.steps.length, proofState]);
+
+  const displayedStepIndex =
+    proofState === "settled" ? plan.steps.length - 1 : activeStepIndex;
+  const activeStep = plan.steps[displayedStepIndex] ?? plan.steps[0];
 
   return (
     <section
       className={styles.solutionProof}
       data-proof-state={proofState}
+      data-proof-playback-started={
+        proofState === "animating" && playbackStarted ? "true" : "false"
+      }
       role="region"
       aria-label="Step-by-step balance proof"
     >
@@ -1594,26 +1611,14 @@ export function SolutionProofVisual({
         <div
           className={styles.proofPersistentStage}
           data-proof-stage="persistent"
-          style={
-            {
-              "--proof-total-duration": `${plan.durationMs}ms`,
-            } as CSSProperties
-          }
         >
-          <header className={styles.proofPersistentHeader}>
-            <strong>Watch the balance change</strong>
-            <span aria-hidden="true">Follow the animals.</span>
-          </header>
-          <div className={styles.proofProgressTrack} aria-hidden="true">
-            <span />
-          </div>
           <div className={styles.proofPersistentCanvas}>
             {plan.steps.map((step, stepIndex) => (
               <TeachingProofPhase
                 step={step}
                 stepIndex={stepIndex}
                 stepCount={plan.steps.length}
-                timing={plan.timeline[stepIndex]}
+                activeStepIndex={displayedStepIndex}
                 previousKind={plan.steps[stepIndex - 1]?.kind}
                 nextKind={plan.steps[stepIndex + 1]?.kind}
                 accentMap={accentMap}
@@ -1621,6 +1626,10 @@ export function SolutionProofVisual({
               />
             ))}
           </div>
+          <p className={styles.proofNarrationCaption}>
+            <span aria-hidden="true">♪</span>
+            {proofNarrationCaption(activeStep)}
+          </p>
         </div>
       </div>
       <div className={styles.proofStoryboard} aria-hidden="true">
@@ -1919,6 +1928,9 @@ export function PuzzleVisual({
   teaching = false,
   proofState,
   revealDifferences = false,
+  narrationEnabled = true,
+  narrationPlayer,
+  onProofPlaybackComplete,
 }: {
   round: Round;
   candidate?: AnswerOption;
@@ -1926,6 +1938,9 @@ export function PuzzleVisual({
   teaching?: boolean;
   proofState?: ProofState;
   revealDifferences?: boolean;
+  narrationEnabled?: boolean;
+  narrationPlayer?: GameNarrationPlayer<LibraProofNarrationCueId> | null;
+  onProofPlaybackComplete?: () => void;
 }) {
   const accentMap = buildRoundAccentMap(round);
   const resolvedProofState = proofState ?? (teaching ? "animating" : "hidden");
@@ -1972,6 +1987,9 @@ export function PuzzleVisual({
           round={round}
           proofState={resolvedProofState}
           accentMap={accentMap}
+          narrationEnabled={narrationEnabled}
+          narrationPlayer={narrationPlayer}
+          onPlaybackComplete={onProofPlaybackComplete}
         />
       ) : null}
       <div className={styles.goalDivider} aria-hidden="true">

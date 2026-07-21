@@ -16,6 +16,10 @@ import {
   readSoundPreference,
   writeSoundPreference,
 } from "@/lib/game-audio";
+import {
+  createGameNarrationPlayer,
+  type GameNarrationPlayer,
+} from "@/lib/game-narration";
 import { ProgressionGameHud } from "@/components/progression/ProgressionGameHud";
 import {
   ProgressionCulminationSectionIntro,
@@ -57,18 +61,20 @@ import {
   STRATEGY_CATALOGUE,
   STRATEGY_CATALOGUE_BY_ID,
   STRATEGY_SECTIONS,
-  REDUCED_TEACHING_PROOF_MS,
   buildTeachingProof,
   canOpenHistoricalReview,
   discoveredStrategyIdsAfterLesson,
   isInfiniteCurriculumCandidate,
   orderedStrategyIdsForRound,
   preRoundStrategyIds,
-  teachingProofDurationMs,
   unseenStrategyIds,
   type StrategyId,
 } from "./strategy-curriculum";
 import { progressionAdapter } from "./progression-adapter";
+import {
+  LIBRA_PROOF_NARRATION,
+  type LibraProofNarrationCueId,
+} from "./proof-narration";
 import styles from "./libra.module.css";
 
 type GamePhase = "idle" | "animating" | "wrong-review" | "answered";
@@ -317,6 +323,9 @@ export default function LibraPage() {
   const [catalogueExpanded, setCatalogueExpanded] = useState(false);
   const [campaignReviewSelection, setCampaignReviewSelection] =
     useState<CampaignReviewSelection | null>(null);
+  const [proofNarrationPlayer] = useState<
+    GameNarrationPlayer<LibraProofNarrationCueId>
+  >(() => createGameNarrationPlayer(LIBRA_PROOF_NARRATION));
 
   const optionButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const nextButtonRef = useRef<HTMLButtonElement>(null);
@@ -337,9 +346,6 @@ export default function LibraPage() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const proofReplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
   const animationTokenRef = useRef(0);
   const inputLockedRef = useRef(false);
   const shouldFocusFirstOption = useRef(false);
@@ -467,10 +473,6 @@ export default function LibraPage() {
   const resetAttemptState = useCallback(() => {
     animationTokenRef.current += 1;
     clearAttemptTimers();
-    if (proofReplayTimerRef.current) {
-      clearTimeout(proofReplayTimerRef.current);
-      proofReplayTimerRef.current = null;
-    }
     inputLockedRef.current = false;
     retryFocusIndexRef.current = null;
     setSelectedIndex(null);
@@ -559,25 +561,11 @@ export default function LibraPage() {
     });
   }, []);
 
-  const replayProof = useCallback((proofRound: Round) => {
-    if (proofReplayTimerRef.current) {
-      clearTimeout(proofReplayTimerRef.current);
-    }
-    const reducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
+  const replayProof = useCallback(() => {
+    proofNarrationPlayer.prime();
     setProofReplayKey((current) => current + 1);
     setProofReplaying(true);
-    proofReplayTimerRef.current = setTimeout(
-      () => {
-        setProofReplaying(false);
-        proofReplayTimerRef.current = null;
-      },
-      reducedMotion
-        ? REDUCED_TEACHING_PROOF_MS
-        : teachingProofDurationMs(proofRound),
-    );
-  }, []);
+  }, [proofNarrationPlayer]);
 
   const ensureAudioContext = useCallback(() => {
     if (typeof window === "undefined") return null;
@@ -652,6 +640,7 @@ export default function LibraPage() {
       inputLockedRef.current = true;
       setRetryReady(false);
       const isCorrect = optionIndex === round.correctIndex;
+      if (isCorrect) proofNarrationPlayer.prime();
       controlledSession?.answer({
         correct: isCorrect,
         answerToken: `option-${optionIndex}`,
@@ -720,27 +709,16 @@ export default function LibraPage() {
       const token = animationTokenRef.current + 1;
       animationTokenRef.current = token;
       clearAttemptTimers();
+      if (isCorrect) return;
+
       const approachDuration = reducedMotion
-        ? isCorrect
-          ? REDUCED_TEACHING_PROOF_MS
-          : REDUCED_FEEDBACK_MS
-        : isCorrect
-          ? teachingProofDurationMs(round)
-          : round.feedbackPolicy === "preserve-inference"
-            ? HIDDEN_WRONG_APPROACH_MS
-            : WRONG_APPROACH_MS;
+        ? REDUCED_FEEDBACK_MS
+        : round.feedbackPolicy === "preserve-inference"
+          ? HIDDEN_WRONG_APPROACH_MS
+          : WRONG_APPROACH_MS;
 
       feedbackTimerRef.current = setTimeout(() => {
         if (animationTokenRef.current !== token) return;
-
-        if (isCorrect) {
-          setPhase("answered");
-          queueStrategyLessons(
-            orderedStrategyIdsForRound(round),
-            "next",
-          );
-          return;
-        }
 
         setPhase("wrong-review");
         reviewTimerRef.current = setTimeout(
@@ -772,11 +750,23 @@ export default function LibraPage() {
       mistakes,
       phase,
       playFeedbackSound,
-      queueStrategyLessons,
+      proofNarrationPlayer,
       round,
       hasStarted,
     ],
   );
+
+  const finishCorrectProof = useCallback(() => {
+    if (phase !== "animating" || !selectedCorrect || !round) return;
+    animationTokenRef.current += 1;
+    clearAttemptTimers();
+    setPhase("answered");
+    queueStrategyLessons(orderedStrategyIdsForRound(round), "next");
+  }, [clearAttemptTimers, phase, queueStrategyLessons, round, selectedCorrect]);
+
+  const finishProofReplay = useCallback(() => {
+    setProofReplaying(false);
+  }, []);
 
   const startCampaign = useCallback(() => {
     resumeAudio();
@@ -1097,10 +1087,20 @@ export default function LibraPage() {
 
   const toggleSound = useCallback(() => {
     const next = !soundEnabled;
+    proofNarrationPlayer.setEnabled(next);
+    if (next) proofNarrationPlayer.prime();
     setSoundEnabled(next);
     writeSoundPreference(next);
     if (next) resumeAudio();
-  }, [resumeAudio, soundEnabled]);
+  }, [proofNarrationPlayer, resumeAudio, soundEnabled]);
+
+  useEffect(() => {
+    return () => proofNarrationPlayer.dispose();
+  }, [proofNarrationPlayer]);
+
+  useEffect(() => {
+    proofNarrationPlayer.setEnabled(soundEnabled);
+  }, [proofNarrationPlayer, soundEnabled]);
 
   useEffect(() => {
     const storedPreference = readSoundPreference(["rotation-match-sound"]);
@@ -1421,24 +1421,18 @@ export default function LibraPage() {
       if (!inputLockedRef.current) return;
 
       if (phase === "animating") {
+        // Correct proofs now use a responsive, in-flow scale scene. Browser
+        // chrome changes and orientation shifts must not skip the narration.
+        // Only positional wrong-answer overlays need the legacy resize escape.
+        if (selectedCorrect) return;
         animationTokenRef.current += 1;
         clearAttemptTimers();
-        if (selectedCorrect) {
-          setPhase("answered");
-          if (round) {
-            queueStrategyLessons(
-              orderedStrategyIdsForRound(round),
-              "next",
-            );
-          }
-        } else {
-          retryFocusIndexRef.current = selectedIndex;
-          inputLockedRef.current = false;
-          setSelectedIndex(null);
-          setRetryReady(true);
-          setPhase("idle");
-          controlledSession?.retry();
-        }
+        retryFocusIndexRef.current = selectedIndex;
+        inputLockedRef.current = false;
+        setSelectedIndex(null);
+        setRetryReady(true);
+        setPhase("idle");
+        controlledSession?.retry();
       } else if (phase === "wrong-review") {
         animationTokenRef.current += 1;
         clearAttemptTimers();
@@ -1469,9 +1463,6 @@ export default function LibraPage() {
     return () => {
       animationTokenRef.current += 1;
       clearAttemptTimers();
-      if (proofReplayTimerRef.current) {
-        clearTimeout(proofReplayTimerRef.current);
-      }
       const context = audioContextRef.current;
       if (context && context.state !== "closed") {
         void context.close().catch(() => undefined);
@@ -2071,6 +2062,11 @@ export default function LibraPage() {
                       proofState={
                         proofReplaying ? "animating" : "settled"
                       }
+                      narrationEnabled={soundEnabled}
+                      narrationPlayer={proofNarrationPlayer}
+                      onProofPlaybackComplete={
+                        proofReplaying ? finishProofReplay : undefined
+                      }
                       key={`historical-proof-${proofReplayKey}`}
                     />
                   </div>
@@ -2081,7 +2077,7 @@ export default function LibraPage() {
                     <button
                       className={styles.replayButton}
                       type="button"
-                      onClick={() => replayProof(historicalSessionRound.round)}
+                      onClick={replayProof}
                       disabled={proofReplaying}
                     >
                       <span aria-hidden="true">↻</span>
@@ -2171,6 +2167,13 @@ export default function LibraPage() {
                             ? "animating"
                             : "settled"
                           : "hidden"
+                      }
+                      narrationEnabled={soundEnabled}
+                      narrationPlayer={proofNarrationPlayer}
+                      onProofPlaybackComplete={
+                        proofReplaying
+                          ? finishProofReplay
+                          : finishCorrectProof
                       }
                       revealDifferences={phase === "wrong-review"}
                       key={`live-proof-${proofReplayKey}`}
@@ -2295,7 +2298,7 @@ export default function LibraPage() {
                       <button
                         className={styles.replayButton}
                         type="button"
-                        onClick={() => replayProof(round)}
+                        onClick={replayProof}
                         disabled={proofReplaying}
                       >
                         <span aria-hidden="true">↻</span>

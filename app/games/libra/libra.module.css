@@ -1469,65 +1469,6 @@
   font-size: 1rem;
 }
 
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="substitute"]
-  .proofTokenRunHighlighted {
-  animation: proofReplacementTarget 620ms
-    calc(var(--proof-phase-delay) + 90ms) ease both;
-}
-
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="substitute"]
-  .proofReplacementTo {
-  animation: proofReplacementTravel 760ms
-    calc(var(--proof-phase-delay) + 230ms)
-    cubic-bezier(0.2, 0.75, 0.25, 1) both;
-}
-
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="substitute"]
-  .proofReplacementTraveler {
-  animation: proofReplacementOntoLoad 820ms
-    calc(var(--proof-phase-delay) + 180ms)
-    cubic-bezier(0.2, 0.75, 0.25, 1) both;
-}
-
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="substitute"]
-  .proofBeforeEquation {
-  animation: proofOldLoadLeave 330ms
-    calc(var(--proof-phase-delay) + 610ms) ease both;
-}
-
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="substitute"]
-  .proofAfterEquation,
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="add-scales"]
-  .proofOperationResult,
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="subtract-scales"]
-  .proofOperationResult {
-  animation: proofNewLoadSettle 390ms
-    calc(var(--proof-phase-delay) + 650ms)
-    cubic-bezier(0.2, 0.75, 0.25, 1) both;
-}
-
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="cancel-matches"]
-  .proofStrike {
-  animation: proofStrikeAcross 460ms
-    calc(var(--proof-phase-delay) + 190ms) ease both;
-}
-
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="regroup"]
-  .proofComboGroup {
-  animation: proofGroupSettle 560ms
-    calc(var(--proof-phase-delay) + 300ms)
-    cubic-bezier(0.2, 0.75, 0.25, 1) both;
-}
-
 @keyframes proofReplacementTarget {
   0%,
   100% {
@@ -1618,61 +1559,45 @@
   min-height: 534px;
   position: relative;
   display: grid;
-  grid-template-rows: auto 4px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 17px;
   background: var(--panel);
 }
 
-.proofPersistentHeader {
-  min-width: 0;
-  min-height: 48px;
+.proofPersistentCanvas {
+  min-height: 468px;
+  position: relative;
+}
+
+.proofNarrationCaption {
+  min-height: 64px;
+  margin: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 10px 16px 8px;
-  color: var(--ink);
-}
-
-.proofPersistentHeader strong {
-  font-size: 0.82rem;
-  font-weight: 900;
-  letter-spacing: -0.01em;
-}
-
-.proofPersistentHeader span {
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 18px 14px;
+  border-top: 1px solid rgb(207 202 189 / 75%);
+  background: rgb(251 248 240 / 82%);
   color: var(--muted);
-  font-size: 0.62rem;
+  font-size: 0.78rem;
   font-weight: 760;
+  line-height: 1.35;
+  text-align: center;
 }
 
-.proofProgressTrack {
-  overflow: hidden;
-  background: #ded9ce;
-}
-
-.proofProgressTrack > span {
-  width: 100%;
-  height: 100%;
-  display: block;
-  background: linear-gradient(90deg, var(--violet), var(--correct));
-  transform: scaleX(0);
-  transform-origin: left center;
-}
-
-.solutionProof[data-proof-state="animating"] .proofProgressTrack > span {
-  animation: proofContinuousProgress var(--proof-total-duration) linear both;
-}
-
-.solutionProof[data-proof-state="settled"] .proofProgressTrack > span {
-  transform: scaleX(1);
-}
-
-.proofPersistentCanvas {
-  min-height: 480px;
-  position: relative;
+.proofNarrationCaption > span {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(119 103 215 / 11%);
+  color: var(--violet);
+  font-size: 0.72rem;
 }
 
 .proofPhaseLayer {
@@ -1683,10 +1608,13 @@
   padding: 10px 13px 12px;
   opacity: 0;
   pointer-events: none;
+  transition: opacity 520ms linear;
 }
 
-.solutionProof[data-proof-state="animating"] .proofPhaseLayer {
+.solutionProof[data-proof-state="animating"]
+  .proofPhaseLayer[data-proof-cue-state="active"] {
   opacity: 1;
+  z-index: 2;
 }
 
 .proofPhaseEnter,
@@ -1696,59 +1624,35 @@
   display: grid;
 }
 
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseEnter {
-  animation: proofPhaseEnter var(--proof-phase-enter-duration)
-    var(--proof-phase-enter-delay) linear both;
-}
-
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-exits="true"]
-  .proofPhaseExit {
-  animation: proofPhaseExit 480ms var(--proof-phase-exit-delay)
-    linear both;
-}
-
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer
-  .proofScaleFigure
-  > figcaption {
-  animation: proofPhaseCaption var(--proof-phase-duration)
-    var(--proof-phase-delay) linear both;
-}
-
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="add-scales"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="add-scales"]
   .proofMorphScale,
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="subtract-scales"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="subtract-scales"]
   .proofMorphScale,
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="substitute"]:not(
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="substitute"]:not(
     [data-proof-next="substitute"]
   )
   .proofMorphScale {
   animation: proofWorkingScaleFocus var(--proof-phase-duration)
-    var(--proof-phase-delay) cubic-bezier(0.2, 0.75, 0.25, 1) both;
+    cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-holds-final="true"]
-  .proofScaleCallouts,
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-holds-final="true"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-holds-final="true"]
   .proofEqualityKey {
   animation: proofPhaseChromeExit var(--proof-phase-duration)
-    var(--proof-phase-delay) linear both;
+    linear both;
 }
 
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="substitute"]:not(
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="substitute"]:not(
     [data-proof-next="substitute"]
   )
   .proofScaleFigure[data-proof-scale-role="substitution-source"] {
   animation: proofHelperScaleExit var(--proof-phase-duration)
-    var(--proof-phase-delay) cubic-bezier(0.2, 0.75, 0.25, 1) both;
+    cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 
 .solutionProof[data-proof-state="settled"]
@@ -1770,9 +1674,6 @@
   transform: translateY(clamp(48px, 8vw, 72px));
 }
 
-.solutionProof[data-proof-state="settled"]
-  .proofPhaseLayer[data-proof-holds-final="true"]
-  .proofScaleCallouts,
 .solutionProof[data-proof-state="settled"]
   .proofPhaseLayer[data-proof-holds-final="true"]
   .proofEqualityKey {
@@ -1853,63 +1754,12 @@
   min-width: 0;
   min-height: 100%;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto;
   place-items: center;
   align-content: center;
   gap: 6px;
 }
 
-@keyframes proofContinuousProgress {
-  to {
-    transform: scaleX(1);
-  }
-}
-
-@keyframes proofPhaseEnter {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes proofPhaseExit {
-  from {
-    opacity: 1;
-  }
-
-  to {
-    opacity: 0;
-  }
-}
-
-@keyframes proofPhaseCaption {
-  0% {
-    opacity: 0;
-  }
-
-  6%,
-  90% {
-    opacity: 1;
-  }
-
-  96%,
-  100% {
-    opacity: 0;
-  }
-}
-
-.proofScaleCallouts {
-  width: min(100%, 520px);
-  min-height: 52px;
-  position: relative;
-  display: grid;
-  place-items: center;
-}
-
-.proofScaleCallouts p,
 .proofFinalCallout {
   min-height: 44px;
   margin: 0;
@@ -1929,15 +1779,6 @@
   box-shadow: 0 5px 16px rgb(23 33 61 / 8%);
 }
 
-.proofScaleCallouts p {
-  width: max-content;
-  max-width: 100%;
-  position: absolute;
-  inset: 0;
-  margin: auto;
-}
-
-.proofScaleCallouts p > span,
 .proofFinalCallout > span {
   width: 24px;
   height: 24px;
@@ -1949,11 +1790,6 @@
   color: var(--violet);
   font-size: 0.74rem;
   font-weight: 950;
-}
-
-.proofScaleCalloutMiddle,
-.proofScaleCalloutLast {
-  opacity: 0;
 }
 
 .proofInspectScales {
@@ -2266,275 +2102,165 @@
   transform: translateY(12px);
 }
 
-.solutionProof[data-proof-state="animating"] .proofScaleCalloutFirst,
-.solutionProof[data-proof-state="animating"] .proofScaleCalloutMiddle,
-.solutionProof[data-proof-state="animating"] .proofScaleCalloutLast,
-.solutionProof[data-proof-state="animating"] .proofMorphBefore,
-.solutionProof[data-proof-state="animating"] .proofMorphAfter,
-.solutionProof[data-proof-state="animating"] .proofScaleTraveler,
-.solutionProof[data-proof-state="animating"] .proofSameChangeBadge,
-.solutionProof[data-proof-state="animating"] .proofScaleDivideBadge,
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="substitute"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"]
+  .proofMorphBefore,
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"]
+  .proofMorphAfter,
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"]
+  .proofScaleTraveler,
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"]
+  .proofSameChangeBadge,
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"]
+  .proofScaleDivideBadge,
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="substitute"]
   .proofScaleLoadGroup[data-proof-load-state="match"],
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="substitute"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="substitute"]
   .proofScaleLoadGroup[data-proof-load-state="replacement"],
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="add-scales"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="add-scales"]
   .proofScaleLoadGroup[data-proof-load-state="move"],
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="subtract-scales"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="subtract-scales"]
   .proofScaleLoadGroup[data-proof-load-state="remove"],
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="cancel-matches"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="cancel-matches"]
   .proofScaleLoadGroup[data-proof-load-state="remove"],
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="regroup"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="regroup"]
   .proofScaleLoadGroup[data-proof-load-state="bundle"],
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="split-evenly"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="split-evenly"]
   .proofScaleLoadGroup[data-proof-load-state="keep"],
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="split-evenly"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="split-evenly"]
   .proofScaleLoadGroup[data-proof-load-state="fade"],
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="add-scales"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="add-scales"]
   .proofDonorScale,
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="subtract-scales"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="subtract-scales"]
   .proofGuideScale {
   animation-duration: var(--proof-phase-duration);
-  animation-delay: var(--proof-phase-delay);
   animation-timing-function: linear;
   animation-fill-mode: both;
 }
 
-.solutionProof[data-proof-state="animating"] .proofScaleCalloutFirst {
-  animation-name: proofCalloutFirst;
-}
-
-.solutionProof[data-proof-state="animating"] .proofScaleCalloutLast {
-  animation-name: proofCalloutLast;
-}
-
-.solutionProof[data-proof-state="animating"]
-  .proofScaleCallouts[data-callout-count="3"]
-  .proofScaleCalloutFirst {
-  animation-name: proofCalloutFirstOfThree;
-}
-
-.solutionProof[data-proof-state="animating"]
-  .proofScaleCallouts[data-callout-count="3"]
-  .proofScaleCalloutMiddle {
-  animation-name: proofCalloutMiddle;
-}
-
-.solutionProof[data-proof-state="animating"]
-  .proofScaleCallouts[data-callout-count="3"]
-  .proofScaleCalloutLast {
-  animation-name: proofCalloutLastOfThree;
-}
-
-.solutionProof[data-proof-state="animating"] .proofMorphBefore {
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"]
+  .proofMorphBefore {
   animation-name: proofScaleMorphOut;
 }
 
-.solutionProof[data-proof-state="animating"] .proofMorphAfter {
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"]
+  .proofMorphAfter {
   animation-name: proofScaleMorphIn;
 }
 
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="regroup"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="regroup"]
   .proofMorphBefore {
   animation-name: proofRegroupOut;
 }
 
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="regroup"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="regroup"]
   .proofMorphAfter {
   animation-name: proofRegroupIn;
 }
 
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="split-evenly"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="split-evenly"]
   .proofMorphBefore {
   animation-name: proofSplitOut;
 }
 
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="split-evenly"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="split-evenly"]
   .proofMorphAfter {
   animation-name: proofSplitIn;
 }
 
-.solutionProof[data-proof-state="animating"] .proofScaleTraveler {
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"]
+  .proofScaleTraveler {
   animation-name: proofSubstitutionLoadTravel;
   animation-timing-function: cubic-bezier(0.2, 0.75, 0.25, 1);
 }
 
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="substitute"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="substitute"]
   .proofScaleLoadGroup[data-proof-load-state="match"],
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="substitute"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="substitute"]
   .proofScaleLoadGroup[data-proof-load-state="replacement"] {
   animation-name: proofCircleEqualLoads;
 }
 
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="add-scales"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="add-scales"]
   .proofScaleLoadGroup[data-proof-load-state="move"] {
   animation-name: proofAddCargoTravel;
   animation-timing-function: cubic-bezier(0.2, 0.75, 0.25, 1);
 }
 
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="add-scales"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="add-scales"]
   .proofSameChangeBadge {
   animation-name: proofOperationBadge;
 }
 
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="add-scales"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="add-scales"]
   .proofDonorScale {
   animation-name: proofDonorScaleEmpty;
 }
 
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="subtract-scales"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="subtract-scales"]
   .proofScaleLoadGroup[data-proof-load-state="remove"],
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="cancel-matches"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="cancel-matches"]
   .proofScaleLoadGroup[data-proof-load-state="remove"] {
   animation-name: proofRemoveMatchedLoads;
 }
 
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="subtract-scales"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="subtract-scales"]
   .proofGuideScale {
   animation-name: proofGuideScaleDim;
 }
 
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="regroup"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="regroup"]
   .proofScaleLoadGroup[data-proof-load-state="bundle"] {
   animation-name: proofBundleCircleIn;
   animation-timing-function: cubic-bezier(0.2, 0.75, 0.25, 1);
 }
 
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="split-evenly"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="split-evenly"]
   .proofScaleDivideBadge {
   animation-name: proofDivideBadgeIn;
 }
 
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="split-evenly"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="split-evenly"]
   .proofScaleLoadGroup[data-proof-load-state="fade"] {
   animation-name: proofExtraGroupsFade;
 }
 
-.solutionProof[data-proof-state="animating"]
-  .proofPhaseLayer[data-proof-phase="split-evenly"]
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="split-evenly"]
   .proofScaleLoadGroup[data-proof-load-state="keep"] {
   animation-name: proofKeptGroup;
-}
-
-@keyframes proofCalloutFirst {
-  0% {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-
-  4%,
-  43% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  50%,
-  100% {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-}
-
-@keyframes proofCalloutLast {
-  0%,
-  55% {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-
-  63%,
-  94% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  100% {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-}
-
-@keyframes proofCalloutFirstOfThree {
-  0% {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-
-  4%,
-  30% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  36%,
-  100% {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-}
-
-@keyframes proofCalloutMiddle {
-  0%,
-  38% {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-
-  44%,
-  64% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  70%,
-  100% {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-}
-
-@keyframes proofCalloutLastOfThree {
-  0%,
-  72% {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-
-  78%,
-  94% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  100% {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
 }
 
 @keyframes proofScaleMorphOut {
@@ -4214,25 +3940,29 @@
   }
 
   .solutionProof {
-    min-height: 0 !important;
-    overflow: visible;
+    overflow: hidden;
   }
 
   .proofSceneViewport {
-    display: none;
+    display: block;
   }
 
   .proofStoryboard {
-    display: grid;
-    gap: 10px;
+    display: none;
   }
 
-  .proofStoryboardPhase {
-    min-height: 260px;
-    position: relative;
-    inset: auto;
+  .proofPhaseLayer {
+    transition: none;
+  }
+
+  .solutionProof[data-proof-state="animating"]
+    .proofPhaseLayer[data-proof-cue-state="active"]
+    .proofSameChangeBadge,
+  .solutionProof[data-proof-state="animating"]
+    .proofPhaseLayer[data-proof-cue-state="active"]
+    .proofScaleDivideBadge {
     opacity: 1;
-    transform: none;
+    transform: translate(-50%, -50%) scale(1);
   }
 
   .teaching .clueScaleWrap {
@@ -4904,11 +4634,11 @@
   }
 
   .proofPersistentCanvas {
-    min-height: 494px;
+    min-height: 482px;
   }
 
-  .proofScaleCallouts p,
-  .proofFinalCallout {
+  .proofFinalCallout,
+  .proofNarrationCaption {
     font-size: 0.73rem;
   }
 
@@ -4940,14 +4670,9 @@
   }
 
   .proofPersistentCanvas {
-    min-height: 514px;
+    min-height: 504px;
   }
 
-  .proofScaleCallouts {
-    min-height: 60px;
-  }
-
-  .proofScaleCallouts p,
   .proofFinalCallout {
     min-height: 50px;
     padding: 7px 10px;
@@ -5016,7 +4741,7 @@
   }
 
   .proofPersistentCanvas {
-    min-height: 508px;
+    min-height: 498px;
   }
 
   .proofSubstitutionScales > .proofScaleFigure,
@@ -5027,9 +4752,14 @@
     width: min(100%, 270px);
   }
 
-  .proofScaleCallouts p,
   .proofFinalCallout {
     font-size: 0.67rem;
+  }
+
+  .proofNarrationCaption {
+    min-height: 64px;
+    padding-inline: 10px;
+    font-size: 0.68rem;
   }
 }
 
@@ -5040,20 +4770,6 @@
 
   .proofStoryboardBody {
     min-height: 0;
-  }
-
-  .proofStoryboard .proofScaleCallouts {
-    min-height: 0;
-    display: grid;
-    gap: 6px;
-  }
-
-  .proofStoryboard .proofScaleCallouts p {
-    width: 100%;
-    position: relative;
-    inset: auto;
-    opacity: 1;
-    transform: none;
   }
 
   .proofStoryboardMorph {

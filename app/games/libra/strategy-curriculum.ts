@@ -389,25 +389,26 @@ export type TeachingProofSceneTiming = {
   durationMs: number;
 };
 
-const TEACHING_PROOF_STEP_DURATIONS_MS: Readonly<
+// These are the longest measured local narration clip for each proof kind,
+// plus its quiet linger. Runtime playback uses the exact per-cue manifest;
+// this timeline remains a deterministic summary for tests and review copy.
+const NARRATED_PROOF_STEP_DURATIONS_MS: Readonly<
   Record<TeachingProofStep["kind"], number>
 > = {
-  inspect: 2_400,
-  substitute: 5_200,
-  "add-scales": 5_200,
-  "subtract-scales": 5_000,
-  "cancel-matches": 4_200,
-  regroup: 4_000,
-  "split-evenly": 5_200,
-  conclude: 2_600,
+  inspect: 8_550,
+  substitute: 9_250,
+  "add-scales": 16_900,
+  "subtract-scales": 15_425,
+  "cancel-matches": 9_950,
+  regroup: 8_875,
+  "split-evenly": 10_450,
+  conclude: 4_625,
 };
-
-export const REDUCED_TEACHING_PROOF_MS = 180;
 
 export function teachingProofStepDurationMs(
   step: Pick<TeachingProofStep, "kind">,
 ): number {
-  return TEACHING_PROOF_STEP_DURATIONS_MS[step.kind];
+  return NARRATED_PROOF_STEP_DURATIONS_MS[step.kind];
 }
 
 export function teachingProofTimeline(
@@ -1241,14 +1242,18 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
 
   const timeline = teachingProofTimeline(steps);
   const lastScene = timeline.at(-1);
+  const durationMs = lastScene
+    ? lastScene.delayMs + lastScene.durationMs
+    : 0;
 
   return {
     steps,
     timeline,
     strategyIds,
     finalEquation,
-    durationMs: lastScene ? lastScene.delayMs + lastScene.durationMs : 0,
-    reducedMotionDurationMs: REDUCED_TEACHING_PROOF_MS,
+    durationMs,
+    // Reduced motion removes travel, not thinking time or narration.
+    reducedMotionDurationMs: durationMs,
   };
 }
 

@@ -568,6 +568,31 @@ errors.
 Before a second game ships, extract or reuse one shared earcon helper rather
 than independently approximating these values in each route.
 
+### Spoken teaching narration
+
+When a game narrates a visual teaching sequence, every game MUST use the same
+suite narrator: Kokoro-82M v1.0, voice `af_heart`, speed `0.88`, generated
+offline from the pinned revision recorded in the narration manifest. Commit
+small same-origin audio clips; the model MUST NOT run or download in the
+player's browser, and runtime narration MUST NOT call a speech service.
+`window.speechSynthesis` is not the canonical narrator because its voice and
+quality vary by device and some installed voices are remote.
+
+Games MUST consume `lib/game-narration.ts` rather than create their own audio
+sequencer or choose another voice. Every game-owned clip manifest MUST match
+the shared `SUITE_NARRATOR_PROVENANCE`; model, revision, voice, and speed are
+validated rather than merely documented. Reuse one media element for the full
+sequence and prime it from the answer gesture so narration remains reliable on
+WebKit. The shared sound toggle controls narration
+as well as earcons. A muted, unavailable, or rejected clip keeps the identical
+slow visual schedule, and a stalled clip MUST have a bounded watchdog so it
+cannot lock gameplay. Each narrated operation keeps one short caption stable
+for the full spoken cue and an absorption pause; do not flash words, highlight
+speech word by word, or add a countdown/progress cursor that competes with the
+puzzle. The audio ending, minimum visual duration, and linger together control
+advancement. Reduced motion removes travel but MUST NOT shorten narration or
+teaching time.
+
 ## Voice and copy
 
 Use plain, compact, encouraging language for teens and adults.

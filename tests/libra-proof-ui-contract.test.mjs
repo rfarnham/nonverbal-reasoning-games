@@ -15,22 +15,6 @@ const pageSource = await readFile(
   "utf8",
 );
 
-function cssKeyframes(name) {
-  const marker = `@keyframes ${name}`;
-  const start = stylesSource.indexOf(marker);
-  assert.notEqual(start, -1, `${name} keyframes exist`);
-  const openingBrace = stylesSource.indexOf("{", start + marker.length);
-  assert.notEqual(openingBrace, -1, `${name} keyframes open`);
-  let depth = 0;
-  for (let index = openingBrace; index < stylesSource.length; index += 1) {
-    if (stylesSource[index] === "{") depth += 1;
-    if (stylesSource[index] !== "}") continue;
-    depth -= 1;
-    if (depth === 0) return stylesSource.slice(start, index + 1);
-  }
-  assert.fail(`${name} keyframes close`);
-}
-
 function componentSource(name, nextName) {
   const startMarker = `function ${name}(`;
   const endMarker = `function ${nextName}(`;
@@ -39,40 +23,6 @@ function componentSource(name, nextName) {
   assert.notEqual(start, -1, `${name} exists`);
   assert.notEqual(end, -1, `${name} has a bounded source block`);
   return visualSource.slice(start, end);
-}
-
-function opacityKeyframes(name) {
-  const source = cssKeyframes(name);
-  const points = [];
-  const blockPattern = /((?:(?:\d+(?:\.\d+)?%|from|to)\s*,?\s*)+)\{([^{}]*)\}/g;
-  for (const match of source.matchAll(blockPattern)) {
-    const opacity = match[2].match(/opacity:\s*(\d*\.?\d+)/)?.[1];
-    if (opacity === undefined) continue;
-    for (const selector of match[1].matchAll(/\d+(?:\.\d+)?%|from|to/g)) {
-      points.push({
-        percent:
-          selector[0] === "from"
-            ? 0
-            : selector[0] === "to"
-              ? 100
-              : Number.parseFloat(selector[0]),
-        opacity: Number.parseFloat(opacity),
-      });
-    }
-  }
-  assert.ok(points.length >= 2, `${name} defines an opacity window`);
-  return points.sort((left, right) => left.percent - right.percent);
-}
-
-function interpolatedOpacity(points, percent) {
-  const rightIndex = points.findIndex((point) => point.percent >= percent);
-  if (rightIndex <= 0) return points[Math.max(0, rightIndex)].opacity;
-  if (rightIndex === -1) return points.at(-1).opacity;
-  const left = points[rightIndex - 1];
-  const right = points[rightIndex];
-  if (right.percent === left.percent) return right.opacity;
-  const progress = (percent - left.percent) / (right.percent - left.percent);
-  return left.opacity + (right.opacity - left.opacity) * progress;
 }
 
 test("the teaching proof renders actual scales for every operation", () => {
@@ -138,7 +88,8 @@ test("the real-scale choreography includes long holds and settled states", () =>
     assert.match(stylesSource, new RegExp(`@keyframes ${keyframe}`));
   }
   assert.match(stylesSource, /var\(--proof-phase-duration\)/);
-  assert.match(stylesSource, /var\(--proof-phase-delay\)/);
+  assert.doesNotMatch(stylesSource, /var\(--proof-phase-delay\)/);
+  assert.match(stylesSource, /data-proof-cue-state="active"/);
   assert.match(stylesSource, /data-proof-load-state="match"/);
   assert.match(stylesSource, /data-proof-load-state="move"/);
   assert.match(stylesSource, /data-proof-load-state="fade"/);
@@ -157,18 +108,16 @@ test("the animated proof uses one persistent canvas instead of swapping step car
   assert.doesNotMatch(visualSource, /styles\.proofTeachingScene/);
 });
 
-test("the cumulative proof timeline schedules in-place phase layers", () => {
+test("the local narration controller advances in-place phase layers", () => {
   assert.match(
     visualSource,
-    /"--proof-phase-delay"[\s\S]{0,160}timing\.delayMs/,
+    /"--proof-phase-duration"[\s\S]{0,180}clip\.minimumVisualMs/,
   );
-  assert.match(
-    visualSource,
-    /"--proof-phase-duration"[\s\S]{0,160}timing\.durationMs/,
-  );
-  assert.match(visualSource, /plan\.timeline/);
+  assert.match(visualSource, /createGameNarrationPlayer\(LIBRA_PROOF_NARRATION/);
+  assert.match(visualSource, /onCueStart:[\s\S]{0,140}setActiveStepIndex\(index\)/);
+  assert.match(visualSource, /data-proof-cue-state=/);
   assert.match(visualSource, /className=\{styles\.proofPhaseLayer\}/);
-  assert.doesNotMatch(visualSource, /stepIndex\s*\*\s*[A-Z_]+/);
+  assert.doesNotMatch(visualSource, /proofProgressTrack/);
 
   assert.match(
     stylesSource,
@@ -178,14 +127,7 @@ test("the cumulative proof timeline schedules in-place phase layers", () => {
     stylesSource,
     /\.proofPhaseLayer\s*\{[^}]*position:\s*absolute;[^}]*inset:\s*0;/s,
   );
-  assert.match(
-    stylesSource,
-    /\.proofPhaseEnter\s*\{[^}]*proofPhaseEnter/s,
-  );
-  assert.match(
-    stylesSource,
-    /data-proof-exits="true"[\s\S]*?\.proofPhaseExit\s*\{[^}]*proofPhaseExit/s,
-  );
+  assert.match(stylesSource, /\.proofPhaseLayer\s*\{[^}]*transition:\s*opacity/s);
 });
 
 test("phase changes do not slide or zoom the persistent proof canvas", () => {
@@ -193,31 +135,16 @@ test("phase changes do not slide or zoom the persistent proof canvas", () => {
   assert.doesNotMatch(stylesSource, /@keyframes proofFinalSceneCycle/);
   assert.doesNotMatch(stylesSource, /\.proofTeachingScene/);
 
-  const phaseEnter = cssKeyframes("proofPhaseEnter");
-  const phaseExit = cssKeyframes("proofPhaseExit");
-  assert.match(phaseEnter, /opacity:/);
-  assert.match(phaseExit, /opacity:/);
-  assert.match(visualSource, /const crossfadeHalfMs = 240/);
-  assert.match(visualSource, /timing\.delayMs - crossfadeHalfMs/);
-  assert.match(
-    visualSource,
-    /timing\.delayMs \+ timing\.durationMs - crossfadeHalfMs/,
-  );
-  assert.match(visualSource, /data-proof-exits=\{exitsAcrossBoundary/);
-  for (const phaseFade of [phaseEnter, phaseExit]) {
-    assert.doesNotMatch(phaseFade, /\btransform\s*:/);
-    assert.doesNotMatch(phaseFade, /\btranslate(?:X|Y)?\(/);
-    assert.doesNotMatch(phaseFade, /\bscale\(/);
-  }
-  assert.match(stylesSource, /@keyframes proofPhaseCaption/);
-  assert.match(
-    stylesSource,
-    /\.proofPhaseLayer[\s\S]*?\.proofScaleFigure[\s\S]*?> figcaption\s*\{[^}]*proofPhaseCaption/s,
-  );
+  const phaseLayer = stylesSource.match(/\.proofPhaseLayer\s*\{[^}]*\}/s)?.[0] ?? "";
+  assert.match(phaseLayer, /transition:\s*opacity/);
+  assert.doesNotMatch(phaseLayer, /\btranslate(?:X|Y)?\(/);
+  assert.doesNotMatch(phaseLayer, /\bscale\(/);
+  assert.doesNotMatch(stylesSource, /@keyframes proofPhaseCaption/);
+  assert.doesNotMatch(visualSource, /timing\.delayMs/);
 });
 
 test("a morph keeps one scale frame and changes only its cargo layers", () => {
-  const morph = componentSource("ProofMorphingBalanceScale", "ProofCallouts");
+  const morph = componentSource("ProofMorphingBalanceScale", "InspectScaleScene");
   const animatedReturn = morph.slice(morph.lastIndexOf("\n  return ("));
 
   assert.equal(animatedReturn.match(/<ProofScaleFrame\b/g)?.length ?? 0, 1);
@@ -266,36 +193,44 @@ test("the conclusion decorates the prior result instead of mounting a new scale"
   }
 });
 
-test("only one callout is visible at any instant", () => {
-  for (const names of [
-    ["proofCalloutFirst", "proofCalloutLast"],
-    [
-      "proofCalloutFirstOfThree",
-      "proofCalloutMiddle",
-      "proofCalloutLastOfThree",
-    ],
-  ]) {
-    const curves = names.map(opacityKeyframes);
-    for (let percent = 0; percent <= 100; percent += 0.25) {
-      const visible = curves.filter(
-        (curve) => interpolatedOpacity(curve, percent) > 0.001,
-      );
-      assert.ok(
-        visible.length <= 1,
-        `${names.join(", ")} overlap at ${percent}%`,
-      );
-    }
-  }
+test("one calm caption replaces cycling callouts and the cursor bar", () => {
+  assert.match(visualSource, /className=\{styles\.proofNarrationCaption\}/);
+  assert.match(visualSource, /proofNarrationCaption\(activeStep\)/);
+  assert.doesNotMatch(visualSource, /function ProofCallouts\(/);
+  assert.doesNotMatch(visualSource, /proofProgressTrack/);
+  assert.doesNotMatch(stylesSource, /proofCallout(?:First|Middle|Last)/);
+  assert.doesNotMatch(stylesSource, /proofContinuousProgress/);
 });
 
-test("reduced motion keeps the static scale storyboard and removes travel", () => {
+test("proof completion follows local narration instead of a page timeout", () => {
+  assert.match(visualSource, /result\.status === "completed"/);
+  assert.match(visualSource, /onPlaybackCompleteRef\.current\?\.\(\)/);
+  assert.match(pageSource, /onProofPlaybackComplete=/);
+  assert.doesNotMatch(pageSource, /teachingProofDurationMs\(round\)/);
+  assert.doesNotMatch(pageSource, /proofReplayTimerRef/);
+});
+
+test("the page primes one reusable narrator from direct gestures", () => {
+  assert.match(pageSource, /proofNarrationPlayer\.prime\(\)/);
+  assert.match(
+    pageSource,
+    /if \(isCorrect\) proofNarrationPlayer\.prime\(\)/,
+  );
+  assert.match(pageSource, /narrationPlayer=\{proofNarrationPlayer\}/);
+});
+
+test("reduced motion keeps the narrated persistent scale focus", () => {
   assert.match(
     stylesSource,
-    /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.proofSceneViewport[\s\S]*?display: none/,
+    /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.proofSceneViewport[\s\S]*?display: block/,
   );
   assert.match(
     stylesSource,
-    /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.proofStoryboard[\s\S]*?display: grid/,
+    /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.proofStoryboard[\s\S]*?display: none/,
+  );
+  assert.match(
+    stylesSource,
+    /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.proofPhaseLayer[\s\S]*?transition: none/,
   );
   assert.match(
     stylesSource,
@@ -306,6 +241,11 @@ test("reduced motion keeps the static scale storyboard and removes travel", () =
     /\.proofStoryboard \.proofScaleDivideBadge\s*\{[^}]*display:\s*grid;[^}]*opacity:\s*1;/s,
   );
   assert.match(visualSource, /data-proof-has-operator=\{children/);
+});
+
+test("responsive changes do not skip a correct narrated proof", () => {
+  assert.match(pageSource, /if \(selectedCorrect\) return;/);
+  assert.match(pageSource, /orientation shifts must not skip the narration/);
 });
 
 test("the visible hint and feedback derive from the exact proof plan", () => {

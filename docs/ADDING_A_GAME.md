@@ -108,6 +108,18 @@ page integration.
 - If equivalent screen-reader play would undermine an inherently visual task,
   describe the task honestly instead of leaking the answer through alt text.
 
+If a visual explanation benefits from spoken narration, use the suite's pinned
+Kokoro `af_heart` narrator and the local-clip player in
+`lib/game-narration.ts`. Add the audited script and clip metadata to a small
+game-owned narration manifest, pass its provenance through
+`defineGameNarrationManifest`, generate the audio offline, and commit it under
+`public/audio/narration/`. Reuse the returned player across the sequence and
+call `prime()` directly from the answer/replay gesture for WebKit. Do not use
+browser-selected speech voices or a
+runtime TTS service. One caption should remain stable for each spoken
+operation, and sound-off or failed playback must preserve the same slow visual
+timing. See the spoken teaching narration contract in `AGENTS.md`.
+
 ## 7. Verify
 
 Run:

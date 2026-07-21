@@ -12,7 +12,6 @@ import {
   STRATEGY_CATALOGUE_BY_ID,
   STRATEGY_IDS,
   STRATEGY_SECTIONS,
-  REDUCED_TEACHING_PROOF_MS,
   buildTeachingProof,
   buildSolutionProof,
   canOpenHistoricalReview,
@@ -360,7 +359,11 @@ function assertTeachingPlan(round, label) {
     expectedDelayMs += timing.durationMs;
   }
   assert.equal(plan.durationMs, expectedDelayMs, `${label}: cumulative duration`);
-  assert.equal(plan.reducedMotionDurationMs, REDUCED_TEACHING_PROOF_MS);
+  assert.equal(
+    plan.reducedMotionDurationMs,
+    plan.durationMs,
+    `${label}: reduced motion keeps the narrated teaching time`,
+  );
   assert.equal(teachingProofDurationMs(round), plan.durationMs);
   assert.equal(new Set(plan.steps.map(({ id }) => id)).size, plan.steps.length);
 

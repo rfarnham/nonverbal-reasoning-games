@@ -1,0 +1,129 @@
+{
+  "narrator": {
+    "model": "hexgrad/Kokoro-82M",
+    "revision": "f3ff3571791e39611d31c381e3a41a3af07b4987",
+    "voice": "af_heart",
+    "speed": 0.88,
+    "sampleRate": 24000,
+    "format": "mp3"
+  },
+  "cues": {
+    "inspect-one": {
+      "caption": "Look closely: both trays weigh the same.",
+      "speechText": "Look closely at this balanced scale. Everything on the left tray weighs the same as everything on the right tray.",
+      "file": "inspect-one.mp3",
+      "audioDurationMs": 7650,
+      "minVisualMs": 5200,
+      "lingerMs": 900,
+      "sha256": "adaefbec8a9788c32796aaf846f66054e94abf5730ef825f1c2129aa4773e4d6"
+    },
+    "inspect-many": {
+      "caption": "Look closely: every scale is balanced.",
+      "speechText": "Look closely at these balanced scales. On every scale, the left tray weighs the same as the right tray.",
+      "file": "inspect-many.mp3",
+      "audioDurationMs": 7175,
+      "minVisualMs": 5200,
+      "lingerMs": 900,
+      "sha256": "2f7dc2506c461a2e7b5d48327cdcd43dc88a099880e06e0fbc7bd302c6750469"
+    },
+    "substitute": {
+      "caption": "Equal loads can trade places.",
+      "speechText": "The circled groups weigh exactly the same. Watch one equal group take the other group's place. The scale stays balanced.",
+      "file": "substitute.mp3",
+      "audioDurationMs": 8250,
+      "minVisualMs": 7000,
+      "lingerMs": 1000,
+      "sha256": "444bcaa25178848f3988b6caa133d5a9f0b9c856595da67ee4060f5876d9773a"
+    },
+    "add-scales": {
+      "caption": "Add left to left, and right to right.",
+      "speechText": "Now we add the two balanced scales. The second left load joins the first left tray. At the same time, the second right load joins the first right tray. Because both sides change together, the larger scale stays balanced.",
+      "file": "add-scales.mp3",
+      "audioDurationMs": 15900,
+      "minVisualMs": 9000,
+      "lingerMs": 1000,
+      "sha256": "92d79d3e88ec23dce30aeb92a39d17334830b6abe7ff18ca4ab578791e101a8e"
+    },
+    "subtract-scales": {
+      "caption": "Take left from left, and right from right.",
+      "speechText": "Use the second balanced scale as a take-away guide. Match its left load on the first left tray, and its right load on the first right tray. Lift both matched loads together. What remains is still balanced.",
+      "file": "subtract-scales.mp3",
+      "audioDurationMs": 14425,
+      "minVisualMs": 9000,
+      "lingerMs": 1000,
+      "sha256": "c32e6b9900c89e7581d89c3f6b32212b204edf556bf8c360b3abc7185989a5f6"
+    },
+    "cancel-matches": {
+      "caption": "Lift the same load from both trays.",
+      "speechText": "The circled group is the same on both trays. Lift one matching group from each side at the same time. The scale stays balanced.",
+      "file": "cancel-matches.mp3",
+      "audioDurationMs": 8950,
+      "minVisualMs": 7200,
+      "lingerMs": 1000,
+      "sha256": "3782953f9f727fff892f3d0da9f58f2240460178383f123fce968dc4e9dcedaa"
+    },
+    "regroup-2": {
+      "caption": "Circle 2 matching groups on each tray.",
+      "speechText": "Look at the animals as two equal groups on each tray. The ovals show the matching groups. Let that picture settle.",
+      "file": "regroup-2.mp3",
+      "audioDurationMs": 7775,
+      "minVisualMs": 6800,
+      "lingerMs": 1000,
+      "sha256": "e168e9427f38703949a939456f46a8c6ed81c475c9e33f5e349a953b0f284fff"
+    },
+    "regroup-3": {
+      "caption": "Circle 3 matching groups on each tray.",
+      "speechText": "Look at the animals as three equal groups on each tray. The ovals show the matching groups. Let that picture settle.",
+      "file": "regroup-3.mp3",
+      "audioDurationMs": 7875,
+      "minVisualMs": 6800,
+      "lingerMs": 1000,
+      "sha256": "773d905796213c0d5c9da2570c62290f7c60da18acc48ab3cad772a622ed4817"
+    },
+    "regroup-4": {
+      "caption": "Circle 4 matching groups on each tray.",
+      "speechText": "Look at the animals as four equal groups on each tray. The ovals show the matching groups. Let that picture settle.",
+      "file": "regroup-4.mp3",
+      "audioDurationMs": 7875,
+      "minVisualMs": 6800,
+      "lingerMs": 1000,
+      "sha256": "efeee4d4daff86ba2cffeeb7e2e9cb8f6e6d939a10d50a0e98f760b6fb4121af"
+    },
+    "split-2": {
+      "caption": "Divide by 2, then keep one group on each tray.",
+      "speechText": "Now divide both trays into two equal groups. Keep one group on the left and one group on the right. One group still balances one group.",
+      "file": "split-2.mp3",
+      "audioDurationMs": 9325,
+      "minVisualMs": 7800,
+      "lingerMs": 1000,
+      "sha256": "c67584d2faeda6f0ac6613192d3162459bbe3553a212c1542f34ca3152b70c06"
+    },
+    "split-3": {
+      "caption": "Divide by 3, then keep one group on each tray.",
+      "speechText": "Now divide both trays into three equal groups. Keep one group on the left and one group on the right. One group still balances one group.",
+      "file": "split-3.mp3",
+      "audioDurationMs": 9450,
+      "minVisualMs": 7800,
+      "lingerMs": 1000,
+      "sha256": "0875b4485f2355195a1c5cfcf95918b4ed9393322e11508871c4681b12e4c772"
+    },
+    "split-4": {
+      "caption": "Divide by 4, then keep one group on each tray.",
+      "speechText": "Now divide both trays into four equal groups. Keep one group on the left and one group on the right. One group still balances one group.",
+      "file": "split-4.mp3",
+      "audioDurationMs": 9425,
+      "minVisualMs": 7800,
+      "lingerMs": 1000,
+      "sha256": "a55b75c9ebdcb99e9127415ee36157be395dc81aed5b2a89317fd896f015d9b1"
+    },
+    "conclude": {
+      "caption": "Balanced — we found the answer.",
+      "speechText": "The scale is still balanced. We found the answer.",
+      "file": "conclude.mp3",
+      "audioDurationMs": 3625,
+      "minVisualMs": 3600,
+      "lingerMs": 1000,
+      "sha256": "f20e4c5d4403ae01f01deb6d0c2175220e450eef8b758e54b568e6c7043ff8a3"
+    }
+  }
+}
