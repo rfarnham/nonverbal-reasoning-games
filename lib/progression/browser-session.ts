@@ -4,6 +4,7 @@ import {
   advanceRedemptionQuestion,
   appendAttemptQuestion,
   beginAttemptRedemption,
+  beginCulminationSection,
   currentAttemptRound,
   currentRedemptionQuestion,
   recordQuestionAttempt,
@@ -769,6 +770,20 @@ export function advanceProgressionBrowserSession<
     }
     return advanceAttemptQuestion(nextAttempt, nowMs);
   });
+}
+
+export function beginProgressionBrowserSection<
+  Round,
+  EngineDifficulty extends string,
+>(
+  adapter: ProgressionGameAdapter<Round, EngineDifficulty>,
+  attemptId: string,
+  nowMs?: number,
+  options: Omit<BrowserSessionOptions, "attemptId" | "search"> = {},
+): BrowserProgressionSession<Round> {
+  return mutateBrowserAttempt(adapter, attemptId, options, (attempt) =>
+    beginCulminationSection(attempt, nowMs),
+  );
 }
 
 export function beginRedemptionBrowserSession<

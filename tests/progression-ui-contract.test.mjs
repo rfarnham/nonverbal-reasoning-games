@@ -68,7 +68,27 @@ test("every released game uses the same controlled progression hook", async () =
       `${slug} must show question progress during Turbo redemption`,
     );
     assert.match(gameSource, /<ProgressionRedemptionIntro/);
+    assert.match(
+      gameSource,
+      /<ProgressionCulminationSectionIntro/,
+      `${slug} must show the shared culmination section intro`,
+    );
+    assert.match(
+      gameSource,
+      /section=\{(?:controlledSession|progression)\.sectionIntro\}/,
+      `${slug} must describe the persisted pending section`,
+    );
+    assert.match(
+      gameSource,
+      /onBegin=\{(?:controlledSession|progression)\.beginSection\}/,
+      `${slug} must require the explicit shared begin action`,
+    );
     assert.match(gameSource, /<ProgressionRecoveryPanel/);
+    assert.ok(
+      (gameSource.match(/disabled=\{progression\.mode === "booting"\}/g) ?? [])
+        .length >= 2,
+      `${slug} must keep standalone mode actions inert while Journey hydrates`,
+    );
     assert.match(
       gameSource,
       /progression\.mode === "redirect" \? null/,
@@ -164,6 +184,36 @@ test("controlled game progress and redemption focus use truthful semantics", asy
   assert.doesNotMatch(hud, /Questions solved/);
   assert.match(panels, /primaryButtonRef\.current\?\.focus\(\)/);
   assert.match(panels, /ref=\{primaryButtonRef\}/);
+});
+
+test("culmination section intros persist context and wait for an explicit begin action", async () => {
+  const hook = await source(
+    "components/progression/useProgressionGameSession.ts",
+  );
+  const panels = await source(
+    "components/progression/ProgressionSessionPanels.tsx",
+  );
+  assert.match(hook, /sectionIntro:/);
+  assert.match(hook, /current: [\s\S]{0,120}total: [\s\S]{0,120}questionCount:/);
+  assert.match(hook, /beginSection/);
+  assert.match(hook, /beginProgressionBrowserSection/);
+  assert.match(
+    hook,
+    /session\.attempt\.pendingSectionIndex === null/,
+    "reading a culmination example must not count as active practice",
+  );
+
+  assert.match(
+    panels,
+    /export function ProgressionCulminationSectionIntro/,
+  );
+  assert.match(panels, /section\.current/);
+  assert.match(panels, /section\.total/);
+  assert.match(panels, /section\.questionCount/);
+  assert.match(panels, /onClick=\{onBegin\}/);
+  assert.match(panels, /primaryButtonRef\.current\?\.focus\(\)/);
+  assert.match(panels, /ref=\{primaryButtonRef\}/);
+  assert.doesNotMatch(panels, /setTimeout|setInterval/);
 });
 
 test("controlled solved resumes preserve post-solve teaching moments", async () => {

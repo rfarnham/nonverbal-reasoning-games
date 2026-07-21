@@ -81,6 +81,34 @@
   outline-offset: 4px;
 }
 
+.sectionIntro {
+  width: min(520px, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 13px;
+  margin: 28px auto 0;
+  padding-top: 25px;
+  border-top: 1px solid #cfcabd;
+  color: #17213d;
+  text-align: center;
+}
+
+.sectionLabel {
+  margin: 0;
+  color: #bf493e;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.sectionCopy {
+  max-width: 440px;
+  margin: 0 0 4px;
+  color: #657087;
+  line-height: 1.55;
+}
+
 @media (max-width: 430px) {
   .panel {
     padding: 28px 20px 34px;

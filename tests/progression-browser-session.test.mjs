@@ -5,6 +5,7 @@ import {
   addActiveTimeBrowserSession,
   advanceProgressionBrowserSession,
   answerProgressionBrowserSession,
+  beginProgressionBrowserSection,
   beginRedemptionBrowserSession,
   loadProgressionBrowserSession,
   progressionAttemptIdFromSearch,
@@ -638,7 +639,46 @@ test("culmination advances and redemption route by the current question slug", (
   const storage = memoryStorage();
   storeAttempt(storage, attempt);
 
-  let session = answerProgressionBrowserSession(
+  let session = loadProgressionBrowserSession(firstAdapter, {
+    attemptId: attempt.id,
+    storage,
+  });
+  assert.equal(session.mode, "controlled");
+  assert.equal(session.attempt.pendingSectionIndex, 0);
+  session = addActiveTimeBrowserSession(
+    firstAdapter,
+    attempt.id,
+    5_000,
+    1,
+    { storage },
+  );
+  assert.equal(session.mode, "controlled");
+  assert.equal(session.attempt.activeTimeMs, 0);
+  assert.equal(session.attempt.pendingSectionIndex, 0);
+  const beforeBegin = storage.getItem(PROGRESSION_STORAGE_KEY);
+  session = loadProgressionBrowserSession(firstAdapter, {
+    attemptId: attempt.id,
+    storage,
+  });
+  assert.equal(session.mode, "controlled");
+  assert.equal(session.attempt.pendingSectionIndex, 0);
+  assert.equal(storage.getItem(PROGRESSION_STORAGE_KEY), beforeBegin);
+
+  session = beginProgressionBrowserSection(
+    firstAdapter,
+    attempt.id,
+    2,
+    { storage },
+  );
+  assert.equal(session.mode, "controlled");
+  assert.equal(session.attempt.pendingSectionIndex, null);
+  assert.equal(
+    loadProgressionState(storage).profiles[0].attempts[attempt.id]
+      .pendingSectionIndex,
+    null,
+  );
+
+  session = answerProgressionBrowserSession(
     firstAdapter,
     attempt.id,
     { correct: false },
@@ -682,9 +722,31 @@ test("culmination advances and redemption route by the current question slug", (
     session.navigationTarget.query.progression,
     "culmination-routing",
   );
+  let saved = loadProgressionState(storage).profiles[0].attempts[attempt.id];
+  assert.equal(saved.currentRoundIndex, 3);
+  assert.equal(saved.currentSectionIndex, 1);
+  assert.equal(saved.pendingSectionIndex, 1);
+
+  session = loadProgressionBrowserSession(adapter("game-2"), {
+    attemptId: attempt.id,
+    storage,
+  });
+  assert.equal(session.mode, "controlled");
+  assert.equal(session.current.ref.gameSlug, "game-2");
+  assert.equal(session.attempt.pendingSectionIndex, 1);
 
   for (let index = 3; index < 24; index += 1) {
     const currentAdapter = adapter(games[Math.floor(index / 3)].slug);
+    if (index % 3 === 0) {
+      session = beginProgressionBrowserSection(
+        currentAdapter,
+        attempt.id,
+        100 + index,
+        { storage },
+      );
+      assert.equal(session.mode, "controlled");
+      assert.equal(session.attempt.pendingSectionIndex, null);
+    }
     session = answerProgressionBrowserSession(
       currentAdapter,
       attempt.id,
@@ -700,6 +762,8 @@ test("culmination advances and redemption route by the current question slug", (
   }
   assert.equal(session.mode, "controlled");
   assert.equal(session.attempt.phase, "redemption-ready");
+  saved = loadProgressionState(storage).profiles[0].attempts[attempt.id];
+  assert.equal(saved.pendingSectionIndex, null);
   const lastAdapter = adapter("game-8");
   session = beginRedemptionBrowserSession(
     lastAdapter,
@@ -767,6 +831,14 @@ test("legacy culmination duplicate references repair before a cross-game handoff
     attemptId: legacyAttempt.id,
     storage,
   });
+  assert.equal(session.mode, "controlled");
+  assert.equal(session.attempt.pendingSectionIndex, 0);
+  session = beginProgressionBrowserSection(
+    firstAdapter,
+    legacyAttempt.id,
+    undefined,
+    { storage },
+  );
   for (let index = 0; index < 3; index += 1) {
     session = answerProgressionBrowserSession(
       firstAdapter,
@@ -793,6 +865,7 @@ test("legacy culmination duplicate references repair before a cross-game handoff
   assert.equal(session.current.round.id, "Starter-0");
   assert.equal(session.attempt.currentRoundIndex, 3);
   assert.equal(session.attempt.currentSectionIndex, 1);
+  assert.equal(session.attempt.pendingSectionIndex, 1);
   assert.ok(
     session.attempt.rounds
       .slice(0, 3)
@@ -817,6 +890,15 @@ test("legacy culmination duplicate references repair before a cross-game handoff
   assert.equal(session.mode, "controlled");
   assert.equal(session.current.resolution, "current");
   assert.equal(session.current.round.id, "Starter-0");
+
+  session = beginProgressionBrowserSection(
+    secondAdapter,
+    legacyAttempt.id,
+    undefined,
+    { storage },
+  );
+  assert.equal(session.mode, "controlled");
+  assert.equal(session.attempt.pendingSectionIndex, null);
 
   session = answerProgressionBrowserSession(
     secondAdapter,

@@ -3,9 +3,12 @@ import test from "node:test";
 
 import {
   PROGRESSION_STORAGE_KEY,
+  PROGRESSION_SCHEMA_VERSION,
   addPlayerProfile,
   advanceAttemptQuestion,
+  beginCulminationSection,
   buildJourneyPlan,
+  createCulminationProgressionAttempt,
   createNormalProgressionAttempt,
   createPlayerProfile,
   createProgressionState,
@@ -14,6 +17,7 @@ import {
   decodeProgressionStateDiagnostic,
   loadProgressionState,
   loadProgressionStateDiagnostic,
+  previousJourneyNodeIds,
   recordQuestionAttempt,
   saveProgressionState,
   settleProgressionAttempt,
@@ -87,7 +91,8 @@ test("versioned storage round-trips exact in-progress answer and section state",
   assert.equal(storage.entries.has(PROGRESSION_STORAGE_KEY), true);
   const loaded = loadProgressionState(storage);
   const resumed = loaded.profiles[0].attempts["resume-me"];
-  assert.equal(loaded.schemaVersion, 1);
+  assert.equal(loaded.schemaVersion, PROGRESSION_SCHEMA_VERSION);
+  assert.equal(resumed.pendingSectionIndex, null);
   assert.equal(loaded.activeProfileId, "profile-1");
   assert.equal(resumed.currentRoundIndex, 0);
   assert.equal(resumed.currentSectionIndex, 0);
@@ -95,6 +100,85 @@ test("versioned storage round-trips exact in-progress answer and section state",
   assert.equal(resumed.rounds[0].attemptCount, 1);
   assert.equal(resumed.rounds[0].firstTryCorrect, false);
   assert.equal(resumed.rounds[0].lastAnswerToken, "choice-2");
+});
+
+test("schema-v1 culmination at a pristine section opener migrates to a pending intro", () => {
+  const journey = buildJourneyPlan(games);
+  const node = journey.boards[0].nodes.at(-1);
+  let attempt = createCulminationProgressionAttempt({
+    id: "legacy-culmination-intro",
+    node,
+    missedQuestions: [],
+    questionPools: games.map(({ slug }) => ({
+      gameSlug: slug,
+      approachableQuestion: questions(slug, "starter")[0],
+      campaignQuestions: questions(slug, node.level),
+      currentContentVersion: "v1",
+      currentGeneratorVersion: "generator-v1",
+    })),
+    nowMs: 2,
+  });
+  attempt = beginCulminationSection(attempt, 3);
+  for (let index = 0; index < 3; index += 1) {
+    attempt = recordQuestionAttempt(attempt, {
+      correct: true,
+      nowMs: 4 + index,
+    });
+    attempt = advanceAttemptQuestion(attempt, 10 + index);
+  }
+  assert.equal(attempt.currentSectionIndex, 1);
+  assert.equal(attempt.currentRoundIndex, 3);
+  assert.equal(attempt.pendingSectionIndex, 1);
+
+  const legacyAttempt = { ...attempt, schemaVersion: 1 };
+  delete legacyAttempt.pendingSectionIndex;
+  const previousStopIds = previousJourneyNodeIds(journey, node.id);
+  const profile = {
+    ...createPlayerProfile({
+      id: "legacy-culmination-profile",
+      name: "Ada",
+      avatarId: "hedgehog",
+      gameSnapshot: games,
+      nowMs: 1,
+    }),
+    clearedStopIds: previousStopIds,
+    awardedStopIds: previousStopIds,
+    attempts: { [legacyAttempt.id]: legacyAttempt },
+    activeAttemptId: legacyAttempt.id,
+  };
+  const migrated = decodeProgressionStateDiagnostic(
+    JSON.stringify({
+      schemaVersion: 1,
+      activeProfileId: profile.id,
+      profiles: [profile],
+    }),
+  );
+
+  assert.equal(migrated.status, "migrated");
+  assert.equal(migrated.state.schemaVersion, PROGRESSION_SCHEMA_VERSION);
+  const resumed = migrated.state.profiles[0].attempts[legacyAttempt.id];
+  assert.equal(resumed.currentRoundIndex, 3);
+  assert.equal(resumed.currentSectionIndex, 1);
+  assert.equal(resumed.pendingSectionIndex, 1);
+  assert.ok(
+    resumed.rounds
+      .slice(0, 3)
+      .every(({ phase, firstTryCorrect }) =>
+        phase === "solved" && firstTryCorrect === true
+      ),
+  );
+  assert.equal(resumed.rounds[3].phase, "answering");
+  assert.equal(resumed.rounds[3].attemptCount, 0);
+
+  const storage = memoryStorage();
+  assert.equal(saveProgressionState(migrated.state, storage), true);
+  const reloaded = loadProgressionStateDiagnostic(storage);
+  assert.equal(reloaded.status, "loaded");
+  assert.equal(
+    reloaded.state.profiles[0].attempts[legacyAttempt.id]
+      .pendingSectionIndex,
+    1,
+  );
 });
 
 test("a canonical settled summary survives normalization unchanged", () => {
@@ -143,7 +227,7 @@ test("a canonical settled summary survives normalization unchanged", () => {
 
 test("malformed, unsupported, and unavailable storage fail closed", () => {
   assert.deepEqual(decodeProgressionState("{broken"), {
-    schemaVersion: 1,
+    schemaVersion: PROGRESSION_SCHEMA_VERSION,
     activeProfileId: null,
     profiles: [],
   });
@@ -152,7 +236,7 @@ test("malformed, unsupported, and unavailable storage fail closed", () => {
       JSON.stringify({ schemaVersion: 999, profiles: [{ id: "future" }] }),
     ),
     {
-      schemaVersion: 1,
+      schemaVersion: PROGRESSION_SCHEMA_VERSION,
       activeProfileId: null,
       profiles: [],
     },
@@ -170,7 +254,7 @@ test("malformed, unsupported, and unavailable storage fail closed", () => {
     },
   };
   assert.deepEqual(loadProgressionState(throwingStorage), {
-    schemaVersion: 1,
+    schemaVersion: PROGRESSION_SCHEMA_VERSION,
     activeProfileId: null,
     profiles: [],
   });
@@ -228,7 +312,7 @@ test("version-zero profile maps migrate without trusting obsolete XP totals", ()
       },
     }),
   );
-  assert.equal(migrated.schemaVersion, 1);
+  assert.equal(migrated.schemaVersion, PROGRESSION_SCHEMA_VERSION);
   assert.equal(migrated.activeProfileId, "legacy");
   assert.equal(migrated.profiles[0].gameSnapshot.length, 8);
   assert.deepEqual(migrated.profiles[0].awardedStopIds, []);

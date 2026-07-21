@@ -319,7 +319,11 @@ Turbo Time:
 A board culmination runs three questions per snapshotted game: one Starter
 Campaign question and two prior missed questions from that game. If there are
 not enough distinct misses, fill from the current Campaign level. Culmination
-sections are sequential and resumable. A non-Wizard culmination advances the
+sections are sequential and resumable. Before the first question of every game
+section, keep that game’s canonical solved Example visible with explicit
+section context and a player-triggered Continue action; never flash through it
+or auto-dismiss it. Persist that acknowledgement, and do not count time spent
+reading the Example as active practice. A non-Wizard culmination advances the
 avatar only after the complete test and redemption are finished; Wizard ends
 with a mastery celebration. Question selection MUST treat a reference as the
 same question before and after its optional fingerprint is materialized, and a

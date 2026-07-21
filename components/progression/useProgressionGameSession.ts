@@ -12,6 +12,7 @@ import {
   addActiveTimeBrowserSession,
   advanceProgressionBrowserSession,
   answerProgressionBrowserSession,
+  beginProgressionBrowserSection,
   beginRedemptionBrowserSession,
   currentBrowserAttemptRound,
   loadProgressionBrowserSession,
@@ -51,10 +52,17 @@ type SessionActions = Readonly<{
   answer(result: { correct: boolean; answerToken?: string }): void;
   retry(): void;
   advance(): void;
+  beginSection(): void;
   beginRedemption(): void;
   setInteractionState(state: ProgressionInteractionState): void;
   setTurboClockPaused(paused: boolean): void;
   refresh(): void;
+}>;
+
+export type ProgressionCulminationSectionIntro = Readonly<{
+  current: number;
+  total: number;
+  questionCount: number;
 }>;
 
 export type ProgressionControlledGameSession<Round> = SessionActions &
@@ -78,6 +86,7 @@ export type ProgressionControlledGameSession<Round> = SessionActions &
     totalQuestions: number | null;
     turboRemainingMs: number | null;
     turboClockPaused: boolean;
+    sectionIntro: ProgressionCulminationSectionIntro | null;
     navigationTarget: null;
     exitTarget: ProgressionRouteTarget;
   }>;
@@ -143,6 +152,7 @@ function canPracticeClockRun(
   return (
     visible &&
     session?.mode === "controlled" &&
+    session.attempt.pendingSectionIndex === null &&
     (session.attempt.phase === "playing" ||
       session.attempt.phase === "redemption")
   );
@@ -177,6 +187,21 @@ function currentQuestionNumber(attempt: ProgressionAttempt): number {
   return attempt.currentRoundIndex === null
     ? attempt.rounds.length
     : attempt.currentRoundIndex + 1;
+}
+
+function culminationSectionIntro(
+  attempt: ProgressionAttempt,
+): ProgressionCulminationSectionIntro | null {
+  const index = attempt.pendingSectionIndex;
+  const section = index === null ? undefined : attempt.sections[index];
+  if (attempt.kind !== "culmination" || index === null || !section) {
+    return null;
+  }
+  return {
+    current: index + 1,
+    total: attempt.sections.length,
+    questionCount: section.questionCount,
+  };
 }
 
 export function useProgressionGameSession<
@@ -303,6 +328,17 @@ export function useProgressionGameSession<
   const advance = useCallback(() => {
     runAction((attemptId) =>
       advanceProgressionBrowserSession(
+        adapter,
+        attemptId,
+        Date.now(),
+        { storageKey },
+      ),
+    );
+  }, [adapter, runAction, storageKey]);
+
+  const beginSection = useCallback(() => {
+    runAction((attemptId) =>
+      beginProgressionBrowserSection(
         adapter,
         attemptId,
         Date.now(),
@@ -459,10 +495,12 @@ export function useProgressionGameSession<
         attemptPhase: session.attempt.phase,
         explanationOpen: turboClockPauseRequested,
       }),
+      sectionIntro: culminationSectionIntro(session.attempt),
       exitTarget: EXIT_TARGET,
       answer,
       retry,
       advance,
+      beginSection,
       beginRedemption,
       setInteractionState,
       setTurboClockPaused,
@@ -471,6 +509,7 @@ export function useProgressionGameSession<
   }, [
     advance,
     answer,
+    beginSection,
     beginRedemption,
     interactionState,
     refresh,

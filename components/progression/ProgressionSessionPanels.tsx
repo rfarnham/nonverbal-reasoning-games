@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 
 import type { ProgressionAttempt } from "@/lib/progression";
+import type { ProgressionCulminationSectionIntro as SectionIntro } from "./useProgressionGameSession";
 
 import styles from "./progression-session-panels.module.css";
 
@@ -19,6 +20,52 @@ export function ProgressionRecoveryPanel({
         Return to Journey
       </Link>
     </section>
+  );
+}
+
+export function ProgressionCulminationSectionIntro({
+  gameTitle,
+  section,
+  onBegin,
+}: Readonly<{
+  gameTitle: string;
+  section: SectionIntro;
+  onBegin: () => void;
+}>) {
+  const labelId = useId();
+  const descriptionId = useId();
+  const primaryButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      primaryButtonRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  return (
+    <div
+      className={styles.sectionIntro}
+      role="group"
+      aria-labelledby={labelId}
+      aria-describedby={descriptionId}
+    >
+      <p className={styles.sectionLabel} id={labelId}>
+        Level challenge · Game {section.current} of {section.total}
+      </p>
+      <p className={styles.sectionCopy} id={descriptionId}>
+        Take a moment with this solved example. Begin the next{" "}
+        {section.questionCount} questions when you’re ready.
+      </p>
+      <button
+        className={styles.primary}
+        type="button"
+        onClick={onBegin}
+        ref={primaryButtonRef}
+      >
+        Begin {gameTitle} <span aria-hidden="true">→</span>
+      </button>
+    </div>
   );
 }
 

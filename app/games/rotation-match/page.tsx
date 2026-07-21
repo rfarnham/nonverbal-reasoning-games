@@ -14,6 +14,7 @@ import { createPortal } from "react-dom";
 
 import { ProgressionGameHud } from "@/components/progression/ProgressionGameHud";
 import {
+  ProgressionCulminationSectionIntro,
   ProgressionRecoveryPanel,
   ProgressionRedemptionIntro,
 } from "@/components/progression/ProgressionSessionPanels";
@@ -592,7 +593,9 @@ export default function TransformationMatchPage() {
         round: progression.current.round,
       }
     : undefined;
-  const gameplayStarted = started || progressionControlled;
+  const gameplayStarted = progressionControlled
+    ? progression.sectionIntro === null
+    : started;
   const isCampaign =
     !progressionControlled && sessionMode === "campaign";
   const isInfinite =
@@ -1561,26 +1564,37 @@ export default function TransformationMatchPage() {
               </span>
             </div>
 
-            <div className={styles.modeActions} aria-label="Choose a game mode">
-              <button
-                className={styles.primaryButton}
-                type="button"
-                onClick={startCampaign}
-                disabled={progression.mode === "booting"}
+            {progressionControlled && progression.sectionIntro ? (
+              <ProgressionCulminationSectionIntro
+                gameTitle={transformationMatchGame.title}
+                section={progression.sectionIntro}
+                onBegin={progression.beginSection}
+              />
+            ) : (
+              <div
+                className={styles.modeActions}
+                aria-label="Choose a game mode"
               >
-                Campaign
-                <span aria-hidden="true">→</span>
-              </button>
-              <button
-                className={styles.modeButton}
-                type="button"
-                onClick={startInfinite}
-                disabled={progression.mode === "booting"}
-              >
-                <span aria-hidden="true">∞</span>
-                Infinite
-              </button>
-            </div>
+                <button
+                  className={styles.primaryButton}
+                  type="button"
+                  onClick={startCampaign}
+                  disabled={progression.mode === "booting"}
+                >
+                  Campaign
+                  <span aria-hidden="true">→</span>
+                </button>
+                <button
+                  className={styles.modeButton}
+                  type="button"
+                  onClick={startInfinite}
+                  disabled={progression.mode === "booting"}
+                >
+                  <span aria-hidden="true">∞</span>
+                  Infinite
+                </button>
+              </div>
+            )}
           </section>
         ) : !complete ? (
           <>

@@ -54,6 +54,16 @@ const ROUND_PHASES: readonly AttemptRoundPhase[] = [
   "solved",
 ];
 const ATTEMPT_KINDS = ["normal", "turbo", "culmination"] as const;
+const LEGACY_SCHEMA_VERSIONS = [0, 1] as const;
+
+function isSupportedSchemaVersion(value: unknown): boolean {
+  return (
+    value === PROGRESSION_SCHEMA_VERSION ||
+    LEGACY_SCHEMA_VERSIONS.includes(
+      value as (typeof LEGACY_SCHEMA_VERSIONS)[number],
+    )
+  );
+}
 
 function recordValue(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -170,6 +180,15 @@ function deriveSections(
     }
   }
   return sections;
+}
+
+function isPristineRound(round: AttemptRound | undefined): boolean {
+  return (
+    round?.phase === "answering" &&
+    round.attemptCount === 0 &&
+    round.firstTryCorrect === null &&
+    round.lastAnswerToken === undefined
+  );
 }
 
 function parseRedemption(raw: unknown): RedemptionState | null | undefined {
@@ -323,6 +342,25 @@ function parseAttempt(raw: unknown): ProgressionAttempt | undefined {
             currentRoundIndex < startRoundIndex + questionCount,
         );
   if (currentSectionIndex === -1) return undefined;
+  const pendingSectionIndex =
+    attempt.pendingSectionIndex === undefined
+      ? kind === "culmination" &&
+        phase === "playing" &&
+        currentRoundIndex !== null &&
+        currentSectionIndex !== null &&
+        currentRoundIndex === sections[currentSectionIndex]?.startRoundIndex &&
+        isPristineRound(validRounds[currentRoundIndex])
+        ? currentSectionIndex
+        : null
+      : attempt.pendingSectionIndex === null
+        ? null
+        : nonNegativeInteger(attempt.pendingSectionIndex);
+  if (
+    pendingSectionIndex === undefined ||
+    (pendingSectionIndex !== null && pendingSectionIndex >= sections.length)
+  ) {
+    return undefined;
+  }
 
   return {
     schemaVersion: PROGRESSION_SCHEMA_VERSION,
@@ -335,6 +373,7 @@ function parseAttempt(raw: unknown): ProgressionAttempt | undefined {
     currentRoundIndex,
     sections,
     currentSectionIndex,
+    pendingSectionIndex,
     redemption,
     activeTimeMs,
     ...(turboRemainingMs === undefined ? {} : { turboRemainingMs }),
@@ -505,7 +544,7 @@ export function migrateProgressionState(raw: unknown): ProgressionState {
     };
   }
   const version = state.schemaVersion ?? state.version ?? 0;
-  if (version !== 0 && version !== PROGRESSION_SCHEMA_VERSION) {
+  if (!isSupportedSchemaVersion(version)) {
     return {
       schemaVersion: PROGRESSION_SCHEMA_VERSION,
       activeProfileId: null,
@@ -580,7 +619,7 @@ export function decodeProgressionStateDiagnostic(
       };
     }
     const version = record.schemaVersion ?? record.version ?? 0;
-    if (version !== 0 && version !== PROGRESSION_SCHEMA_VERSION) {
+    if (!isSupportedSchemaVersion(version)) {
       return {
         state: migrateProgressionState(null),
         status: "unsupported",
@@ -590,7 +629,7 @@ export function decodeProgressionStateDiagnostic(
     return {
       state,
       status:
-        version === 0
+        version !== PROGRESSION_SCHEMA_VERSION
           ? "migrated"
           : jsonEquivalent(raw, state)
             ? "loaded"

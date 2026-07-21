@@ -340,6 +340,12 @@ export function assertProgressionAttemptIntegrity(
   if (!sectionsMatch(attempt.sections, sections)) {
     fail("the saved game sections do not match the question order");
   }
+  if (
+    attempt.pendingSectionIndex !== null &&
+    attempt.kind !== "culmination"
+  ) {
+    fail("a non-culmination stop contains a pending game section");
+  }
 
   const playing = attempt.phase === "playing";
   if (playing) {
@@ -368,6 +374,17 @@ export function assertProgressionAttemptIntegrity(
     if (attempt.currentSectionIndex !== expectedSectionIndex) {
       fail("playing has an invalid current game section");
     }
+    if (attempt.pendingSectionIndex !== null) {
+      const pendingSection = sections[attempt.pendingSectionIndex];
+      if (
+        attempt.pendingSectionIndex !== expectedSectionIndex ||
+        !pendingSection ||
+        currentIndex !== pendingSection.startRoundIndex ||
+        !isPristineRound(attempt.rounds[currentIndex])
+      ) {
+        fail("playing has an invalid pending game section");
+      }
+    }
     if (attempt.redemption !== null || attempt.settlement !== undefined) {
       fail("playing contains later-stage state");
     }
@@ -377,6 +394,7 @@ export function assertProgressionAttemptIntegrity(
   if (
     attempt.currentRoundIndex !== null ||
     attempt.currentSectionIndex !== null ||
+    attempt.pendingSectionIndex !== null ||
     attempt.rounds.some(({ phase }) => phase !== "solved")
   ) {
     fail(`${attempt.phase} contains unfinished ordinary questions`);

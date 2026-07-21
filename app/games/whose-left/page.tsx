@@ -16,6 +16,7 @@ import {
 } from "@/lib/game-audio";
 import { ProgressionGameHud } from "@/components/progression/ProgressionGameHud";
 import {
+  ProgressionCulminationSectionIntro,
   ProgressionRecoveryPanel,
   ProgressionRedemptionIntro,
 } from "@/components/progression/ProgressionSessionPanels";
@@ -301,7 +302,9 @@ export default function WhoseLeftPage() {
         round: progression.current.round,
       }
     : undefined;
-  const gameplayStarted = started || progressionControlled;
+  const gameplayStarted = progressionControlled
+    ? progression.sectionIntro === null
+    : started;
   const isCampaign =
     !progressionControlled && sessionMode === "campaign";
   const isInfinite =
@@ -1160,26 +1163,37 @@ export default function WhoseLeftPage() {
               </div>
             </div>
 
-            <div className={styles.modeActions} aria-label="Choose a game mode">
-              <button
-                className={styles.primaryButton}
-                type="button"
-                onClick={startCampaign}
-                disabled={progression.mode === "booting"}
+            {progressionControlled && progression.sectionIntro ? (
+              <ProgressionCulminationSectionIntro
+                gameTitle={whoseLeftGame.title}
+                section={progression.sectionIntro}
+                onBegin={progression.beginSection}
+              />
+            ) : (
+              <div
+                className={styles.modeActions}
+                aria-label="Choose a game mode"
               >
-                Campaign
-                <span aria-hidden="true">→</span>
-              </button>
-              <button
-                className={styles.modeButton}
-                type="button"
-                onClick={startInfinite}
-                disabled={progression.mode === "booting"}
-              >
-                <span aria-hidden="true">∞</span>
-                Infinite
-              </button>
-            </div>
+                <button
+                  className={styles.primaryButton}
+                  type="button"
+                  onClick={startCampaign}
+                  disabled={progression.mode === "booting"}
+                >
+                  Campaign
+                  <span aria-hidden="true">→</span>
+                </button>
+                <button
+                  className={styles.modeButton}
+                  type="button"
+                  onClick={startInfinite}
+                  disabled={progression.mode === "booting"}
+                >
+                  <span aria-hidden="true">∞</span>
+                  Infinite
+                </button>
+              </div>
+            )}
             <p
               className={styles.generationMessage}
               role="status"

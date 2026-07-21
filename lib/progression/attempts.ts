@@ -115,6 +115,8 @@ export function createProgressionAttempt({
     currentRoundIndex: rounds.length ? 0 : null,
     sections,
     currentSectionIndex: sections.length ? 0 : null,
+    pendingSectionIndex:
+      node.kind === "culmination" && sections.length ? 0 : null,
     redemption: null,
     activeTimeMs: 0,
     ...(node.kind === "turbo"
@@ -177,6 +179,9 @@ export function recordQuestionAttempt(
   { correct, answerToken, nowMs }: RecordAnswerInput,
 ): ProgressionAttempt {
   assertActiveAttempt(attempt);
+  if (attempt.pendingSectionIndex !== null) {
+    throw new Error("Begin the current culmination section before answering.");
+  }
   const currentIndex = attempt.currentRoundIndex;
   const current =
     currentIndex === null ? undefined : attempt.rounds[currentIndex];
@@ -244,13 +249,51 @@ export function advanceAttemptQuestion(
     return finishAttemptQuestions(attempt, nowMs);
   }
   const nextRoundIndex = currentIndex + 1;
+  const nextSectionIndex = sectionIndexForRound(
+    attempt.sections,
+    nextRoundIndex,
+  );
   return {
     ...attempt,
     currentRoundIndex: nextRoundIndex,
-    currentSectionIndex: sectionIndexForRound(
-      attempt.sections,
-      nextRoundIndex,
-    ),
+    currentSectionIndex: nextSectionIndex,
+    pendingSectionIndex:
+      attempt.kind === "culmination" &&
+      nextSectionIndex !== attempt.currentSectionIndex
+        ? nextSectionIndex
+        : null,
+    updatedAtMs: normalizedNow(nowMs),
+  };
+}
+
+export function beginCulminationSection(
+  attempt: ProgressionAttempt,
+  nowMs?: number,
+): ProgressionAttempt {
+  assertActiveAttempt(attempt);
+  const sectionIndex = attempt.pendingSectionIndex;
+  const currentRoundIndex = attempt.currentRoundIndex;
+  const section =
+    sectionIndex === null ? undefined : attempt.sections[sectionIndex];
+  const round =
+    currentRoundIndex === null ? undefined : attempt.rounds[currentRoundIndex];
+  if (
+    attempt.kind !== "culmination" ||
+    sectionIndex === null ||
+    sectionIndex !== attempt.currentSectionIndex ||
+    !section ||
+    currentRoundIndex !== section.startRoundIndex ||
+    !round ||
+    round.phase !== "answering" ||
+    round.attemptCount !== 0 ||
+    round.firstTryCorrect !== null ||
+    round.lastAnswerToken !== undefined
+  ) {
+    throw new Error("This culmination section is not waiting to begin.");
+  }
+  return {
+    ...attempt,
+    pendingSectionIndex: null,
     updatedAtMs: normalizedNow(nowMs),
   };
 }
@@ -279,6 +322,7 @@ export function finishAttemptQuestions(
     phase: hasMistakes ? "redemption-ready" : "summary-ready",
     currentRoundIndex: null,
     currentSectionIndex: null,
+    pendingSectionIndex: null,
     updatedAtMs: normalizedNow(nowMs),
   };
 }
@@ -292,6 +336,7 @@ export function addAttemptActiveTime(
   if (!Number.isFinite(elapsedMs) || elapsedMs < 0) {
     throw new Error("Active time must be a finite, non-negative duration.");
   }
+  if (attempt.pendingSectionIndex !== null) return attempt;
   const duration = Math.round(elapsedMs);
   const remaining =
     attempt.turboRemainingMs === undefined

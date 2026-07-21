@@ -9,6 +9,7 @@ import {
   advanceRedemptionQuestion,
   assertProgressionAttemptIntegrity,
   beginAttemptRedemption,
+  beginCulminationSection,
   buildJourneyPlan,
   closeAttemptSummary,
   createCulminationProgressionAttempt,
@@ -568,14 +569,44 @@ test("culmination keeps ordered three-question game sections and replaces stale 
       .some(({ question }) => question.contentVersion === "old"),
     false,
   );
+  assert.equal(attempt.pendingSectionIndex, 0);
+  assert.equal(addAttemptActiveTime(attempt, 5_000, 40).activeTimeMs, 0);
+  assertProgressionAttemptIntegrity(attempt, node);
+  assert.throws(
+    () =>
+      assertProgressionAttemptIntegrity(
+        { ...attempt, pendingSectionIndex: 1 },
+        node,
+      ),
+    /pending.*section/i,
+  );
+  assert.throws(
+    () => recordQuestionAttempt(attempt, { correct: true }),
+    /Begin the current culmination section/,
+  );
 
-  let progressed = attempt;
+  let progressed = beginCulminationSection(attempt, 41);
+  assert.equal(progressed.pendingSectionIndex, null);
   for (let index = 0; index < 3; index += 1) {
     progressed = recordQuestionAttempt(progressed, { correct: true });
     progressed = advanceAttemptQuestion(progressed);
   }
   assert.equal(currentAttemptSection(progressed).gameSlug, "game-2");
   assert.equal(progressed.currentSectionIndex, 1);
+  assert.equal(progressed.currentRoundIndex, 3);
+  assert.equal(progressed.pendingSectionIndex, 1);
+  assert.throws(
+    () => recordQuestionAttempt(progressed, { correct: true }),
+    /Begin the current culmination section/,
+  );
+
+  progressed = beginCulminationSection(progressed, 42);
+  assert.equal(progressed.pendingSectionIndex, null);
+  assert.equal(progressed.currentSectionIndex, 1);
+  assert.throws(
+    () => beginCulminationSection(progressed),
+    /not waiting to begin/,
+  );
 });
 
 test("culmination treats a materialized miss as the same approachable question", () => {

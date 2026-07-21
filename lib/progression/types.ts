@@ -1,4 +1,4 @@
-export const PROGRESSION_SCHEMA_VERSION = 1 as const;
+export const PROGRESSION_SCHEMA_VERSION = 2 as const;
 
 export const PROGRESSION_LEVELS = [
   "starter",
@@ -150,6 +150,7 @@ export type ProgressionAttempt = {
   currentRoundIndex: number | null;
   sections: readonly AttemptSection[];
   currentSectionIndex: number | null;
+  pendingSectionIndex: number | null;
   redemption: RedemptionState | null;
   activeTimeMs: number;
   turboRemainingMs?: number;

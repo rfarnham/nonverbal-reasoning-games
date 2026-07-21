@@ -26,6 +26,7 @@ import {
 } from "@/lib/infinite-progression";
 import { ProgressionGameHud } from "@/components/progression/ProgressionGameHud";
 import {
+  ProgressionCulminationSectionIntro,
   ProgressionRecoveryPanel,
   ProgressionRedemptionIntro,
 } from "@/components/progression/ProgressionSessionPanels";
@@ -345,8 +346,9 @@ export default function PatternMatrixPage() {
 
   const controlledSession =
     progression.mode === "controlled" ? progression : null;
-  const progressionBooting = progression.mode === "booting";
-  const hasStarted = controlledSession !== null || started;
+  const hasStarted = controlledSession
+    ? controlledSession.sectionIntro === null
+    : started;
   const isCampaign =
     controlledSession === null && sessionMode === "campaign";
   const isInfinite =
@@ -1651,30 +1653,38 @@ export default function PatternMatrixPage() {
               </span>
             </div>
 
-            <div
-              className={styles.modeActions}
-              role="group"
-              aria-label="Choose a game mode"
-            >
-              <button
-                className={styles.primaryButton}
-                type="button"
-                onClick={startCampaign}
-                disabled={progressionBooting}
+            {controlledSession?.sectionIntro ? (
+              <ProgressionCulminationSectionIntro
+                gameTitle={patternMatrixGame.title}
+                section={controlledSession.sectionIntro}
+                onBegin={controlledSession.beginSection}
+              />
+            ) : (
+              <div
+                className={styles.modeActions}
+                role="group"
+                aria-label="Choose a game mode"
               >
-                Campaign
-                <span aria-hidden="true">→</span>
-              </button>
-              <button
-                className={styles.modeButton}
-                type="button"
-                onClick={startInfinite}
-                disabled={progressionBooting}
-              >
-                <span aria-hidden="true">∞</span>
-                Infinite
-              </button>
-            </div>
+                <button
+                  className={styles.primaryButton}
+                  type="button"
+                  onClick={startCampaign}
+                  disabled={progression.mode === "booting"}
+                >
+                  Campaign
+                  <span aria-hidden="true">→</span>
+                </button>
+                <button
+                  className={styles.modeButton}
+                  type="button"
+                  onClick={startInfinite}
+                  disabled={progression.mode === "booting"}
+                >
+                  <span aria-hidden="true">∞</span>
+                  Infinite
+                </button>
+              </div>
+            )}
           </section>
         ) : !complete ? (
           <>
