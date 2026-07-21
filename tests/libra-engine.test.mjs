@@ -24,6 +24,9 @@ import {
   solutionStrategyFeedback,
   validateRound,
 } from "../app/games/libra/game-engine.ts";
+import { progressionAdapter } from "../app/games/libra/progression-adapter.ts";
+import { progressionMetadata } from "../app/games/libra/progression-metadata.ts";
+import { resolveProgressionQuestion } from "../lib/progression/game-adapter.ts";
 
 const SEEDS_PER_DIFFICULTY = 400;
 
@@ -86,6 +89,21 @@ const GENERATED = Object.fromEntries(
     ),
   ]),
 );
+
+test("Libra generator v2 safely migrates saved v1 questions", () => {
+  assert.equal(progressionMetadata.generatorVersion, "2");
+  const resolved = resolveProgressionQuestion(progressionAdapter, {
+    source: "generated",
+    gameSlug: "libra",
+    level: "starter",
+    seed: "legacy-libra-starter",
+    generatorVersion: "1",
+  });
+  assert.equal(resolved.resolution, "generated-fallback");
+  assert.equal(resolved.ref.source, "campaign");
+  assert.equal(resolved.round.difficulty, "Starter");
+  assert.equal(validateRound(resolved.round).valid, true);
+});
 
 function relationExpressions(round) {
   return round.equations.flatMap(({ left, right }) => [left, right]);
@@ -472,6 +490,62 @@ test("authored strategy archetypes progress from foundations to scale algebra", 
   }
 });
 
+test("Starter split-evenly rounds require a real split without constraining cancellation", () => {
+  const direct = ROUNDS.find(
+    ({ difficulty, family }) =>
+      difficulty === "Starter" && family === "direct",
+  );
+  const cancellation = ROUNDS.find(
+    ({ difficulty, family }) =>
+      difficulty === "Starter" && family === "cancellation",
+  );
+  assert.ok(direct);
+  assert.ok(cancellation);
+
+  assert.ok(direct.solutionDerivation.normalizeBy >= 2);
+  assert.equal(cancellation.solutionDerivation.normalizeBy, 1);
+  assertValidRound(cancellation, "authored Starter cancellation");
+
+  const answerExpression = makeExpression([
+    direct.question.unit,
+    direct.answer,
+  ]);
+  for (const [label, equation, multiplier] of [
+    [
+      "target on left",
+      { left: direct.question.target, right: answerExpression },
+      1,
+    ],
+    [
+      "target on right",
+      { left: answerExpression, right: direct.question.target },
+      -1,
+    ],
+  ]) {
+    const validation = validateRound({
+      ...direct,
+      equations: [equation],
+      solutionDerivation: {
+        equationMultipliers: [multiplier],
+        normalizeBy: 1,
+      },
+    });
+    assert.equal(validation.valid, false, label);
+    assert.ok(
+      validation.errors.some((error) =>
+        error.includes("directly show the requested answer"),
+      ),
+      `${label} evidence leak`,
+    );
+    assert.ok(
+      validation.errors.some((error) =>
+        error.includes("at least two target groups"),
+      ),
+      `${label} split-evenly normalization`,
+    );
+  }
+});
+
 test("every stored derivation is an exact certificate for its target", () => {
   for (const [index, round] of [...ROUNDS, TUTORIAL].entries()) {
     assert.equal(
@@ -591,6 +665,38 @@ test("the seeded corpus covers every generated family and both advanced target f
       `${difficulty} generated density envelope`,
     );
   }
+});
+
+test("generated Starter direct rounds always require splitting at least two target groups", () => {
+  const direct = GENERATED.Starter.filter(({ family }) => family === "direct");
+  const cancellation = GENERATED.Starter.filter(
+    ({ family }) => family === "cancellation",
+  );
+
+  assert.ok(direct.length >= 100, "the corpus meaningfully samples direct rounds");
+  assert.ok(
+    cancellation.length >= 100,
+    "the corpus meaningfully samples cancellation rounds",
+  );
+  assert.ok(
+    direct.every(({ solutionDerivation }) =>
+      solutionDerivation.normalizeBy >= 2,
+    ),
+  );
+  assert.ok(
+    direct.every(
+      (round) =>
+        expressionKey(round.equations[0].left) !==
+        expressionKey(round.question.target),
+    ),
+    "a direct relation never displays the requested single target unchanged",
+  );
+  assert.ok(
+    cancellation.every(
+      ({ solutionDerivation }) => solutionDerivation.normalizeBy === 1,
+    ),
+    "cancellation may legitimately remove equal loads without splitting",
+  );
 });
 
 test("generated Junior through Wizard repeatedly exercise every strategy archetype", () => {
@@ -829,6 +935,15 @@ test("validation rejects duplicate choices, oversized pans, and leaked Wizard cu
 test("generation retries rejected repeats and fails safely on hostile sources", () => {
   const constantZero = () => 0;
   const repeated = generateInfiniteRound("Starter", constantZero);
+  assert.equal(repeated.family, "direct");
+  assert.ok(repeated.solutionDerivation.normalizeBy >= 2);
+
+  const constantNearOne = () => 1 - Number.EPSILON;
+  const cancellation = generateInfiniteRound("Starter", constantNearOne);
+  assert.equal(cancellation.family, "cancellation");
+  assert.equal(cancellation.solutionDerivation.normalizeBy, 1);
+  assertValidRound(cancellation, "hostile-source cancellation round");
+
   const excluded = new Set([roundFingerprint(repeated)]);
 
   let retryCalls = 0;

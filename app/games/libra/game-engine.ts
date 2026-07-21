@@ -2155,6 +2155,24 @@ export function validateRound(round: Round): RoundValidation {
   if (derivedAnswer !== null && derivedAnswer > 8) {
     errors.push("Answers must fit at most eight individual tokens.");
   }
+  if (derivedAnswer !== null) {
+    const targetKey = expressionKey(round.question.target);
+    const answerKey = expressionKey(
+      makeExpression([round.question.unit, derivedAnswer]),
+    );
+    if (
+      round.equations.some(({ left, right }) => {
+        const leftKey = expressionKey(left);
+        const rightKey = expressionKey(right);
+        return (
+          (leftKey === targetKey && rightKey === answerKey) ||
+          (leftKey === answerKey && rightKey === targetKey)
+        );
+      })
+    ) {
+      errors.push("A displayed scale must not directly show the requested answer.");
+    }
+  }
 
   if (
     !Number.isInteger(round.correctIndex) ||
@@ -2254,6 +2272,13 @@ export function validateRound(round: Round): RoundValidation {
     round.solutionDerivation.normalizeBy < 2
   ) {
     errors.push("Creating a repeated combo must end with normalization.");
+  }
+  if (
+    round.difficulty === "Starter" &&
+    round.family === "direct" &&
+    round.solutionDerivation.normalizeBy < 2
+  ) {
+    errors.push("Starter split-evenly rounds must use at least two target groups.");
   }
 
   if (round.difficulty === "Wizard") {
@@ -2434,8 +2459,10 @@ function generatedStarterSpec(random: RandomSource): StarterSpec {
     Creature,
     Creature,
   ];
-  const answer = 2 + randomInteger(random, 7);
-  const wantsCancellation = randomInteger(random, 2) === 1 && answer < 8;
+  const wantsCancellation = randomInteger(random, 2) === 1;
+  const answer = wantsCancellation
+    ? 2 + randomInteger(random, 6)
+    : 2 + randomInteger(random, 3);
   if (wantsCancellation) {
     return {
       difficulty: "Starter",
@@ -2447,13 +2474,13 @@ function generatedStarterSpec(random: RandomSource): StarterSpec {
       correctIndex: randomInteger(random, 4),
     };
   }
-  const maxMultiplier = Math.max(1, Math.min(3, Math.floor(8 / answer)));
+  const maxMultiplier = Math.min(3, Math.floor(8 / answer));
   return {
     difficulty: "Starter",
     family: "direct",
     creatures: [target, unit],
     answer,
-    multiplier: 1 + randomInteger(random, maxMultiplier),
+    multiplier: 2 + randomInteger(random, maxMultiplier - 1),
     offset: 0,
     correctIndex: randomInteger(random, 4),
   };

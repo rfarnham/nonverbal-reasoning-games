@@ -243,12 +243,26 @@ test("Journey summary rebases writes, restores focus, and rejects mid-stop previ
   const summary = await source(
     "components/progression/JourneySummaryClient.tsx",
   );
+  const launch = await source(
+    "components/progression/journey-launch.ts",
+  );
   assert.match(summary, /function readLatestSummary/);
   assert.match(summary, /window\.addEventListener\("storage", syncStorage\)/);
   assert.match(summary, /function isSummaryAttempt/);
   assert.match(summary, /attempt\.phase === "summary-ready"/);
   assert.doesNotMatch(summary, /attempt\.phase === "playing"/);
   assert.match(summary, /ref=\{summaryTitleRef\} tabIndex=\{-1\}/);
+  assert.match(
+    summary,
+    /result\.settlement\.passed[\s\S]{0,300}closeAttemptSummary\(result\.profile, result\.attempt\.id\)/,
+  );
+  assert.match(
+    summary,
+    /if \(result\.settlement\.passed\)[\s\S]{0,1000}navigateToJourney\(\{ replace: true \}\)/,
+  );
+  assert.match(summary, /loaded\.attempt\.phase !== "summary"/);
+  assert.match(launch, /window\.location\.replace\(target\)/);
+  assert.doesNotMatch(summary, /"Continue Journey"/);
 });
 
 test("Journey map keeps cleared stops non-gating and animates finite avatar travel", async () => {

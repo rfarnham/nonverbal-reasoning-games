@@ -338,7 +338,9 @@ synthesized jingle when sound is enabled.
 
 After every attempt, show an extremely positive summary with XP earned,
 first-attempt accuracy, and active practice time. Time is informational outside
-Turbo and MUST NOT be praised as a measure of ability.
+Turbo and MUST NOT be praised as a measure of ability. Claiming XP or finishing
+a passed summary MUST settle the attempt, save the award, and return to the
+Journey map in one action; do not add a second **Continue Journey** confirmation.
 
 Journey supports multiple device-local profiles. Prompt for a short display
 name and one of at most 16 bundled, consistently styled animal avatars, including

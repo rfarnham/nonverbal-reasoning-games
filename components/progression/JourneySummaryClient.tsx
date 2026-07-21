@@ -105,9 +105,9 @@ function readLatestSummary(
 }
 
 function playAwardSound() {
-  if (!readSoundPreference()) return;
+  if (!readSoundPreference()) return false;
   const context = createGameAudioContext();
-  if (!context) return;
+  if (!context) return false;
   const play = () => {
     playXpJingle(context);
     window.setTimeout(() => {
@@ -119,12 +119,14 @@ function playAwardSound() {
   } else if (context.state === "running") {
     play();
   }
+  return true;
 }
 
 export function JourneySummaryClient() {
   const [loaded, setLoaded] = useState<LoadedSummary | null | undefined>();
   const [storageWarning, setStorageWarning] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+  const [completing, setCompleting] = useState(false);
   const summaryTitleRef = useRef<HTMLHeadingElement>(null);
   const focusedAttemptRef = useRef<string | null>(null);
 
@@ -166,6 +168,41 @@ export function JourneySummaryClient() {
     });
     return () => window.cancelAnimationFrame(frame);
   }, [loaded?.attempt.id, preview]);
+
+  useEffect(() => {
+    if (!loaded || loaded.attempt.phase !== "summary") return;
+    const timer = window.setTimeout(() => {
+      setCompleting(true);
+      try {
+        const latest = readLatestSummary(
+          loaded.profile.id,
+          loaded.attempt.id,
+        );
+        if (!latest || latest.attempt.phase !== "summary") {
+          setStorageWarning(true);
+          setCompleting(false);
+          return;
+        }
+        const closedProfile = closeAttemptSummary(
+          latest.profile,
+          latest.attempt.id,
+        );
+        const nextState = replacePlayerProfile(latest.state, closedProfile);
+        if (!saveProgressionState(nextState)) {
+          setStorageWarning(true);
+          setCompleting(false);
+          return;
+        }
+        const nextNode = nextIncompleteJourneyNode(closedProfile);
+        if (nextNode) markJourneyArrival(closedProfile.id, nextNode.id);
+        navigateToJourney({ replace: true });
+      } catch {
+        setStorageWarning(true);
+        setCompleting(false);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loaded]);
 
   if (loaded === undefined) {
     return (
@@ -226,27 +263,56 @@ export function JourneySummaryClient() {
     : "You completed the whole stop and made every miss right. One more pass will make this trail feel familiar.";
 
   function settle() {
-    if (settled) return;
+    if (settled || completing) return;
+    setCompleting(true);
     try {
       const latest = readLatestSummary(profile.id, attempt.id);
       if (!latest) {
         setStorageWarning(true);
+        setCompleting(false);
         return;
       }
       if (latest.attempt.phase !== "summary-ready") {
         setLoaded(latest);
         setAnnouncement("This result is already up to date.");
+        setCompleting(false);
         return;
       }
       const result = settleProgressionAttempt(
         latest.profile,
         latest.attempt,
       );
-      const nextState = replacePlayerProfile(latest.state, result.profile);
+      const nextProfile = result.settlement.passed
+        ? closeAttemptSummary(result.profile, result.attempt.id)
+        : result.profile;
+      const nextState = replacePlayerProfile(latest.state, nextProfile);
       if (!saveProgressionState(nextState)) {
         setStorageWarning(true);
+        setCompleting(false);
         return;
       }
+
+      if (result.settlement.passed) {
+        const nextNode = nextIncompleteJourneyNode(nextProfile);
+        if (nextNode) markJourneyArrival(nextProfile.id, nextNode.id);
+        setAnnouncement(
+          result.settlement.xpAwarded > 0
+            ? `${result.settlement.xpAwarded} XP added. Moving on.`
+            : "Practice complete. Moving on.",
+        );
+        const jingleStarted =
+          result.settlement.xpAwarded > 0 && playAwardSound();
+        if (jingleStarted) {
+          window.setTimeout(
+            () => navigateToJourney({ replace: true }),
+            340,
+          );
+        } else {
+          navigateToJourney({ replace: true });
+        }
+        return;
+      }
+
       setLoaded({
         state: nextState,
         profile: result.profile,
@@ -259,16 +325,20 @@ export function JourneySummaryClient() {
             ? "Practice complete."
             : "Attempt saved. This stop is ready to try again.",
       );
-      if (result.settlement.xpAwarded > 0) playAwardSound();
+      setCompleting(false);
     } catch {
       setStorageWarning(true);
+      setCompleting(false);
     }
   }
 
   function continueJourney() {
+    if (completing) return;
+    setCompleting(true);
     const latest = readLatestSummary(profile.id, attempt.id);
     if (!latest) {
       setStorageWarning(true);
+      setCompleting(false);
       return;
     }
     const currentProfile = latest.profile;
@@ -277,6 +347,7 @@ export function JourneySummaryClient() {
       currentAttempt.phase !== "summary" &&
       currentAttempt.phase !== "retry-required"
     ) {
+      setCompleting(false);
       return;
     }
     try {
@@ -299,6 +370,7 @@ export function JourneySummaryClient() {
         const nextState = replacePlayerProfile(latest.state, retryProfile);
         if (!saveProgressionState(nextState)) {
           setStorageWarning(true);
+          setCompleting(false);
           return;
         }
         navigateToProgressionAttempt(retryAttempt);
@@ -308,15 +380,17 @@ export function JourneySummaryClient() {
       const nextState = replacePlayerProfile(latest.state, closedProfile);
       if (!saveProgressionState(nextState)) {
         setStorageWarning(true);
+        setCompleting(false);
         return;
       }
       if (currentAttempt.phase === "summary") {
         const nextNode = nextIncompleteJourneyNode(closedProfile);
         if (nextNode) markJourneyArrival(closedProfile.id, nextNode.id);
       }
-      navigateToJourney();
+      navigateToJourney({ replace: true });
     } catch {
       setStorageWarning(true);
+      setCompleting(false);
     }
   }
 
@@ -386,28 +460,38 @@ export function JourneySummaryClient() {
 
           <div className={styles.summaryActions}>
             {!settled ? (
-              <button className={styles.primaryButton} type="button" onClick={settle}>
-                {settlement.xpAwarded > 0
-                  ? `Claim ${settlement.xpAwarded} XP`
-                  : passed
-                    ? "Finish stop"
-                    : "Save this practice"}
+              <button
+                className={styles.primaryButton}
+                type="button"
+                onClick={settle}
+                disabled={completing}
+              >
+                {completing
+                  ? "Moving on…"
+                  : settlement.xpAwarded > 0
+                    ? `Claim ${settlement.xpAwarded} XP`
+                    : passed
+                      ? "Finish stop"
+                      : "Save this practice"}
               </button>
             ) : (
               <button
                 className={styles.primaryButton}
                 type="button"
                 onClick={continueJourney}
+                disabled={completing}
               >
-                {passed
-                  ? isFinalMastery
-                    ? "Back to the full Journey"
-                    : isCulmination
-                      ? "See the next level"
-                      : "Continue Journey"
-                  : profile.clearedStopIds.includes(node.id)
-                    ? "Back to Journey"
-                    : "Try this stop again"}
+                {completing
+                  ? "Moving on…"
+                  : passed
+                    ? isFinalMastery
+                      ? "Back to the full Journey"
+                      : isCulmination
+                        ? "See the next level"
+                        : "Journey map"
+                    : profile.clearedStopIds.includes(node.id)
+                      ? "Back to Journey"
+                      : "Try this stop again"}
                 <span aria-hidden="true">→</span>
               </button>
             )}

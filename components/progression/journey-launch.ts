@@ -180,6 +180,13 @@ export function navigateToProgressionAttempt(attempt: ProgressionAttempt) {
   );
 }
 
-export function navigateToJourney() {
-  window.location.assign(`${basePath}/journey/`);
+export function navigateToJourney(
+  options: { replace?: boolean } = {},
+) {
+  const target = `${basePath}/journey/`;
+  if (options.replace) {
+    window.location.replace(target);
+  } else {
+    window.location.assign(target);
+  }
 }
