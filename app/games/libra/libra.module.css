@@ -1139,10 +1139,8 @@
   display: none;
 }
 
-.proofTeachingScene {
+.proofStoryboardPhase {
   min-width: 0;
-  position: absolute;
-  inset: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 10px;
@@ -1150,34 +1148,19 @@
   border: 1px solid var(--line);
   border-radius: 15px;
   background: var(--panel);
-  opacity: 0;
-  pointer-events: none;
 }
 
-.solutionProof[data-proof-state="settled"] .proofTeachingSceneLast {
-  opacity: 1;
-}
-
-.solutionProof[data-proof-state="animating"] .proofTeachingScene {
-  animation: proofSceneCycle var(--proof-scene-duration)
-    var(--proof-scene-delay) ease both;
-}
-
-.solutionProof[data-proof-state="animating"] .proofTeachingSceneLast {
-  animation-name: proofFinalSceneCycle;
-}
-
-.proofSceneHeader {
+.proofStoryboardHeader {
   min-width: 0;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--line);
 }
 
-.proofSceneHeader strong {
+.proofStoryboardHeader strong {
   overflow: hidden;
   color: var(--ink);
   font-size: 0.82rem;
@@ -1201,27 +1184,7 @@
   font-weight: 900;
 }
 
-.proofStepDots {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-}
-
-.proofStepDots > span {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #cbc5b9;
-}
-
-.proofStepDots > .proofStepDotActive {
-  width: 18px;
-  border-radius: 999px;
-  background: var(--violet);
-}
-
-.proofSceneBody {
+.proofStoryboardBody {
   min-width: 0;
   display: grid;
   place-items: center;
@@ -1276,7 +1239,7 @@
 }
 
 .proofTeachingSource .proofEquation,
-.proofSceneBody > .proofEquation,
+.proofStoryboardBody > .proofEquation,
 .proofBeforeAfter .proofEquation,
 .proofOperationResult .proofEquation,
 .proofRegroupScene .proofEquation,
@@ -1506,89 +1469,62 @@
   font-size: 1rem;
 }
 
-@keyframes proofSceneCycle {
-  0%,
-  100% {
-    opacity: 0;
-    transform: translateY(7px) scale(0.99);
-  }
-
-  10%,
-  82% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes proofFinalSceneCycle {
-  0% {
-    opacity: 0;
-    transform: translateY(7px) scale(0.99);
-  }
-
-  12%,
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="substitute"]
+  .proofPhaseLayer[data-proof-phase="substitute"]
   .proofTokenRunHighlighted {
   animation: proofReplacementTarget 620ms
-    calc(var(--proof-scene-delay) + 90ms) ease both;
+    calc(var(--proof-phase-delay) + 90ms) ease both;
 }
 
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="substitute"]
+  .proofPhaseLayer[data-proof-phase="substitute"]
   .proofReplacementTo {
   animation: proofReplacementTravel 760ms
-    calc(var(--proof-scene-delay) + 230ms)
+    calc(var(--proof-phase-delay) + 230ms)
     cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="substitute"]
+  .proofPhaseLayer[data-proof-phase="substitute"]
   .proofReplacementTraveler {
   animation: proofReplacementOntoLoad 820ms
-    calc(var(--proof-scene-delay) + 180ms)
+    calc(var(--proof-phase-delay) + 180ms)
     cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="substitute"]
+  .proofPhaseLayer[data-proof-phase="substitute"]
   .proofBeforeEquation {
   animation: proofOldLoadLeave 330ms
-    calc(var(--proof-scene-delay) + 610ms) ease both;
+    calc(var(--proof-phase-delay) + 610ms) ease both;
 }
 
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="substitute"]
+  .proofPhaseLayer[data-proof-phase="substitute"]
   .proofAfterEquation,
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="add-scales"]
+  .proofPhaseLayer[data-proof-phase="add-scales"]
   .proofOperationResult,
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="subtract-scales"]
+  .proofPhaseLayer[data-proof-phase="subtract-scales"]
   .proofOperationResult {
   animation: proofNewLoadSettle 390ms
-    calc(var(--proof-scene-delay) + 650ms)
+    calc(var(--proof-phase-delay) + 650ms)
     cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="cancel-matches"]
+  .proofPhaseLayer[data-proof-phase="cancel-matches"]
   .proofStrike {
   animation: proofStrikeAcross 460ms
-    calc(var(--proof-scene-delay) + 190ms) ease both;
+    calc(var(--proof-phase-delay) + 190ms) ease both;
 }
 
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="regroup"]
+  .proofPhaseLayer[data-proof-phase="regroup"]
   .proofComboGroup {
   animation: proofGroupSettle 560ms
-    calc(var(--proof-scene-delay) + 300ms)
+    calc(var(--proof-phase-delay) + 300ms)
     cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 
@@ -1678,14 +1614,233 @@
   min-height: 534px;
 }
 
-.proofTeachingScene {
-  gap: 8px;
-  padding: 11px 13px;
+.proofPersistentStage {
+  min-height: 534px;
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 4px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  background: var(--panel);
 }
 
-.proofSceneBody {
-  min-height: 420px;
-  align-items: stretch;
+.proofPersistentHeader {
+  min-width: 0;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 16px 8px;
+  color: var(--ink);
+}
+
+.proofPersistentHeader strong {
+  font-size: 0.82rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.proofPersistentHeader span {
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 760;
+}
+
+.proofProgressTrack {
+  overflow: hidden;
+  background: #ded9ce;
+}
+
+.proofProgressTrack > span {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: linear-gradient(90deg, var(--violet), var(--correct));
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+.solutionProof[data-proof-state="animating"] .proofProgressTrack > span {
+  animation: proofContinuousProgress var(--proof-total-duration) linear both;
+}
+
+.solutionProof[data-proof-state="settled"] .proofProgressTrack > span {
+  transform: scaleX(1);
+}
+
+.proofPersistentCanvas {
+  min-height: 480px;
+  position: relative;
+}
+
+.proofPhaseLayer {
+  min-width: 0;
+  position: absolute;
+  inset: 0;
+  display: grid;
+  padding: 10px 13px 12px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.solutionProof[data-proof-state="animating"] .proofPhaseLayer {
+  opacity: 1;
+}
+
+.proofPhaseEnter,
+.proofPhaseExit {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofPhaseEnter {
+  animation: proofPhaseEnter var(--proof-phase-enter-duration)
+    var(--proof-phase-enter-delay) linear both;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofPhaseLayer[data-proof-exits="true"]
+  .proofPhaseExit {
+  animation: proofPhaseExit 480ms var(--proof-phase-exit-delay)
+    linear both;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofPhaseLayer
+  .proofScaleFigure
+  > figcaption {
+  animation: proofPhaseCaption var(--proof-phase-duration)
+    var(--proof-phase-delay) linear both;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofPhaseLayer[data-proof-phase="add-scales"]
+  .proofMorphScale,
+.solutionProof[data-proof-state="animating"]
+  .proofPhaseLayer[data-proof-phase="subtract-scales"]
+  .proofMorphScale,
+.solutionProof[data-proof-state="animating"]
+  .proofPhaseLayer[data-proof-phase="substitute"]:not(
+    [data-proof-next="substitute"]
+  )
+  .proofMorphScale {
+  animation: proofWorkingScaleFocus var(--proof-phase-duration)
+    var(--proof-phase-delay) cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofPhaseLayer[data-proof-holds-final="true"]
+  .proofScaleCallouts,
+.solutionProof[data-proof-state="animating"]
+  .proofPhaseLayer[data-proof-holds-final="true"]
+  .proofEqualityKey {
+  animation: proofPhaseChromeExit var(--proof-phase-duration)
+    var(--proof-phase-delay) linear both;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofPhaseLayer[data-proof-phase="substitute"]:not(
+    [data-proof-next="substitute"]
+  )
+  .proofScaleFigure[data-proof-scale-role="substitution-source"] {
+  animation: proofHelperScaleExit var(--proof-phase-duration)
+    var(--proof-phase-delay) cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.solutionProof[data-proof-state="settled"]
+  .proofPhaseLayer[data-proof-holds-final="true"],
+.solutionProof[data-proof-state="settled"]
+  .proofPhaseLayer[data-proof-final="true"] {
+  opacity: 1;
+}
+
+.solutionProof[data-proof-state="settled"]
+  .proofPhaseLayer[data-proof-holds-final="true"][data-proof-phase="substitute"]
+  .proofMorphScale,
+.solutionProof[data-proof-state="settled"]
+  .proofPhaseLayer[data-proof-holds-final="true"][data-proof-phase="add-scales"]
+  .proofMorphScale,
+.solutionProof[data-proof-state="settled"]
+  .proofPhaseLayer[data-proof-holds-final="true"][data-proof-phase="subtract-scales"]
+  .proofMorphScale {
+  transform: translateY(clamp(48px, 8vw, 72px));
+}
+
+.solutionProof[data-proof-state="settled"]
+  .proofPhaseLayer[data-proof-holds-final="true"]
+  .proofScaleCallouts,
+.solutionProof[data-proof-state="settled"]
+  .proofPhaseLayer[data-proof-holds-final="true"]
+  .proofEqualityKey {
+  opacity: 0;
+}
+
+.solutionProof[data-proof-state="settled"]
+  .proofPhaseLayer[data-proof-holds-final="true"]
+  .proofMorphBefore {
+  opacity: 0;
+}
+
+.solutionProof[data-proof-state="settled"]
+  .proofPhaseLayer[data-proof-holds-final="true"]
+  .proofMorphAfter {
+  opacity: 1;
+  transform: none;
+}
+
+.solutionProof[data-proof-state="settled"]
+  .proofPhaseLayer[data-proof-holds-final="true"]
+  .proofDonorScale,
+.solutionProof[data-proof-state="settled"]
+  .proofPhaseLayer[data-proof-holds-final="true"]
+  .proofGuideScale,
+.solutionProof[data-proof-state="settled"]
+  .proofPhaseLayer[data-proof-holds-final="true"]
+  .proofScaleFigure[data-proof-scale-role="substitution-source"] {
+  opacity: 0;
+  transform: translateY(clamp(36px, 6vw, 58px));
+}
+
+@keyframes proofWorkingScaleFocus {
+  0%,
+  74% {
+    transform: translateY(0);
+  }
+
+  88%,
+  100% {
+    transform: translateY(clamp(48px, 8vw, 72px));
+  }
+}
+
+@keyframes proofHelperScaleExit {
+  0%,
+  72% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  88%,
+  100% {
+    opacity: 0;
+    transform: translateY(clamp(36px, 6vw, 58px));
+  }
+}
+
+@keyframes proofPhaseChromeExit {
+  0%,
+  88% {
+    opacity: 1;
+  }
+
+  97%,
+  100% {
+    opacity: 0;
+  }
 }
 
 .proofSceneCaption {
@@ -1702,6 +1857,48 @@
   place-items: center;
   align-content: center;
   gap: 6px;
+}
+
+@keyframes proofContinuousProgress {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes proofPhaseEnter {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes proofPhaseExit {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes proofPhaseCaption {
+  0% {
+    opacity: 0;
+  }
+
+  6%,
+  90% {
+    opacity: 1;
+  }
+
+  96%,
+  100% {
+    opacity: 0;
+  }
 }
 
 .proofScaleCallouts {
@@ -1762,10 +1959,26 @@
 .proofInspectScales {
   width: 100%;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   place-items: center;
   align-content: center;
-  gap: 5px 12px;
+  gap: 3px;
+}
+
+.proofInspectScales:has(> :nth-child(3)) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.proofInspectScales:has(> :nth-child(3)) > :first-child {
+  grid-column: 1 / -1;
+}
+
+.proofInspectScales > .proofScaleFigure {
+  width: min(100%, 350px);
+}
+
+.proofInspectScales:has(> :nth-child(3)) > .proofScaleFigure {
+  width: min(100%, 260px);
 }
 
 .proofScaleFigure {
@@ -1805,6 +2018,11 @@
 
 .proofBalanceScale .balanceBeam path {
   stroke-width: 4.6;
+}
+
+.proofScaleCargoLayer {
+  position: absolute;
+  inset: 0;
 }
 
 .proofScalePan {
@@ -1891,19 +2109,13 @@
 .proofSubstitutionScales > .proofMorphScale,
 .proofOperationScales > .proofScaleFigure,
 .proofOperationScales > .proofMorphScale {
-  width: min(100%, 330px);
+  width: min(100%, 350px);
 }
 
 .proofMorphScale {
   width: min(100%, 350px);
   min-width: 0;
   position: relative;
-  display: grid;
-  place-items: center;
-}
-
-.proofMorphScale > .proofScaleFigure {
-  grid-area: 1 / 1;
 }
 
 .proofMorphAfter {
@@ -2000,6 +2212,14 @@
   align-self: center;
 }
 
+.proofStoryboardMorph {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: 8px;
+}
+
 .proofFinalCallout {
   border-color: rgb(22 131 107 / 42%);
   background: rgb(22 131 107 / 8%);
@@ -2019,6 +2239,33 @@
   background: rgb(22 131 107 / 5%);
 }
 
+.proofConclusionOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  place-items: center;
+  padding: 10px 13px 12px;
+  pointer-events: none;
+}
+
+.proofPivotCheck {
+  width: 46px;
+  height: 46px;
+  align-self: center;
+  display: grid;
+  place-items: center;
+  border: 4px solid var(--panel);
+  border-radius: 50%;
+  background: var(--correct);
+  color: white;
+  font-size: 1.2rem;
+  font-weight: 950;
+  box-shadow: 0 8px 24px rgb(22 131 107 / 26%);
+  transform: translateY(12px);
+}
+
 .solutionProof[data-proof-state="animating"] .proofScaleCalloutFirst,
 .solutionProof[data-proof-state="animating"] .proofScaleCalloutMiddle,
 .solutionProof[data-proof-state="animating"] .proofScaleCalloutLast,
@@ -2028,37 +2275,37 @@
 .solutionProof[data-proof-state="animating"] .proofSameChangeBadge,
 .solutionProof[data-proof-state="animating"] .proofScaleDivideBadge,
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="substitute"]
+  .proofPhaseLayer[data-proof-phase="substitute"]
   .proofScaleLoadGroup[data-proof-load-state="match"],
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="substitute"]
+  .proofPhaseLayer[data-proof-phase="substitute"]
   .proofScaleLoadGroup[data-proof-load-state="replacement"],
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="add-scales"]
+  .proofPhaseLayer[data-proof-phase="add-scales"]
   .proofScaleLoadGroup[data-proof-load-state="move"],
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="subtract-scales"]
+  .proofPhaseLayer[data-proof-phase="subtract-scales"]
   .proofScaleLoadGroup[data-proof-load-state="remove"],
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="cancel-matches"]
+  .proofPhaseLayer[data-proof-phase="cancel-matches"]
   .proofScaleLoadGroup[data-proof-load-state="remove"],
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="regroup"]
+  .proofPhaseLayer[data-proof-phase="regroup"]
   .proofScaleLoadGroup[data-proof-load-state="bundle"],
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="split-evenly"]
+  .proofPhaseLayer[data-proof-phase="split-evenly"]
   .proofScaleLoadGroup[data-proof-load-state="keep"],
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="split-evenly"]
+  .proofPhaseLayer[data-proof-phase="split-evenly"]
   .proofScaleLoadGroup[data-proof-load-state="fade"],
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="add-scales"]
+  .proofPhaseLayer[data-proof-phase="add-scales"]
   .proofDonorScale,
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="subtract-scales"]
+  .proofPhaseLayer[data-proof-phase="subtract-scales"]
   .proofGuideScale {
-  animation-duration: var(--proof-scene-duration);
-  animation-delay: var(--proof-scene-delay);
+  animation-duration: var(--proof-phase-duration);
+  animation-delay: var(--proof-phase-delay);
   animation-timing-function: linear;
   animation-fill-mode: both;
 }
@@ -2098,25 +2345,25 @@
 }
 
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="regroup"]
+  .proofPhaseLayer[data-proof-phase="regroup"]
   .proofMorphBefore {
   animation-name: proofRegroupOut;
 }
 
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="regroup"]
+  .proofPhaseLayer[data-proof-phase="regroup"]
   .proofMorphAfter {
   animation-name: proofRegroupIn;
 }
 
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="split-evenly"]
+  .proofPhaseLayer[data-proof-phase="split-evenly"]
   .proofMorphBefore {
   animation-name: proofSplitOut;
 }
 
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="split-evenly"]
+  .proofPhaseLayer[data-proof-phase="split-evenly"]
   .proofMorphAfter {
   animation-name: proofSplitIn;
 }
@@ -2127,75 +2374,80 @@
 }
 
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="substitute"]
+  .proofPhaseLayer[data-proof-phase="substitute"]
   .proofScaleLoadGroup[data-proof-load-state="match"],
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="substitute"]
+  .proofPhaseLayer[data-proof-phase="substitute"]
   .proofScaleLoadGroup[data-proof-load-state="replacement"] {
   animation-name: proofCircleEqualLoads;
 }
 
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="add-scales"]
+  .proofPhaseLayer[data-proof-phase="add-scales"]
   .proofScaleLoadGroup[data-proof-load-state="move"] {
   animation-name: proofAddCargoTravel;
   animation-timing-function: cubic-bezier(0.2, 0.75, 0.25, 1);
 }
 
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="add-scales"]
+  .proofPhaseLayer[data-proof-phase="add-scales"]
   .proofSameChangeBadge {
   animation-name: proofOperationBadge;
 }
 
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="add-scales"]
+  .proofPhaseLayer[data-proof-phase="add-scales"]
   .proofDonorScale {
   animation-name: proofDonorScaleEmpty;
 }
 
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="subtract-scales"]
+  .proofPhaseLayer[data-proof-phase="subtract-scales"]
   .proofScaleLoadGroup[data-proof-load-state="remove"],
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="cancel-matches"]
+  .proofPhaseLayer[data-proof-phase="cancel-matches"]
   .proofScaleLoadGroup[data-proof-load-state="remove"] {
   animation-name: proofRemoveMatchedLoads;
 }
 
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="subtract-scales"]
+  .proofPhaseLayer[data-proof-phase="subtract-scales"]
   .proofGuideScale {
   animation-name: proofGuideScaleDim;
 }
 
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="regroup"]
+  .proofPhaseLayer[data-proof-phase="regroup"]
   .proofScaleLoadGroup[data-proof-load-state="bundle"] {
   animation-name: proofBundleCircleIn;
   animation-timing-function: cubic-bezier(0.2, 0.75, 0.25, 1);
 }
 
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="split-evenly"]
+  .proofPhaseLayer[data-proof-phase="split-evenly"]
   .proofScaleDivideBadge {
   animation-name: proofDivideBadgeIn;
 }
 
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="split-evenly"]
+  .proofPhaseLayer[data-proof-phase="split-evenly"]
   .proofScaleLoadGroup[data-proof-load-state="fade"] {
   animation-name: proofExtraGroupsFade;
 }
 
 .solutionProof[data-proof-state="animating"]
-  .proofTeachingScene[data-step-kind="split-evenly"]
+  .proofPhaseLayer[data-proof-phase="split-evenly"]
   .proofScaleLoadGroup[data-proof-load-state="keep"] {
   animation-name: proofKeptGroup;
 }
 
 @keyframes proofCalloutFirst {
-  0%,
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  4%,
   43% {
     opacity: 1;
     transform: translateY(0);
@@ -2216,20 +2468,30 @@
   }
 
   63%,
-  100% {
+  94% {
     opacity: 1;
     transform: translateY(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
   }
 }
 
 @keyframes proofCalloutFirstOfThree {
-  0%,
-  31% {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  4%,
+  30% {
     opacity: 1;
     transform: translateY(0);
   }
 
-  37%,
+  36%,
   100% {
     opacity: 0;
     transform: translateY(-4px);
@@ -2238,18 +2500,18 @@
 
 @keyframes proofCalloutMiddle {
   0%,
-  32% {
+  38% {
     opacity: 0;
     transform: translateY(4px);
   }
 
-  39%,
-  67% {
+  44%,
+  64% {
     opacity: 1;
     transform: translateY(0);
   }
 
-  73%,
+  70%,
   100% {
     opacity: 0;
     transform: translateY(-4px);
@@ -2258,15 +2520,20 @@
 
 @keyframes proofCalloutLastOfThree {
   0%,
-  74% {
+  72% {
     opacity: 0;
     transform: translateY(4px);
   }
 
-  80%,
-  100% {
+  78%,
+  94% {
     opacity: 1;
     transform: translateY(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
   }
 }
 
@@ -2381,13 +2648,13 @@
   67%,
   73% {
     opacity: 1;
-    transform: translate(var(--proof-travel-x), 47cqw) scale(1.03);
+    transform: translate(var(--proof-travel-x), -47cqw) scale(1.03);
   }
 
   81%,
   100% {
     opacity: 0;
-    transform: translate(var(--proof-travel-x), 47cqw) scale(1);
+    transform: translate(var(--proof-travel-x), -47cqw) scale(1);
   }
 }
 
@@ -2440,11 +2707,13 @@
   0%,
   70% {
     opacity: 1;
+    transform: translateY(0);
   }
 
   82%,
   100% {
-    opacity: 0.22;
+    opacity: 0;
+    transform: translateY(clamp(36px, 6vw, 58px));
   }
 }
 
@@ -2472,11 +2741,13 @@
   0%,
   60% {
     opacity: 1;
+    transform: translateY(0);
   }
 
   76%,
   100% {
-    opacity: 0.32;
+    opacity: 0;
+    transform: translateY(clamp(36px, 6vw, 58px));
   }
 }
 
@@ -2536,45 +2807,18 @@
 @keyframes proofKeptGroup {
   0%,
   54% {
-    transform: scale(1);
+    transform: translateX(0) scale(1);
   }
 
   65%,
-  80% {
+  74% {
     box-shadow: 0 0 0 8px rgb(243 189 78 / 17%);
-    transform: scale(1.09);
+    transform: translateX(0) scale(1.09);
   }
 
   88%,
   100% {
-    transform: scale(1);
-  }
-}
-
-@keyframes proofSceneCycle {
-  0%,
-  100% {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-
-  4%,
-  94% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes proofFinalSceneCycle {
-  0% {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-
-  7%,
-  100% {
-    opacity: 1;
-    transform: translateY(0);
+    transform: translateX(var(--proof-group-center-shift)) scale(1);
   }
 }
 
@@ -3618,12 +3862,12 @@
     padding: 8px;
   }
 
-  .proofTeachingScene {
+  .proofPhaseLayer {
     padding: 10px;
   }
 
   .proofTeachingSource .proofEquation,
-  .proofSceneBody > .proofEquation,
+  .proofStoryboardBody > .proofEquation,
   .proofBeforeAfter .proofEquation,
   .proofOperationResult .proofEquation,
   .proofRegroupScene .proofEquation,
@@ -3815,17 +4059,13 @@
     padding: 6px;
   }
 
-  .proofTeachingScene {
+  .proofPhaseLayer {
     gap: 7px;
     padding: 9px 8px;
   }
 
-  .proofSceneHeader {
+  .proofStoryboardHeader {
     grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .proofStepDots {
-    display: none;
   }
 
   .proofBeforeAfter {
@@ -3860,7 +4100,7 @@
   }
 
   .proofTeachingSource .proofEquation,
-  .proofSceneBody > .proofEquation,
+  .proofStoryboardBody > .proofEquation,
   .proofBeforeAfter .proofEquation,
   .proofOperationResult .proofEquation,
   .proofRegroupScene .proofEquation,
@@ -3987,7 +4227,7 @@
     gap: 10px;
   }
 
-  .proofStoryboard .proofTeachingScene {
+  .proofStoryboardPhase {
     min-height: 260px;
     position: relative;
     inset: auto;
@@ -4659,8 +4899,12 @@
     min-height: 548px;
   }
 
-  .proofSceneBody {
-    min-height: 432px;
+  .proofPersistentStage {
+    min-height: 548px;
+  }
+
+  .proofPersistentCanvas {
+    min-height: 494px;
   }
 
   .proofScaleCallouts p,
@@ -4687,12 +4931,16 @@
     min-height: 568px;
   }
 
-  .proofTeachingScene {
+  .proofPhaseLayer {
     padding: 9px 7px;
   }
 
-  .proofSceneBody {
-    min-height: 454px;
+  .proofPersistentStage {
+    min-height: 568px;
+  }
+
+  .proofPersistentCanvas {
+    min-height: 514px;
   }
 
   .proofScaleCallouts {
@@ -4710,6 +4958,14 @@
   .proofInspectScales {
     grid-template-columns: 1fr;
     gap: 1px;
+  }
+
+  .proofInspectScales:has(> :nth-child(3)) {
+    grid-template-columns: 1fr;
+  }
+
+  .proofInspectScales:has(> :nth-child(3)) > :first-child {
+    grid-column: auto;
   }
 
   .proofInspectScales .proofScaleFigure {
@@ -4759,8 +5015,8 @@
     min-height: 562px;
   }
 
-  .proofSceneBody {
-    min-height: 448px;
+  .proofPersistentCanvas {
+    min-height: 508px;
   }
 
   .proofSubstitutionScales > .proofScaleFigure,
@@ -4778,11 +5034,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .proofStoryboard .proofTeachingScene {
+  .proofStoryboardPhase {
     min-height: 0;
   }
 
-  .proofStoryboard .proofSceneBody {
+  .proofStoryboardBody {
     min-height: 0;
   }
 
@@ -4800,22 +5056,27 @@
     transform: none;
   }
 
-  .proofStoryboard .proofMorphScale {
+  .proofStoryboardMorph {
     width: 100%;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
   }
 
-  .proofStoryboard .proofMorphScale > .proofScaleFigure {
-    grid-area: auto;
-    opacity: 1;
-    transform: none;
+  .proofStoryboardMorph[data-proof-has-operator="true"] {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   }
 
   .proofStoryboard .proofScaleTraveler,
-  .proofStoryboard .proofSameChangeBadge,
-  .proofStoryboard .proofScaleDivideBadge {
+  .proofStoryboard .proofSameChangeBadge {
     display: none;
+    animation: none !important;
+  }
+
+  .proofStoryboard .proofScaleDivideBadge {
+    position: static;
+    display: grid;
+    opacity: 1;
+    transform: none;
     animation: none !important;
   }
 
@@ -4834,7 +5095,11 @@
 }
 
 @media (max-width: 480px) and (prefers-reduced-motion: reduce) {
-  .proofStoryboard .proofMorphScale {
+  .proofStoryboardMorph {
+    grid-template-columns: 1fr;
+  }
+
+  .proofStoryboardMorph[data-proof-has-operator="true"] {
     grid-template-columns: 1fr;
   }
 }

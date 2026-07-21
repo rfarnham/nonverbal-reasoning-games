@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import type {
   AnswerOption,
@@ -551,9 +551,12 @@ type TeachingGroupedEquationValue = Extract<
   { kind: "regroup" }
 >["after"];
 
-type ProofSceneStyle = CSSProperties & {
-  "--proof-scene-delay": string;
-  "--proof-scene-duration": string;
+type ProofPhaseStyle = CSSProperties & {
+  "--proof-phase-delay": string;
+  "--proof-phase-duration": string;
+  "--proof-phase-enter-delay": string;
+  "--proof-phase-enter-duration": string;
+  "--proof-phase-exit-delay": string;
 };
 
 function isGroupedEquation(
@@ -660,15 +663,27 @@ function sourceLabel(source: TeachingSource): string {
 function ProofScaleLoadGroup({
   group,
   accentMap,
+  groupIndex = 0,
+  groupCount = 1,
 }: {
   group: ProofLoadGroup;
   accentMap?: AccentMap;
+  groupIndex?: number;
+  groupCount?: number;
 }) {
   if (group.expression.length === 0) return null;
+  const centerShift = `calc(${(groupCount - 1) * 50}% + ${groupCount - 1}px)`;
   return (
     <span
       className={styles.proofScaleLoadGroup}
       data-proof-load-state={group.tone ?? "plain"}
+      data-proof-group-index={groupIndex}
+      data-proof-group-count={groupCount}
+      style={
+        {
+          "--proof-group-center-shift": centerShift,
+        } as CSSProperties
+      }
     >
       <CargoGroup expression={group.expression} accentMap={accentMap} />
     </span>
@@ -696,11 +711,62 @@ function ProofScalePan({
           <ProofScaleLoadGroup
             group={group}
             accentMap={accentMap}
+            groupIndex={groupIndex}
+            groupCount={groups.length}
             key={group.key ?? `${side}-${groupIndex}`}
           />
         ))}
       </span>
     </span>
+  );
+}
+
+function ProofScaleCargoLayer({
+  role,
+  leftGroups,
+  rightGroups,
+  className = "",
+  accentMap,
+}: {
+  role: string;
+  leftGroups: readonly ProofLoadGroup[];
+  rightGroups: readonly ProofLoadGroup[];
+  className?: string;
+  accentMap?: AccentMap;
+}) {
+  return (
+    <span
+      className={`${styles.proofScaleCargoLayer} ${className}`}
+      data-proof-scale-role={role}
+    >
+      <ProofScalePan side="left" groups={leftGroups} accentMap={accentMap} />
+      <ProofScalePan side="right" groups={rightGroups} accentMap={accentMap} />
+    </span>
+  );
+}
+
+function ProofScaleFrame({
+  label,
+  role,
+  className = "",
+  children,
+}: {
+  label: string;
+  role: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <figure
+      className={`${styles.proofScaleFigure} ${className}`}
+      data-proof-scale-role={role}
+    >
+      <figcaption>{label}</figcaption>
+      <div className={`${styles.balanceScale} ${styles.proofBalanceScale}`}>
+        <ScaleDrawing />
+        {children}
+      </div>
+    </figure>
   );
 }
 
@@ -731,42 +797,133 @@ function ProofBalanceScale({
   ];
 
   return (
-    <figure
-      className={`${styles.proofScaleFigure} ${className}`}
-      data-proof-scale-role={role}
+    <ProofScaleFrame
+      label={label}
+      role={role}
+      className={className}
     >
-      <figcaption>{label}</figcaption>
-      <div className={`${styles.balanceScale} ${styles.proofBalanceScale}`}>
-        <ScaleDrawing />
-        <ProofScalePan
-          side="left"
-          groups={resolvedLeftGroups}
+      <ProofScaleCargoLayer
+        role={`${role}-cargo`}
+        leftGroups={resolvedLeftGroups}
+        rightGroups={resolvedRightGroups}
+        accentMap={accentMap}
+      />
+      {travelers.flatMap((traveler, travelerIndex) =>
+        traveler.groups.map((group, groupIndex) => (
+          <span
+            className={`${styles.panCargo} ${
+              traveler.sourceSide === "left"
+                ? styles.leftCargo
+                : styles.rightCargo
+            } ${styles.proofScaleTraveler}`}
+            data-proof-motion="substitute-load"
+            data-source-side={traveler.sourceSide}
+            data-target-side={traveler.targetSide}
+            key={`traveler-${travelerIndex}-${groupIndex}`}
+          >
+            <ProofScaleLoadGroup group={group} accentMap={accentMap} />
+          </span>
+        )),
+      )}
+    </ProofScaleFrame>
+  );
+}
+
+function ProofMorphingBalanceScale({
+  before,
+  after,
+  label,
+  beforeLabel,
+  afterLabel,
+  beforeRole,
+  afterRole,
+  beforeLeftGroups,
+  beforeRightGroups,
+  afterLeftGroups,
+  afterRightGroups,
+  className = "",
+  storyboard = false,
+  accentMap,
+  children,
+}: {
+  before: BalanceEquation;
+  after: BalanceEquation;
+  label: string;
+  beforeLabel: string;
+  afterLabel: string;
+  beforeRole: string;
+  afterRole: string;
+  beforeLeftGroups?: readonly ProofLoadGroup[];
+  beforeRightGroups?: readonly ProofLoadGroup[];
+  afterLeftGroups?: readonly ProofLoadGroup[];
+  afterRightGroups?: readonly ProofLoadGroup[];
+  className?: string;
+  storyboard?: boolean;
+  accentMap?: AccentMap;
+  children?: ReactNode;
+}) {
+  const resolvedBeforeLeft = beforeLeftGroups ?? [
+    { expression: before.left, tone: "plain" as const },
+  ];
+  const resolvedBeforeRight = beforeRightGroups ?? [
+    { expression: before.right, tone: "plain" as const },
+  ];
+  const resolvedAfterLeft = afterLeftGroups ?? [
+    { expression: after.left, tone: "plain" as const },
+  ];
+  const resolvedAfterRight = afterRightGroups ?? [
+    { expression: after.right, tone: "plain" as const },
+  ];
+
+  if (storyboard) {
+    return (
+      <div
+        className={`${styles.proofStoryboardMorph} ${className}`}
+        data-proof-has-operator={children ? "true" : undefined}
+      >
+        <ProofBalanceScale
+          equation={before}
+          label={beforeLabel}
+          role={beforeRole}
+          leftGroups={resolvedBeforeLeft}
+          rightGroups={resolvedBeforeRight}
           accentMap={accentMap}
         />
-        <ProofScalePan
-          side="right"
-          groups={resolvedRightGroups}
+        {children}
+        <ProofBalanceScale
+          equation={after}
+          label={afterLabel}
+          role={afterRole}
+          leftGroups={resolvedAfterLeft}
+          rightGroups={resolvedAfterRight}
           accentMap={accentMap}
         />
-        {travelers.flatMap((traveler, travelerIndex) =>
-          traveler.groups.map((group, groupIndex) => (
-            <span
-              className={`${styles.panCargo} ${
-                traveler.sourceSide === "left"
-                  ? styles.leftCargo
-                  : styles.rightCargo
-              } ${styles.proofScaleTraveler}`}
-              data-proof-motion="substitute-load"
-              data-source-side={traveler.sourceSide}
-              data-target-side={traveler.targetSide}
-              key={`traveler-${travelerIndex}-${groupIndex}`}
-            >
-              <ProofScaleLoadGroup group={group} accentMap={accentMap} />
-            </span>
-          )),
-        )}
       </div>
-    </figure>
+    );
+  }
+
+  return (
+    <ProofScaleFrame
+      label={label}
+      role="persistent-working-scale"
+      className={`${styles.proofMorphScale} ${className}`}
+    >
+      <ProofScaleCargoLayer
+        role={beforeRole}
+        leftGroups={resolvedBeforeLeft}
+        rightGroups={resolvedBeforeRight}
+        className={styles.proofMorphBefore}
+        accentMap={accentMap}
+      />
+      <ProofScaleCargoLayer
+        role={afterRole}
+        leftGroups={resolvedAfterLeft}
+        rightGroups={resolvedAfterRight}
+        className={styles.proofMorphAfter}
+        accentMap={accentMap}
+      />
+      {children}
+    </ProofScaleFrame>
   );
 }
 
@@ -834,9 +991,11 @@ function InspectScaleScene({
 function SubstitutionScaleScene({
   step,
   accentMap,
+  storyboard = false,
 }: {
   step: Extract<TeachingProofStep, { kind: "substitute" }>;
   accentMap?: AccentMap;
+  storyboard?: boolean;
 }) {
   const { replacement } = step;
   const sourceLeftGroups: readonly ProofLoadGroup[] = [
@@ -900,11 +1059,26 @@ function SubstitutionScaleScene({
       data-proof-motion="substitution"
     >
       <ProofCallouts
-        first="The violet load appears on both scales. The gold load has the same weight."
-        middle="Watch the gold load float to the matching violet spot."
-        last="Swap equal loads. The scale stays balanced!"
+        first="This circled group balances that circled group."
+        middle="Find that circled group on the working scale. Swap it."
+        last="The new animals weigh the same, so it stays balanced!"
       />
       <div className={styles.proofSubstitutionScales}>
+        <ProofMorphingBalanceScale
+          before={step.before}
+          after={step.after}
+          label="Working scale"
+          beforeLabel="Before the equal swap"
+          afterLabel="After the equal swap"
+          beforeRole="substitution-before"
+          afterRole="substitution-after"
+          beforeLeftGroups={beforeLeftGroups}
+          beforeRightGroups={beforeRightGroups}
+          afterLeftGroups={afterLeftGroups}
+          afterRightGroups={afterRightGroups}
+          storyboard={storyboard}
+          accentMap={accentMap}
+        />
         <ProofBalanceScale
           equation={step.source.equation}
           label={sourceLabel(step.source)}
@@ -925,26 +1099,6 @@ function SubstitutionScaleScene({
           ]}
           accentMap={accentMap}
         />
-        <div className={styles.proofMorphScale}>
-          <ProofBalanceScale
-            equation={step.before}
-            label="Working scale"
-            role="substitution-before"
-            leftGroups={beforeLeftGroups}
-            rightGroups={beforeRightGroups}
-            className={styles.proofMorphBefore}
-            accentMap={accentMap}
-          />
-          <ProofBalanceScale
-            equation={step.after}
-            label="After the equal swap"
-            role="substitution-after"
-            leftGroups={afterLeftGroups}
-            rightGroups={afterRightGroups}
-            className={styles.proofMorphAfter}
-            accentMap={accentMap}
-          />
-        </div>
       </div>
       <span className={styles.proofEqualityKey} aria-hidden="true">
         <span className={styles.proofEqualityMatch}>same load</span>
@@ -957,9 +1111,11 @@ function SubstitutionScaleScene({
 function AddScalesScene({
   step,
   accentMap,
+  storyboard = false,
 }: {
   step: Extract<TeachingProofStep, { kind: "add-scales" }>;
   accentMap?: AccentMap;
+  storyboard?: boolean;
 }) {
   const [receiving, joining] = step.before;
   const movingLeft = [{
@@ -976,27 +1132,22 @@ function AddScalesScene({
   return (
     <div className={styles.proofScaleScene} data-proof-motion="add-scales">
       <ProofCallouts
-        first="Both scales are balanced. Left joins left, and right joins right."
-        middle="Both tray loads move together."
+        first="Both scales are balanced."
+        middle="Left joins left. Right joins right."
         last="One bigger scale. Still balanced!"
       />
       <div className={styles.proofOperationScales}>
-        <div className={styles.proofMorphScale}>
-          <ProofBalanceScale
-            equation={receiving.equation}
-            label={sourceLabel(receiving)}
-            role="add-receiver"
-            className={styles.proofMorphBefore}
-            accentMap={accentMap}
-          />
-          <ProofBalanceScale
-            equation={step.after}
-            label="The joined scale"
-            role="add-result"
-            className={styles.proofMorphAfter}
-            accentMap={accentMap}
-          />
-        </div>
+        <ProofMorphingBalanceScale
+          before={receiving.equation}
+          after={step.after}
+          label={sourceLabel(receiving)}
+          beforeLabel={sourceLabel(receiving)}
+          afterLabel="The joined scale"
+          beforeRole="add-receiver"
+          afterRole="add-result"
+          storyboard={storyboard}
+          accentMap={accentMap}
+        />
         <ProofBalanceScale
           equation={joining.equation}
           label={sourceLabel(joining)}
@@ -1017,9 +1168,11 @@ function AddScalesScene({
 function SubtractScalesScene({
   step,
   accentMap,
+  storyboard = false,
 }: {
   step: Extract<TeachingProofStep, { kind: "subtract-scales" }>;
   accentMap?: AccentMap;
+  storyboard?: boolean;
 }) {
   const [working, guide] = step.before;
   const beforeLeftGroups: readonly ProofLoadGroup[] = [
@@ -1041,29 +1194,24 @@ function SubtractScalesScene({
       data-proof-motion="subtract-scales"
     >
       <ProofCallouts
-        first="Use the second balanced scale as a take-away guide."
-        middle="Lift the matching load from both trays."
-        last="Take left from left and right from right. What remains is balanced."
+        first="This balanced scale shows what to take away."
+        middle="Match left with left and right with right."
+        last="Both matched groups leave together. What remains still balances!"
       />
       <div className={styles.proofOperationScales}>
-        <div className={styles.proofMorphScale}>
-          <ProofBalanceScale
-            equation={working.equation}
-            label={sourceLabel(working)}
-            role="subtract-working"
-            leftGroups={beforeLeftGroups}
-            rightGroups={beforeRightGroups}
-            className={styles.proofMorphBefore}
-            accentMap={accentMap}
-          />
-          <ProofBalanceScale
-            equation={step.after}
-            label="What remains"
-            role="subtract-result"
-            className={styles.proofMorphAfter}
-            accentMap={accentMap}
-          />
-        </div>
+        <ProofMorphingBalanceScale
+          before={working.equation}
+          after={step.after}
+          label={sourceLabel(working)}
+          beforeLabel={sourceLabel(working)}
+          afterLabel="What remains"
+          beforeRole="subtract-working"
+          afterRole="subtract-result"
+          beforeLeftGroups={beforeLeftGroups}
+          beforeRightGroups={beforeRightGroups}
+          storyboard={storyboard}
+          accentMap={accentMap}
+        />
         <ProofBalanceScale
           equation={guide.equation}
           label={sourceLabel(guide)}
@@ -1081,9 +1229,11 @@ function SubtractScalesScene({
 function CancelScaleScene({
   step,
   accentMap,
+  storyboard = false,
 }: {
   step: Extract<TeachingProofStep, { kind: "cancel-matches" }>;
   accentMap?: AccentMap;
+  storyboard?: boolean;
 }) {
   const beforeLeftGroups: readonly ProofLoadGroup[] = [
     ...(step.after.left.length > 0
@@ -1104,28 +1254,24 @@ function CancelScaleScene({
       data-proof-motion="cancel-matches"
     >
       <ProofCallouts
-        first="The coral circles show the same load on both trays."
+        first="The circles show the same group on both trays."
         middle="Lift both circled loads at the same time."
         last="Take one matching load from each tray. Still balanced!"
       />
-      <div className={`${styles.proofMorphScale} ${styles.proofSingleScaleMorph}`}>
-        <ProofBalanceScale
-          equation={step.before}
-          label="Before"
-          role="cancel-before"
-          leftGroups={beforeLeftGroups}
-          rightGroups={beforeRightGroups}
-          className={styles.proofMorphBefore}
-          accentMap={accentMap}
-        />
-        <ProofBalanceScale
-          equation={step.after}
-          label="After the matching loads leave"
-          role="cancel-after"
-          className={styles.proofMorphAfter}
-          accentMap={accentMap}
-        />
-      </div>
+      <ProofMorphingBalanceScale
+        before={step.before}
+        after={step.after}
+        label="Working scale"
+        beforeLabel="Before"
+        afterLabel="After the matching loads leave"
+        beforeRole="cancel-before"
+        afterRole="cancel-after"
+        beforeLeftGroups={beforeLeftGroups}
+        beforeRightGroups={beforeRightGroups}
+        className={styles.proofSingleScaleMorph}
+        storyboard={storyboard}
+        accentMap={accentMap}
+      />
     </div>
   );
 }
@@ -1147,45 +1293,43 @@ function groupedProofLoads(
 function RegroupScaleScene({
   step,
   accentMap,
+  storyboard = false,
 }: {
   step: Extract<TeachingProofStep, { kind: "regroup" }>;
   accentMap?: AccentMap;
+  storyboard?: boolean;
 }) {
   return (
     <div className={styles.proofScaleScene} data-proof-motion="regroup-combos">
       <ProofCallouts
         first={`Put the animals into ${step.after.groupCount} matching groups on each tray.`}
         middle="Now draw an oval around every combo."
-        last="Each gold oval is one matching combo."
+        last="Each oval marks one group."
       />
-      <div className={`${styles.proofMorphScale} ${styles.proofSingleScaleMorph}`}>
-        <ProofBalanceScale
-          equation={step.before}
-          label="The same animals"
-          role="regroup-before"
-          className={styles.proofMorphBefore}
-          accentMap={accentMap}
-        />
-        <ProofBalanceScale
-          equation={step.before}
-          label={`${step.after.groupCount} matching groups`}
-          role="regroup-after"
-          leftGroups={groupedProofLoads(
-            step.after.leftBundle,
-            step.after.groupCount,
-            "bundle",
-            "left",
-          )}
-          rightGroups={groupedProofLoads(
-            step.after.rightBundle,
-            step.after.groupCount,
-            "bundle",
-            "right",
-          )}
-          className={styles.proofMorphAfter}
-          accentMap={accentMap}
-        />
-      </div>
+      <ProofMorphingBalanceScale
+        before={step.before}
+        after={step.before}
+        label="Working scale"
+        beforeLabel="The same animals"
+        afterLabel={`${step.after.groupCount} matching groups`}
+        beforeRole="regroup-before"
+        afterRole="regroup-after"
+        afterLeftGroups={groupedProofLoads(
+          step.after.leftBundle,
+          step.after.groupCount,
+          "bundle",
+          "left",
+        )}
+        afterRightGroups={groupedProofLoads(
+          step.after.rightBundle,
+          step.after.groupCount,
+          "bundle",
+          "right",
+        )}
+        className={styles.proofSingleScaleMorph}
+        storyboard={storyboard}
+        accentMap={accentMap}
+      />
     </div>
   );
 }
@@ -1193,9 +1337,11 @@ function RegroupScaleScene({
 function SplitScaleScene({
   step,
   accentMap,
+  storyboard = false,
 }: {
   step: Extract<TeachingProofStep, { kind: "split-evenly" }>;
   accentMap?: AccentMap;
+  storyboard?: boolean;
 }) {
   let grouped: TeachingGroupedEquationValue;
   let expandedEquation: BalanceEquation;
@@ -1224,40 +1370,37 @@ function SplitScaleScene({
     <div className={styles.proofScaleScene} data-proof-motion="split-groups">
       <ProofCallouts
         first={`There are ${step.divisor} equal groups on each tray.`}
-        middle={`Show ÷ ${step.divisor}, then let the extra groups fade away.`}
-        last={`÷ ${step.divisor} means keep 1 group on each tray. It still balances!`}
+        middle={`÷ ${step.divisor} means look at 1 equal group from each tray.`}
+        last="One left group still balances one right group!"
       />
-      <div className={`${styles.proofMorphScale} ${styles.proofSingleScaleMorph}`}>
-        <ProofBalanceScale
-          equation={expandedEquation}
-          label={`${step.divisor} equal groups on each side`}
-          role="split-grouped"
-          leftGroups={groupedProofLoads(
-            grouped.leftBundle,
-            grouped.groupCount,
-            "split",
-            "left",
-          )}
-          rightGroups={groupedProofLoads(
-            grouped.rightBundle,
-            grouped.groupCount,
-            "split",
-            "right",
-          )}
-          className={`${styles.proofMorphBefore} ${styles.proofSplitGroupedScale}`}
-          accentMap={accentMap}
-        />
-        <ProofBalanceScale
-          equation={step.after}
-          label="One group on each side"
-          role="split-result"
-          className={`${styles.proofMorphAfter} ${styles.proofSplitFinalScale}`}
-          accentMap={accentMap}
-        />
+      <ProofMorphingBalanceScale
+        before={expandedEquation}
+        after={step.after}
+        label="Working scale"
+        beforeLabel={`${step.divisor} equal groups on each side`}
+        afterLabel="One group on each side"
+        beforeRole="split-grouped"
+        afterRole="split-result"
+        beforeLeftGroups={groupedProofLoads(
+          grouped.leftBundle,
+          grouped.groupCount,
+          "split",
+          "left",
+        )}
+        beforeRightGroups={groupedProofLoads(
+          grouped.rightBundle,
+          grouped.groupCount,
+          "split",
+          "right",
+        )}
+        className={`${styles.proofSingleScaleMorph} ${styles.proofSplitMorph}`}
+        storyboard={storyboard}
+        accentMap={accentMap}
+      >
         <span className={styles.proofScaleDivideBadge} data-proof-motion="divide-sign">
           ÷ {step.divisor}
         </span>
-      </div>
+      </ProofMorphingBalanceScale>
     </div>
   );
 }
@@ -1265,23 +1408,41 @@ function SplitScaleScene({
 function ConclusionScaleScene({
   step,
   accentMap,
+  storyboard = false,
 }: {
   step: Extract<TeachingProofStep, { kind: "conclude" }>;
   accentMap?: AccentMap;
+  storyboard?: boolean;
 }) {
+  if (storyboard) {
+    return (
+      <div className={styles.proofScaleScene} data-proof-motion="conclusion">
+        <div className={styles.proofFinalCallout}>
+          <span aria-hidden="true">✓</span>
+          Balanced! We found it.
+        </div>
+        <ProofBalanceScale
+          equation={step.equation}
+          label="The answer"
+          role="conclusion"
+          className={styles.proofConclusionScale}
+          accentMap={accentMap}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className={styles.proofScaleScene} data-proof-motion="conclusion">
+    <div
+      className={styles.proofConclusionOverlay}
+      data-proof-motion="conclusion"
+      data-proof-scale-role="conclusion"
+    >
       <div className={styles.proofFinalCallout}>
         <span aria-hidden="true">✓</span>
         Balanced! We found it.
       </div>
-      <ProofBalanceScale
-        equation={step.equation}
-        label="The answer"
-        role="conclusion"
-        className={styles.proofConclusionScale}
-        accentMap={accentMap}
-      />
+      <span className={styles.proofPivotCheck} aria-hidden="true">✓</span>
     </div>
   );
 }
@@ -1289,78 +1450,120 @@ function ConclusionScaleScene({
 function TeachingProofSceneVisual({
   step,
   accentMap,
+  storyboard = false,
 }: {
   step: TeachingProofStep;
   accentMap?: AccentMap;
+  storyboard?: boolean;
 }) {
   switch (step.kind) {
     case "inspect":
       return <InspectScaleScene step={step} accentMap={accentMap} />;
     case "substitute":
-      return <SubstitutionScaleScene step={step} accentMap={accentMap} />;
+      return <SubstitutionScaleScene step={step} accentMap={accentMap} storyboard={storyboard} />;
     case "add-scales":
-      return <AddScalesScene step={step} accentMap={accentMap} />;
+      return <AddScalesScene step={step} accentMap={accentMap} storyboard={storyboard} />;
     case "subtract-scales":
-      return <SubtractScalesScene step={step} accentMap={accentMap} />;
+      return <SubtractScalesScene step={step} accentMap={accentMap} storyboard={storyboard} />;
     case "cancel-matches":
-      return <CancelScaleScene step={step} accentMap={accentMap} />;
+      return <CancelScaleScene step={step} accentMap={accentMap} storyboard={storyboard} />;
     case "regroup":
-      return <RegroupScaleScene step={step} accentMap={accentMap} />;
+      return <RegroupScaleScene step={step} accentMap={accentMap} storyboard={storyboard} />;
     case "split-evenly":
-      return <SplitScaleScene step={step} accentMap={accentMap} />;
+      return <SplitScaleScene step={step} accentMap={accentMap} storyboard={storyboard} />;
     case "conclude":
-      return <ConclusionScaleScene step={step} accentMap={accentMap} />;
+      return <ConclusionScaleScene step={step} accentMap={accentMap} storyboard={storyboard} />;
   }
 }
 
-function TeachingProofSceneCard({
+function TeachingProofPhase({
   step,
   stepIndex,
   stepCount,
-  delayMs,
-  durationMs,
+  timing,
+  previousKind,
+  nextKind,
   accentMap,
-  storyboard = false,
 }: {
   step: TeachingProofStep;
   stepIndex: number;
   stepCount: number;
-  delayMs: number;
-  durationMs: number;
+  timing: { delayMs: number; durationMs: number };
+  previousKind?: TeachingProofStep["kind"];
+  nextKind?: TeachingProofStep["kind"];
   accentMap?: AccentMap;
-  storyboard?: boolean;
 }) {
-  const sceneStyle: ProofSceneStyle = {
-    "--proof-scene-delay": `${delayMs}ms`,
-    "--proof-scene-duration": `${durationMs}ms`,
+  const crossfadeHalfMs = 240;
+  const isFinal = stepIndex === stepCount - 1;
+  const entersAcrossBoundary = stepIndex > 0 && !isFinal;
+  const exitsAcrossBoundary = stepIndex < stepCount - 2;
+  const enterDelayMs = entersAcrossBoundary
+    ? timing.delayMs - crossfadeHalfMs
+    : timing.delayMs;
+  const enterDurationMs = entersAcrossBoundary
+    ? crossfadeHalfMs * 2
+    : crossfadeHalfMs;
+  const phaseStyle: ProofPhaseStyle = {
+    "--proof-phase-delay": `${timing.delayMs}ms`,
+    "--proof-phase-duration": `${timing.durationMs}ms`,
+    "--proof-phase-enter-delay": `${enterDelayMs}ms`,
+    "--proof-phase-enter-duration": `${enterDurationMs}ms`,
+    "--proof-phase-exit-delay": `${
+      timing.delayMs + timing.durationMs - crossfadeHalfMs
+    }ms`,
   };
+
   return (
-    <article
-      className={`${styles.proofTeachingScene} ${
-        stepIndex === stepCount - 1 ? styles.proofTeachingSceneLast : ""
-      } ${storyboard ? styles.proofStoryboardScene : ""}`}
-      data-step-kind={step.kind}
-      style={sceneStyle}
+    <div
+      className={styles.proofPhaseLayer}
+      data-proof-phase={step.kind}
+      data-proof-previous={previousKind}
+      data-proof-next={nextKind}
+      data-proof-first={stepIndex === 0 ? "true" : undefined}
+      data-proof-final={stepIndex === stepCount - 1 ? "true" : undefined}
+      data-proof-exits={exitsAcrossBoundary ? "true" : undefined}
+      data-proof-holds-final={
+        stepIndex === stepCount - 2 ? "true" : undefined
+      }
+      style={phaseStyle}
     >
-      <header className={styles.proofSceneHeader}>
+      <div className={styles.proofPhaseEnter}>
+        <div className={styles.proofPhaseExit}>
+          <TeachingProofSceneVisual step={step} accentMap={accentMap} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TeachingProofStoryboardPhase({
+  step,
+  stepIndex,
+  stepCount,
+  accentMap,
+}: {
+  step: TeachingProofStep;
+  stepIndex: number;
+  stepCount: number;
+  accentMap?: AccentMap;
+}) {
+  return (
+    <section className={styles.proofStoryboardPhase} data-step-kind={step.kind}>
+      <header className={styles.proofStoryboardHeader}>
         <span className={styles.proofStepNumber}>
           {stepIndex + 1} / {stepCount}
         </span>
         <strong>{step.title}</strong>
-        <span className={styles.proofStepDots} aria-hidden="true">
-          {Array.from({ length: stepCount }, (_, dotIndex) => (
-            <span
-              className={dotIndex === stepIndex ? styles.proofStepDotActive : ""}
-              key={dotIndex}
-            />
-          ))}
-        </span>
       </header>
-      <div className={styles.proofSceneBody}>
-        <TeachingProofSceneVisual step={step} accentMap={accentMap} />
+      <div className={styles.proofStoryboardBody}>
+        <TeachingProofSceneVisual
+          step={step}
+          accentMap={accentMap}
+          storyboard
+        />
       </div>
       <p className={styles.proofSceneCaption}>{step.text}</p>
-    </article>
+    </section>
   );
 }
 
@@ -1388,28 +1591,45 @@ export function SolutionProofVisual({
         ))}
       </ol>
       <div className={styles.proofSceneViewport} aria-hidden="true">
-        {plan.steps.map((step, stepIndex) => (
-          <TeachingProofSceneCard
-            step={step}
-            stepIndex={stepIndex}
-            stepCount={plan.steps.length}
-            delayMs={plan.timeline[stepIndex].delayMs}
-            durationMs={plan.timeline[stepIndex].durationMs}
-            accentMap={accentMap}
-            key={step.id}
-          />
-        ))}
+        <div
+          className={styles.proofPersistentStage}
+          data-proof-stage="persistent"
+          style={
+            {
+              "--proof-total-duration": `${plan.durationMs}ms`,
+            } as CSSProperties
+          }
+        >
+          <header className={styles.proofPersistentHeader}>
+            <strong>Watch the balance change</strong>
+            <span aria-hidden="true">Follow the animals.</span>
+          </header>
+          <div className={styles.proofProgressTrack} aria-hidden="true">
+            <span />
+          </div>
+          <div className={styles.proofPersistentCanvas}>
+            {plan.steps.map((step, stepIndex) => (
+              <TeachingProofPhase
+                step={step}
+                stepIndex={stepIndex}
+                stepCount={plan.steps.length}
+                timing={plan.timeline[stepIndex]}
+                previousKind={plan.steps[stepIndex - 1]?.kind}
+                nextKind={plan.steps[stepIndex + 1]?.kind}
+                accentMap={accentMap}
+                key={step.id}
+              />
+            ))}
+          </div>
+        </div>
       </div>
       <div className={styles.proofStoryboard} aria-hidden="true">
         {plan.steps.map((step, stepIndex) => (
-          <TeachingProofSceneCard
+          <TeachingProofStoryboardPhase
             step={step}
             stepIndex={stepIndex}
             stepCount={plan.steps.length}
-            delayMs={0}
-            durationMs={plan.timeline[stepIndex].durationMs}
             accentMap={accentMap}
-            storyboard
             key={`story-${step.id}`}
           />
         ))}
