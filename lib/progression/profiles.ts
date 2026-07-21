@@ -5,7 +5,10 @@ import {
   isJourneyNodeUnlocked,
   nextJourneyNode,
 } from "./journey.ts";
-import { questionReferenceKey } from "./questions.ts";
+import {
+  questionReferenceIdentityKey,
+  questionReferenceKey,
+} from "./questions.ts";
 import {
   PROGRESSION_SCHEMA_VERSION,
   type AttemptSettlement,
@@ -464,7 +467,7 @@ export function selectCulminationQuestions({
   const keys = new Set<string>();
   for (const question of candidates) {
     if (question.gameSlug !== gameSlug) continue;
-    const key = questionReferenceKey(question);
+    const key = questionReferenceIdentityKey(question);
     if (keys.has(key)) continue;
     keys.add(key);
     selected.push(question);

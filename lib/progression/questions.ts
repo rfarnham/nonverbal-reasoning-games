@@ -44,6 +44,20 @@ export function isQuestionReference(
 }
 
 export function questionReferenceKey(question: QuestionReference): string {
+  return [
+    questionReferenceIdentityKey(question),
+    encodeURIComponent(question.fingerprint ?? ""),
+  ].join(":");
+}
+
+/**
+ * Identifies the versioned question content without its optional materialized
+ * fingerprint. A reference keeps this identity while its fingerprint is added
+ * after the canonical game round is resolved.
+ */
+export function questionReferenceIdentityKey(
+  question: QuestionReference,
+): string {
   const prefix = [
     encodeURIComponent(question.gameSlug),
     question.level,
@@ -55,7 +69,6 @@ export function questionReferenceKey(question: QuestionReference): string {
       ...prefix,
       encodeURIComponent(question.contentVersion),
       question.questionIndex,
-      encodeURIComponent(question.fingerprint ?? ""),
     ].join(":");
   }
 
@@ -63,7 +76,6 @@ export function questionReferenceKey(question: QuestionReference): string {
     ...prefix,
     encodeURIComponent(question.generatorVersion),
     encodeURIComponent(question.seed),
-    encodeURIComponent(question.fingerprint ?? ""),
   ].join(":");
 }
 

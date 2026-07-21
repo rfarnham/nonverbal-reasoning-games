@@ -1,5 +1,8 @@
 import { createProgressionAttempt } from "./attempts.ts";
-import { questionReferenceKey } from "./questions.ts";
+import {
+  questionReferenceIdentityKey,
+  questionReferenceKey,
+} from "./questions.ts";
 import {
   CAMPAIGN_QUESTIONS_PER_STOP,
   PROGRESSION_LEVELS,
@@ -225,7 +228,7 @@ function culminationSectionQuestions(
   }
 
   const selected: QuestionReference[] = [pool.approachableQuestion];
-  const selectedKeys = new Set(selected.map(questionReferenceKey));
+  const selectedKeys = new Set(selected.map(questionReferenceIdentityKey));
   const candidates: QuestionReference[] = [];
   for (const missedQuestion of missed) {
     const current = currentMissReference(missedQuestion.question, pool);
@@ -241,12 +244,12 @@ function culminationSectionQuestions(
   for (const question of candidates) {
     if (
       !isAtOrBelowLevel(question.level, node.level) ||
-      selectedKeys.has(questionReferenceKey(question))
+      selectedKeys.has(questionReferenceIdentityKey(question))
     ) {
       continue;
     }
     selected.push(question);
-    selectedKeys.add(questionReferenceKey(question));
+    selectedKeys.add(questionReferenceIdentityKey(question));
     if (selected.length === node.questionsPerGame) return selected;
   }
   throw new Error(

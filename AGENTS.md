@@ -321,7 +321,10 @@ Campaign question and two prior missed questions from that game. If there are
 not enough distinct misses, fill from the current Campaign level. Culmination
 sections are sequential and resumable. A non-Wizard culmination advances the
 avatar only after the complete test and redemption are finished; Wizard ends
-with a mastery celebration.
+with a mastery celebration. Question selection MUST treat a reference as the
+same question before and after its optional fingerprint is materialized, and a
+saved culmination with an untouched legacy collision MUST repair generically
+without discarding already solved sections.
 
 Only first attempts affect Journey accuracy. Always let the player finish and
 redeem the entire stop. Accuracy strictly greater than 70% clears it. A cleared

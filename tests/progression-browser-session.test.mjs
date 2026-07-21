@@ -719,6 +719,121 @@ test("culmination advances and redemption route by the current question slug", (
   assert.equal(session.current.ref.gameSlug, "game-1");
 });
 
+test("legacy culmination duplicate references repair before a cross-game handoff", () => {
+  const node = buildJourneyPlan(games).boards[0].nodes.at(-1);
+  const attempt = createCulminationProgressionAttempt({
+    id: "culmination-legacy-duplicate",
+    node,
+    missedQuestions: [],
+    questionPools: games.map(({ slug }) => {
+      const gameAdapter = adapter(slug);
+      const campaignQuestions = campaignQuestionReferences(
+        gameAdapter,
+        "starter",
+      );
+      return {
+        gameSlug: slug,
+        approachableQuestion: campaignQuestions[0],
+        campaignQuestions,
+        currentContentVersion: "1",
+        currentGeneratorVersion: "1",
+      };
+    }),
+  });
+  const gameTwoOpener = attempt.rounds[3].question;
+  assert.equal(gameTwoOpener.source, "campaign");
+  const unmaterializedOpener = {
+    source: gameTwoOpener.source,
+    gameSlug: gameTwoOpener.gameSlug,
+    level: gameTwoOpener.level,
+    questionIndex: gameTwoOpener.questionIndex,
+    contentVersion: gameTwoOpener.contentVersion,
+  };
+  const legacyAttempt = {
+    ...attempt,
+    rounds: attempt.rounds.map((round, index) =>
+      index === 3
+        ? { ...round, question: unmaterializedOpener }
+        : index === 4
+          ? { ...round, question: gameTwoOpener }
+          : round,
+    ),
+  };
+  const storage = memoryStorage();
+  storeAttempt(storage, legacyAttempt);
+
+  const firstAdapter = adapter("game-1");
+  let session = loadProgressionBrowserSession(firstAdapter, {
+    attemptId: legacyAttempt.id,
+    storage,
+  });
+  for (let index = 0; index < 3; index += 1) {
+    session = answerProgressionBrowserSession(
+      firstAdapter,
+      legacyAttempt.id,
+      { correct: true },
+      { storage },
+    );
+    session = advanceProgressionBrowserSession(
+      firstAdapter,
+      legacyAttempt.id,
+      undefined,
+      { storage },
+    );
+  }
+  assert.equal(session.mode, "redirect");
+  assert.equal(session.navigationTarget.pathname, "/games/game-2/");
+
+  const secondAdapter = adapter("game-2");
+  session = loadProgressionBrowserSession(secondAdapter, {
+    attemptId: legacyAttempt.id,
+    storage,
+  });
+  assert.equal(session.mode, "controlled");
+  assert.equal(session.current.round.id, "Starter-0");
+  assert.equal(session.attempt.currentRoundIndex, 3);
+  assert.equal(session.attempt.currentSectionIndex, 1);
+  assert.ok(
+    session.attempt.rounds
+      .slice(0, 3)
+      .every(
+        ({ phase, firstTryCorrect }) =>
+          phase === "solved" && firstTryCorrect === true,
+      ),
+  );
+  assert.equal(session.attempt.rounds[3].question.fingerprint, "Starter-0");
+  const repairedQuestion = session.attempt.rounds[4].question;
+  assert.equal(repairedQuestion.source, "campaign");
+  assert.notEqual(repairedQuestion.questionIndex, 0);
+  assert.equal(
+    repairedQuestion.fingerprint,
+    `Starter-${repairedQuestion.questionIndex}`,
+  );
+
+  session = loadProgressionBrowserSession(secondAdapter, {
+    attemptId: legacyAttempt.id,
+    storage,
+  });
+  assert.equal(session.mode, "controlled");
+  assert.equal(session.current.resolution, "current");
+  assert.equal(session.current.round.id, "Starter-0");
+
+  session = answerProgressionBrowserSession(
+    secondAdapter,
+    legacyAttempt.id,
+    { correct: true },
+    { storage },
+  );
+  session = advanceProgressionBrowserSession(
+    secondAdapter,
+    legacyAttempt.id,
+    undefined,
+    { storage },
+  );
+  assert.equal(session.mode, "controlled");
+  assert.equal(session.current.round.id, repairedQuestion.fingerprint);
+});
+
 test("redemption practice time never consumes a Turbo countdown", () => {
   const gameAdapter = adapter();
   const node = buildJourneyPlan(games).boards[0].nodes[2];

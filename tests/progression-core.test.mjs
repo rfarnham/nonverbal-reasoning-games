@@ -23,6 +23,7 @@ import {
   isClearAccuracy,
   isJourneyNodeUnlocked,
   profileXpTotal,
+  questionReferenceIdentityKey,
   recordQuestionAttempt,
   recordRedemptionAttempt,
   retryCurrentQuestion,
@@ -575,4 +576,54 @@ test("culmination keeps ordered three-question game sections and replaces stale 
   }
   assert.equal(currentAttemptSection(progressed).gameSlug, "game-2");
   assert.equal(progressed.currentSectionIndex, 1);
+});
+
+test("culmination treats a materialized miss as the same approachable question", () => {
+  const node = buildJourneyPlan(games).boards[0].nodes.at(-1);
+  const duplicateMiss = campaignQuestion(
+    "game-1",
+    "starter",
+    0,
+    "current",
+  );
+  const approachable = {
+    source: duplicateMiss.source,
+    gameSlug: duplicateMiss.gameSlug,
+    level: duplicateMiss.level,
+    questionIndex: duplicateMiss.questionIndex,
+    contentVersion: duplicateMiss.contentVersion,
+  };
+  const attempt = createCulminationProgressionAttempt({
+    id: "culmination-materialized-duplicate",
+    node,
+    missedQuestions: [
+      {
+        key: "materialized-opener",
+        question: duplicateMiss,
+        missCount: 1,
+        lastMissedAtMs: 10,
+      },
+    ],
+    questionPools: games.map(({ slug }) => ({
+      gameSlug: slug,
+      approachableQuestion:
+        slug === "game-1"
+          ? approachable
+          : campaignQuestion(slug, "starter", 0, "current"),
+      campaignQuestions: campaignLevel(slug, "starter", "current"),
+      currentContentVersion: "current",
+      currentGeneratorVersion: "generator-current",
+    })),
+  });
+
+  const firstSection = attempt.rounds.slice(0, 3).map(({ question }) => question);
+  const identities = firstSection.map(questionReferenceIdentityKey);
+  assert.equal(new Set(identities).size, 3);
+  assert.equal(
+    firstSection.filter(
+      ({ source, level, questionIndex }) =>
+        source === "campaign" && level === "starter" && questionIndex === 0,
+    ).length,
+    1,
+  );
 });

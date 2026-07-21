@@ -36,6 +36,7 @@ import {
   type StorageLike,
 } from "./types.ts";
 import {
+  campaignQuestionReferences,
   createFreshGeneratedQuestion,
   ProgressionQuestionResolutionError,
   resolveProgressionQuestion,
@@ -225,6 +226,88 @@ function sameLogicalQuestion(
     : left.source === "generated" &&
         right.source === "generated" &&
         left.seed === right.seed;
+}
+
+function logicalQuestionSlotKey(question: QuestionReference): string {
+  const prefix = [
+    encodeURIComponent(question.gameSlug),
+    question.level,
+    question.source,
+  ];
+  return question.source === "campaign"
+    ? [...prefix, question.questionIndex].join(":")
+    : [...prefix, encodeURIComponent(question.seed)].join(":");
+}
+
+function isPristineAttemptRound(round: AttemptRound): boolean {
+  return (
+    round.phase === "answering" &&
+    round.attemptCount === 0 &&
+    round.firstTryCorrect === null &&
+    round.lastAnswerToken === undefined
+  );
+}
+
+/**
+ * Early culmination builds could select the same Campaign slot twice when one
+ * reference already had a fingerprint and the approachable copy did not. The
+ * first copy then failed integrity validation as soon as it was materialized.
+ * Replace only untouched duplicate copies with deterministic current Campaign
+ * fallbacks so an already-saved test can continue without losing solved work.
+ */
+function repairCulminationQuestionCollisions<
+  Round,
+  EngineDifficulty extends string,
+>(
+  adapter: ProgressionGameAdapter<Round, EngineDifficulty>,
+  attempt: ProgressionAttempt,
+): ProgressionAttempt {
+  if (attempt.kind !== "culmination" || attempt.phase !== "playing") {
+    return attempt;
+  }
+
+  const seenSlots = new Set<string>();
+  const duplicateIndexes: number[] = [];
+  for (const [index, round] of attempt.rounds.entries()) {
+    if (round.question.gameSlug !== adapter.gameSlug) continue;
+    const slot = logicalQuestionSlotKey(round.question);
+    if (seenSlots.has(slot)) {
+      if (!isPristineAttemptRound(round)) {
+        throw new Error("An attempted culmination question cannot be replaced.");
+      }
+      duplicateIndexes.push(index);
+    } else {
+      seenSlots.add(slot);
+    }
+  }
+  if (!duplicateIndexes.length) return attempt;
+
+  const duplicateSet = new Set(duplicateIndexes);
+  const usedSlots = new Set(
+    attempt.rounds
+      .filter((_, index) => !duplicateSet.has(index))
+      .map(({ question }) => logicalQuestionSlotKey(question)),
+  );
+  const candidates = campaignQuestionReferences(adapter, attempt.level).filter(
+    (question) => !usedSlots.has(logicalQuestionSlotKey(question)),
+  );
+  if (candidates.length < duplicateIndexes.length) {
+    throw new Error("No current Campaign fallback can repair this culmination.");
+  }
+
+  const rounds = [...attempt.rounds];
+  duplicateIndexes.forEach((roundIndex, candidateIndex) => {
+    const replacement = candidates[candidateIndex];
+    if (!replacement) {
+      throw new Error("A culmination fallback disappeared unexpectedly.");
+    }
+    rounds[roundIndex] = {
+      ...rounds[roundIndex],
+      question: replacement,
+    };
+    usedSlots.add(logicalQuestionSlotKey(replacement));
+  });
+  return { ...attempt, rounds };
 }
 
 function currentQuestion(
@@ -443,15 +526,35 @@ export function loadProgressionBrowserSession<
   }
 
   try {
-    const exclusions = exclusionSets(attempt, question);
-    const resolved = resolveProgressionQuestion(adapter, question, {
+    let activeAttempt = attempt;
+    let activeQuestion = question;
+    const repairedAttempt = repairCulminationQuestionCollisions(
+      adapter,
+      activeAttempt,
+    );
+    if (repairedAttempt !== activeAttempt) {
+      const persisted = persistAttempt(context, repairedAttempt);
+      if (!isPersistedContext(persisted)) return persisted;
+      context = persisted;
+      activeAttempt = persisted.attempt;
+      const repairedQuestion = currentQuestion(activeAttempt);
+      if (!repairedQuestion || repairedQuestion.gameSlug !== adapter.gameSlug) {
+        return recovery(
+          "This journey stop could not restore its current culmination question.",
+        );
+      }
+      activeQuestion = repairedQuestion;
+    }
+
+    const exclusions = exclusionSets(activeAttempt, activeQuestion);
+    const resolved = resolveProgressionQuestion(adapter, activeQuestion, {
       excludedFingerprints: exclusions.fingerprints,
       excludedQuestionKeys: exclusions.questionKeys,
     });
     if (resolved.migrated) {
       const nextAttempt = replaceCurrentQuestion(
-        attempt,
-        question,
+        activeAttempt,
+        activeQuestion,
         resolved.ref,
       );
       const persisted = persistAttempt(context, nextAttempt);
