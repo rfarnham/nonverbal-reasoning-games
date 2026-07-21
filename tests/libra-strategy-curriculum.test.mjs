@@ -13,7 +13,6 @@ import {
   STRATEGY_IDS,
   STRATEGY_SECTIONS,
   REDUCED_TEACHING_PROOF_MS,
-  TEACHING_PROOF_STEP_MS,
   buildTeachingProof,
   buildSolutionProof,
   canOpenHistoricalReview,
@@ -23,6 +22,8 @@ import {
   orderedStrategyIdsForRound,
   preRoundStrategyIds,
   teachingProofDurationMs,
+  teachingProofStepDurationMs,
+  teachingProofTimeline,
   unseenStrategyIds,
 } from "../app/games/libra/strategy-curriculum.ts";
 
@@ -317,6 +318,27 @@ function equationChanged(before, after, label) {
   );
 }
 
+function addedExpressionCounts(...expressions) {
+  return Object.fromEntries(
+    BALANCE_TOKENS.map((token) => [
+      token,
+      expressions.reduce(
+        (total, expression) => total + counts(expression)[token],
+        0,
+      ),
+    ]),
+  );
+}
+
+function changedExpressionCounts(before, removed, added = []) {
+  return Object.fromEntries(
+    BALANCE_TOKENS.map((token) => [
+      token,
+      counts(before)[token] - counts(removed)[token] + counts(added)[token],
+    ]),
+  );
+}
+
 function assertTeachingPlan(round, label) {
   const plan = buildTeachingProof(round);
   const expectedGoal = {
@@ -327,11 +349,17 @@ function assertTeachingPlan(round, label) {
   equationMatches(plan.finalEquation, expectedGoal);
   assert.equal(plan.steps.at(-1).kind, "conclude", `${label}: concludes`);
   equationMatches(plan.steps.at(-1).equation, expectedGoal);
-  assert.equal(
-    plan.durationMs,
-    plan.steps.length * TEACHING_PROOF_STEP_MS,
-    `${label}: duration follows visible step count`,
-  );
+  assert.deepEqual(plan.timeline, teachingProofTimeline(plan.steps));
+  assert.equal(plan.timeline.length, plan.steps.length);
+  let expectedDelayMs = 0;
+  for (const [stepIndex, timing] of plan.timeline.entries()) {
+    const step = plan.steps[stepIndex];
+    assert.equal(timing.stepId, step.id);
+    assert.equal(timing.delayMs, expectedDelayMs);
+    assert.equal(timing.durationMs, teachingProofStepDurationMs(step));
+    expectedDelayMs += timing.durationMs;
+  }
+  assert.equal(plan.durationMs, expectedDelayMs, `${label}: cumulative duration`);
   assert.equal(plan.reducedMotionDurationMs, REDUCED_TEACHING_PROOF_MS);
   assert.equal(teachingProofDurationMs(round), plan.durationMs);
   assert.equal(new Set(plan.steps.map(({ id }) => id)).size, plan.steps.length);
@@ -349,15 +377,105 @@ function assertTeachingPlan(round, label) {
     if (step.kind === "substitute" || step.kind === "cancel-matches") {
       equationChanged(step.before, step.after, `${label}: ${step.kind} changes state`);
     }
+    if (step.kind === "substitute") {
+      assert.notEqual(step.replacement.sourceFromSide, step.replacement.sourceToSide);
+      assert.deepEqual(
+        scaledCounts(
+          step.source.equation[step.replacement.sourceFromSide],
+          step.replacement.copies,
+        ),
+        counts(step.replacement.from),
+        `${label}: source load scales to every highlighted copy`,
+      );
+      assert.deepEqual(
+        scaledCounts(
+          step.source.equation[step.replacement.sourceToSide],
+          step.replacement.copies,
+        ),
+        counts(step.replacement.to),
+        `${label}: source replacement scales to every traveler`,
+      );
+      assert.deepEqual(
+        counts(step.after[step.replacement.side]),
+        changedExpressionCounts(
+          step.before[step.replacement.side],
+          step.replacement.from,
+          step.replacement.to,
+        ),
+        `${label}: substitution morphs only the pictured target load`,
+      );
+      const otherSide = step.replacement.side === "left" ? "right" : "left";
+      expressionMatches(step.before[otherSide], step.after[otherSide]);
+    }
+    if (step.kind === "add-scales") {
+      assert.equal(step.before.length, 2, `${label}: add shows two scales`);
+      assert.deepEqual(
+        counts(step.after.left),
+        addedExpressionCounts(...step.before.map(({ equation }) => equation.left)),
+      );
+      assert.deepEqual(
+        counts(step.after.right),
+        addedExpressionCounts(...step.before.map(({ equation }) => equation.right)),
+      );
+    }
     if (step.kind === "subtract-scales") {
       equationChanged(
         step.before[0].equation,
         step.after,
         `${label}: subtraction changes state`,
       );
+      assert.equal(step.before.length, 2, `${label}: subtract shows two scales`);
+      assert.deepEqual(
+        counts(step.after.left),
+        changedExpressionCounts(
+          step.before[0].equation.left,
+          step.before[1].equation.left,
+        ),
+      );
+      assert.deepEqual(
+        counts(step.after.right),
+        changedExpressionCounts(
+          step.before[0].equation.right,
+          step.before[1].equation.right,
+        ),
+      );
     }
-    if (step.kind === "split-evenly" && "left" in step.before) {
-      equationChanged(step.before, step.after, `${label}: split changes state`);
+    if (step.kind === "cancel-matches") {
+      assert.deepEqual(
+        counts(step.after.left),
+        changedExpressionCounts(step.before.left, step.removed),
+      );
+      assert.deepEqual(
+        counts(step.after.right),
+        changedExpressionCounts(step.before.right, step.removed),
+      );
+    }
+    if (step.kind === "regroup") {
+      assert.deepEqual(
+        counts(step.before.left),
+        scaledCounts(step.after.leftBundle, step.after.groupCount),
+      );
+      assert.deepEqual(
+        counts(step.before.right),
+        scaledCounts(step.after.rightBundle, step.after.groupCount),
+      );
+    }
+    if (step.kind === "split-evenly") {
+      if ("groupCount" in step.before) {
+        assert.equal(step.before.groupCount, step.divisor);
+        expressionMatches(step.before.leftBundle, step.after.left);
+        expressionMatches(step.before.rightBundle, step.after.right);
+      } else {
+        equationChanged(step.before, step.after, `${label}: split changes state`);
+        assert.deepEqual(
+          counts(step.before.left),
+          scaledCounts(step.after.left, step.divisor),
+        );
+        assert.deepEqual(
+          counts(step.before.right),
+          scaledCounts(step.after.right, step.divisor),
+        );
+      }
     }
   }
   assert.deepEqual(plan.strategyIds, actualStrategies, `${label}: visible tools`);
@@ -405,21 +523,87 @@ test("offset chains cancel only after the bridge has been substituted", () => {
 
 test("combo primers use one scale before add-scale combos are introduced", () => {
   const juniorRounds = ROUNDS.filter(({ difficulty }) => difficulty === "Junior");
-  for (const round of juniorRounds.filter(({ family }) => family === "combo-primer")) {
+  const comboPrimers = juniorRounds.filter(
+    ({ family }) => family === "combo-primer",
+  );
+  assert.equal(comboPrimers.length, 3);
+  assert.deepEqual(
+    comboPrimers.map((round) => juniorRounds.indexOf(round) + 1),
+    [8, 9, 10],
+  );
+  for (const round of comboPrimers) {
     const plan = buildTeachingProof(round);
+    assert.equal(round.equations.length, 1);
+    assert.equal(round.question.target.length, 2);
     assert.deepEqual(
       plan.steps.map(({ kind }) => kind),
       ["inspect", "regroup", "split-evenly", "conclude"],
     );
     assert.deepEqual(plan.steps[0].sources.map(({ sourceIndex }) => sourceIndex), [0]);
     assert.ok(!plan.strategyIds.includes("add-scales"));
+    assert.ok(!plan.strategyIds.includes("subtract-scales"));
   }
 
   const addCombo = juniorRounds.find(({ family }) => family === "add-combo");
+  assert.equal(juniorRounds.indexOf(addCombo) + 1, 11);
   assert.deepEqual(
     buildTeachingProof(addCombo).steps.map(({ kind }) => kind),
     ["inspect", "add-scales", "regroup", "split-evenly", "conclude"],
   );
+});
+
+test("plain one-animal targets divide directly instead of pretending to form a combo", () => {
+  for (const [index, round] of ROUNDS.entries()) {
+    if (round.question.target.length !== 1) continue;
+    const plan = buildTeachingProof(round);
+    assert.ok(
+      !plan.steps.some(({ kind }) => kind === "regroup"),
+      `campaign round ${index + 1}: no combo regroup for a single animal`,
+    );
+    assert.ok(!plan.strategyIds.includes("create-combo"));
+  }
+});
+
+test("every authored proof uses only tools available by that point in Campaign", () => {
+  let discovered = [];
+
+  for (const [index, round] of ROUNDS.entries()) {
+    const available = new Set([
+      ...discovered,
+      ...preRoundStrategyIds(round),
+    ]);
+    for (const strategyId of buildTeachingProof(round).strategyIds) {
+      assert.ok(
+        available.has(strategyId),
+        `campaign round ${index + 1}: ${strategyId} is available`,
+      );
+    }
+    for (const strategyId of orderedStrategyIdsForRound(round)) {
+      discovered = discoveredStrategyIdsAfterLesson(discovered, strategyId);
+    }
+  }
+});
+
+test("proof operations linger long enough to inspect the scales and moving loads", () => {
+  const minimumMsByKind = {
+    inspect: 2_000,
+    substitute: 4_600,
+    "add-scales": 4_600,
+    "subtract-scales": 4_400,
+    "cancel-matches": 3_600,
+    regroup: 3_500,
+    "split-evenly": 4_600,
+    conclude: 2_000,
+  };
+
+  for (const round of ROUNDS) {
+    for (const step of buildTeachingProof(round).steps) {
+      assert.ok(
+        teachingProofStepDurationMs(step) >= minimumMsByKind[step.kind],
+        `${step.kind} has a readable hold`,
+      );
+    }
+  }
 });
 
 test("authored family plans follow the direct strategy matrix", () => {

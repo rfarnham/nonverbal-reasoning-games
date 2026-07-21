@@ -105,7 +105,7 @@ export const STRATEGY_CATALOGUE_BY_ID: Readonly<
     shortName: "Subtract",
     symbol: "−",
     description:
-      "Reverse a balanced scale to remove matching loads.",
+      "Take one balanced scale away from another: left from left, right from right.",
   },
 };
 
@@ -286,6 +286,8 @@ export type TeachingEquationSource = {
 
 export type TeachingReplacement = {
   side: "left" | "right";
+  sourceFromSide: "left" | "right";
+  sourceToSide: "left" | "right";
   from: Expression;
   to: Expression;
   copies: number;
@@ -374,14 +376,51 @@ export type TeachingProofStep =
 
 export type TeachingProofPlan = {
   steps: readonly TeachingProofStep[];
+  timeline: readonly TeachingProofSceneTiming[];
   strategyIds: readonly StrategyId[];
   finalEquation: BalanceEquation;
   durationMs: number;
   reducedMotionDurationMs: number;
 };
 
-export const TEACHING_PROOF_STEP_MS = 1_100;
+export type TeachingProofSceneTiming = {
+  stepId: string;
+  delayMs: number;
+  durationMs: number;
+};
+
+const TEACHING_PROOF_STEP_DURATIONS_MS: Readonly<
+  Record<TeachingProofStep["kind"], number>
+> = {
+  inspect: 2_400,
+  substitute: 5_200,
+  "add-scales": 5_200,
+  "subtract-scales": 5_000,
+  "cancel-matches": 4_200,
+  regroup: 4_000,
+  "split-evenly": 5_200,
+  conclude: 2_600,
+};
+
 export const REDUCED_TEACHING_PROOF_MS = 180;
+
+export function teachingProofStepDurationMs(
+  step: Pick<TeachingProofStep, "kind">,
+): number {
+  return TEACHING_PROOF_STEP_DURATIONS_MS[step.kind];
+}
+
+export function teachingProofTimeline(
+  steps: readonly TeachingProofStep[],
+): readonly TeachingProofSceneTiming[] {
+  let delayMs = 0;
+  return steps.map((step) => {
+    const durationMs = teachingProofStepDurationMs(step);
+    const timing = { stepId: step.id, delayMs, durationMs };
+    delayMs += durationMs;
+    return timing;
+  });
+}
 
 function emptyCounts(): Record<BalanceToken, number> {
   return Object.fromEntries(
@@ -632,6 +671,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
   const steps: TeachingProofStep[] = [];
   const equations = round.equations.map(canonicalEquation);
   const finalEquation = goalEquation(round);
+  const targetIsCombo = round.question.target.length > 1;
   let stepNumber = 0;
 
   const nextId = (kind: TeachingProofStep["kind"]): string =>
@@ -684,21 +724,27 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
         "A teaching substitution must replace loads proven equal by its source.",
       );
     }
+    const sourceFromSide = expressionsMatch(sourceEquation.left, from)
+      ? "left"
+      : "right";
+    const sourceToSide = sourceFromSide === "left" ? "right" : "left";
     const after = replaceLoad(before, side, from, to, copies);
     assertChanged(before, after, "substitute");
     steps.push({
       id: nextId("substitute"),
       kind: "substitute",
-      title: "Replace the equal load",
-      text: `On the ${side} pan, replace ${expressionText(
+      title: "Swap the equal load",
+      text: `The circled loads weigh the same. On the ${side} tray, swap ${expressionText(
         scaleExpression(from, copies),
-      )} with ${expressionText(scaleExpression(to, copies))}.`,
+      )} for ${expressionText(scaleExpression(to, copies))}.`,
       strategyId: "substitution",
       before: canonicalEquation(before),
       after,
       source: source(sourceEquation, sourceIndex),
       replacement: {
         side,
+        sourceFromSide,
+        sourceToSide,
         from: canonicalExpression(scaleExpression(from, copies)),
         to: canonicalExpression(scaleExpression(to, copies)),
         copies,
@@ -713,8 +759,8 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
     steps.push({
       id: nextId("add-scales"),
       kind: "add-scales",
-      title: "Join the two balanced scales",
-      text: `Put the left pans together and the right pans together: ${equationText(
+      title: "Move both trays together",
+      text: `Move the second left load onto the first left tray, and the second right load onto the first right tray. The joined scale shows ${equationText(
         after,
       )}.`,
       strategyId: "add-scales",
@@ -732,8 +778,8 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
     steps.push({
       id: nextId("subtract-scales"),
       kind: "subtract-scales",
-      title: "Subtract the known scale",
-      text: `Remove the second scale's left pan from the first left pan, and its right pan from the first right pan: ${equationText(
+      title: "Use the take-away guide",
+      text: `Take the second scale's left load from the first left tray, and its right load from the first right tray. What remains is ${equationText(
         after,
       )}.`,
       strategyId: "subtract-scales",
@@ -758,8 +804,8 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
     steps.push({
       id: nextId("cancel-matches"),
       kind: "cancel-matches",
-      title: "Remove the same load",
-      text: `Take ${expressionText(canonicalRemoved)} off both pans: ${equationText(
+      title: "Lift the matching loads",
+      text: `The same load is circled on both trays. Take ${expressionText(canonicalRemoved)} from each tray. Now ${equationText(
         after,
       )}.`,
       strategyId: "cancel-matches",
@@ -793,8 +839,8 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
     steps.push({
       id: nextId("regroup"),
       kind: "regroup",
-      title: `See ${divisor} matching bundles`,
-      text: `Regroup each pan into ${divisor} equal bundles. Each left bundle is ${expressionText(
+      title: `Circle ${divisor} matching combos`,
+      text: `Circle ${divisor} equal groups on each tray. Each left group is ${expressionText(
         grouped.leftBundle,
       )}.`,
       strategyId: "create-combo",
@@ -805,7 +851,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
       id: nextId("split-evenly"),
       kind: "split-evenly",
       title: `Keep one of the ${divisor} groups`,
-      text: `Split both pans into ${divisor} equal groups: ${equationText(
+      text: `÷ ${divisor} means keep one equal group on each tray. Now ${equationText(
         finalEquation,
       )}.`,
       strategyId: "split-evenly",
@@ -836,7 +882,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
       id: nextId("split-evenly"),
       kind: "split-evenly",
       title: `Split into ${divisor} equal groups`,
-      text: `Keep one equal group on each pan: ${equationText(after)}.`,
+      text: `Circle ${divisor} equal groups on each tray, then keep one group on each side. Now ${equationText(after)}.`,
       strategyId: "split-evenly",
       before: canonicalEquation(before),
       after: canonicalEquation(after),
@@ -845,8 +891,15 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
     return canonicalEquation(after);
   };
 
+  const finishBySplitting = (
+    before: BalanceEquation,
+    divisor: number,
+  ): BalanceEquation =>
+    targetIsCombo
+      ? regroupAndSplit(before, divisor)
+      : splitDirectly(before, divisor);
+
   let current: BalanceEquation;
-  const targetIsCombo = round.question.target.length > 1;
 
   switch (round.family) {
     case "direct": {
@@ -883,7 +936,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
     }
     case "combo-primer": {
       inspect(0);
-      current = regroupAndSplit(
+      current = finishBySplitting(
         equations[0],
         round.solutionDerivation.normalizeBy,
       );
@@ -895,7 +948,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
         source(equations[0], 0),
         source(equations[1], 1),
       ]);
-      current = regroupAndSplit(
+      current = finishBySplitting(
         current,
         round.solutionDerivation.normalizeBy,
       );
@@ -907,7 +960,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
         source(equations[0], 0),
         source(equations[1], 1),
       );
-      current = regroupAndSplit(
+      current = finishBySplitting(
         current,
         round.solutionDerivation.normalizeBy,
       );
@@ -1028,7 +1081,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
         source(current, null),
         source(equations[1], 1),
       ]);
-      current = regroupAndSplit(
+      current = finishBySplitting(
         current,
         round.solutionDerivation.normalizeBy,
       );
@@ -1049,7 +1102,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
         source(equations[1], 1),
       );
       if (round.solutionDerivation.normalizeBy > 1) {
-        current = regroupAndSplit(
+        current = finishBySplitting(
           current,
           round.solutionDerivation.normalizeBy,
         );
@@ -1116,7 +1169,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
         });
         current = cancelMatches(current);
       }
-      current = regroupAndSplit(current, divisor);
+      current = finishBySplitting(current, divisor);
       break;
     }
     case "sealed-sum": {
@@ -1134,7 +1187,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
         source(equations[1], 1),
       ]);
       current = cancelMatches(current);
-      current = regroupAndSplit(
+      current = finishBySplitting(
         current,
         round.solutionDerivation.normalizeBy,
       );
@@ -1155,7 +1208,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
         source(equations[1], 1),
       );
       if (round.solutionDerivation.normalizeBy > 1) {
-        current = regroupAndSplit(
+        current = finishBySplitting(
           current,
           round.solutionDerivation.normalizeBy,
         );
@@ -1173,8 +1226,8 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
   steps.push({
     id: nextId("conclude"),
     kind: "conclude",
-    title: "Balanced",
-    text: `So ${equationText(finalEquation)}.`,
+    title: "Balanced!",
+    text: `Balanced: ${equationText(finalEquation)}.`,
     strategyId: null,
     equation: finalEquation,
   });
@@ -1186,11 +1239,15 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
     }
   }
 
+  const timeline = teachingProofTimeline(steps);
+  const lastScene = timeline.at(-1);
+
   return {
     steps,
+    timeline,
     strategyIds,
     finalEquation,
-    durationMs: steps.length * TEACHING_PROOF_STEP_MS,
+    durationMs: lastScene ? lastScene.delayMs + lastScene.durationMs : 0,
     reducedMotionDurationMs: REDUCED_TEACHING_PROOF_MS,
   };
 }

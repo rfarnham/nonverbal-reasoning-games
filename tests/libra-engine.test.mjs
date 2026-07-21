@@ -778,7 +778,9 @@ test("generated teaching plans visibly exercise every available strategy", () =>
       "split-evenly": 150,
       "cancel-matches": 150,
       substitution: 200,
-      "create-combo": 150,
+      // Only multi-animal targets visibly create a combo. Single-animal
+      // coefficient reductions use Split evenly without relabeling them.
+      "create-combo": 120,
       "add-scales": 100,
       "subtract-scales": 50,
     },

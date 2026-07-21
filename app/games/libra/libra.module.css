@@ -1665,6 +1665,919 @@
   }
 }
 
+/* Real-scale proof player */
+
+.solutionProof {
+  width: min(100%, 720px);
+  min-height: 560px;
+  padding: 12px;
+  background: #f2eee5;
+}
+
+.proofSceneViewport {
+  min-height: 534px;
+}
+
+.proofTeachingScene {
+  gap: 8px;
+  padding: 11px 13px;
+}
+
+.proofSceneBody {
+  min-height: 420px;
+  align-items: stretch;
+}
+
+.proofSceneCaption {
+  min-height: 18px;
+  font-size: 0.7rem;
+}
+
+.proofScaleScene {
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+}
+
+.proofScaleCallouts {
+  width: min(100%, 520px);
+  min-height: 52px;
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.proofScaleCallouts p,
+.proofFinalCallout {
+  min-height: 44px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 8px 15px;
+  border: 1px solid rgb(119 103 215 / 38%);
+  border-radius: 999px;
+  background: rgb(255 253 248 / 96%);
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 820;
+  line-height: 1.25;
+  text-align: center;
+  box-shadow: 0 5px 16px rgb(23 33 61 / 8%);
+}
+
+.proofScaleCallouts p {
+  width: max-content;
+  max-width: 100%;
+  position: absolute;
+  inset: 0;
+  margin: auto;
+}
+
+.proofScaleCallouts p > span,
+.proofFinalCallout > span {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(119 103 215 / 12%);
+  color: var(--violet);
+  font-size: 0.74rem;
+  font-weight: 950;
+}
+
+.proofScaleCalloutMiddle,
+.proofScaleCalloutLast {
+  opacity: 0;
+}
+
+.proofInspectScales {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  place-items: center;
+  align-content: center;
+  gap: 5px 12px;
+}
+
+.proofScaleFigure {
+  width: min(100%, 350px);
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  margin: 0;
+}
+
+.proofScaleFigure > figcaption {
+  min-height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.proofBalanceScale {
+  width: 100%;
+  max-width: none;
+}
+
+.proofBalanceScale .scaleDrawing path {
+  stroke-width: 2.6;
+}
+
+.proofBalanceScale .balanceBeam path {
+  stroke-width: 4.6;
+}
+
+.proofScalePan {
+  --token-size: clamp(19px, 6.1cqw, 25px);
+  width: 42%;
+  bottom: 15%;
+  z-index: 2;
+}
+
+.proofScalePanGroups {
+  max-width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+}
+
+.proofScaleLoadGroup {
+  --token-size: clamp(17px, 5.7cqw, 24px);
+  min-width: 0;
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 3px 4px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  transform-origin: center bottom;
+}
+
+.proofScaleLoadGroup .cargoGroup {
+  max-width: 100%;
+}
+
+.proofScaleLoadGroup[data-proof-load-state="match"] {
+  border-color: var(--violet);
+  background: rgb(119 103 215 / 10%);
+  box-shadow: 0 0 0 4px rgb(119 103 215 / 9%);
+}
+
+.proofScaleLoadGroup[data-proof-load-state="replacement"] {
+  border-color: #d99b25;
+  background: rgb(243 189 78 / 14%);
+  box-shadow: 0 0 0 4px rgb(243 189 78 / 10%);
+}
+
+.proofScaleLoadGroup[data-proof-load-state="move"] {
+  border-color: var(--correct);
+  background: rgb(22 131 107 / 10%);
+  box-shadow: 0 0 0 4px rgb(22 131 107 / 8%);
+}
+
+.proofScaleLoadGroup[data-proof-load-state="guide"] {
+  border-color: rgb(191 73 62 / 62%);
+  border-style: dashed;
+  background: rgb(191 73 62 / 6%);
+}
+
+.proofScaleLoadGroup[data-proof-load-state="remove"] {
+  border-color: var(--wrong);
+  background: rgb(191 73 62 / 10%);
+  box-shadow: 0 0 0 4px rgb(191 73 62 / 8%);
+}
+
+.proofScaleLoadGroup[data-proof-load-state="bundle"],
+.proofScaleLoadGroup[data-proof-load-state="keep"],
+.proofScaleLoadGroup[data-proof-load-state="fade"] {
+  border-color: #e0a326;
+  background: rgb(243 189 78 / 12%);
+  box-shadow: 0 0 0 3px rgb(243 189 78 / 8%);
+}
+
+.proofSubstitutionScales,
+.proofOperationScales {
+  width: 100%;
+  position: relative;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 3px;
+}
+
+.proofSubstitutionScales > .proofScaleFigure,
+.proofSubstitutionScales > .proofMorphScale,
+.proofOperationScales > .proofScaleFigure,
+.proofOperationScales > .proofMorphScale {
+  width: min(100%, 330px);
+}
+
+.proofMorphScale {
+  width: min(100%, 350px);
+  min-width: 0;
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.proofMorphScale > .proofScaleFigure {
+  grid-area: 1 / 1;
+}
+
+.proofMorphAfter {
+  opacity: 0;
+}
+
+.proofScaleTraveler {
+  z-index: 8;
+  opacity: 0;
+}
+
+.proofScaleTraveler[data-source-side="left"][data-target-side="left"],
+.proofScaleTraveler[data-source-side="right"][data-target-side="right"] {
+  --proof-travel-x: 0cqw;
+}
+
+.proofScaleTraveler[data-source-side="left"][data-target-side="right"] {
+  --proof-travel-x: 46cqw;
+}
+
+.proofScaleTraveler[data-source-side="right"][data-target-side="left"] {
+  --proof-travel-x: -46cqw;
+}
+
+.proofScaleTraveler .proofScaleLoadGroup {
+  border-color: #d99b25;
+  background: rgb(255 253 248 / 96%);
+  box-shadow: 0 7px 18px rgb(23 33 61 / 18%);
+}
+
+.proofEqualityKey {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  color: var(--muted);
+  font-size: 0.6rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.proofEqualityKey > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.proofEqualityKey > span::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border: 2px solid;
+  border-radius: 50%;
+}
+
+.proofEqualityMatch::before {
+  border-color: var(--violet);
+}
+
+.proofEqualityReplacement::before {
+  border-color: #d99b25;
+}
+
+.proofSameChangeBadge,
+.proofScaleDivideBadge {
+  min-height: 36px;
+  position: absolute;
+  z-index: 12;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  padding: 6px 13px;
+  border: 2px solid var(--correct);
+  border-radius: 999px;
+  background: rgb(255 253 248 / 96%);
+  color: var(--correct);
+  font-size: 0.72rem;
+  font-weight: 950;
+  box-shadow: 0 6px 18px rgb(23 33 61 / 14%);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.88);
+}
+
+.proofScaleDivideBadge {
+  top: 48%;
+  border-color: #1679d2;
+  color: #1266b2;
+  font-size: 1.05rem;
+}
+
+.proofSingleScaleMorph {
+  align-self: center;
+}
+
+.proofFinalCallout {
+  border-color: rgb(22 131 107 / 42%);
+  background: rgb(22 131 107 / 8%);
+  color: var(--correct);
+}
+
+.proofFinalCallout > span {
+  background: var(--correct);
+  color: white;
+}
+
+.proofConclusionScale {
+  width: min(100%, 390px);
+  padding: 8px 10px;
+  border: 2px solid rgb(22 131 107 / 35%);
+  border-radius: 18px;
+  background: rgb(22 131 107 / 5%);
+}
+
+.solutionProof[data-proof-state="animating"] .proofScaleCalloutFirst,
+.solutionProof[data-proof-state="animating"] .proofScaleCalloutMiddle,
+.solutionProof[data-proof-state="animating"] .proofScaleCalloutLast,
+.solutionProof[data-proof-state="animating"] .proofMorphBefore,
+.solutionProof[data-proof-state="animating"] .proofMorphAfter,
+.solutionProof[data-proof-state="animating"] .proofScaleTraveler,
+.solutionProof[data-proof-state="animating"] .proofSameChangeBadge,
+.solutionProof[data-proof-state="animating"] .proofScaleDivideBadge,
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="substitute"]
+  .proofScaleLoadGroup[data-proof-load-state="match"],
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="substitute"]
+  .proofScaleLoadGroup[data-proof-load-state="replacement"],
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="add-scales"]
+  .proofScaleLoadGroup[data-proof-load-state="move"],
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="subtract-scales"]
+  .proofScaleLoadGroup[data-proof-load-state="remove"],
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="cancel-matches"]
+  .proofScaleLoadGroup[data-proof-load-state="remove"],
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="regroup"]
+  .proofScaleLoadGroup[data-proof-load-state="bundle"],
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="split-evenly"]
+  .proofScaleLoadGroup[data-proof-load-state="keep"],
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="split-evenly"]
+  .proofScaleLoadGroup[data-proof-load-state="fade"],
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="add-scales"]
+  .proofDonorScale,
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="subtract-scales"]
+  .proofGuideScale {
+  animation-duration: var(--proof-scene-duration);
+  animation-delay: var(--proof-scene-delay);
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+
+.solutionProof[data-proof-state="animating"] .proofScaleCalloutFirst {
+  animation-name: proofCalloutFirst;
+}
+
+.solutionProof[data-proof-state="animating"] .proofScaleCalloutLast {
+  animation-name: proofCalloutLast;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofScaleCallouts[data-callout-count="3"]
+  .proofScaleCalloutFirst {
+  animation-name: proofCalloutFirstOfThree;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofScaleCallouts[data-callout-count="3"]
+  .proofScaleCalloutMiddle {
+  animation-name: proofCalloutMiddle;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofScaleCallouts[data-callout-count="3"]
+  .proofScaleCalloutLast {
+  animation-name: proofCalloutLastOfThree;
+}
+
+.solutionProof[data-proof-state="animating"] .proofMorphBefore {
+  animation-name: proofScaleMorphOut;
+}
+
+.solutionProof[data-proof-state="animating"] .proofMorphAfter {
+  animation-name: proofScaleMorphIn;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="regroup"]
+  .proofMorphBefore {
+  animation-name: proofRegroupOut;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="regroup"]
+  .proofMorphAfter {
+  animation-name: proofRegroupIn;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="split-evenly"]
+  .proofMorphBefore {
+  animation-name: proofSplitOut;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="split-evenly"]
+  .proofMorphAfter {
+  animation-name: proofSplitIn;
+}
+
+.solutionProof[data-proof-state="animating"] .proofScaleTraveler {
+  animation-name: proofSubstitutionLoadTravel;
+  animation-timing-function: cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="substitute"]
+  .proofScaleLoadGroup[data-proof-load-state="match"],
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="substitute"]
+  .proofScaleLoadGroup[data-proof-load-state="replacement"] {
+  animation-name: proofCircleEqualLoads;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="add-scales"]
+  .proofScaleLoadGroup[data-proof-load-state="move"] {
+  animation-name: proofAddCargoTravel;
+  animation-timing-function: cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="add-scales"]
+  .proofSameChangeBadge {
+  animation-name: proofOperationBadge;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="add-scales"]
+  .proofDonorScale {
+  animation-name: proofDonorScaleEmpty;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="subtract-scales"]
+  .proofScaleLoadGroup[data-proof-load-state="remove"],
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="cancel-matches"]
+  .proofScaleLoadGroup[data-proof-load-state="remove"] {
+  animation-name: proofRemoveMatchedLoads;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="subtract-scales"]
+  .proofGuideScale {
+  animation-name: proofGuideScaleDim;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="regroup"]
+  .proofScaleLoadGroup[data-proof-load-state="bundle"] {
+  animation-name: proofBundleCircleIn;
+  animation-timing-function: cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="split-evenly"]
+  .proofScaleDivideBadge {
+  animation-name: proofDivideBadgeIn;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="split-evenly"]
+  .proofScaleLoadGroup[data-proof-load-state="fade"] {
+  animation-name: proofExtraGroupsFade;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="split-evenly"]
+  .proofScaleLoadGroup[data-proof-load-state="keep"] {
+  animation-name: proofKeptGroup;
+}
+
+@keyframes proofCalloutFirst {
+  0%,
+  43% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  50%,
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes proofCalloutLast {
+  0%,
+  55% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  63%,
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes proofCalloutFirstOfThree {
+  0%,
+  31% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  37%,
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes proofCalloutMiddle {
+  0%,
+  32% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  39%,
+  67% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  73%,
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes proofCalloutLastOfThree {
+  0%,
+  74% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  80%,
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes proofScaleMorphOut {
+  0%,
+  66% {
+    opacity: 1;
+  }
+
+  74%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes proofScaleMorphIn {
+  0%,
+  66% {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+
+  75%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes proofRegroupOut {
+  0%,
+  38% {
+    opacity: 1;
+  }
+
+  49%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes proofRegroupIn {
+  0%,
+  40% {
+    opacity: 0;
+  }
+
+  51%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes proofSplitOut {
+  0%,
+  80% {
+    opacity: 1;
+  }
+
+  88%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes proofSplitIn {
+  0%,
+  81% {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+
+  89%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes proofCircleEqualLoads {
+  0%,
+  8% {
+    box-shadow: 0 0 0 0 transparent;
+    transform: scale(0.96);
+  }
+
+  16%,
+  48% {
+    box-shadow: 0 0 0 6px rgb(119 103 215 / 14%);
+    transform: scale(1.04);
+  }
+
+  58%,
+  100% {
+    box-shadow: 0 0 0 3px rgb(119 103 215 / 7%);
+    transform: scale(1);
+  }
+}
+
+@keyframes proofSubstitutionLoadTravel {
+  0%,
+  36% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.92);
+  }
+
+  42% {
+    opacity: 0.82;
+    transform: translate(0, 0) scale(1);
+  }
+
+  67%,
+  73% {
+    opacity: 1;
+    transform: translate(var(--proof-travel-x), 47cqw) scale(1.03);
+  }
+
+  81%,
+  100% {
+    opacity: 0;
+    transform: translate(var(--proof-travel-x), 47cqw) scale(1);
+  }
+}
+
+@keyframes proofAddCargoTravel {
+  0%,
+  33% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  43% {
+    box-shadow: 0 0 0 7px rgb(22 131 107 / 14%);
+    transform: translateY(0) scale(1.05);
+  }
+
+  68%,
+  73% {
+    opacity: 1;
+    transform: translateY(-43cqw) scale(1);
+  }
+
+  82%,
+  100% {
+    opacity: 0;
+    transform: translateY(-43cqw) scale(0.98);
+  }
+}
+
+@keyframes proofOperationBadge {
+  0%,
+  31% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.88);
+  }
+
+  39%,
+  67% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  75%,
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.95);
+  }
+}
+
+@keyframes proofDonorScaleEmpty {
+  0%,
+  70% {
+    opacity: 1;
+  }
+
+  82%,
+  100% {
+    opacity: 0.22;
+  }
+}
+
+@keyframes proofRemoveMatchedLoads {
+  0%,
+  35% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  43%,
+  52% {
+    box-shadow: 0 0 0 7px rgb(191 73 62 / 15%);
+    transform: translateY(0) scale(1.05);
+  }
+
+  69%,
+  100% {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.92);
+  }
+}
+
+@keyframes proofGuideScaleDim {
+  0%,
+  60% {
+    opacity: 1;
+  }
+
+  76%,
+  100% {
+    opacity: 0.32;
+  }
+}
+
+@keyframes proofBundleCircleIn {
+  0%,
+  38% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+
+  52% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+
+  62%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes proofDivideBadgeIn {
+  0%,
+  32% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.84);
+  }
+
+  42%,
+  76% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  84%,
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+}
+
+@keyframes proofExtraGroupsFade {
+  0%,
+  51% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  64%,
+  100% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+}
+
+@keyframes proofKeptGroup {
+  0%,
+  54% {
+    transform: scale(1);
+  }
+
+  65%,
+  80% {
+    box-shadow: 0 0 0 8px rgb(243 189 78 / 17%);
+    transform: scale(1.09);
+  }
+
+  88%,
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes proofSceneCycle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  4%,
+  94% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes proofFinalSceneCycle {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  7%,
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .strategyLessonVisual {
   width: min(100%, 720px);
   margin-inline: auto;
@@ -3726,5 +4639,202 @@
   .replayButton,
   .campaignProblem::before {
     transition: none;
+  }
+}
+
+/* Final proof-player responsive and reduced-motion overrides */
+
+.teaching > .clueRail,
+.teaching > .goalDivider,
+.teaching > .goalScale {
+  display: none;
+}
+
+@media (max-width: 620px) {
+  .solutionProof {
+    min-height: 570px;
+  }
+
+  .proofSceneViewport {
+    min-height: 548px;
+  }
+
+  .proofSceneBody {
+    min-height: 432px;
+  }
+
+  .proofScaleCallouts p,
+  .proofFinalCallout {
+    font-size: 0.73rem;
+  }
+
+  .proofSubstitutionScales > .proofScaleFigure,
+  .proofSubstitutionScales > .proofMorphScale,
+  .proofOperationScales > .proofScaleFigure,
+  .proofOperationScales > .proofMorphScale {
+    width: min(100%, 310px);
+  }
+}
+
+@media (max-width: 480px) {
+  .solutionProof,
+  .solutionProof[data-proof-state="animating"] {
+    min-height: 590px;
+  }
+
+  .solutionProof[data-proof-state="animating"] .proofSceneViewport,
+  .proofSceneViewport {
+    min-height: 568px;
+  }
+
+  .proofTeachingScene {
+    padding: 9px 7px;
+  }
+
+  .proofSceneBody {
+    min-height: 454px;
+  }
+
+  .proofScaleCallouts {
+    min-height: 60px;
+  }
+
+  .proofScaleCallouts p,
+  .proofFinalCallout {
+    min-height: 50px;
+    padding: 7px 10px;
+    border-radius: 15px;
+    font-size: 0.7rem;
+  }
+
+  .proofInspectScales {
+    grid-template-columns: 1fr;
+    gap: 1px;
+  }
+
+  .proofInspectScales .proofScaleFigure {
+    width: min(100%, 235px);
+  }
+
+  .proofScaleFigure > figcaption {
+    min-height: 18px;
+    font-size: 0.52rem;
+  }
+
+  .proofSubstitutionScales > .proofScaleFigure,
+  .proofSubstitutionScales > .proofMorphScale,
+  .proofOperationScales > .proofScaleFigure,
+  .proofOperationScales > .proofMorphScale,
+  .proofSingleScaleMorph {
+    width: min(100%, 292px);
+  }
+
+  .proofScalePan {
+    --token-size: clamp(17px, 6cqw, 22px);
+  }
+
+  .proofScaleLoadGroup {
+    --token-size: clamp(15px, 5.5cqw, 21px);
+    padding: 2px 3px;
+  }
+
+  .proofEqualityKey {
+    gap: 9px;
+    font-size: 0.52rem;
+  }
+
+  .proofSceneCaption {
+    font-size: 0.62rem;
+  }
+}
+
+@media (max-width: 390px) {
+  .solutionProof,
+  .solutionProof[data-proof-state="animating"] {
+    min-height: 580px;
+  }
+
+  .solutionProof[data-proof-state="animating"] .proofSceneViewport,
+  .proofSceneViewport {
+    min-height: 562px;
+  }
+
+  .proofSceneBody {
+    min-height: 448px;
+  }
+
+  .proofSubstitutionScales > .proofScaleFigure,
+  .proofSubstitutionScales > .proofMorphScale,
+  .proofOperationScales > .proofScaleFigure,
+  .proofOperationScales > .proofMorphScale,
+  .proofSingleScaleMorph {
+    width: min(100%, 270px);
+  }
+
+  .proofScaleCallouts p,
+  .proofFinalCallout {
+    font-size: 0.67rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .proofStoryboard .proofTeachingScene {
+    min-height: 0;
+  }
+
+  .proofStoryboard .proofSceneBody {
+    min-height: 0;
+  }
+
+  .proofStoryboard .proofScaleCallouts {
+    min-height: 0;
+    display: grid;
+    gap: 6px;
+  }
+
+  .proofStoryboard .proofScaleCallouts p {
+    width: 100%;
+    position: relative;
+    inset: auto;
+    opacity: 1;
+    transform: none;
+  }
+
+  .proofStoryboard .proofMorphScale {
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .proofStoryboard .proofMorphScale > .proofScaleFigure {
+    grid-area: auto;
+    opacity: 1;
+    transform: none;
+  }
+
+  .proofStoryboard .proofScaleTraveler,
+  .proofStoryboard .proofSameChangeBadge,
+  .proofStoryboard .proofScaleDivideBadge {
+    display: none;
+    animation: none !important;
+  }
+
+  .proofStoryboard .proofScaleLoadGroup,
+  .proofStoryboard .proofDonorScale,
+  .proofStoryboard .proofGuideScale {
+    opacity: 1;
+    transform: none;
+    animation: none !important;
+  }
+
+  .proofStoryboard
+    .proofScaleLoadGroup[data-proof-load-state="fade"] {
+    opacity: 0.32;
+  }
+}
+
+@media (max-width: 480px) and (prefers-reduced-motion: reduce) {
+  .proofStoryboard .proofMorphScale {
+    grid-template-columns: 1fr;
   }
 }
