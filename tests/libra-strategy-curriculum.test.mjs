@@ -12,12 +12,17 @@ import {
   STRATEGY_CATALOGUE_BY_ID,
   STRATEGY_IDS,
   STRATEGY_SECTIONS,
+  REDUCED_TEACHING_PROOF_MS,
+  TEACHING_PROOF_STEP_MS,
+  buildTeachingProof,
   buildSolutionProof,
   canOpenHistoricalReview,
   canIntroduceStrategiesBeforeRound,
   discoveredStrategyIdsAfterLesson,
+  isInfiniteCurriculumCandidate,
   orderedStrategyIdsForRound,
   preRoundStrategyIds,
+  teachingProofDurationMs,
   unseenStrategyIds,
 } from "../app/games/libra/strategy-curriculum.ts";
 
@@ -292,5 +297,237 @@ test("all authored and representative generated rounds build exact visual proofs
         `${difficulty} generated round ${sample + 1}`,
       );
     }
+  }
+});
+
+function expressionMatches(left, right) {
+  assert.deepEqual(counts(left), counts(right));
+}
+
+function equationMatches(left, right) {
+  expressionMatches(left.left, right.left);
+  expressionMatches(left.right, right.right);
+}
+
+function equationChanged(before, after, label) {
+  assert.notDeepEqual(
+    [counts(before.left), counts(before.right)],
+    [counts(after.left), counts(after.right)],
+    label,
+  );
+}
+
+function assertTeachingPlan(round, label) {
+  const plan = buildTeachingProof(round);
+  const expectedGoal = {
+    left: round.question.target,
+    right: [{ creature: round.question.unit, count: round.answer }],
+  };
+
+  equationMatches(plan.finalEquation, expectedGoal);
+  assert.equal(plan.steps.at(-1).kind, "conclude", `${label}: concludes`);
+  equationMatches(plan.steps.at(-1).equation, expectedGoal);
+  assert.equal(
+    plan.durationMs,
+    plan.steps.length * TEACHING_PROOF_STEP_MS,
+    `${label}: duration follows visible step count`,
+  );
+  assert.equal(plan.reducedMotionDurationMs, REDUCED_TEACHING_PROOF_MS);
+  assert.equal(teachingProofDurationMs(round), plan.durationMs);
+  assert.equal(new Set(plan.steps.map(({ id }) => id)).size, plan.steps.length);
+
+  const actualStrategies = [];
+  for (const step of plan.steps) {
+    assert.ok(step.title.length > 0, `${label}: titled ${step.kind}`);
+    assert.ok(step.text.length > 0, `${label}: described ${step.kind}`);
+    if (
+      step.strategyId !== null &&
+      !actualStrategies.includes(step.strategyId)
+    ) {
+      actualStrategies.push(step.strategyId);
+    }
+    if (step.kind === "substitute" || step.kind === "cancel-matches") {
+      equationChanged(step.before, step.after, `${label}: ${step.kind} changes state`);
+    }
+    if (step.kind === "subtract-scales") {
+      equationChanged(
+        step.before[0].equation,
+        step.after,
+        `${label}: subtraction changes state`,
+      );
+    }
+    if (step.kind === "split-evenly" && "left" in step.before) {
+      equationChanged(step.before, step.after, `${label}: split changes state`);
+    }
+  }
+  assert.deepEqual(plan.strategyIds, actualStrategies, `${label}: visible tools`);
+  assert.deepEqual(
+    orderedStrategyIdsForRound(round),
+    actualStrategies,
+    `${label}: hint tools exactly match proof tools`,
+  );
+}
+
+test("all 48 authored rounds have direct, non-no-op teaching plans ending at the exact goal", () => {
+  for (const [index, round] of ROUNDS.entries()) {
+    assertTeachingPlan(round, `campaign round ${index + 1} (${round.family})`);
+  }
+});
+
+test("substitution replaces loads in place without adding whole scales", () => {
+  const juniorRounds = ROUNDS.filter(({ difficulty }) => difficulty === "Junior");
+  const juniorTwo = juniorRounds[1];
+  const plan = buildTeachingProof(juniorTwo);
+  assert.equal(juniorTwo.family, "chain");
+  assert.deepEqual(
+    plan.steps.map(({ kind }) => kind),
+    ["inspect", "substitute", "conclude"],
+  );
+  assert.deepEqual(plan.strategyIds, ["substitution"]);
+
+  const replacement = plan.steps.find(({ kind }) => kind === "substitute").replacement;
+  assert.equal(replacement.copies, 2);
+  assert.deepEqual(replacement.from, [{ creature: "rabbit", count: 2 }]);
+  assert.deepEqual(replacement.to, [{ creature: "frog", count: 6 }]);
+});
+
+test("offset chains cancel only after the bridge has been substituted", () => {
+  const offset = ROUNDS.find(
+    ({ difficulty, family }) => difficulty === "Junior" && family === "offset-chain",
+  );
+  const plan = buildTeachingProof(offset);
+  assert.deepEqual(
+    plan.steps.map(({ kind }) => kind),
+    ["inspect", "substitute", "cancel-matches", "conclude"],
+  );
+  assert.deepEqual(plan.strategyIds, ["substitution", "cancel-matches"]);
+});
+
+test("combo primers use one scale before add-scale combos are introduced", () => {
+  const juniorRounds = ROUNDS.filter(({ difficulty }) => difficulty === "Junior");
+  for (const round of juniorRounds.filter(({ family }) => family === "combo-primer")) {
+    const plan = buildTeachingProof(round);
+    assert.deepEqual(
+      plan.steps.map(({ kind }) => kind),
+      ["inspect", "regroup", "split-evenly", "conclude"],
+    );
+    assert.deepEqual(plan.steps[0].sources.map(({ sourceIndex }) => sourceIndex), [0]);
+    assert.ok(!plan.strategyIds.includes("add-scales"));
+  }
+
+  const addCombo = juniorRounds.find(({ family }) => family === "add-combo");
+  assert.deepEqual(
+    buildTeachingProof(addCombo).steps.map(({ kind }) => kind),
+    ["inspect", "add-scales", "regroup", "split-evenly", "conclude"],
+  );
+});
+
+test("authored family plans follow the direct strategy matrix", () => {
+  const plansByFamily = new Map();
+  for (const round of ROUNDS) {
+    const kinds = buildTeachingProof(round).steps.map(({ kind }) => kind);
+    const existing = plansByFamily.get(round.family) ?? [];
+    existing.push(kinds);
+    plansByFamily.set(round.family, existing);
+  }
+
+  for (const family of ["chain", "offset-chain", "fork", "cross", "parallel"]) {
+    for (const kinds of plansByFamily.get(family)) {
+      assert.ok(kinds.includes("substitute"), `${family}: substitutes in place`);
+      assert.ok(!kinds.includes("add-scales"), `${family}: never adds whole scales`);
+      assert.ok(
+        !kinds.includes("subtract-scales"),
+        `${family}: never subtracts whole scales`,
+      );
+    }
+  }
+
+  for (const kinds of plansByFamily.get("sum-combo")) {
+    assert.ok(kinds.indexOf("substitute") < kinds.indexOf("add-scales"));
+    assert.ok(kinds.indexOf("add-scales") < kinds.indexOf("regroup"));
+  }
+  for (const kinds of plansByFamily.get("difference")) {
+    assert.ok(kinds.indexOf("substitute") < kinds.indexOf("subtract-scales"));
+  }
+  for (const kinds of plansByFamily.get("combo-bridge")) {
+    assert.ok(kinds.indexOf("subtract-scales") < kinds.indexOf("split-evenly"));
+    assert.ok(kinds.indexOf("split-evenly") < kinds.indexOf("substitute"));
+  }
+});
+
+test("generated rounds use the same strategy-aware teaching model", () => {
+  for (const [difficultyIndex, difficulty] of [
+    "Starter",
+    "Junior",
+    "Expert",
+    "Wizard",
+  ].entries()) {
+    for (let sample = 0; sample < 400; sample += 1) {
+      const round = generateInfiniteRoundFromSeed(
+        difficulty,
+        0x71b0_0000 + difficultyIndex * 0x1_0000 + sample,
+      );
+      assertTeachingPlan(round, `${difficulty} generated ${sample + 1}`);
+    }
+  }
+});
+
+test("standalone Infinite introduces strategy families in scaffolded discovery order", () => {
+  const round = (difficulty, family) => {
+    const found = ROUNDS.find(
+      (candidate) =>
+        candidate.difficulty === difficulty && candidate.family === family,
+    );
+    assert.ok(found, `${difficulty} ${family} fixture`);
+    return found;
+  };
+  const accepts = (difficulty, family, discovered) =>
+    isInfiniteCurriculumCandidate(round(difficulty, family), discovered);
+
+  assert.equal(accepts("Starter", "direct", []), true);
+  assert.equal(accepts("Starter", "cancellation", []), false);
+  assert.equal(accepts("Starter", "direct", ["split-evenly"]), false);
+  assert.equal(
+    accepts("Starter", "cancellation", ["split-evenly"]),
+    true,
+  );
+
+  const foundations = ["split-evenly", "cancel-matches"];
+  assert.equal(accepts("Junior", "chain", foundations), true);
+  assert.equal(accepts("Junior", "offset-chain", foundations), false);
+  assert.equal(accepts("Junior", "combo-primer", foundations), false);
+
+  const substituted = [...foundations, "substitution"];
+  assert.equal(accepts("Junior", "combo-primer", substituted), true);
+  assert.equal(accepts("Junior", "add-combo", substituted), false);
+  assert.equal(accepts("Junior", "subtract-combo", substituted), false);
+  assert.equal(round("Junior", "combo-primer").equations.length, 1);
+
+  const combined = [...substituted, "create-combo"];
+  assert.equal(accepts("Junior", "combo-primer", combined), false);
+  assert.equal(accepts("Junior", "add-combo", combined), true);
+  assert.equal(accepts("Junior", "subtract-combo", combined), false);
+
+  const added = [...combined, "add-scales"];
+  assert.equal(accepts("Junior", "subtract-combo", added), true);
+  assert.equal(accepts("Junior", "add-combo", added), false);
+
+  assert.equal(accepts("Expert", "difference", added), true);
+  assert.equal(accepts("Expert", "sum-combo", added), false);
+
+  const complete = [...added, "subtract-scales"];
+  for (const candidate of ROUNDS.filter(
+    ({ difficulty }) => difficulty === "Expert",
+  )) {
+    assert.equal(isInfiniteCurriculumCandidate(candidate, complete), true);
+  }
+
+  const missingAdd = [...combined, "subtract-scales"];
+  assert.equal(accepts("Wizard", "sealed-sum", missingAdd), false);
+  assert.equal(accepts("Wizard", "sealed-difference", missingAdd), true);
+  for (const candidate of ROUNDS.filter(
+    ({ difficulty }) => difficulty === "Wizard",
+  )) {
+    assert.equal(isInfiniteCurriculumCandidate(candidate, complete), true);
   }
 });

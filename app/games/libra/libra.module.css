@@ -1107,6 +1107,564 @@
   }
 }
 
+/* Strategy-aware teaching proofs */
+
+.solutionProof {
+  width: min(100%, 610px);
+  min-height: 318px;
+  margin: 10px auto 14px;
+  padding: 14px;
+  overflow: hidden;
+  border: 1px solid #c9c3b7;
+  border-radius: 20px;
+  background: rgb(255 253 248 / 92%);
+}
+
+.proofAccessibleSteps {
+  width: 1px;
+  height: 1px;
+  position: absolute;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.proofSceneViewport {
+  min-height: 288px;
+  position: relative;
+}
+
+.proofStoryboard {
+  display: none;
+}
+
+.proofTeachingScene {
+  min-width: 0;
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--panel);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.solutionProof[data-proof-state="settled"] .proofTeachingSceneLast {
+  opacity: 1;
+}
+
+.solutionProof[data-proof-state="animating"] .proofTeachingScene {
+  animation: proofSceneCycle var(--proof-scene-duration)
+    var(--proof-scene-delay) ease both;
+}
+
+.solutionProof[data-proof-state="animating"] .proofTeachingSceneLast {
+  animation-name: proofFinalSceneCycle;
+}
+
+.proofSceneHeader {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.proofSceneHeader strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.proofStepNumber {
+  min-width: 45px;
+  min-height: 26px;
+  display: inline-grid;
+  place-items: center;
+  padding-inline: 8px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: white;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.62rem;
+  font-weight: 900;
+}
+
+.proofStepDots {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.proofStepDots > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #cbc5b9;
+}
+
+.proofStepDots > .proofStepDotActive {
+  width: 18px;
+  border-radius: 999px;
+  background: var(--violet);
+}
+
+.proofSceneBody {
+  min-width: 0;
+  display: grid;
+  place-items: center;
+}
+
+.proofSceneCaption {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 720;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.proofSceneSources,
+.proofOperationSources {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: center;
+  gap: 10px;
+}
+
+.proofTeachingSource {
+  --token-size: 26px;
+  min-width: 0;
+  min-height: 78px;
+  display: grid;
+  place-content: center;
+  gap: 7px;
+  padding: 10px 12px;
+  border: 2px solid var(--line);
+  border-radius: 13px;
+  background: #fffdf8;
+}
+
+.proofTeachingSourceAdd {
+  border-color: rgb(22 131 107 / 50%);
+}
+
+.proofTeachingSourceSubtract {
+  border-color: rgb(191 73 62 / 50%);
+}
+
+.proofTeachingSourceSubstitute {
+  border-color: rgb(119 103 215 / 55%);
+  background: rgb(119 103 215 / 5%);
+}
+
+.proofTeachingSource .proofSourceLabel {
+  text-align: center;
+}
+
+.proofTeachingSource .proofEquation,
+.proofSceneBody > .proofEquation,
+.proofBeforeAfter .proofEquation,
+.proofOperationResult .proofEquation,
+.proofRegroupScene .proofEquation,
+.proofSplitScene .proofEquation,
+.proofConclusion .proofEquation {
+  --token-size: clamp(24px, 4vw, 31px);
+}
+
+.proofTokenRunHighlighted {
+  z-index: 1;
+  padding: 3px 5px;
+  border: 2px solid var(--violet);
+  border-radius: 10px;
+  background: rgb(119 103 215 / 10%);
+  box-shadow: 0 0 0 4px rgb(119 103 215 / 8%);
+}
+
+.proofBeforeAfter {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.proofBeforeEquation,
+.proofAfterEquation,
+.proofOperationResult {
+  min-width: 0;
+  min-height: 66px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fffdf8;
+}
+
+.proofAfterEquation,
+.proofOperationResult {
+  border-color: rgb(22 131 107 / 48%);
+  background: rgb(22 131 107 / 6%);
+}
+
+.proofTransitionArrow {
+  display: grid;
+  place-items: center;
+  color: #8e877b;
+  font-size: 1.15rem;
+  font-weight: 950;
+  transform: rotate(-90deg);
+}
+
+.proofSubstitutionScene {
+  width: 100%;
+  display: grid;
+  grid-template-areas:
+    "source replace"
+    "working working";
+  grid-template-columns: minmax(0, 1.35fr) minmax(160px, 0.65fr);
+  align-items: stretch;
+  gap: 10px;
+}
+
+.proofSubstitutionScene > .proofTeachingSource {
+  grid-area: source;
+}
+
+.proofSubstitutionScene > .proofBeforeAfter {
+  grid-area: working;
+}
+
+.proofReplacementRail {
+  grid-area: replace;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border: 1px dashed rgb(119 103 215 / 58%);
+  border-radius: 13px;
+  background: rgb(119 103 215 / 5%);
+}
+
+.proofReplacementFrom,
+.proofReplacementTo {
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  gap: 5px;
+}
+
+.proofReplacementArrow {
+  color: var(--violet);
+  font-size: 1.3rem;
+  font-weight: 950;
+  transform: rotate(-90deg);
+}
+
+.proofMiniLabel {
+  color: var(--muted);
+  font-size: 0.54rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.proofReplacementGroups {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.proofReplacementGroup {
+  --token-size: 20px;
+  display: inline-flex;
+  padding: 3px 4px;
+  border: 1px solid rgb(119 103 215 / 42%);
+  border-radius: 8px;
+  background: #fffdf8;
+}
+
+.proofReplacementTraveler {
+  max-width: 48%;
+  position: absolute;
+  z-index: 5;
+  top: 50%;
+  left: 72%;
+  display: inline-flex;
+  padding: 4px;
+  border: 2px solid var(--violet);
+  border-radius: 10px;
+  background: rgb(255 253 248 / 96%);
+  box-shadow: 0 8px 20px rgb(23 33 61 / 18%);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -112px) scale(0.78);
+}
+
+.proofReplacementTraveler[data-target-side="left"] {
+  left: 28%;
+}
+
+.proofScaleOperationScene,
+.proofRegroupScene,
+.proofSplitScene {
+  width: 100%;
+  display: grid;
+  place-items: center;
+  gap: 9px;
+}
+
+.proofOperationSources {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.proofOperationSourceWrap {
+  min-width: 0;
+  position: relative;
+}
+
+.proofOperationSourceWrap .proofTeachingSource {
+  width: 100%;
+}
+
+.proofLargeOperator {
+  width: 32px;
+  height: 32px;
+  position: absolute;
+  z-index: 2;
+  left: -21px;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  border: 2px solid #fffdf8;
+  border-radius: 50%;
+  background: var(--ink);
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 950;
+  transform: translateY(-50%);
+}
+
+.proofOperationResult {
+  width: min(100%, 420px);
+  gap: 6px;
+}
+
+.proofRegroupScene > .proofEquation:first-child,
+.proofSplitScene > .proofEquation:first-child {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fffdf8;
+}
+
+.proofRegroupScene > .proofEquation:last-child,
+.proofSplitScene > .proofEquation:last-child {
+  padding: 8px 12px;
+  border: 1px solid rgb(243 189 78 / 72%);
+  border-radius: 12px;
+  background: rgb(243 189 78 / 9%);
+}
+
+.proofConclusion {
+  width: min(100%, 430px);
+  min-height: 112px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 18px 52px 18px 18px;
+  border: 2px solid rgb(22 131 107 / 58%);
+  border-radius: 16px;
+  background: rgb(22 131 107 / 8%);
+}
+
+.proofConclusion .proofCheck {
+  width: 38px;
+  height: 38px;
+  right: 12px;
+  font-size: 1rem;
+}
+
+@keyframes proofSceneCycle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translateY(7px) scale(0.99);
+  }
+
+  10%,
+  82% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes proofFinalSceneCycle {
+  0% {
+    opacity: 0;
+    transform: translateY(7px) scale(0.99);
+  }
+
+  12%,
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="substitute"]
+  .proofTokenRunHighlighted {
+  animation: proofReplacementTarget 620ms
+    calc(var(--proof-scene-delay) + 90ms) ease both;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="substitute"]
+  .proofReplacementTo {
+  animation: proofReplacementTravel 760ms
+    calc(var(--proof-scene-delay) + 230ms)
+    cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="substitute"]
+  .proofReplacementTraveler {
+  animation: proofReplacementOntoLoad 820ms
+    calc(var(--proof-scene-delay) + 180ms)
+    cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="substitute"]
+  .proofBeforeEquation {
+  animation: proofOldLoadLeave 330ms
+    calc(var(--proof-scene-delay) + 610ms) ease both;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="substitute"]
+  .proofAfterEquation,
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="add-scales"]
+  .proofOperationResult,
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="subtract-scales"]
+  .proofOperationResult {
+  animation: proofNewLoadSettle 390ms
+    calc(var(--proof-scene-delay) + 650ms)
+    cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="cancel-matches"]
+  .proofStrike {
+  animation: proofStrikeAcross 460ms
+    calc(var(--proof-scene-delay) + 190ms) ease both;
+}
+
+.solutionProof[data-proof-state="animating"]
+  .proofTeachingScene[data-step-kind="regroup"]
+  .proofComboGroup {
+  animation: proofGroupSettle 560ms
+    calc(var(--proof-scene-delay) + 300ms)
+    cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+@keyframes proofReplacementTarget {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px rgb(119 103 215 / 8%);
+  }
+
+  45%,
+  78% {
+    box-shadow: 0 0 0 8px rgb(119 103 215 / 20%);
+    transform: scale(1.06);
+  }
+}
+
+@keyframes proofReplacementOntoLoad {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -112px) scale(0.78);
+  }
+
+  18% {
+    opacity: 0.72;
+  }
+
+  68%,
+  84% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.03);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes proofReplacementTravel {
+  from {
+    opacity: 0.2;
+    transform: translateY(-20px) scale(0.88);
+  }
+
+  55% {
+    opacity: 0.78;
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes proofOldLoadLeave {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0.32;
+  }
+}
+
+@keyframes proofNewLoadSettle {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .strategyLessonVisual {
   width: min(100%, 720px);
   margin-inline: auto;
@@ -1258,27 +1816,30 @@
 }
 
 .strategyLessonTimeline .lessonBefore {
-  animation: lessonBeforeIn 250ms ease both;
+  animation: lessonBeforeIn 480ms ease both;
 }
 
 .strategyLessonTimeline .lessonFlow {
-  animation: lessonFlowIn 320ms 230ms ease both;
+  animation: lessonFlowIn 560ms 520ms ease both;
 }
 
 .strategyLessonTimeline .lessonOperator {
-  animation: lessonOperatorAct 360ms 350ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  animation: lessonOperatorAct 640ms 1.02s
+    cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 
 .strategyLessonTimeline .proofStrike {
-  animation: proofStrikeAcross 300ms 430ms ease both;
+  animation: proofStrikeAcross 520ms 1.42s ease both;
 }
 
 .strategyLessonTimeline .lessonAfter {
-  animation: lessonAfterIn 360ms 510ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  animation: lessonAfterIn 700ms 1.72s
+    cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 
 .strategyLessonTimeline .lessonAfter .proofComboGroup {
-  animation: proofGroupSettle 300ms 610ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  animation: proofGroupSettle 560ms 2.12s
+    cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 
 @keyframes lessonBeforeIn {
@@ -2144,6 +2705,20 @@
     padding: 8px;
   }
 
+  .proofTeachingScene {
+    padding: 10px;
+  }
+
+  .proofTeachingSource .proofEquation,
+  .proofSceneBody > .proofEquation,
+  .proofBeforeAfter .proofEquation,
+  .proofOperationResult .proofEquation,
+  .proofRegroupScene .proofEquation,
+  .proofSplitScene .proofEquation,
+  .proofConclusion .proofEquation {
+    --token-size: clamp(22px, 5.6vw, 28px);
+  }
+
   .proofSources {
     grid-template-columns: 1fr;
   }
@@ -2246,6 +2821,30 @@
   }
 }
 
+@media (max-width: 480px) {
+  .solutionProof[data-proof-state="animating"] {
+    min-height: 520px;
+  }
+
+  .solutionProof[data-proof-state="animating"] .proofSceneViewport {
+    min-height: 498px;
+  }
+
+  .proofSubstitutionScene {
+    grid-template-areas:
+      "source"
+      "replace"
+      "working";
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .proofReplacementRail {
+    width: min(100%, 360px);
+    justify-self: center;
+  }
+}
+
 @media (max-width: 390px) {
   .pageShell {
     padding-inline: 12px;
@@ -2297,6 +2896,68 @@
 
   .campaignStatus .roundCount {
     display: none;
+  }
+
+  .solutionProof {
+    padding: 6px;
+  }
+
+  .proofTeachingScene {
+    gap: 7px;
+    padding: 9px 8px;
+  }
+
+  .proofSceneHeader {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .proofStepDots {
+    display: none;
+  }
+
+  .proofBeforeAfter {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .proofTransitionArrow,
+  .proofReplacementArrow {
+    transform: none;
+  }
+
+  .proofReplacementRail {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .proofOperationSources {
+    gap: 6px;
+  }
+
+  .proofLargeOperator {
+    width: 26px;
+    height: 26px;
+    left: -16px;
+    font-size: 0.88rem;
+  }
+
+  .proofTeachingSource {
+    --token-size: 20px;
+    padding-inline: 5px;
+  }
+
+  .proofTeachingSource .proofEquation,
+  .proofSceneBody > .proofEquation,
+  .proofBeforeAfter .proofEquation,
+  .proofOperationResult .proofEquation,
+  .proofRegroupScene .proofEquation,
+  .proofSplitScene .proofEquation,
+  .proofConclusion .proofEquation {
+    --token-size: clamp(19px, 6.4vw, 25px);
+  }
+
+  .proofSceneCaption {
+    font-size: 0.66rem;
   }
 
   .cluePanel {
@@ -2381,7 +3042,7 @@
   .solutionProof *,
   .strategyLessonTimeline *,
   .infiniteSupercharged .energyTrack {
-    animation: none;
+    animation: none !important;
   }
 
   .solutionProof[data-proof-state="animating"] .proofSourceEquation,
@@ -2395,6 +3056,28 @@
   .strategyLessonTimeline .lessonOperator,
   .strategyLessonTimeline .lessonAfter,
   .strategyLessonTimeline .proofStrike {
+    opacity: 1;
+    transform: none;
+  }
+
+  .solutionProof {
+    min-height: 0 !important;
+    overflow: visible;
+  }
+
+  .proofSceneViewport {
+    display: none;
+  }
+
+  .proofStoryboard {
+    display: grid;
+    gap: 10px;
+  }
+
+  .proofStoryboard .proofTeachingScene {
+    min-height: 260px;
+    position: relative;
+    inset: auto;
     opacity: 1;
     transform: none;
   }

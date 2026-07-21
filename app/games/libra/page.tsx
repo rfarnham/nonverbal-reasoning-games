@@ -37,12 +37,12 @@ import {
 } from "./balance-visual";
 import {
   CREATURE_NAMES,
+  GENERATOR_MAX_ATTEMPTS,
   ROUNDS,
   describeExpression,
   generateInfiniteRound,
   optionFeedback,
   roundFingerprint,
-  solutionStrategyFeedback,
   type Difficulty,
   type Round,
 } from "./game-engine";
@@ -57,10 +57,14 @@ import {
   STRATEGY_CATALOGUE,
   STRATEGY_CATALOGUE_BY_ID,
   STRATEGY_SECTIONS,
+  REDUCED_TEACHING_PROOF_MS,
+  buildTeachingProof,
   canOpenHistoricalReview,
   discoveredStrategyIdsAfterLesson,
+  isInfiniteCurriculumCandidate,
   orderedStrategyIdsForRound,
   preRoundStrategyIds,
+  teachingProofDurationMs,
   unseenStrategyIds,
   type StrategyId,
 } from "./strategy-curriculum";
@@ -108,7 +112,6 @@ type CampaignReviewSelection = {
   problemIndex: number;
 };
 
-const CORRECT_FEEDBACK_MS = 900;
 const WRONG_APPROACH_MS = 540;
 const HIDDEN_WRONG_APPROACH_MS = 160;
 const WRONG_REVIEW_MS = 2200;
@@ -138,6 +141,13 @@ function progressionTargetHref(
 
 function progressionLevelLabel(level: string): string {
   return `${level.charAt(0).toUpperCase()}${level.slice(1)}`;
+}
+
+function teachingProofFeedback(round: Round): string {
+  const actions = buildTeachingProof(round).steps
+    .filter(({ kind }) => kind !== "inspect" && kind !== "conclude")
+    .map(({ title }) => title);
+  return `${actions.join(" → ")}.`;
 }
 
 function initialCampaignCursors(): CampaignCursors {
@@ -225,26 +235,36 @@ function tryBuildInfiniteSessionRound(
   ordinal: number,
   seenFingerprints: ReadonlySet<string>,
   difficulty: Difficulty,
+  discoveredStrategyIds: readonly StrategyId[],
 ): { sessionRound: SessionRound; fingerprint: string } | null {
-  try {
-    const round = generateInfiniteRound(
-      difficulty,
-      Math.random,
-      seenFingerprints,
-    );
-    const fingerprint = roundFingerprint(round);
-    if (seenFingerprints.has(fingerprint)) return null;
-    return {
-      sessionRound: {
-        id: `infinite-${ordinal}-${fingerprint}`,
-        ordinal,
-        round,
-      },
-      fingerprint,
-    };
-  } catch {
-    return null;
+  const rejectedFingerprints = new Set(seenFingerprints);
+
+  for (let attempt = 0; attempt < GENERATOR_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      const round = generateInfiniteRound(
+        difficulty,
+        Math.random,
+        rejectedFingerprints,
+      );
+      const fingerprint = roundFingerprint(round);
+      rejectedFingerprints.add(fingerprint);
+      if (!isInfiniteCurriculumCandidate(round, discoveredStrategyIds)) {
+        continue;
+      }
+      return {
+        sessionRound: {
+          id: `infinite-${ordinal}-${fingerprint}`,
+          ordinal,
+          round,
+        },
+        fingerprint,
+      };
+    } catch {
+      return null;
+    }
   }
+
+  return null;
 }
 
 export default function LibraPage() {
@@ -539,7 +559,7 @@ export default function LibraPage() {
     });
   }, []);
 
-  const replayProof = useCallback(() => {
+  const replayProof = useCallback((proofRound: Round) => {
     if (proofReplayTimerRef.current) {
       clearTimeout(proofReplayTimerRef.current);
     }
@@ -553,7 +573,9 @@ export default function LibraPage() {
         setProofReplaying(false);
         proofReplayTimerRef.current = null;
       },
-      reducedMotion ? REDUCED_FEEDBACK_MS : 1500,
+      reducedMotion
+        ? REDUCED_TEACHING_PROOF_MS
+        : teachingProofDurationMs(proofRound),
     );
   }, []);
 
@@ -699,9 +721,11 @@ export default function LibraPage() {
       animationTokenRef.current = token;
       clearAttemptTimers();
       const approachDuration = reducedMotion
-        ? REDUCED_FEEDBACK_MS
+        ? isCorrect
+          ? REDUCED_TEACHING_PROOF_MS
+          : REDUCED_FEEDBACK_MS
         : isCorrect
-          ? CORRECT_FEEDBACK_MS
+          ? teachingProofDurationMs(round)
           : round.feedbackPolicy === "preserve-inference"
             ? HIDDEN_WRONG_APPROACH_MS
             : WRONG_APPROACH_MS;
@@ -802,6 +826,7 @@ export default function LibraPage() {
       1,
       infiniteFingerprintsRef.current,
       initialAdaptive.targetDifficulty,
+      [],
     );
     if (generated) {
       infiniteFingerprintsRef.current.add(generated.fingerprint);
@@ -951,6 +976,7 @@ export default function LibraPage() {
         nextOrdinal,
         infiniteFingerprintsRef.current,
         infiniteAdaptiveRef.current.targetDifficulty,
+        discoveredStrategyIds,
       );
       if (!generated) {
         inputLockedRef.current = false;
@@ -1004,6 +1030,7 @@ export default function LibraPage() {
     campaignReviewSelection,
     campaignProblemIndex,
     controlledSession,
+    discoveredStrategyIds,
     isCampaign,
     isInfinite,
     isLastRedemptionRound,
@@ -1021,6 +1048,7 @@ export default function LibraPage() {
       ordinal,
       infiniteFingerprintsRef.current,
       infiniteAdaptiveRef.current.targetDifficulty,
+      discoveredStrategyIds,
     );
     if (!generated) return;
 
@@ -1039,7 +1067,12 @@ export default function LibraPage() {
       setRoundCursor((current) => current + 1);
     }
     shouldFocusFirstOption.current = true;
-  }, [queueStrategyLessons, resetAttemptState, roundQueue.length]);
+  }, [
+    discoveredStrategyIds,
+    queueStrategyLessons,
+    resetAttemptState,
+    roundQueue.length,
+  ]);
 
   const endInfinite = useCallback(() => {
     if (
@@ -1419,10 +1452,8 @@ export default function LibraPage() {
     }
 
     window.addEventListener("resize", finishFeedback);
-    window.addEventListener("scroll", finishFeedback, true);
     return () => {
       window.removeEventListener("resize", finishFeedback);
-      window.removeEventListener("scroll", finishFeedback, true);
     };
   }, [
     clearAttemptTimers,
@@ -2045,14 +2076,13 @@ export default function LibraPage() {
                   </div>
                   <div className={styles.historicalProofCopy}>
                     <p>
-                      {solutionStrategyFeedback(
-                        historicalSessionRound.round,
-                      )}
+                      {teachingProofFeedback(historicalSessionRound.round)}
                     </p>
                     <button
                       className={styles.replayButton}
                       type="button"
-                      onClick={replayProof}
+                      onClick={() => replayProof(historicalSessionRound.round)}
+                      disabled={proofReplaying}
                     >
                       <span aria-hidden="true">↻</span>
                       Replay proof
@@ -2158,14 +2188,17 @@ export default function LibraPage() {
                       {round.options.map((option, optionIndex) => {
                         const isCorrect = optionIndex === round.correctIndex;
                         const isSelected = selectedIndex === optionIndex;
+                        const isShowingCorrectProof =
+                          phase === "answered" ||
+                          (phase === "animating" && selectedCorrect);
                         const showCorrect =
-                          phase === "answered" && isCorrect;
+                          isShowingCorrectProof && isCorrect;
                         const showWrong =
                           phase === "wrong-review" &&
                           isSelected &&
                           !isCorrect;
                         const muted =
-                          (phase === "answered" && !isCorrect) ||
+                          (isShowingCorrectProof && !isCorrect) ||
                           (phase === "wrong-review" && !isSelected);
                         const revealDifferences =
                           showWrong &&
@@ -2256,13 +2289,14 @@ export default function LibraPage() {
                           Correct · {optionFeedback(round, round.correctIndex)}
                         </strong>
                         <span className={styles.strategyFeedback}>
-                          {solutionStrategyFeedback(round)}
+                          {teachingProofFeedback(round)}
                         </span>
                       </span>
                       <button
                         className={styles.replayButton}
                         type="button"
-                        onClick={replayProof}
+                        onClick={() => replayProof(round)}
+                        disabled={proofReplaying}
                       >
                         <span aria-hidden="true">↻</span>
                         Replay proof
@@ -2285,6 +2319,10 @@ export default function LibraPage() {
                         <span aria-hidden="true">→</span>
                       </button>
                     </>
+                  ) : phase === "animating" && selectedCorrect ? (
+                    <strong className={styles.correctText}>
+                      Correct · Watch the balance change step by step.
+                    </strong>
                   ) : retryReady ? (
                     <strong className={styles.retryText}>Try again</strong>
                   ) : null}

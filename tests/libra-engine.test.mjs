@@ -26,6 +26,7 @@ import {
 } from "../app/games/libra/game-engine.ts";
 import { progressionAdapter } from "../app/games/libra/progression-adapter.ts";
 import { progressionMetadata } from "../app/games/libra/progression-metadata.ts";
+import { buildTeachingProof } from "../app/games/libra/strategy-curriculum.ts";
 import { resolveProgressionQuestion } from "../lib/progression/game-adapter.ts";
 
 const SEEDS_PER_DIFFICULTY = 400;
@@ -36,6 +37,12 @@ const EXPECTED_EQUATION_COUNTS = {
   Expert: 3,
   Wizard: 3,
 };
+
+function expectedEquationCount(round) {
+  return round.difficulty === "Junior" && round.family === "combo-primer"
+    ? 1
+    : EXPECTED_EQUATION_COUNTS[round.difficulty];
+}
 
 const EXPECTED_CREATURE_COUNTS = {
   Starter: 2,
@@ -49,6 +56,7 @@ const EXPECTED_FAMILIES = {
   Junior: new Set([
     "chain",
     "offset-chain",
+    "combo-primer",
     "add-combo",
     "subtract-combo",
   ]),
@@ -90,14 +98,15 @@ const GENERATED = Object.fromEntries(
   ]),
 );
 
-test("Libra generator v2 safely migrates saved v1 questions", () => {
-  assert.equal(progressionMetadata.generatorVersion, "2");
+test("Libra content v2 and generator v3 safely migrate saved generator v2 questions", () => {
+  assert.equal(progressionMetadata.contentVersion, "2");
+  assert.equal(progressionMetadata.generatorVersion, "3");
   const resolved = resolveProgressionQuestion(progressionAdapter, {
     source: "generated",
     gameSlug: "libra",
     level: "starter",
     seed: "legacy-libra-starter",
-    generatorVersion: "1",
+    generatorVersion: "2",
   });
   assert.equal(resolved.resolution, "generated-fallback");
   assert.equal(resolved.ref.source, "campaign");
@@ -142,7 +151,7 @@ function assertValidRound(round, label) {
 
   assert.equal(
     round.equations.length,
-    EXPECTED_EQUATION_COUNTS[round.difficulty],
+    expectedEquationCount(round),
     `${label} relation count`,
   );
   assert.equal(
@@ -281,7 +290,10 @@ test("the authored ladder adds relations and covers its intended rule families",
   }
 
   for (const round of ROUNDS.filter(({ difficulty }) => difficulty !== "Wizard")) {
-    assert.equal(validateRound(round).freeVariableCount, 0);
+    assert.equal(
+      validateRound(round).freeVariableCount,
+      round.family === "combo-primer" ? 1 : 0,
+    );
     assert.equal(round.scaffold?.kind, "equation-path");
     assert.deepEqual(
       new Set(round.scaffold.equationOrder),
@@ -336,9 +348,9 @@ test("authored strategy archetypes progress from foundations to scale algebra", 
   assert.deepEqual(
     comboPrimers.map(({ solutionDerivation }) => solutionDerivation),
     [
-      { equationMultipliers: [1, 0], normalizeBy: 2 },
-      { equationMultipliers: [1, 0], normalizeBy: 3 },
-      { equationMultipliers: [1, 0], normalizeBy: 4 },
+      { equationMultipliers: [1], normalizeBy: 2 },
+      { equationMultipliers: [1], normalizeBy: 3 },
+      { equationMultipliers: [1], normalizeBy: 4 },
     ],
   );
 
@@ -346,24 +358,18 @@ test("authored strategy archetypes progress from foundations to scale algebra", 
     {
       comboLeft: "cat:2+bear:2",
       comboRight: "beetle:8",
-      checkLeft: "cat:1+bear:2",
-      checkRight: "beetle:6",
       target: "cat:1+bear:1",
       answer: 4,
     },
     {
       comboLeft: "goose:3+fox:3",
       comboRight: "chick:6",
-      checkLeft: "goose:1+fox:3",
-      checkRight: "chick:4",
       target: "goose:1+fox:1",
       answer: 2,
     },
     {
       comboLeft: "rabbit:4+turtle:4",
       comboRight: "frog:8",
-      checkLeft: "rabbit:3+turtle:1",
-      checkRight: "frog:4",
       target: "rabbit:1+turtle:1",
       answer: 2,
     },
@@ -374,8 +380,6 @@ test("authored strategy archetypes progress from foundations to scale algebra", 
       {
         comboLeft: expressionKey(round.equations[0].left),
         comboRight: expressionKey(round.equations[0].right),
-        checkLeft: expressionKey(round.equations[1].left),
-        checkRight: expressionKey(round.equations[1].right),
         target: expressionKey(round.question.target),
         answer: round.answer,
       },
@@ -387,13 +391,12 @@ test("authored strategy archetypes progress from foundations to scale algebra", 
       round.answer,
       `Junior combo primer ${index + 1} is solved by regrouping its repeated combo`,
     );
-    assert.equal(
-      calculateAnswer([round.equations[1]], round.question),
-      null,
-      `Junior combo primer ${index + 1} check scale does not expose the target`,
-    );
+    assert.equal(round.equations.length, 1);
+    assert.equal(validateRound(round).freeVariableCount, 1);
   }
 
+  assert.equal(junior[10], juniorAdd);
+  assert.equal(juniorAdd.family, "add-combo");
   assert.deepEqual(juniorAdd.solutionStrategies, [
     "add-scales",
     "create-combo",
@@ -699,6 +702,21 @@ test("generated Starter direct rounds always require splitting at least two targ
   );
 });
 
+test("generated Junior includes honest one-scale combo primers", () => {
+  const primers = GENERATED.Junior.filter(
+    ({ family }) => family === "combo-primer",
+  );
+
+  assert.ok(primers.length >= 30, "the corpus meaningfully samples combo primers");
+  for (const [index, round] of primers.entries()) {
+    assert.equal(round.equations.length, 1, `combo primer ${index + 1}`);
+    assert.deepEqual(round.solutionStrategies, ["create-combo"]);
+    assert.deepEqual(round.solutionDerivation.equationMultipliers, [1]);
+    assert.ok(round.solutionDerivation.normalizeBy >= 2);
+    assert.equal(validateRound(round).freeVariableCount, 1);
+  }
+});
+
 test("generated Junior through Wizard repeatedly exercise every strategy archetype", () => {
   const minimumCounts = {
     Junior: {
@@ -732,6 +750,87 @@ test("generated Junior through Wizard repeatedly exercise every strategy archety
       );
     }
   }
+});
+
+test("generated teaching plans visibly exercise every available strategy", () => {
+  const minimumCounts = {
+    Starter: {
+      "split-evenly": 100,
+      "cancel-matches": 100,
+    },
+    Junior: {
+      "split-evenly": 100,
+      "cancel-matches": 50,
+      substitution: 100,
+      "create-combo": 100,
+      "add-scales": 30,
+      "subtract-scales": 30,
+    },
+    Expert: {
+      "split-evenly": 100,
+      "cancel-matches": 50,
+      substitution: 200,
+      "create-combo": 75,
+      "add-scales": 50,
+      "subtract-scales": 100,
+    },
+    Wizard: {
+      "split-evenly": 150,
+      "cancel-matches": 150,
+      substitution: 200,
+      "create-combo": 150,
+      "add-scales": 100,
+      "subtract-scales": 50,
+    },
+  };
+
+  for (const [difficulty, expected] of Object.entries(minimumCounts)) {
+    const visiblePlans = GENERATED[difficulty].map(
+      (round) => buildTeachingProof(round).strategyIds,
+    );
+    for (const [strategy, minimum] of Object.entries(expected)) {
+      const count = visiblePlans.filter((ids) => ids.includes(strategy)).length;
+      assert.ok(
+        count >= minimum,
+        `${difficulty} visible ${strategy}: ${count} should be at least ${minimum}`,
+      );
+    }
+  }
+});
+
+test("validation rejects a chain family label that lies about visible cancellation", () => {
+  const chain = ROUNDS.find(
+    ({ difficulty, family }) =>
+      difficulty === "Junior" && family === "chain",
+  );
+  const offsetChain = ROUNDS.find(
+    ({ difficulty, family }) =>
+      difficulty === "Junior" && family === "offset-chain",
+  );
+  assert.ok(chain);
+  assert.ok(offsetChain);
+
+  const mislabeledOffset = validateRound({
+    ...chain,
+    family: "offset-chain",
+  });
+  assert.equal(mislabeledOffset.valid, false);
+  assert.ok(
+    mislabeledOffset.errors.some((error) =>
+      error.includes("removable unit offset"),
+    ),
+  );
+
+  const mislabeledChain = validateRound({
+    ...offsetChain,
+    family: "chain",
+  });
+  assert.equal(mislabeledChain.valid, false);
+  assert.ok(
+    mislabeledChain.errors.some((error) =>
+      error.includes("removable unit offset"),
+    ),
+  );
 });
 
 test("Wizard generation always preserves the sealed-load invariant", () => {

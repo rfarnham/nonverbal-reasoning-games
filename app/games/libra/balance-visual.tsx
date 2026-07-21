@@ -1,5 +1,7 @@
 "use client";
 
+import type { CSSProperties, ReactNode } from "react";
+
 import type {
   AnswerOption,
   BalanceToken,
@@ -8,8 +10,11 @@ import type {
   Expression,
   Round,
 } from "./game-engine";
-import { BALANCE_TOKENS, BALANCE_TOKEN_NAMES } from "./game-engine";
-import type { StrategyId } from "./strategy-curriculum";
+import type { StrategyId, TeachingProofStep } from "./strategy-curriculum";
+import {
+  TEACHING_PROOF_STEP_MS,
+  buildTeachingProof,
+} from "./strategy-curriculum";
 import styles from "./libra.module.css";
 
 const TOKEN_COLORS: Readonly<Record<Creature, string>> = {
@@ -208,14 +213,6 @@ export type ProofState = "hidden" | "animating" | "settled";
 type ProofTerm = {
   creature: BalanceToken;
   count: number;
-};
-
-type ProofArithmetic = {
-  expandedLeft: readonly ProofTerm[];
-  expandedRight: readonly ProofTerm[];
-  cancellation: Readonly<Partial<Record<BalanceToken, number>>>;
-  reducedLeft: readonly ProofTerm[];
-  reducedRight: readonly ProofTerm[];
 };
 
 function flattenedExpression(expression: Expression) {
@@ -417,74 +414,6 @@ export function BalanceScale({
   );
 }
 
-function mergeProofTerms(expressions: readonly Expression[]): readonly ProofTerm[] {
-  const counts = new Map<BalanceToken, number>();
-  for (const expression of expressions) {
-    for (const term of expression) {
-      counts.set(term.creature, (counts.get(term.creature) ?? 0) + term.count);
-    }
-  }
-  return BALANCE_TOKENS.flatMap((creature) => {
-    const count = counts.get(creature) ?? 0;
-    return count > 0 ? [{ creature, count }] : [];
-  });
-}
-
-function subtractCancelledTerms(
-  terms: readonly ProofTerm[],
-  cancellation: Readonly<Partial<Record<BalanceToken, number>>>,
-): readonly ProofTerm[] {
-  return terms.flatMap((term) => {
-    const count = term.count - (cancellation[term.creature] ?? 0);
-    return count > 0 ? [{ ...term, count }] : [];
-  });
-}
-
-function buildProofArithmetic(round: Round): ProofArithmetic {
-  const leftExpressions: Expression[] = [];
-  const rightExpressions: Expression[] = [];
-
-  round.solutionDerivation.equationMultipliers.forEach(
-    (multiplier, equationIndex) => {
-      const equation = round.equations[equationIndex];
-      if (!equation) return;
-      const copies = Math.abs(multiplier);
-      const left = multiplier > 0 ? equation.left : equation.right;
-      const right = multiplier > 0 ? equation.right : equation.left;
-      for (let copyIndex = 0; copyIndex < copies; copyIndex += 1) {
-        leftExpressions.push(left);
-        rightExpressions.push(right);
-      }
-    },
-  );
-
-  const expandedLeft = mergeProofTerms(leftExpressions);
-  const expandedRight = mergeProofTerms(rightExpressions);
-  const leftCounts = new Map(
-    expandedLeft.map((term) => [term.creature, term.count]),
-  );
-  const rightCounts = new Map(
-    expandedRight.map((term) => [term.creature, term.count]),
-  );
-  const cancellation = Object.fromEntries(
-    BALANCE_TOKENS.flatMap((creature) => {
-      const count = Math.min(
-        leftCounts.get(creature) ?? 0,
-        rightCounts.get(creature) ?? 0,
-      );
-      return count > 0 ? [[creature, count]] : [];
-    }),
-  ) as Readonly<Partial<Record<BalanceToken, number>>>;
-
-  return {
-    expandedLeft,
-    expandedRight,
-    cancellation,
-    reducedLeft: subtractCancelledTerms(expandedLeft, cancellation),
-    reducedRight: subtractCancelledTerms(expandedRight, cancellation),
-  };
-}
-
 function ProofToken({
   creature,
   accentMap,
@@ -503,11 +432,13 @@ function ProofTokenRun({
   creature,
   count,
   cancelled = false,
+  highlighted = false,
   accentMap,
 }: {
   creature: BalanceToken;
   count: number;
   cancelled?: boolean;
+  highlighted?: boolean;
   accentMap?: AccentMap;
 }) {
   if (count <= 0) return null;
@@ -516,7 +447,7 @@ function ProofTokenRun({
     <span
       className={`${styles.proofTokenRun} ${
         cancelled ? styles.proofTokenRunCancelled : ""
-      }`}
+      } ${highlighted ? styles.proofTokenRunHighlighted : ""}`}
     >
       {count > 3 ? <span className={styles.proofCount}>{count}×</span> : null}
       {Array.from({ length: shownCount }, (_, tokenIndex) => (
@@ -534,12 +465,15 @@ function ProofTokenRun({
 function ProofExpression({
   expression,
   cancellation,
+  highlighted,
   accentMap,
 }: {
   expression: readonly ProofTerm[];
   cancellation?: Readonly<Partial<Record<BalanceToken, number>>>;
+  highlighted?: readonly BalanceToken[];
   accentMap?: AccentMap;
 }) {
+  const highlightedTokens = new Set(highlighted);
   const hasTerms = expression.some(({ count }) => count > 0);
   return (
     <span className={styles.proofExpression}>
@@ -563,6 +497,7 @@ function ProofExpression({
               <ProofTokenRun
                 creature={term.creature}
                 count={term.count - cancelledCount}
+                highlighted={highlightedTokens.has(term.creature)}
                 accentMap={accentMap}
               />
             </span>
@@ -579,11 +514,15 @@ function ProofEquation({
   left,
   right,
   cancellation,
+  highlightLeft,
+  highlightRight,
   accentMap,
 }: {
   left: readonly ProofTerm[];
   right: readonly ProofTerm[];
   cancellation?: Readonly<Partial<Record<BalanceToken, number>>>;
+  highlightLeft?: readonly BalanceToken[];
+  highlightRight?: readonly BalanceToken[];
   accentMap?: AccentMap;
 }) {
   return (
@@ -591,102 +530,434 @@ function ProofEquation({
       <ProofExpression
         expression={left}
         cancellation={cancellation}
+        highlighted={highlightLeft}
         accentMap={accentMap}
       />
       <span className={styles.proofEquals}>=</span>
       <ProofExpression
         expression={right}
         cancellation={cancellation}
+        highlighted={highlightRight}
         accentMap={accentMap}
       />
     </span>
   );
 }
 
-function operationWord(multiplier: number, index: number): string {
-  const copies = Math.abs(multiplier);
-  const repeat = copies > 1 ? `${copies} copies of ` : "";
-  if (index === 0 && multiplier > 0) return `Use ${repeat}scale 1`;
-  return `${multiplier < 0 ? "Subtract" : "Add"} ${repeat}scale ${index + 1}`;
+type TeachingSource = Extract<
+  TeachingProofStep,
+  { kind: "inspect" }
+>["sources"][number];
+
+type TeachingGroupedEquationValue = Extract<
+  TeachingProofStep,
+  { kind: "regroup" }
+>["after"];
+
+type ProofSceneStyle = CSSProperties & {
+  "--proof-scene-delay": string;
+  "--proof-scene-duration": string;
+};
+
+function proofCancellationMap(
+  expression: Expression,
+): Readonly<Partial<Record<BalanceToken, number>>> {
+  return Object.fromEntries(
+    expression.map(({ creature, count }) => [creature, count]),
+  );
 }
 
-function proofNarration(round: Round, arithmetic: ProofArithmetic): string {
-  const selections = round.solutionDerivation.equationMultipliers
-    .flatMap((multiplier, equationIndex) =>
-      multiplier === 0 ? [] : [operationWord(multiplier, equationIndex)],
-    )
-    .join(", then ");
-  const cancelledNames = BALANCE_TOKENS.flatMap((token) => {
-    const count = arithmetic.cancellation[token] ?? 0;
-    if (count === 0) return [];
-    return [`${count} ${BALANCE_TOKEN_NAMES[token]}${count === 1 ? "" : "s"}`];
-  });
-  const cancellation =
-    cancelledNames.length > 0
-      ? ` Cancel matching ${cancelledNames.join(" and ")} from both sides.`
-      : "";
-  const normalize = round.solutionDerivation.normalizeBy;
-  const division =
-    normalize > 1
-      ? ` Regroup the left side into ${normalize} identical target groups and divide both sides by ${normalize}.`
-      : "";
-  return `${selections}.${cancellation}${division} The target balances ${round.answer} ${
-    BALANCE_TOKEN_NAMES[round.question.unit]
-  }${round.answer === 1 ? "" : "s"}.`;
+function isGroupedEquation(
+  value: BalanceEquation | TeachingGroupedEquationValue,
+): value is TeachingGroupedEquationValue {
+  return "groupCount" in value;
 }
 
-function SourceEquation({
-  equation,
-  multiplier,
-  equationIndex,
+function expressionPerCopy(
+  expression: Expression,
+  copies: number,
+): Expression {
+  if (
+    copies <= 1 ||
+    expression.some(({ count }) => count % copies !== 0)
+  ) {
+    return expression;
+  }
+  return expression.map(({ creature, count }) => ({
+    creature,
+    count: count / copies,
+  }));
+}
+
+function TeachingSourceCard({
+  source,
   accentMap,
+  tone = "neutral",
 }: {
-  equation: BalanceEquation;
-  multiplier: number;
-  equationIndex: number;
+  source: TeachingSource;
   accentMap?: AccentMap;
+  tone?: "neutral" | "add" | "subtract" | "substitute";
 }) {
-  const symbol =
-    equationIndex === 0 && multiplier > 0 ? "●" : multiplier < 0 ? "−" : "+";
   return (
     <div
-      className={`${styles.proofSourceEquation} ${
-        multiplier < 0 ? styles.proofSourceSubtract : styles.proofSourceAdd
+      className={`${styles.proofTeachingSource} ${
+        tone === "add"
+          ? styles.proofTeachingSourceAdd
+          : tone === "subtract"
+            ? styles.proofTeachingSourceSubtract
+            : tone === "substitute"
+              ? styles.proofTeachingSourceSubstitute
+              : ""
       }`}
     >
-      <span className={styles.proofOperationSymbol}>{symbol}</span>
-      <span className={styles.proofSourceBody}>
-        <span className={styles.proofSourceLabel}>
-          {operationWord(multiplier, equationIndex)}
-        </span>
-        <ProofEquation
-          left={equation.left}
-          right={equation.right}
-          accentMap={accentMap}
-        />
+      <span className={styles.proofSourceLabel}>
+        {source.sourceIndex === null
+          ? "Working balance"
+          : `Scale ${source.sourceIndex + 1}`}
       </span>
-      {Math.abs(multiplier) > 1 ? (
-        <span className={styles.proofCopies}>{Math.abs(multiplier)}×</span>
-      ) : null}
+      <ProofEquation
+        left={source.equation.left}
+        right={source.equation.right}
+        accentMap={accentMap}
+      />
     </div>
   );
 }
 
-function targetComboGroups(round: Round, accentMap?: AccentMap) {
+function GroupedEquationVisual({
+  equation,
+  accentMap,
+}: {
+  equation: TeachingGroupedEquationValue;
+  accentMap?: AccentMap;
+}) {
   return (
-    <span className={styles.proofComboGroups}>
-      {Array.from(
-        { length: round.solutionDerivation.normalizeBy },
-        (_, groupIndex) => (
-          <span className={styles.proofComboGroup} key={groupIndex}>
+    <span className={styles.proofEquation}>
+      <span className={styles.proofComboGroups}>
+        {Array.from({ length: equation.groupCount }, (_, groupIndex) => (
+          <span className={styles.proofComboGroup} key={`left-${groupIndex}`}>
             <ProofExpression
-              expression={round.question.target}
+              expression={equation.leftBundle}
+              accentMap={accentMap}
+            />
+          </span>
+        ))}
+      </span>
+      <span className={styles.proofEquals}>=</span>
+      <span className={styles.proofComboGroups}>
+        {Array.from({ length: equation.groupCount }, (_, groupIndex) => (
+          <span className={styles.proofComboGroup} key={`right-${groupIndex}`}>
+            <ProofExpression
+              expression={equation.rightBundle}
+              accentMap={accentMap}
+            />
+          </span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
+function ProofBeforeAfter({
+  before,
+  after,
+  accentMap,
+  cancellation,
+  highlightLeft,
+  highlightRight,
+  replacementOverlay,
+}: {
+  before: BalanceEquation;
+  after: BalanceEquation;
+  accentMap?: AccentMap;
+  cancellation?: Readonly<Partial<Record<BalanceToken, number>>>;
+  highlightLeft?: readonly BalanceToken[];
+  highlightRight?: readonly BalanceToken[];
+  replacementOverlay?: ReactNode;
+}) {
+  return (
+    <div className={styles.proofBeforeAfter}>
+      <div className={styles.proofBeforeEquation}>
+        <ProofEquation
+          left={before.left}
+          right={before.right}
+          cancellation={cancellation}
+          highlightLeft={highlightLeft}
+          highlightRight={highlightRight}
+          accentMap={accentMap}
+        />
+        {replacementOverlay}
+      </div>
+      <span className={styles.proofTransitionArrow} aria-hidden="true">
+        ↓
+      </span>
+      <div className={styles.proofAfterEquation}>
+        <ProofEquation
+          left={after.left}
+          right={after.right}
+          accentMap={accentMap}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SubstitutionScene({
+  step,
+  accentMap,
+}: {
+  step: Extract<TeachingProofStep, { kind: "substitute" }>;
+  accentMap?: AccentMap;
+}) {
+  const highlighted = step.replacement.from.map(({ creature }) => creature);
+  const copyExpression = expressionPerCopy(
+    step.replacement.to,
+    step.replacement.copies,
+  );
+  const replacementGroups = (
+    <span className={styles.proofReplacementGroups}>
+      {Array.from(
+        { length: Math.max(1, step.replacement.copies) },
+        (_, copyIndex) => (
+          <span className={styles.proofReplacementGroup} key={copyIndex}>
+            <ProofExpression
+              expression={copyExpression}
               accentMap={accentMap}
             />
           </span>
         ),
       )}
     </span>
+  );
+
+  return (
+    <div className={styles.proofSubstitutionScene}>
+      <TeachingSourceCard
+        source={step.source}
+        tone="substitute"
+        accentMap={accentMap}
+      />
+      <div className={styles.proofReplacementRail}>
+        <div className={styles.proofReplacementFrom}>
+          <span className={styles.proofMiniLabel}>Find</span>
+          <ProofExpression
+            expression={step.replacement.from}
+            highlighted={highlighted}
+            accentMap={accentMap}
+          />
+        </div>
+        <span className={styles.proofReplacementArrow} aria-hidden="true">
+          ⇣
+        </span>
+        <div className={styles.proofReplacementTo}>
+          <span className={styles.proofMiniLabel}>Replace with</span>
+          {replacementGroups}
+        </div>
+      </div>
+      <ProofBeforeAfter
+        before={step.before}
+        after={step.after}
+        highlightLeft={
+          step.replacement.side === "left" ? highlighted : undefined
+        }
+        highlightRight={
+          step.replacement.side === "right" ? highlighted : undefined
+        }
+        replacementOverlay={
+          <span
+            className={styles.proofReplacementTraveler}
+            data-target-side={step.replacement.side}
+            aria-hidden="true"
+          >
+            {replacementGroups}
+          </span>
+        }
+        accentMap={accentMap}
+      />
+    </div>
+  );
+}
+
+function ScaleOperationScene({
+  step,
+  accentMap,
+}: {
+  step: Extract<
+    TeachingProofStep,
+    { kind: "add-scales" | "subtract-scales" }
+  >;
+  accentMap?: AccentMap;
+}) {
+  const isSubtract = step.kind === "subtract-scales";
+  return (
+    <div className={styles.proofScaleOperationScene}>
+      <div className={styles.proofOperationSources}>
+        {step.before.map((source, index) => (
+          <div className={styles.proofOperationSourceWrap} key={`${source.sourceIndex}-${index}`}>
+            {index > 0 ? (
+              <span className={styles.proofLargeOperator}>
+                {isSubtract ? "−" : "+"}
+              </span>
+            ) : null}
+            <TeachingSourceCard
+              source={source}
+              tone={isSubtract ? "subtract" : "add"}
+              accentMap={accentMap}
+            />
+          </div>
+        ))}
+      </div>
+      <span className={styles.proofTransitionArrow} aria-hidden="true">
+        ↓
+      </span>
+      <div className={styles.proofOperationResult}>
+        <span className={styles.proofMiniLabel}>
+          {isSubtract ? "What remains" : "Together"}
+        </span>
+        <ProofEquation
+          left={step.after.left}
+          right={step.after.right}
+          accentMap={accentMap}
+        />
+      </div>
+    </div>
+  );
+}
+
+function TeachingProofSceneVisual({
+  step,
+  accentMap,
+}: {
+  step: TeachingProofStep;
+  accentMap?: AccentMap;
+}) {
+  switch (step.kind) {
+    case "inspect":
+      return (
+        <div className={styles.proofSceneSources}>
+          {step.sources.map((source, index) => (
+            <TeachingSourceCard
+              source={source}
+              accentMap={accentMap}
+              key={`${source.sourceIndex}-${index}`}
+            />
+          ))}
+        </div>
+      );
+    case "substitute":
+      return <SubstitutionScene step={step} accentMap={accentMap} />;
+    case "add-scales":
+    case "subtract-scales":
+      return <ScaleOperationScene step={step} accentMap={accentMap} />;
+    case "cancel-matches":
+      return (
+        <ProofBeforeAfter
+          before={step.before}
+          after={step.after}
+          cancellation={proofCancellationMap(step.removed)}
+          accentMap={accentMap}
+        />
+      );
+    case "regroup":
+      return (
+        <div className={styles.proofRegroupScene}>
+          <ProofEquation
+            left={step.before.left}
+            right={step.before.right}
+            accentMap={accentMap}
+          />
+          <span className={styles.proofTransitionArrow} aria-hidden="true">
+            ↓
+          </span>
+          <GroupedEquationVisual
+            equation={step.after}
+            accentMap={accentMap}
+          />
+        </div>
+      );
+    case "split-evenly":
+      return (
+        <div className={styles.proofSplitScene}>
+          {isGroupedEquation(step.before) ? (
+            <GroupedEquationVisual
+              equation={step.before}
+              accentMap={accentMap}
+            />
+          ) : (
+            <ProofEquation
+              left={step.before.left}
+              right={step.before.right}
+              accentMap={accentMap}
+            />
+          )}
+          <span className={styles.proofDivideBadge}>
+            ÷ {step.divisor} on both sides
+          </span>
+          <ProofEquation
+            left={step.after.left}
+            right={step.after.right}
+            accentMap={accentMap}
+          />
+        </div>
+      );
+    case "conclude":
+      return (
+        <div className={styles.proofConclusion}>
+          <ProofEquation
+            left={step.equation.left}
+            right={step.equation.right}
+            accentMap={accentMap}
+          />
+          <span className={styles.proofCheck}>✓</span>
+        </div>
+      );
+  }
+}
+
+function TeachingProofSceneCard({
+  step,
+  stepIndex,
+  stepCount,
+  accentMap,
+  storyboard = false,
+}: {
+  step: TeachingProofStep;
+  stepIndex: number;
+  stepCount: number;
+  accentMap?: AccentMap;
+  storyboard?: boolean;
+}) {
+  const sceneStyle: ProofSceneStyle = {
+    "--proof-scene-delay": `${stepIndex * TEACHING_PROOF_STEP_MS}ms`,
+    "--proof-scene-duration": `${TEACHING_PROOF_STEP_MS}ms`,
+  };
+  return (
+    <article
+      className={`${styles.proofTeachingScene} ${
+        stepIndex === stepCount - 1 ? styles.proofTeachingSceneLast : ""
+      } ${storyboard ? styles.proofStoryboardScene : ""}`}
+      data-step-kind={step.kind}
+      style={sceneStyle}
+    >
+      <header className={styles.proofSceneHeader}>
+        <span className={styles.proofStepNumber}>
+          {stepIndex + 1} / {stepCount}
+        </span>
+        <strong>{step.title}</strong>
+        <span className={styles.proofStepDots} aria-hidden="true">
+          {Array.from({ length: stepCount }, (_, dotIndex) => (
+            <span
+              className={dotIndex === stepIndex ? styles.proofStepDotActive : ""}
+              key={dotIndex}
+            />
+          ))}
+        </span>
+      </header>
+      <div className={styles.proofSceneBody}>
+        <TeachingProofSceneVisual step={step} accentMap={accentMap} />
+      </div>
+      <p className={styles.proofSceneCaption}>{step.text}</p>
+    </article>
   );
 }
 
@@ -699,100 +970,45 @@ export function SolutionProofVisual({
   proofState: Exclude<ProofState, "hidden">;
   accentMap?: AccentMap;
 }) {
-  const arithmetic = buildProofArithmetic(round);
-  const hasCancellation = BALANCE_TOKENS.some(
-    (token) => (arithmetic.cancellation[token] ?? 0) > 0,
-  );
-  const normalizeBy = round.solutionDerivation.normalizeBy;
-  const finalRight: readonly ProofTerm[] = [
-    { creature: round.question.unit, count: round.answer },
-  ];
+  const plan = buildTeachingProof(round);
 
   return (
     <section
       className={styles.solutionProof}
       data-proof-state={proofState}
-      role="img"
-      aria-label={proofNarration(round, arithmetic)}
+      role="region"
+      aria-label="Step-by-step balance proof"
     >
-      <div className={styles.solutionProofInner} aria-hidden="true">
-        <div className={styles.proofSources}>
-          {round.solutionDerivation.equationMultipliers.map(
-            (multiplier, equationIndex) => {
-              const equation = round.equations[equationIndex];
-              return equation && multiplier !== 0 ? (
-                <SourceEquation
-                  equation={equation}
-                  multiplier={multiplier}
-                  equationIndex={equationIndex}
-                  accentMap={accentMap}
-                  key={`${equationIndex}-${multiplier}`}
-                />
-              ) : null;
-            },
-          )}
-        </div>
-
-        <span className={styles.proofFlowArrow}>↓</span>
-
-        <div className={`${styles.proofStage} ${styles.proofCombineStage}`}>
-          <span className={styles.proofStageLabel}>
-            {hasCancellation ? "Line up matching loads" : "Combine the scales"}
-          </span>
-          <ProofEquation
-            left={arithmetic.expandedLeft}
-            right={arithmetic.expandedRight}
-            cancellation={hasCancellation ? arithmetic.cancellation : undefined}
+      <ol className={styles.proofAccessibleSteps}>
+        {plan.steps.map((step) => (
+          <li key={step.id}>{step.text}</li>
+        ))}
+      </ol>
+      <p className={styles.proofAccessibleSteps} role="status">
+        {plan.steps.map((step) => step.text).join(" ")}
+      </p>
+      <div className={styles.proofSceneViewport} aria-hidden="true">
+        {plan.steps.map((step, stepIndex) => (
+          <TeachingProofSceneCard
+            step={step}
+            stepIndex={stepIndex}
+            stepCount={plan.steps.length}
             accentMap={accentMap}
+            key={step.id}
           />
-        </div>
-
-        {hasCancellation ? (
-          <>
-            <span className={styles.proofFlowArrow}>↓</span>
-            <div className={`${styles.proofStage} ${styles.proofCancelStage}`}>
-              <span className={styles.proofStageLabel}>Cancel the same load</span>
-              <ProofEquation
-                left={arithmetic.reducedLeft}
-                right={arithmetic.reducedRight}
-                accentMap={accentMap}
-              />
-            </div>
-          </>
-        ) : null}
-
-        {normalizeBy > 1 ? (
-          <>
-            <span className={styles.proofFlowArrow}>↓</span>
-            <div className={`${styles.proofStage} ${styles.proofRegroupStage}`}>
-              <span className={styles.proofStageLabel}>
-                Regroup into {normalizeBy} matching combos
-              </span>
-              <span className={styles.proofEquation}>
-                {targetComboGroups(round, accentMap)}
-                <span className={styles.proofEquals}>=</span>
-                <ProofExpression
-                  expression={arithmetic.reducedRight}
-                  accentMap={accentMap}
-                />
-              </span>
-              <span className={styles.proofDivideBadge}>÷ {normalizeBy} on both sides</span>
-            </div>
-          </>
-        ) : null}
-
-        <span className={styles.proofFlowArrow}>↓</span>
-        <div className={`${styles.proofStage} ${styles.proofFinalStage}`}>
-          <span className={styles.proofStageLabel}>
-            {normalizeBy > 1 ? "One combo" : "Balanced"}
-          </span>
-          <ProofEquation
-            left={round.question.target}
-            right={finalRight}
+        ))}
+      </div>
+      <div className={styles.proofStoryboard} aria-hidden="true">
+        {plan.steps.map((step, stepIndex) => (
+          <TeachingProofSceneCard
+            step={step}
+            stepIndex={stepIndex}
+            stepCount={plan.steps.length}
             accentMap={accentMap}
+            storyboard
+            key={`story-${step.id}`}
           />
-          <span className={styles.proofCheck}>✓</span>
-        </div>
+        ))}
       </div>
     </section>
   );

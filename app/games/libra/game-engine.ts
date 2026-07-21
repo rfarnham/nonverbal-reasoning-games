@@ -226,7 +226,6 @@ type JuniorSpec =
       firstWeight: number;
       secondWeight: number;
       coefficient: number;
-      checkCoefficients: readonly [number, number];
       correctIndex: number;
     }
   | {
@@ -367,6 +366,18 @@ const EQUATION_COUNTS: Readonly<Record<Difficulty, number>> = {
   Expert: 3,
   Wizard: 3,
 };
+
+function expectedEquationCount(
+  round: Pick<Round, "difficulty" | "family">,
+): number {
+  // A combo primer is deliberately one complete scale: the repeated pair is
+  // already visible and only needs regrouping and an even split. Junior's
+  // later add/subtract-combo families are the first time two scales belong in
+  // the same proof.
+  return round.difficulty === "Junior" && round.family === "combo-primer"
+    ? 1
+    : EQUATION_COUNTS[round.difficulty];
+}
 
 const CREATURE_COUNTS: Readonly<Record<Difficulty, number>> = {
   Starter: 2,
@@ -547,7 +558,6 @@ const JUNIOR_SPECS: readonly JuniorBlueprint[] = [
     firstWeight: 2,
     secondWeight: 2,
     coefficient: 2,
-    checkCoefficients: [1, 2],
   },
   {
     difficulty: "Junior",
@@ -556,7 +566,6 @@ const JUNIOR_SPECS: readonly JuniorBlueprint[] = [
     firstWeight: 1,
     secondWeight: 1,
     coefficient: 3,
-    checkCoefficients: [1, 3],
   },
   {
     difficulty: "Junior",
@@ -565,7 +574,6 @@ const JUNIOR_SPECS: readonly JuniorBlueprint[] = [
     firstWeight: 1,
     secondWeight: 1,
     coefficient: 4,
-    checkCoefficients: [3, 1],
   },
   {
     difficulty: "Junior",
@@ -849,6 +857,18 @@ export function expressionKey(expression: Expression): string {
 
 export function expressionItemCount(expression: Expression): number {
   return expression.reduce((total, group) => total + group.count, 0);
+}
+
+function expressionContains(
+  expression: Expression,
+  required: Expression,
+): boolean {
+  return required.every(({ creature, count }) => {
+    const available = expression
+      .filter((group) => group.creature === creature)
+      .reduce((total, group) => total + group.count, 0);
+    return available >= count;
+  });
 }
 
 function equationCoefficients(
@@ -1232,10 +1252,6 @@ function makeJuniorTemplate(spec: JuniorSpec): TemplateResult {
   if (spec.family === "combo-primer") {
     const comboTotal =
       spec.coefficient * (spec.firstWeight + spec.secondWeight);
-    const [targetCheckCount, bridgeCheckCount] = spec.checkCoefficients;
-    const checkTotal =
-      targetCheckCount * spec.firstWeight +
-      bridgeCheckCount * spec.secondWeight;
     return {
       family: spec.family,
       equations: [
@@ -1246,27 +1262,23 @@ function makeJuniorTemplate(spec: JuniorSpec): TemplateResult {
           ),
           makeExpression([unit, comboTotal]),
         ),
-        makeEquation(
-          makeExpression(
-            [target, targetCheckCount],
-            [bridge, bridgeCheckCount],
-          ),
-          makeExpression([unit, checkTotal]),
-        ),
       ],
       question: {
         target: makeExpression([target, 1], [bridge, 1]),
         unit,
       },
-      equationOrder: [0, 1],
+      equationOrder: [0],
       solutionStrategies: ["create-combo"],
       solutionDerivation: {
-        equationMultipliers: [1, 0],
+        equationMultipliers: [1],
         normalizeBy: spec.coefficient,
       },
       mistakes: [
         { count: comboTotal, kind: "forgot-to-divide" },
-        { count: checkTotal, kind: "used-one-scale" },
+        {
+          count: Math.max(spec.firstWeight, spec.secondWeight),
+          kind: "ignored-group",
+        },
         { count: spec.coefficient, kind: "forgot-to-normalize" },
       ],
     };
@@ -2112,8 +2124,13 @@ export function validateRound(round: Round): RoundValidation {
   if (!isDifficulty(round.difficulty)) {
     errors.push(`Unknown difficulty: ${round.difficulty}`);
   }
-  if (round.equations.length !== EQUATION_COUNTS[round.difficulty]) {
-    errors.push(`${round.difficulty} must use ${EQUATION_COUNTS[round.difficulty]} equations.`);
+  const requiredEquationCount = expectedEquationCount(round);
+  if (round.equations.length !== requiredEquationCount) {
+    errors.push(
+      `${round.family} ${round.difficulty} rounds must use ${requiredEquationCount} equation${
+        requiredEquationCount === 1 ? "" : "s"
+      }.`,
+    );
   }
   if (allEquationCreatures(round).length !== CREATURE_COUNTS[round.difficulty]) {
     errors.push(`${round.difficulty} uses the wrong number of creatures.`);
@@ -2281,6 +2298,28 @@ export function validateRound(round: Round): RoundValidation {
     errors.push("Starter split-evenly rounds must use at least two target groups.");
   }
 
+  if (
+    round.difficulty === "Junior" &&
+    (round.family === "chain" || round.family === "offset-chain")
+  ) {
+    const unitLoad: Expression = [
+      { creature: round.question.unit, count: 1 },
+    ];
+    const targetSharesPanWithUnit = round.equations.some(({ left, right }) =>
+      [left, right].some(
+        (pan) =>
+          expressionContains(pan, round.question.target) &&
+          expressionContains(pan, unitLoad),
+      ),
+    );
+    const expectsVisibleOffset = round.family === "offset-chain";
+    if (targetSharesPanWithUnit !== expectsVisibleOffset) {
+      errors.push(
+        "Junior chain family must match whether the target shares a pan with a removable unit offset.",
+      );
+    }
+  }
+
   if (round.difficulty === "Wizard") {
     const mysteryGroups = panExpressions
       .flat()
@@ -2323,8 +2362,14 @@ export function validateRound(round: Round): RoundValidation {
     ) {
       errors.push("The sealed mystery load is reserved for Wizard.");
     }
-    if (analysis.freeVariableCount !== 0) {
-      errors.push("Non-Wizard relations must determine every relative weight.");
+    const requiredFreeVariableCount =
+      round.difficulty === "Junior" && round.family === "combo-primer" ? 1 : 0;
+    if (analysis.freeVariableCount !== requiredFreeVariableCount) {
+      errors.push(
+        round.family === "combo-primer"
+          ? "A combo primer must determine the pair while leaving its two individual weights open."
+          : "Non-Wizard relations must determine every relative weight.",
+      );
     }
     if (
       round.scaffold?.kind !== "equation-path" ||
@@ -2492,10 +2537,27 @@ function generatedJuniorSpec(random: RandomSource): JuniorSpec {
     Creature,
     Creature,
   ];
-  const strategyIndex = randomInteger(random, 6);
+  const strategyIndex = randomInteger(random, 7);
   const correctIndex = randomInteger(random, 4);
 
   if (strategyIndex === 0) {
+    const coefficient = 2 + randomInteger(random, 3);
+    const maximumPairWeight = Math.floor(8 / coefficient);
+    const firstWeight = 1 + randomInteger(random, maximumPairWeight - 1);
+    const secondWeight =
+      1 + randomInteger(random, maximumPairWeight - firstWeight);
+    return {
+      difficulty: "Junior",
+      family: "combo-primer",
+      creatures: [target, bridge, unit],
+      firstWeight,
+      secondWeight,
+      coefficient,
+      correctIndex,
+    };
+  }
+
+  if (strategyIndex === 1) {
     return {
       difficulty: "Junior",
       family: "add-combo",
@@ -2507,7 +2569,7 @@ function generatedJuniorSpec(random: RandomSource): JuniorSpec {
     };
   }
 
-  if (strategyIndex === 1) {
+  if (strategyIndex === 2) {
     return {
       difficulty: "Junior",
       family: "subtract-combo",
