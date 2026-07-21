@@ -264,7 +264,12 @@ function SegmentStrip({
   const differenceSet = new Set(differenceIndexes);
 
   return (
-    <span className={styles.beadStrip} role="img" aria-label={label}>
+    <span
+      className={styles.beadStrip}
+      role="img"
+      aria-label={label}
+      data-bead-count={pattern.length}
+    >
       {pattern.map((token, index) => {
         const revealedToken = revealPattern?.[index];
         const displayed =

@@ -37,6 +37,15 @@ export type SegmentOccurrence = Readonly<{
   alignment: MatchAlignment;
 }>;
 
+/**
+ * One compatible answer at one physical bracelet arc. A forward traversal and
+ * the reverse traversal of the same arc are deliberately one solution.
+ */
+export type CompatibleSolution = Readonly<{
+  optionIndex: number;
+  occurrence: SegmentOccurrence;
+}>;
+
 export type BraceletRound = Readonly<{
   id: string;
   difficulty: Difficulty;
@@ -403,8 +412,30 @@ export function matchingOptionIndexes(
   bracelet: Bracelet,
   options: readonly BraceletOption[],
 ): readonly number[] {
+  return [
+    ...new Set(
+      findCompatibleSolutions(bracelet, options).map(
+        ({ optionIndex }) => optionIndex,
+      ),
+    ),
+  ];
+}
+
+/**
+ * Enumerate the complete solution space for a question. Hidden tokens are
+ * wildcards, bracelet wraparound is allowed, and reading from the other side
+ * is included by `findOccurrences`. Occurrences identify physical arcs, so the
+ * two reading directions of one arc are not double-counted.
+ */
+export function findCompatibleSolutions(
+  bracelet: Bracelet,
+  options: readonly BraceletOption[],
+): readonly CompatibleSolution[] {
   return options.flatMap((option, optionIndex) =>
-    findOccurrences(bracelet, option.pattern).length > 0 ? [optionIndex] : [],
+    findOccurrences(bracelet, option.pattern).map((occurrence) => ({
+      optionIndex,
+      occurrence,
+    })),
   );
 }
 
@@ -910,9 +941,14 @@ export function validateRound(round: BraceletRound): ValidationResult {
     issues.push("Options must be distinct even when read in reverse.");
   }
 
-  const matches = matchingOptionIndexes(round.bracelet, round.options);
-  if (matches.length !== 1 || matches[0] !== round.correctIndex) {
-    issues.push("Exactly one option must match in either direction.");
+  const solutions = findCompatibleSolutions(round.bracelet, round.options);
+  if (
+    solutions.length !== 1 ||
+    solutions[0].optionIndex !== round.correctIndex
+  ) {
+    issues.push(
+      "Exactly one option at one physical placement must match in either direction.",
+    );
   }
   if (round.options[round.correctIndex]?.kind !== "correct") {
     issues.push("The calculated answer must carry the correct option kind.");

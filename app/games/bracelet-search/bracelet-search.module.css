@@ -301,110 +301,134 @@
 
 .gameStatus {
   width: min(1050px, 100%);
-  min-height: 52px;
-  margin: 0 auto 22px;
-  padding: 8px 12px;
+  min-height: 44px;
+  margin: 0 auto 16px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: 12px;
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  background: rgb(255 253 248 / 90%);
 }
 
 .campaignStatus {
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: end;
+  gap: 14px;
 }
 
 .campaignNavigator {
   min-width: 0;
   display: grid;
-  gap: 8px;
+  gap: 7px;
 }
 
 .campaignLevels {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
+  gap: 5px;
 }
 
 .campaignLevel {
+  --level-marker: #c9c5bb;
   min-width: 0;
   min-height: 44px;
-  padding: 4px 8px;
-  overflow: hidden;
-  border: 0;
-  border-radius: 9px;
-  color: var(--muted);
-  background: transparent;
+  padding: 5px 8px 5px 24px;
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  background: var(--panel);
   cursor: pointer;
   font: inherit;
-  font-size: 0.75rem;
-  font-weight: 850;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 0.7rem;
+  font-weight: 840;
+}
+
+.campaignLevel::before {
+  width: 12px;
+  height: 12px;
+  position: absolute;
+  top: 50%;
+  left: 8px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--level-marker);
+  content: "";
+  font-family: Arial, sans-serif;
+  font-size: 0.54rem;
+  font-weight: 900;
+  line-height: 1;
+  transform: translateY(-50%);
 }
 
 .campaignLevel:disabled {
   cursor: default;
+  opacity: 0.72;
 }
 
 .campaignLevelActive {
-  color: var(--ink);
-  background: #f2eee4;
-  box-shadow: inset 0 -2px 0 var(--ink);
+  border-color: var(--ink);
+  box-shadow: inset 0 -3px 0 var(--level-marker);
 }
 
-.campaignLevelCorrect::after,
-.campaignLevelIncorrect::after {
-  margin-left: 5px;
-  font-weight: 950;
+.campaignLevelCorrect {
+  --level-marker: var(--correct);
 }
 
-.campaignLevelCorrect::after {
-  color: var(--correct);
+.campaignLevelCorrect::before {
   content: "✓";
 }
 
-.campaignLevelIncorrect::after {
-  color: var(--incorrect);
+.campaignLevelIncorrect {
+  --level-marker: var(--incorrect);
+}
+
+.campaignLevelIncorrect::before {
   content: "×";
+}
+
+.campaignLevelNotDone {
+  --level-marker: #aaa69d;
 }
 
 .campaignProblems {
   display: grid;
-  grid-template-columns: repeat(12, minmax(24px, 1fr));
-  gap: 2px;
+  grid-template-columns: repeat(12, minmax(5px, 1fr));
+  align-items: center;
+  gap: 4px;
 }
 
 .campaignProblem {
+  --problem-color: #c9c5bb;
   min-width: 0;
-  min-height: 24px;
+  min-height: 44px;
   position: relative;
   display: block;
   border: 0;
   border-radius: 8px;
+  padding: 0;
+  color: #fff;
   background: transparent;
+  font-family: Arial, sans-serif;
+  font-size: 0.56rem;
+  font-weight: 900;
+  line-height: 1;
+  transition: transform 140ms ease;
 }
 
 .campaignProblemItem {
   min-width: 0;
+  min-height: 44px;
   display: block;
 }
 
 .campaignProblem::before {
-  width: min(22px, 70%);
-  height: 11px;
   position: absolute;
-  top: 50%;
-  left: 50%;
-  border: 1px solid #aaa79f;
+  inset: 15px 0;
   border-radius: 999px;
-  background: #e5e1d7;
+  background: var(--problem-color);
   content: "";
-  transform: translate(-50%, -50%);
 }
 
 .campaignProblemButton {
@@ -413,14 +437,12 @@
   cursor: pointer;
 }
 
-.campaignProblemCorrect::before {
-  border-color: var(--correct);
-  background: var(--correct);
+.campaignProblemCorrect {
+  --problem-color: var(--correct);
 }
 
-.campaignProblemIncorrect::before {
-  border-color: var(--incorrect);
-  background: var(--incorrect);
+.campaignProblemIncorrect {
+  --problem-color: var(--incorrect);
 }
 
 .campaignProblemCorrect::after,
@@ -430,8 +452,6 @@
   display: grid;
   place-items: center;
   color: #fff;
-  font-size: 0.48rem;
-  font-weight: 950;
   line-height: 1;
 }
 
@@ -443,8 +463,16 @@
   content: "×";
 }
 
+.campaignProblemNotDone {
+  --problem-color: #c9c5bb;
+}
+
 .campaignProblemCurrent {
-  outline: 2px solid var(--focus);
+  transform: scaleY(1.08);
+}
+
+.campaignProblemCurrent::before {
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
 
@@ -471,18 +499,18 @@
 
 .progressTrack {
   min-width: 0;
-  height: 9px;
   display: grid;
-  gap: 4px;
+  gap: 3px;
 }
 
 .progressTrack > span {
+  height: 5px;
   border-radius: 999px;
-  background: #dedad0;
+  background: #ded9cd;
 }
 
 .progressTrack > .progressDone {
-  background: var(--correct);
+  background: var(--ink);
 }
 
 .endButton {
@@ -914,6 +942,7 @@
   color: var(--ink);
   background: #fff;
   cursor: pointer;
+  container-type: inline-size;
   font: inherit;
   transition:
     border-color 160ms ease,
@@ -949,6 +978,7 @@
 }
 
 .beadStrip {
+  min-width: 0;
   max-width: 100%;
   display: flex;
   align-items: center;
@@ -967,13 +997,33 @@
 }
 
 .stripBead {
-  width: clamp(30px, 4.4vw, 42px);
-  height: clamp(30px, 4.4vw, 42px);
-  flex: 0 0 auto;
+  --strip-bead-size: clamp(30px, 4.4vw, 42px);
+  width: var(--strip-bead-size);
+  height: auto;
+  min-width: 0;
+  max-width: var(--strip-bead-size);
+  flex: 1 1 var(--strip-bead-size);
+  aspect-ratio: 1;
   transition:
     border-color 160ms ease,
     box-shadow 160ms ease,
     opacity 160ms ease;
+}
+
+.optionButton .beadStrip {
+  width: 100%;
+}
+
+.optionButton .beadStrip[data-bead-count="4"],
+.optionButton .beadStrip[data-bead-count="5"] {
+  gap: clamp(3px, 1.5cqi, 6px);
+}
+
+.optionButton .beadStrip[data-bead-count="4"]::before,
+.optionButton .beadStrip[data-bead-count="4"]::after,
+.optionButton .beadStrip[data-bead-count="5"]::before,
+.optionButton .beadStrip[data-bead-count="5"]::after {
+  width: clamp(5px, 3cqi, 10px);
 }
 
 .stripDifference {
@@ -1411,16 +1461,22 @@
   }
 
   .campaignStatus {
-    padding-top: 10px;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto auto;
   }
 
   .campaignProblems {
     grid-template-columns: repeat(6, minmax(44px, 1fr));
+    gap: 3px;
   }
 
-  .campaignNavigator {
-    grid-column: 1 / -1;
+  .campaignLevel {
+    min-height: 44px;
+    padding-inline: 19px 4px;
+    font-size: 0.64rem;
+  }
+
+  .campaignLevel::before {
+    left: 5px;
   }
 
   .gameStatus:not(.campaignStatus) {
@@ -1458,8 +1514,7 @@
   }
 
   .stripBead {
-    width: clamp(26px, 7.2vw, 35px);
-    height: clamp(26px, 7.2vw, 35px);
+    --strip-bead-size: clamp(26px, 7.2vw, 35px);
   }
 
   .beadStrip {
@@ -1516,28 +1571,33 @@
     display: none;
   }
 
-  .campaignLevel {
-    min-height: 44px;
-    padding-inline: 3px;
-    font-size: 0.68rem;
+  .campaignStatus {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
   }
 
-  .campaignLevelCorrect::after,
-  .campaignLevelIncorrect::after {
-    margin-left: 2px;
+  .campaignLevels {
+    gap: 3px;
+  }
+
+  .campaignLevel {
+    padding-left: 14px;
+    font-size: 0.62rem;
+  }
+
+  .campaignLevel::before {
+    width: 9px;
+    height: 9px;
+    left: 3px;
+    font-size: 0.45rem;
   }
 
   .campaignProblems {
-    gap: 2px;
+    gap: 3px;
   }
 
-  .campaignProblem {
-    min-width: 0;
-    min-height: 24px;
-  }
-
-  .campaignProblemButton {
-    min-height: 44px;
+  .campaignStatus .roundCount {
+    display: none;
   }
 
   .braceletPanel {
@@ -1554,8 +1614,7 @@
   }
 
   .stripBead {
-    width: min(7vw, 27px);
-    height: min(7vw, 27px);
+    --strip-bead-size: min(7vw, 27px);
     border-width: 1.5px;
   }
 

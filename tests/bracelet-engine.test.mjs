@@ -19,6 +19,7 @@ import {
   decodePattern,
   distractorKindMatches,
   encodePattern,
+  findCompatibleSolutions,
   findOccurrences,
   generateInfiniteRound,
   matchingOptionIndexes,
@@ -96,6 +97,11 @@ function assertOneExactAnswer(round, label) {
     `${label} matching option`,
   );
   assert.equal(
+    findCompatibleSolutions(round.bracelet, round.options).length,
+    1,
+    `${label} total option/placement solution count`,
+  );
+  assert.equal(
     findOccurrences(
       round.bracelet,
       round.options[round.correctIndex].pattern,
@@ -109,6 +115,15 @@ function assertOneExactAnswer(round, label) {
     ).size,
     4,
     `${label} reversal-distinct options`,
+  );
+}
+
+function bruteSolutions(bracelet, options) {
+  return options.flatMap((option, optionIndex) =>
+    brutePhysicalStarts(bracelet, option.pattern).map((clockwiseStart) => ({
+      optionIndex,
+      clockwiseStart,
+    })),
   );
 }
 
@@ -476,6 +491,57 @@ test("Wizard uses one centered wildcard and wrong feedback cannot leak it", () =
   assert.ok(
     invalid.issues.some((issue) => issue.includes("center bead")),
   );
+});
+
+test("all Wizard Campaign and 400 deterministic Infinite rounds have one solution from every view", () => {
+  const campaign = ROUNDS.filter(
+    ({ difficulty }) => difficulty === "Wizard",
+  );
+  assert.equal(campaign.length, 12);
+
+  const generated = Array.from({ length: 400 }, (_, seed) =>
+    generateInfiniteRound(
+      "Wizard",
+      createSeededRandom(0x71a2_0000 + seed),
+    ),
+  );
+
+  for (const [roundIndex, round] of [...campaign, ...generated].entries()) {
+    const source = roundIndex < campaign.length ? "Campaign" : "Infinite";
+    const number =
+      roundIndex < campaign.length
+        ? roundIndex + 1
+        : roundIndex - campaign.length + 1;
+    const label = `Wizard ${source} ${number}`;
+    assertWizardRound(round, label);
+
+    for (const [viewIndex, view] of braceletViews(round.bracelet).entries()) {
+      const solutions = bruteSolutions(view, round.options);
+      assert.equal(
+        solutions.length,
+        1,
+        `${label}, bracelet view ${viewIndex + 1}: total compatible option/arc pairs`,
+      );
+      assert.equal(
+        solutions[0].optionIndex,
+        round.correctIndex,
+        `${label}, bracelet view ${viewIndex + 1}: compatible option`,
+      );
+      assert.equal(
+        brutePhysicalStarts(
+          view,
+          round.options[round.correctIndex].pattern,
+        ).length,
+        1,
+        `${label}, bracelet view ${viewIndex + 1}: physical placement`,
+      );
+      assert.equal(
+        findCompatibleSolutions(view, round.options).length,
+        1,
+        `${label}, bracelet view ${viewIndex + 1}: engine solution count`,
+      );
+    }
+  }
 });
 
 function makeGeneratedCorpus(countPerDifficulty = 400) {
