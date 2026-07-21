@@ -12,17 +12,39 @@ export type DominoPiece = {
   second: PipMask;
 };
 
+export type GridRows = 2 | 3;
+export type GridColumns = 2 | 3 | 4;
+
+export type TargetShapeId =
+  | "2x2-rect"
+  | "2x3-rect"
+  | "2x4-ledge"
+  | "3x3-stair";
+
+export type TargetShape = {
+  id: TargetShapeId;
+  rows: GridRows;
+  columns: GridColumns;
+  /** Row-major indexes occupied by the six-cell (or Starter four-cell) target. */
+  occupiedCells: readonly number[];
+};
+
 export type LayoutId =
   | "2x2-rows"
   | "2x2-columns"
   | "2x3-columns"
   | "2x3-left-stack"
-  | "2x3-right-stack";
+  | "2x3-right-stack"
+  | "2x4-ledge-horizontal"
+  | "2x4-ledge-vertical"
+  | "3x3-stair-horizontal"
+  | "3x3-stair-vertical";
 
 export type TilingLayout = {
   id: LayoutId;
-  rows: 2;
-  columns: 2 | 3;
+  targetShapeId: TargetShapeId;
+  rows: GridRows;
+  columns: GridColumns;
   pairs: readonly (readonly [number, number])[];
 };
 
@@ -42,7 +64,8 @@ export type BuildWitness = {
 };
 
 export type DominoDesign = {
-  cells: readonly PipMask[];
+  /** Null grid positions are holes outside a non-rectangular target. */
+  cells: readonly (PipMask | null)[];
 };
 
 export type MismatchKind =
@@ -72,8 +95,9 @@ export type DominoRound = {
   id: string;
   difficulty: Difficulty;
   pieces: readonly DominoPiece[];
-  rows: 2;
-  columns: 2 | 3;
+  targetShapeId: TargetShapeId;
+  rows: GridRows;
+  columns: GridColumns;
   /** Null means the seams are hidden and every legal tiling is allowed. */
   layoutId: LayoutId | null;
   seamsVisible: boolean;
@@ -89,13 +113,13 @@ export type ReachableDesign = {
 };
 
 export type DifficultyRule = {
-  rows: 2;
-  columns: 2 | 3;
+  targetShapeIds: readonly TargetShapeId[];
   pieceCount: 2 | 3;
   seamsVisible: boolean;
   minDirectionalHalves: number;
   maxDirectionalHalves: number;
   minDistinctHalves: number;
+  maxDistinctHalves: number;
   minReachableDesigns: number;
 };
 
@@ -162,9 +186,37 @@ const DIRECTIONAL_PATTERN_NAMES = [
   "six",
 ] as const satisfies readonly PipPatternName[];
 
+export const TARGET_SHAPES: Readonly<Record<TargetShapeId, TargetShape>> = {
+  "2x2-rect": {
+    id: "2x2-rect",
+    rows: 2,
+    columns: 2,
+    occupiedCells: [0, 1, 2, 3],
+  },
+  "2x3-rect": {
+    id: "2x3-rect",
+    rows: 2,
+    columns: 3,
+    occupiedCells: [0, 1, 2, 3, 4, 5],
+  },
+  "2x4-ledge": {
+    id: "2x4-ledge",
+    rows: 2,
+    columns: 4,
+    occupiedCells: [0, 1, 2, 3, 4, 5],
+  },
+  "3x3-stair": {
+    id: "3x3-stair",
+    rows: 3,
+    columns: 3,
+    occupiedCells: [0, 1, 3, 4, 5, 8],
+  },
+};
+
 export const TILING_LAYOUTS: Readonly<Record<LayoutId, TilingLayout>> = {
   "2x2-rows": {
     id: "2x2-rows",
+    targetShapeId: "2x2-rect",
     rows: 2,
     columns: 2,
     pairs: [
@@ -174,6 +226,7 @@ export const TILING_LAYOUTS: Readonly<Record<LayoutId, TilingLayout>> = {
   },
   "2x2-columns": {
     id: "2x2-columns",
+    targetShapeId: "2x2-rect",
     rows: 2,
     columns: 2,
     pairs: [
@@ -183,6 +236,7 @@ export const TILING_LAYOUTS: Readonly<Record<LayoutId, TilingLayout>> = {
   },
   "2x3-columns": {
     id: "2x3-columns",
+    targetShapeId: "2x3-rect",
     rows: 2,
     columns: 3,
     pairs: [
@@ -193,6 +247,7 @@ export const TILING_LAYOUTS: Readonly<Record<LayoutId, TilingLayout>> = {
   },
   "2x3-left-stack": {
     id: "2x3-left-stack",
+    targetShapeId: "2x3-rect",
     rows: 2,
     columns: 3,
     pairs: [
@@ -203,6 +258,7 @@ export const TILING_LAYOUTS: Readonly<Record<LayoutId, TilingLayout>> = {
   },
   "2x3-right-stack": {
     id: "2x3-right-stack",
+    targetShapeId: "2x3-rect",
     rows: 2,
     columns: 3,
     pairs: [
@@ -211,50 +267,94 @@ export const TILING_LAYOUTS: Readonly<Record<LayoutId, TilingLayout>> = {
       [4, 5],
     ],
   },
+  "2x4-ledge-horizontal": {
+    id: "2x4-ledge-horizontal",
+    targetShapeId: "2x4-ledge",
+    rows: 2,
+    columns: 4,
+    pairs: [
+      [0, 1],
+      [2, 3],
+      [4, 5],
+    ],
+  },
+  "2x4-ledge-vertical": {
+    id: "2x4-ledge-vertical",
+    targetShapeId: "2x4-ledge",
+    rows: 2,
+    columns: 4,
+    pairs: [
+      [0, 4],
+      [1, 5],
+      [2, 3],
+    ],
+  },
+  "3x3-stair-horizontal": {
+    id: "3x3-stair-horizontal",
+    targetShapeId: "3x3-stair",
+    rows: 3,
+    columns: 3,
+    pairs: [
+      [0, 1],
+      [3, 4],
+      [5, 8],
+    ],
+  },
+  "3x3-stair-vertical": {
+    id: "3x3-stair-vertical",
+    targetShapeId: "3x3-stair",
+    rows: 3,
+    columns: 3,
+    pairs: [
+      [0, 3],
+      [1, 4],
+      [5, 8],
+    ],
+  },
 };
 
 export const DIFFICULTY_RULES: Readonly<
   Record<Difficulty, DifficultyRule>
 > = {
   Starter: {
-    rows: 2,
-    columns: 2,
+    targetShapeIds: ["2x2-rect"],
     pieceCount: 2,
     seamsVisible: true,
     minDirectionalHalves: 0,
     maxDirectionalHalves: 0,
     minDistinctHalves: 4,
+    maxDistinctHalves: 4,
     minReachableDesigns: 6,
   },
   Junior: {
-    rows: 2,
-    columns: 2,
-    pieceCount: 2,
+    targetShapeIds: ["2x3-rect", "2x4-ledge", "3x3-stair"],
+    pieceCount: 3,
     seamsVisible: false,
-    minDirectionalHalves: 2,
-    maxDirectionalHalves: 2,
-    minDistinctHalves: 4,
-    minReachableDesigns: 10,
+    minDirectionalHalves: 0,
+    maxDirectionalHalves: 0,
+    minDistinctHalves: 5,
+    maxDistinctHalves: 6,
+    minReachableDesigns: 24,
   },
   Expert: {
-    rows: 2,
-    columns: 3,
+    targetShapeIds: ["2x3-rect", "2x4-ledge", "3x3-stair"],
     pieceCount: 3,
-    seamsVisible: true,
+    seamsVisible: false,
     minDirectionalHalves: 4,
     maxDirectionalHalves: 4,
     minDistinctHalves: 5,
+    maxDistinctHalves: 6,
     minReachableDesigns: 24,
   },
   Wizard: {
-    rows: 2,
-    columns: 3,
+    targetShapeIds: ["2x3-rect", "2x4-ledge", "3x3-stair"],
     pieceCount: 3,
     seamsVisible: false,
     minDirectionalHalves: 4,
     maxDirectionalHalves: 4,
-    minDistinctHalves: 5,
-    minReachableDesigns: 72,
+    minDistinctHalves: 4,
+    maxDistinctHalves: 4,
+    minReachableDesigns: 24,
   },
 };
 
@@ -305,29 +405,51 @@ export function isDirectionalPipMask(mask: PipMask): boolean {
   return rotatePipMask(mask, 1) !== mask;
 }
 
-function layoutsForBoard(rows: 2, columns: 2 | 3): readonly TilingLayout[] {
+export function targetShapeIdForDimensions(
+  rows: GridRows,
+  columns: GridColumns,
+): TargetShapeId {
+  const matches = Object.values(TARGET_SHAPES).filter(
+    (shape) => shape.rows === rows && shape.columns === columns,
+  );
+  if (matches.length !== 1) {
+    throw new Error(`No unique target shape uses a ${rows}x${columns} grid.`);
+  }
+  return matches[0].id;
+}
+
+function layoutsForShape(
+  targetShapeId: TargetShapeId,
+): readonly TilingLayout[] {
   return Object.values(TILING_LAYOUTS).filter(
-    (layout) => layout.rows === rows && layout.columns === columns,
+    (layout) => layout.targetShapeId === targetShapeId,
   );
 }
 
 export function legalLayoutIds(
-  rows: 2,
-  columns: 2 | 3,
+  rows: GridRows,
+  columns: GridColumns,
 ): readonly LayoutId[] {
-  return layoutsForBoard(rows, columns).map(({ id }) => id);
+  return legalLayoutIdsForShape(targetShapeIdForDimensions(rows, columns));
+}
+
+export function legalLayoutIdsForShape(
+  targetShapeId: TargetShapeId,
+): readonly LayoutId[] {
+  return layoutsForShape(targetShapeId).map(({ id }) => id);
 }
 
 function checkedLayouts(
-  rows: 2,
-  columns: 2 | 3,
+  rows: GridRows,
+  columns: GridColumns,
   layoutId: LayoutId | null,
 ): readonly TilingLayout[] {
-  if (layoutId === null) return layoutsForBoard(rows, columns);
+  const targetShapeId = targetShapeIdForDimensions(rows, columns);
+  if (layoutId === null) return layoutsForShape(targetShapeId);
   const layout = TILING_LAYOUTS[layoutId];
-  if (!layout || layout.rows !== rows || layout.columns !== columns) {
+  if (!layout || layout.targetShapeId !== targetShapeId) {
     throw new Error(
-      `Layout ${layoutId} does not tile a ${rows}x${columns} board.`,
+      `Layout ${layoutId} does not tile target shape ${targetShapeId}.`,
     );
   }
   return [layout];
@@ -376,7 +498,22 @@ function assertUsablePieces(
 }
 
 export function designKey(design: DominoDesign): string {
-  return design.cells.map((mask) => mask.toString(16).padStart(3, "0")).join(".");
+  return design.cells
+    .map((mask) =>
+      mask === null ? "---" : mask.toString(16).padStart(3, "0"),
+    )
+    .join(".");
+}
+
+export function exactMaskMultiplicitySignature(
+  design: DominoDesign,
+): string {
+  const counts = new Map<PipMask, number>();
+  for (const mask of design.cells) {
+    if (mask === null) continue;
+    counts.set(mask, (counts.get(mask) ?? 0) + 1);
+  }
+  return [...counts.values()].sort((left, right) => right - left).join(",");
 }
 
 export function differingCellIndexes(
@@ -396,9 +533,11 @@ function renderAssignment(
   layout: TilingLayout,
   flippedBits: number,
 ): { design: DominoDesign; witness: BuildWitness } {
-  const cells = Array.from(
+  const shape = TARGET_SHAPES[layout.targetShapeId];
+  const occupiedCells = new Set(shape.occupiedCells);
+  const cells: (PipMask | null)[] = Array.from(
     { length: layout.rows * layout.columns },
-    () => -1,
+    () => null,
   );
   const placements: PlacedDomino[] = [];
 
@@ -422,8 +561,14 @@ function renderAssignment(
     });
   }
 
-  if (cells.some((mask) => !isPipMask(mask))) {
-    throw new Error(`Layout ${layout.id} did not cover every board cell.`);
+  if (
+    shape.occupiedCells.some((cell) => {
+      const mask = cells[cell];
+      return mask === null || !isPipMask(mask);
+    }) ||
+    cells.some((mask, cell) => !occupiedCells.has(cell) && mask !== null)
+  ) {
+    throw new Error(`Layout ${layout.id} did not exactly cover its target.`);
   }
 
   return {
@@ -438,12 +583,13 @@ function renderAssignment(
  */
 export function enumerateBuildableDesigns(
   pieces: readonly DominoPiece[],
-  rows: 2,
-  columns: 2 | 3,
+  rows: GridRows,
+  columns: GridColumns,
   layoutId: LayoutId | null = null,
 ): readonly ReachableDesign[] {
   const layouts = checkedLayouts(rows, columns, layoutId);
-  assertUsablePieces(pieces, (rows * columns) / 2);
+  const shape = TARGET_SHAPES[targetShapeIdForDimensions(rows, columns)];
+  assertUsablePieces(pieces, shape.occupiedCells.length / 2);
   const byKey = new Map<
     string,
     { design: DominoDesign; witnesses: BuildWitness[] }
@@ -499,16 +645,21 @@ function witnessFingerprint(witness: BuildWitness): string {
 
 export function renderWitness(
   pieces: readonly DominoPiece[],
-  rows: 2,
-  columns: 2 | 3,
+  rows: GridRows,
+  columns: GridColumns,
   witness: BuildWitness,
 ): DominoDesign {
-  assertUsablePieces(pieces, (rows * columns) / 2);
+  const shape = TARGET_SHAPES[targetShapeIdForDimensions(rows, columns)];
+  const occupiedCells = new Set(shape.occupiedCells);
+  assertUsablePieces(pieces, shape.occupiedCells.length / 2);
   const layout = checkedLayouts(rows, columns, witness.layoutId)[0];
   const byId = new Map(pieces.map((piece) => [piece.id, piece]));
   const usedPieces = new Set<string>();
   const usedCells = new Set<number>();
-  const cells = Array.from({ length: rows * columns }, () => -1);
+  const cells: (PipMask | null)[] = Array.from(
+    { length: rows * columns },
+    () => null,
+  );
 
   if (witness.placements.length !== pieces.length) {
     throw new Error("A build witness must place every domino exactly once.");
@@ -549,8 +700,14 @@ export function renderWitness(
     usedCells.add(placement.toCell);
   }
 
-  if (cells.some((mask) => !isPipMask(mask))) {
-    throw new Error("A build witness leaves an uncovered cell.");
+  if (
+    shape.occupiedCells.some((cell) => {
+      const mask = cells[cell];
+      return mask === null || !isPipMask(mask);
+    }) ||
+    cells.some((mask, cell) => !occupiedCells.has(cell) && mask !== null)
+  ) {
+    throw new Error("A build witness does not exactly cover the target.");
   }
   return { cells };
 }
@@ -558,8 +715,8 @@ export function renderWitness(
 export function findBuildWitnesses(
   pieces: readonly DominoPiece[],
   design: DominoDesign,
-  rows: 2,
-  columns: 2 | 3,
+  rows: GridRows,
+  columns: GridColumns,
   layoutId: LayoutId | null = null,
 ): readonly BuildWitness[] {
   if (design.cells.length !== rows * columns) return [];
@@ -574,8 +731,8 @@ export function findBuildWitnesses(
 export function isDesignBuildable(
   pieces: readonly DominoPiece[],
   design: DominoDesign,
-  rows: 2,
-  columns: 2 | 3,
+  rows: GridRows,
+  columns: GridColumns,
   layoutId: LayoutId | null = null,
 ): boolean {
   return findBuildWitnesses(pieces, design, rows, columns, layoutId).length > 0;
@@ -599,17 +756,46 @@ function nearestReachable(
     .sort(
       (left, right) =>
         left.differences.length - right.differences.length ||
+        Number(
+          isQuarterTurnDifference(
+            design,
+            right.reachable.design,
+            right.differences,
+          ),
+        ) -
+          Number(
+            isQuarterTurnDifference(
+              design,
+              left.reachable.design,
+              left.differences,
+            ),
+          ) ||
         designKey(left.reachable.design).localeCompare(
           designKey(right.reachable.design),
         ),
     )[0];
 }
 
+function isQuarterTurnDifference(
+  shown: DominoDesign,
+  buildable: DominoDesign,
+  differences: readonly number[],
+): boolean {
+  if (differences.length !== 1) return false;
+  const cell = differences[0];
+  const buildableMask = buildable.cells[cell];
+  const shownMask = shown.cells[cell];
+  if (buildableMask === null || shownMask === null) return false;
+  return ([1, 3] as const).some(
+    (turns) => rotatePipMask(buildableMask, turns) === shownMask,
+  );
+}
+
 export function analyzeImpossibleDesign(
   pieces: readonly DominoPiece[],
   design: DominoDesign,
-  rows: 2,
-  columns: 2 | 3,
+  rows: GridRows,
+  columns: GridColumns,
   layoutId: LayoutId | null,
 ): MismatchAnalysis {
   const allowed = enumerateBuildableDesigns(pieces, rows, columns, layoutId);
@@ -686,68 +872,71 @@ type AuthoredSpec = {
     readonly [string, string],
     ...(readonly [string, string])[],
   ];
+  targetShapeId: TargetShapeId;
   layoutId: LayoutId | null;
+  preferredTrapPattern?: PipPatternName;
+  preferredTrapTurn?: 1 | 3;
   salt: number;
 };
 
 const STARTER_SPECS: readonly AuthoredSpec[] = [
-  { pieces: [["center", "corners"], ["edges", "center-corners"]], layoutId: "2x2-rows", salt: 11 },
-  { pieces: [["center", "edges"], ["corners", "center-edges"]], layoutId: "2x2-columns", salt: 23 },
-  { pieces: [["center", "center-corners"], ["edges", "ring"]], layoutId: "2x2-rows", salt: 37 },
-  { pieces: [["center", "center-edges"], ["corners", "ring"]], layoutId: "2x2-columns", salt: 41 },
-  { pieces: [["center", "ring"], ["center-corners", "all"]], layoutId: "2x2-rows", salt: 53 },
-  { pieces: [["corners", "edges"], ["center-edges", "all"]], layoutId: "2x2-columns", salt: 67 },
-  { pieces: [["corners", "center-corners"], ["edges", "all"]], layoutId: "2x2-rows", salt: 71 },
-  { pieces: [["corners", "center-edges"], ["center-corners", "ring"]], layoutId: "2x2-columns", salt: 83 },
-  { pieces: [["edges", "center-corners"], ["center-edges", "ring"]], layoutId: "2x2-rows", salt: 97 },
-  { pieces: [["edges", "center-edges"], ["corners", "all"]], layoutId: "2x2-columns", salt: 101 },
-  { pieces: [["center-corners", "center-edges"], ["center", "all"]], layoutId: "2x2-rows", salt: 113 },
-  { pieces: [["center-edges", "ring"], ["edges", "all"]], layoutId: "2x2-columns", salt: 127 },
+  { pieces: [["center", "corners"], ["edges", "center-corners"]], targetShapeId: "2x2-rect", layoutId: "2x2-rows", salt: 11 },
+  { pieces: [["center", "edges"], ["corners", "center-edges"]], targetShapeId: "2x2-rect", layoutId: "2x2-columns", salt: 23 },
+  { pieces: [["center", "center-corners"], ["edges", "ring"]], targetShapeId: "2x2-rect", layoutId: "2x2-rows", salt: 37 },
+  { pieces: [["center", "center-edges"], ["corners", "ring"]], targetShapeId: "2x2-rect", layoutId: "2x2-columns", salt: 41 },
+  { pieces: [["center", "ring"], ["center-corners", "all"]], targetShapeId: "2x2-rect", layoutId: "2x2-rows", salt: 53 },
+  { pieces: [["corners", "edges"], ["center-edges", "all"]], targetShapeId: "2x2-rect", layoutId: "2x2-columns", salt: 67 },
+  { pieces: [["corners", "center-corners"], ["edges", "all"]], targetShapeId: "2x2-rect", layoutId: "2x2-rows", salt: 71 },
+  { pieces: [["corners", "center-edges"], ["center-corners", "ring"]], targetShapeId: "2x2-rect", layoutId: "2x2-columns", salt: 83 },
+  { pieces: [["edges", "center-corners"], ["center-edges", "ring"]], targetShapeId: "2x2-rect", layoutId: "2x2-rows", salt: 97 },
+  { pieces: [["edges", "center-edges"], ["corners", "all"]], targetShapeId: "2x2-rect", layoutId: "2x2-columns", salt: 101 },
+  { pieces: [["center-corners", "center-edges"], ["center", "all"]], targetShapeId: "2x2-rect", layoutId: "2x2-rows", salt: 113 },
+  { pieces: [["center-edges", "ring"], ["edges", "all"]], targetShapeId: "2x2-rect", layoutId: "2x2-columns", salt: 127 },
 ];
 
 const JUNIOR_SPECS: readonly AuthoredSpec[] = [
-  { pieces: [["diag-two", "center"], ["diag-three", "corners"]], layoutId: null, salt: 139 },
-  { pieces: [["top-pair", "edges"], ["corner-l", "center-corners"]], layoutId: null, salt: 149 },
-  { pieces: [["edge-single", "center-edges"], ["corner-single", "ring"]], layoutId: null, salt: 157 },
-  { pieces: [["top-bar", "all"], ["six", "center"]], layoutId: null, salt: 167 },
-  { pieces: [["diag-two@1", "corners"], ["top-pair@2", "edges"]], layoutId: null, salt: 179 },
-  { pieces: [["diag-three@1", "center-corners"], ["corner-l@2", "center-edges"]], layoutId: null, salt: 191 },
-  { pieces: [["edge-single@1", "ring"], ["corner-single@2", "all"]], layoutId: null, salt: 197 },
-  { pieces: [["top-bar@1", "center"], ["six@1", "corners"]], layoutId: null, salt: 211 },
-  { pieces: [["diag-two", "edges"], ["corner-l@1", "ring"]], layoutId: null, salt: 223 },
-  { pieces: [["diag-three@1", "center-edges"], ["edge-single@2", "center-corners"]], layoutId: null, salt: 227 },
-  { pieces: [["top-pair@3", "all"], ["corner-single@1", "edges"]], layoutId: null, salt: 239 },
-  { pieces: [["top-bar@2", "corners"], ["six@1", "center-edges"]], layoutId: null, salt: 251 },
+  { pieces: [["center", "corners"], ["edges", "center-corners"], ["center-edges", "ring"]], targetShapeId: "2x3-rect", layoutId: null, salt: 139 },
+  { pieces: [["center", "edges"], ["corners", "center-edges"], ["ring", "all"]], targetShapeId: "2x3-rect", layoutId: null, salt: 149 },
+  { pieces: [["center", "center-corners"], ["edges", "ring"], ["corners", "all"]], targetShapeId: "2x3-rect", layoutId: null, salt: 157 },
+  { pieces: [["center", "center-edges"], ["corners", "ring"], ["center-corners", "all"]], targetShapeId: "2x4-ledge", layoutId: null, salt: 167 },
+  { pieces: [["center", "ring"], ["edges", "all"], ["corners", "center-corners"]], targetShapeId: "3x3-stair", layoutId: null, salt: 179 },
+  { pieces: [["center", "all"], ["corners", "center-edges"], ["edges", "ring"]], targetShapeId: "2x4-ledge", layoutId: null, salt: 191 },
+  { pieces: [["corners", "edges"], ["center-corners", "center-edges"], ["ring", "all"]], targetShapeId: "2x3-rect", layoutId: null, salt: 197 },
+  { pieces: [["corners", "center-corners"], ["edges", "center-edges"], ["center", "all"]], targetShapeId: "3x3-stair", layoutId: null, salt: 211 },
+  { pieces: [["corners", "center-edges"], ["center-corners", "ring"], ["edges", "all"]], targetShapeId: "2x4-ledge", layoutId: null, salt: 223 },
+  { pieces: [["corners", "ring"], ["edges", "center-corners"], ["center-edges", "all"]], targetShapeId: "3x3-stair", layoutId: null, salt: 227 },
+  { pieces: [["corners", "all"], ["center", "center-edges"], ["center-corners", "ring"]], targetShapeId: "2x4-ledge", layoutId: null, salt: 239 },
+  { pieces: [["edges", "center-edges"], ["center", "ring"], ["center-corners", "all"]], targetShapeId: "3x3-stair", layoutId: null, salt: 251 },
 ];
 
 const EXPERT_SPECS: readonly AuthoredSpec[] = [
-  { pieces: [["diag-two", "center"], ["diag-three", "corners"], ["top-pair", "corner-l"]], layoutId: "2x3-columns", salt: 263 },
-  { pieces: [["edge-single", "edges"], ["corner-single", "center-corners"], ["top-bar", "six"]], layoutId: "2x3-left-stack", salt: 271 },
-  { pieces: [["diag-two@1", "center-edges"], ["top-pair@1", "ring"], ["corner-l@2", "edge-single@2"]], layoutId: "2x3-right-stack", salt: 283 },
-  { pieces: [["diag-three@1", "all"], ["corner-single@1", "center"], ["top-bar@1", "six@1"]], layoutId: "2x3-columns", salt: 293 },
-  { pieces: [["diag-two", "corners"], ["corner-l@1", "edges"], ["edge-single@3", "top-bar@2"]], layoutId: "2x3-left-stack", salt: 307 },
-  { pieces: [["diag-three@1", "center-corners"], ["top-pair@2", "center-edges"], ["corner-single@2", "six@1"]], layoutId: "2x3-right-stack", salt: 311 },
-  { pieces: [["edge-single@1", "ring"], ["top-bar@3", "all"], ["diag-two@1", "corner-l@3"]], layoutId: "2x3-columns", salt: 331 },
-  { pieces: [["corner-single@3", "center"], ["six", "corners"], ["diag-three", "top-pair@1"]], layoutId: "2x3-left-stack", salt: 347 },
-  { pieces: [["top-bar@2", "edges"], ["corner-l", "center-corners"], ["edge-single@2", "diag-two"]], layoutId: "2x3-right-stack", salt: 353 },
-  { pieces: [["six@1", "center-edges"], ["diag-three@1", "ring"], ["top-pair@3", "corner-single"]], layoutId: "2x3-columns", salt: 367 },
-  { pieces: [["diag-two@1", "all"], ["edge-single@3", "center"], ["corner-l@2", "top-bar@1"]], layoutId: "2x3-left-stack", salt: 379 },
-  { pieces: [["diag-three", "corners"], ["six@1", "edges"], ["corner-single@1", "top-pair@2"]], layoutId: "2x3-right-stack", salt: 389 },
+  { pieces: [["diag-two", "center"], ["diag-three", "corners"], ["top-pair", "corner-l"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 263 },
+  { pieces: [["edge-single", "edges"], ["corner-single", "center-corners"], ["top-bar", "six"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "edge-single", preferredTrapTurn: 1, salt: 271 },
+  { pieces: [["diag-two@1", "center-edges"], ["top-pair@1", "ring"], ["corner-l@2", "edge-single@2"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 3, salt: 283 },
+  { pieces: [["diag-three@1", "all"], ["corner-single@1", "center"], ["top-bar@1", "six@1"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "diag-three", salt: 293 },
+  { pieces: [["diag-two", "corners"], ["corner-l@1", "edges"], ["edge-single@3", "top-bar@2"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "diag-two", salt: 307 },
+  { pieces: [["diag-three@1", "center-corners"], ["top-pair@2", "center-edges"], ["corner-single@2", "six@1"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "corner-single", preferredTrapTurn: 3, salt: 311 },
+  { pieces: [["edge-single@1", "ring"], ["top-bar@3", "all"], ["diag-two@1", "corner-l@3"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-bar", preferredTrapTurn: 1, salt: 331 },
+  { pieces: [["corner-single@3", "center"], ["six", "corners"], ["diag-three", "top-pair@1"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "six", salt: 347 },
+  { pieces: [["top-bar@2", "edges"], ["corner-l", "center-corners"], ["edge-single@2", "diag-two"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "edge-single", preferredTrapTurn: 3, salt: 353 },
+  { pieces: [["six@1", "center-edges"], ["diag-three@1", "ring"], ["top-pair@3", "corner-single"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "diag-three", salt: 367 },
+  { pieces: [["diag-two@1", "all"], ["edge-single@3", "center"], ["corner-l@2", "top-bar@1"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "corner-l", preferredTrapTurn: 1, salt: 379 },
+  { pieces: [["diag-three", "corners"], ["six@1", "edges"], ["corner-single@1", "top-pair@2"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 3, salt: 389 },
 ];
 
 const WIZARD_SPECS: readonly AuthoredSpec[] = [
-  { pieces: [["diag-two@1", "center"], ["corner-l@1", "corners"], ["edge-single@1", "top-bar@1"]], layoutId: null, salt: 401 },
-  { pieces: [["diag-three@1", "edges"], ["top-pair@1", "center-corners"], ["corner-single@1", "six@1"]], layoutId: null, salt: 419 },
-  { pieces: [["edge-single@2", "center-edges"], ["top-bar@2", "ring"], ["diag-two", "corner-l@2"]], layoutId: null, salt: 431 },
-  { pieces: [["corner-single@2", "all"], ["six", "center"], ["diag-three", "top-pair@2"]], layoutId: null, salt: 443 },
-  { pieces: [["top-bar@3", "corners"], ["corner-l@3", "edges"], ["edge-single@3", "diag-two@1"]], layoutId: null, salt: 457 },
-  { pieces: [["six@1", "center-corners"], ["diag-three@1", "center-edges"], ["top-pair@3", "corner-single@3"]], layoutId: null, salt: 463 },
-  { pieces: [["diag-two", "ring"], ["edge-single", "all"], ["corner-l@1", "top-bar"]], layoutId: null, salt: 479 },
-  { pieces: [["diag-three", "center"], ["corner-single", "corners"], ["six", "top-pair@1"]], layoutId: null, salt: 487 },
-  { pieces: [["top-bar@1", "edges"], ["corner-l@2", "center-corners"], ["edge-single@2", "diag-two@1"]], layoutId: null, salt: 499 },
-  { pieces: [["six", "center-edges"], ["diag-three@1", "ring"], ["top-pair@2", "corner-single@1"]], layoutId: null, salt: 509 },
-  { pieces: [["diag-two", "all"], ["edge-single@1", "center"], ["corner-l@3", "top-bar@2"]], layoutId: null, salt: 521 },
-  { pieces: [["diag-three@1", "corners"], ["six", "edges"], ["corner-single@2", "top-pair@3"]], layoutId: null, salt: 541 },
+  { pieces: [["diag-two", "center"], ["corner-l@1", "corners"], ["diag-two", "corner-l@1"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 401 },
+  { pieces: [["edge-single", "edges"], ["top-pair@1", "center-corners"], ["edge-single", "top-pair@1"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "edge-single", preferredTrapTurn: 1, salt: 419 },
+  { pieces: [["top-pair@1", "center-edges"], ["edge-single@2", "ring"], ["top-pair@1", "edge-single@2"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 3, salt: 431 },
+  { pieces: [["diag-three", "all"], ["corner-single@2", "center"], ["diag-three", "corner-single@2"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "diag-three", salt: 443 },
+  { pieces: [["diag-two", "corners"], ["top-bar@3", "edges"], ["diag-two", "top-bar@3"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "diag-two", salt: 457 },
+  { pieces: [["corner-single@3", "center-corners"], ["six@1", "center-edges"], ["corner-single@3", "six@1"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "corner-single", preferredTrapTurn: 3, salt: 463 },
+  { pieces: [["top-bar@2", "ring"], ["corner-l", "all"], ["top-bar@2", "corner-l"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-bar", preferredTrapTurn: 1, salt: 479 },
+  { pieces: [["six", "center"], ["top-pair@1", "corners"], ["six", "top-pair@1"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "six", salt: 487 },
+  { pieces: [["corner-l@2", "edges"], ["edge-single@2", "center-corners"], ["corner-l@2", "edge-single@2"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "corner-l", preferredTrapTurn: 3, salt: 499 },
+  { pieces: [["diag-three@1", "center-edges"], ["corner-single@1", "ring"], ["diag-three@1", "corner-single@1"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "diag-three", salt: 509 },
+  { pieces: [["edge-single@1", "all"], ["top-bar@2", "center"], ["edge-single@1", "top-bar@2"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "edge-single", preferredTrapTurn: 1, salt: 521 },
+  { pieces: [["top-pair@3", "corners"], ["six", "edges"], ["top-pair@3", "six"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 3, salt: 541 },
 ];
 
 const AUTHORED_SPECS: Readonly<Record<Difficulty, readonly AuthoredSpec[]>> = {
@@ -758,10 +947,10 @@ const AUTHORED_SPECS: Readonly<Record<Difficulty, readonly AuthoredSpec[]>> = {
 };
 
 const ANSWER_SEQUENCES: Readonly<Record<Difficulty, readonly number[]>> = {
-  Starter: [2, 0, 3, 1, 2, 1, 3, 0, 1, 3, 0, 2],
-  Junior: [2, 1, 3, 0, 1, 3, 0, 2, 3, 1, 2, 0],
-  Expert: [3, 0, 2, 1, 2, 0, 1, 3, 1, 3, 0, 2],
-  Wizard: [0, 2, 1, 3, 2, 0, 3, 1, 2, 0, 1, 3],
+  Starter: [2, 0, 3, 2, 3, 0, 1, 0, 2, 1, 3, 1],
+  Junior: [1, 3, 1, 0, 2, 1, 2, 3, 0, 3, 2, 0],
+  Expert: [3, 0, 2, 0, 1, 0, 3, 1, 3, 2, 1, 2],
+  Wizard: [0, 2, 0, 1, 2, 1, 3, 2, 3, 1, 0, 3],
 };
 
 function piecesFromSpec(spec: AuthoredSpec): readonly DominoPiece[] {
@@ -795,16 +984,31 @@ function rotatedValues<T>(values: readonly T[], salt: number): T[] {
 
 function selectBuildableOptions(
   reachable: readonly ReachableDesign[],
-  rows: 2,
-  columns: 2 | 3,
+  rows: GridRows,
+  columns: GridColumns,
   layoutId: LayoutId | null,
   salt: number,
   impossibleDesign: DominoDesign,
   minimumDistance: number,
+  requiredSharedSignature?: string,
 ): readonly { design: DominoDesign; witness: BuildWitness }[] {
   const allowedLayoutIds =
     layoutId === null ? legalLayoutIds(rows, columns) : [layoutId];
   const targetLayoutIds = rotatedValues(allowedLayoutIds, salt);
+  const sharedSignatureKeys = new Set(
+    requiredSharedSignature
+      ? reachable
+          .filter(
+            ({ design }) =>
+              exactMaskMultiplicitySignature(design) ===
+              requiredSharedSignature,
+          )
+          .map(({ design }) => designKey(design))
+      : [],
+  );
+  if (requiredSharedSignature && sharedSignatureKeys.size === 0) {
+    throw new Error("No buildable design shares the required face-count signature.");
+  }
   type SelectedBuildable = {
     design: DominoDesign;
     witness: BuildWitness;
@@ -813,14 +1017,34 @@ function selectBuildableOptions(
   function search(
     selected: readonly SelectedBuildable[],
   ): readonly SelectedBuildable[] | null {
-    if (selected.length === 3) return selected;
-    const targetLayoutId = targetLayoutIds[selected.length];
-    const candidates = rotatedValues(
+    if (selected.length === 3) {
+      return !requiredSharedSignature ||
+        selected.some(({ design }) => sharedSignatureKeys.has(designKey(design)))
+        ? selected
+        : null;
+    }
+    const targetLayoutId =
+      targetLayoutIds[selected.length % targetLayoutIds.length];
+    const rotatedCandidates = rotatedValues(
       reachable,
       targetLayoutId
         ? salt + selected.length * 7
         : salt * 3 + selected.length + 1,
     );
+    const alreadySharesSignature = selected.some(({ design }) =>
+      sharedSignatureKeys.has(designKey(design)),
+    );
+    const candidates =
+      requiredSharedSignature && !alreadySharesSignature
+        ? [
+            ...rotatedCandidates.filter(({ design }) =>
+              sharedSignatureKeys.has(designKey(design)),
+            ),
+            ...rotatedCandidates.filter(
+              ({ design }) => !sharedSignatureKeys.has(designKey(design)),
+            ),
+          ]
+        : rotatedCandidates;
 
     for (const candidate of candidates) {
       const candidateKey = designKey(candidate.design);
@@ -828,6 +1052,17 @@ function selectBuildableOptions(
         selected.some(({ design }) => designKey(design) === candidateKey)
       ) {
         continue;
+      }
+      if (layoutId === null && targetLayoutId) {
+        const witnessLayouts = new Set(
+          candidate.witnesses.map(({ layoutId: value }) => value),
+        );
+        if (
+          witnessLayouts.size !== 1 ||
+          !witnessLayouts.has(targetLayoutId)
+        ) {
+          continue;
+        }
       }
       const comparisons = [
         impossibleDesign,
@@ -875,12 +1110,18 @@ function swappedCandidates(
   const candidates: DominoDesign[] = [];
   for (const item of rotatedValues(reachable, salt)) {
     for (let first = 0; first < item.design.cells.length; first += 1) {
+      if (item.design.cells[first] === null) continue;
       for (
         let second = first + 1;
         second < item.design.cells.length;
         second += 1
       ) {
-        if (item.design.cells[first] === item.design.cells[second]) continue;
+        if (
+          item.design.cells[second] === null ||
+          item.design.cells[first] === item.design.cells[second]
+        ) {
+          continue;
+        }
         const cells = [...item.design.cells];
         [cells[first], cells[second]] = [cells[second], cells[first]];
         candidates.push({ cells });
@@ -893,13 +1134,28 @@ function swappedCandidates(
 function twistedCandidates(
   reachable: readonly ReachableDesign[],
   salt: number,
+  preferredPattern?: PipPatternName,
+  preferredTurn?: 1 | 3,
 ): DominoDesign[] {
   const candidates: DominoDesign[] = [];
   for (const item of rotatedValues(reachable, salt * 2 + 1)) {
     for (let cell = 0; cell < item.design.cells.length; cell += 1) {
-      for (const turns of [1, 2, 3] as const) {
-        const rotated = rotatePipMask(item.design.cells[cell], turns);
-        if (rotated === item.design.cells[cell]) continue;
+      const mask = item.design.cells[cell];
+      if (mask === null) continue;
+      if (
+        preferredPattern &&
+        ![0, 1, 2, 3].some(
+          (turns) => rotatePipMask(PIP_PATTERNS[preferredPattern], turns) === mask,
+        )
+      ) {
+        continue;
+      }
+      // The teaching trap is a true quarter-turn: the pip count stays fixed,
+      // but a directional face points 90 degrees away from a legal build.
+      const turnsToTry = preferredTurn ? [preferredTurn] : ([1, 3] as const);
+      for (const turns of turnsToTry) {
+        const rotated = rotatePipMask(mask, turns);
+        if (rotated === mask) continue;
         const cells = [...item.design.cells];
         cells[cell] = rotated;
         candidates.push({ cells });
@@ -912,19 +1168,26 @@ function twistedCandidates(
 function chooseImpossibleDesign(
   pieces: readonly DominoPiece[],
   reachable: readonly ReachableDesign[],
-  rows: 2,
-  columns: 2 | 3,
+  rows: GridRows,
+  columns: GridColumns,
   layoutId: LayoutId | null,
   salt: number,
   difficulty: Difficulty,
   isUsable: (design: DominoDesign) => boolean,
+  preferredTrapPattern?: PipPatternName,
+  preferredTrapTurn?: 1 | 3,
 ): DominoDesign {
   const reachableKeys = new Set(
     reachable.map((item) => designKey(item.design)),
   );
   const candidates: DominoDesign[] = [];
 
-  if (layoutId !== null) {
+  const teachesShownSeams = difficulty === "Starter";
+  const teachesBrokenPair = difficulty === "Junior";
+  const teachesOrientationError =
+    difficulty === "Expert" || difficulty === "Wizard";
+
+  if (layoutId !== null && teachesShownSeams) {
     const seamTraps = enumerateBuildableDesigns(
       pieces,
       rows,
@@ -942,10 +1205,18 @@ function chooseImpossibleDesign(
     candidates.push(...rotatedValues(seamTraps, salt));
   }
 
-  const localFamilies =
-    salt % 2 === 0
-      ? [swappedCandidates(reachable, salt), twistedCandidates(reachable, salt)]
-      : [twistedCandidates(reachable, salt), swappedCandidates(reachable, salt)];
+  const localFamilies = teachesOrientationError
+    ? [
+        twistedCandidates(
+          reachable,
+          salt,
+          preferredTrapPattern,
+          preferredTrapTurn,
+        ),
+      ]
+    : teachesBrokenPair
+      ? [swappedCandidates(reachable, salt)]
+      : [];
   candidates.push(...localFamilies.flat());
 
   const seen = new Set<string>();
@@ -954,9 +1225,9 @@ function chooseImpossibleDesign(
     if (seen.has(key) || reachableKeys.has(key)) return false;
     seen.add(key);
     const distance = distanceToReachable(candidate, reachable);
-    const distanceIsSuitable = usesGenerousAlternatives(difficulty)
-      ? distance === 2
-      : distance >= 1 && distance <= 2;
+    const distanceIsSuitable = teachesOrientationError
+      ? distance === 1
+      : distance === 2;
     return distanceIsSuitable && isUsable(candidate);
   });
   if (!closeCandidate) {
@@ -968,27 +1239,37 @@ function chooseImpossibleDesign(
 function isInterestingPieceSet(
   pieces: readonly DominoPiece[],
   difficulty: Difficulty,
+  targetShapeId: TargetShapeId,
 ): boolean {
   const rules = DIFFICULTY_RULES[difficulty];
+  const shape = TARGET_SHAPES[targetShapeId];
   if (pieces.length !== rules.pieceCount) return false;
   const halves = pieces.flatMap(({ first, second }) => [first, second]);
   const directionalCount = halves.filter(isDirectionalPipMask).length;
+  const distinctHalfCount = new Set(halves).size;
   if (
     directionalCount < rules.minDirectionalHalves ||
     directionalCount > rules.maxDirectionalHalves ||
-    new Set(halves).size < rules.minDistinctHalves ||
+    distinctHalfCount < rules.minDistinctHalves ||
+    distinctHalfCount > rules.maxDistinctHalves ||
     new Set(pieces.map(physicalPieceKey)).size !== pieces.length
   ) {
     return false;
   }
+  if (
+    difficulty === "Wizard" &&
+    exactMaskMultiplicitySignature({ cells: halves }) !== "2,2,1,1"
+  ) {
+    return false;
+  }
   const layoutId = rules.seamsVisible
-    ? legalLayoutIds(rules.rows, rules.columns)[0]
+    ? legalLayoutIdsForShape(targetShapeId)[0]
     : null;
   return (
     enumerateBuildableDesigns(
       pieces,
-      rules.rows,
-      rules.columns,
+      shape.rows,
+      shape.columns,
       layoutId,
     ).length >= rules.minReachableDesigns
   );
@@ -998,35 +1279,42 @@ function assembleRound(
   id: string,
   difficulty: Difficulty,
   pieces: readonly DominoPiece[],
+  targetShapeId: TargetShapeId,
   layoutId: LayoutId | null,
   correctIndex: number,
   salt: number,
+  preferredTrapPattern?: PipPatternName,
+  preferredTrapTurn?: 1 | 3,
 ): DominoRound {
   const rules = DIFFICULTY_RULES[difficulty];
+  const shape = TARGET_SHAPES[targetShapeId];
   if (!Number.isInteger(correctIndex) || correctIndex < 0 || correctIndex > 3) {
     throw new Error("The impossible option index must be between 0 and 3.");
   }
   if (rules.seamsVisible !== (layoutId !== null)) {
     throw new Error(`${difficulty} has an inconsistent seam scaffold.`);
   }
-  if (!isInterestingPieceSet(pieces, difficulty)) {
+  if (!rules.targetShapeIds.includes(targetShapeId)) {
+    throw new Error(`${difficulty} does not teach target ${targetShapeId}.`);
+  }
+  if (!isInterestingPieceSet(pieces, difficulty, targetShapeId)) {
     throw new Error(`${difficulty} uses an uninteresting domino set.`);
   }
   if (layoutId !== null) {
-    checkedLayouts(rules.rows, rules.columns, layoutId);
+    checkedLayouts(shape.rows, shape.columns, layoutId);
   }
   const reachable = enumerateBuildableDesigns(
     pieces,
-    rules.rows,
-    rules.columns,
+    shape.rows,
+    shape.columns,
     layoutId,
   );
   const minimumOptionDistance = usesGenerousAlternatives(difficulty) ? 2 : 1;
   const impossibleDesign = chooseImpossibleDesign(
     pieces,
     reachable,
-    rules.rows,
-    rules.columns,
+    shape.rows,
+    shape.columns,
     layoutId,
     salt,
     difficulty,
@@ -1034,27 +1322,35 @@ function assembleRound(
       try {
         selectBuildableOptions(
           reachable,
-          rules.rows,
-          rules.columns,
+          shape.rows,
+          shape.columns,
           layoutId,
           salt,
           candidate,
           minimumOptionDistance,
+          difficulty === "Expert" || difficulty === "Wizard"
+            ? exactMaskMultiplicitySignature(candidate)
+            : undefined,
         );
         return true;
       } catch {
         return false;
       }
     },
+    preferredTrapPattern,
+    preferredTrapTurn,
   );
   const possibleOptions = selectBuildableOptions(
     reachable,
-    rules.rows,
-    rules.columns,
+    shape.rows,
+    shape.columns,
     layoutId,
     salt,
     impossibleDesign,
     minimumOptionDistance,
+    difficulty === "Expert" || difficulty === "Wizard"
+      ? exactMaskMultiplicitySignature(impossibleDesign)
+      : undefined,
   ).map<DominoOption>(({ design, witness }) => ({
     design,
     buildable: true,
@@ -1065,8 +1361,8 @@ function assembleRound(
   const mismatch = analyzeImpossibleDesign(
     pieces,
     impossibleDesign,
-    rules.rows,
-    rules.columns,
+    shape.rows,
+    shape.columns,
     layoutId,
   );
   const impossibleOption: DominoOption = {
@@ -1083,8 +1379,9 @@ function assembleRound(
     id,
     difficulty,
     pieces,
-    rows: rules.rows,
-    columns: rules.columns,
+    targetShapeId,
+    rows: shape.rows,
+    columns: shape.columns,
     layoutId,
     seamsVisible: rules.seamsVisible,
     options,
@@ -1121,25 +1418,56 @@ function answerSequenceErrors(
   ) {
     errors.push(`${difficulty} repeats one four-position cycle.`);
   }
+  for (let blockStart = 0; blockStart < indexes.length; blockStart += 4) {
+    if (new Set(indexes.slice(blockStart, blockStart + 4)).size === 4) {
+      errors.push(
+        `${difficulty} block ${blockStart / 4 + 1} exposes every answer position once.`,
+      );
+    }
+  }
   return errors;
+}
+
+function designMatchesTarget(
+  design: DominoDesign,
+  shape: TargetShape,
+): boolean {
+  if (design.cells.length !== shape.rows * shape.columns) return false;
+  const occupied = new Set(shape.occupiedCells);
+  return design.cells.every((mask, cell) =>
+    occupied.has(cell) ? mask !== null && isPipMask(mask) : mask === null,
+  );
 }
 
 export function validateRound(round: DominoRound): readonly string[] {
   const errors: string[] = [];
   const rules = DIFFICULTY_RULES[round.difficulty];
   if (!rules) return [`Unknown difficulty: ${round.difficulty}`];
+  const shape = TARGET_SHAPES[round.targetShapeId];
+  if (!shape) return [`Unknown target shape: ${round.targetShapeId}`];
   if (
-    round.rows !== rules.rows ||
-    round.columns !== rules.columns ||
+    !rules.targetShapeIds.includes(round.targetShapeId) ||
+    round.rows !== shape.rows ||
+    round.columns !== shape.columns ||
     round.pieces.length !== rules.pieceCount
   ) {
-    errors.push("Board dimensions or piece count do not match the difficulty.");
+    errors.push("Target shape, board dimensions, or piece count do not match the difficulty.");
   }
   if (
     round.seamsVisible !== rules.seamsVisible ||
     round.seamsVisible !== (round.layoutId !== null)
   ) {
     errors.push("Seam visibility does not match the difficulty.");
+  }
+  if (
+    round.difficulty === "Wizard" &&
+    exactMaskMultiplicitySignature({
+      cells: round.pieces.flatMap(({ first, second }) => [first, second]),
+    }) !== "2,2,1,1"
+  ) {
+    errors.push(
+      "Wizard source pieces must repeat two face masks exactly twice each.",
+    );
   }
   if (round.options.length !== 4) errors.push("A round must have four options.");
   if (
@@ -1156,15 +1484,15 @@ export function validateRound(round: DominoRound): readonly string[] {
   ) {
     errors.push("Answer designs must be distinct.");
   }
-  const optionCellCountsAreValid = round.options.every(
-    ({ design }) => design.cells.length === round.rows * round.columns,
+  const optionFootprintsAreValid = round.options.every(
+    ({ design }) => designMatchesTarget(design, shape),
   );
-  if (!optionCellCountsAreValid) {
-    errors.push("Every answer design must fill the complete board.");
+  if (!optionFootprintsAreValid) {
+    errors.push("Every answer design must exactly fill the target footprint.");
   }
   if (
     usesGenerousAlternatives(round.difficulty) &&
-    optionCellCountsAreValid
+    optionFootprintsAreValid
   ) {
     for (let first = 0; first < round.options.length; first += 1) {
       for (let second = first + 1; second < round.options.length; second += 1) {
@@ -1182,14 +1510,42 @@ export function validateRound(round: DominoRound): readonly string[] {
     }
   }
 
-  const actualBuildability = round.options.map(({ design }) =>
-    isDesignBuildable(
+  let scopedReachable: readonly ReachableDesign[];
+  try {
+    scopedReachable = enumerateBuildableDesigns(
       round.pieces,
-      design,
       round.rows,
       round.columns,
       round.layoutId,
-    ),
+    );
+  } catch {
+    errors.push("The round's pieces or tiling scope cannot be enumerated.");
+    return errors;
+  }
+  const scopedReachableByKey = new Map(
+    scopedReachable.map((reachable) => [
+      designKey(reachable.design),
+      reachable,
+    ]),
+  );
+  let allLayoutReachableByKey = scopedReachableByKey;
+  if (round.difficulty === "Starter" && round.layoutId !== null) {
+    const allLayoutReachable = enumerateBuildableDesigns(
+      round.pieces,
+      round.rows,
+      round.columns,
+      null,
+    );
+    allLayoutReachableByKey = new Map(
+      allLayoutReachable.map((reachable) => [
+        designKey(reachable.design),
+        reachable,
+      ]),
+    );
+  }
+
+  const actualBuildability = round.options.map(({ design }) =>
+    scopedReachableByKey.has(designKey(design)),
   );
   const impossibleIndexes = actualBuildability.flatMap((buildable, index) =>
     buildable ? [] : [index],
@@ -1226,15 +1582,114 @@ export function validateRound(round: DominoRound): readonly string[] {
       } catch {
         errors.push(`Option ${index + 1} has an invalid build witness.`);
       }
-    } else if (
-      option.witness ||
-      !option.mismatch ||
-      option.kind === "buildable" ||
-      option.mismatch.differingCells.length <
-        (usesGenerousAlternatives(round.difficulty) ? 2 : 1) ||
-      option.mismatch.differingCells.length > 2
+    } else {
+      if (
+        option.witness ||
+        !option.mismatch ||
+        option.kind === "buildable" ||
+        option.mismatch.differingCells.length <
+          (usesGenerousAlternatives(round.difficulty) ? 2 : 1) ||
+        option.mismatch.differingCells.length > 2
+      ) {
+        errors.push(
+          `Option ${index + 1} needs a local impossible explanation.`,
+        );
+        continue;
+      }
+      const actualDifferences = differingCellIndexes(
+        option.design,
+        option.mismatch.closestBuildable,
+      );
+      if (
+        actualDifferences.length !== option.mismatch.differingCells.length ||
+        actualDifferences.some(
+          (cell, differenceIndex) =>
+            cell !== option.mismatch?.differingCells[differenceIndex],
+        )
+      ) {
+        errors.push(`Option ${index + 1} reports incorrect local differences.`);
+      }
+      if (!scopedReachableByKey.has(designKey(option.mismatch.closestBuildable))) {
+        errors.push(`Option ${index + 1} needs a buildable comparison.`);
+      }
+
+      const teachesShownSeams = round.difficulty === "Starter";
+      if (
+        teachesShownSeams &&
+        (option.kind !== "seam-trap" ||
+          round.layoutId === null ||
+          !allLayoutReachableByKey.has(designKey(option.design)))
+      ) {
+        errors.push(
+          `Option ${index + 1} must be a two-cell shown-seam trap.`,
+        );
+      }
+
+      if (
+        round.difficulty === "Junior" &&
+        (option.kind !== "broken-pair" ||
+          option.mismatch.differingCells.length !== 2 ||
+          scopedReachableByKey.has(designKey(option.design)))
+      ) {
+        errors.push(
+          `Option ${index + 1} must be a two-cell globally impossible broken pair.`,
+        );
+      }
+
+      const teachesOrientationError =
+        round.difficulty === "Expert" || round.difficulty === "Wizard";
+      if (
+        teachesOrientationError &&
+        (option.kind !== "twisted-half" ||
+          !isQuarterTurnDifference(
+            option.design,
+            option.mismatch.closestBuildable,
+            actualDifferences,
+          ))
+      ) {
+        errors.push(
+          `Option ${index + 1} must be a one-face quarter-turn trap.`,
+        );
+      }
+    }
+  }
+
+  if (round.layoutId === null) {
+    const exclusivelyRepresentedLayouts = new Set<LayoutId>();
+    for (const option of round.options.filter(({ buildable }) => buildable)) {
+      const reachable = scopedReachableByKey.get(designKey(option.design));
+      const witnessLayouts = new Set(
+        reachable?.witnesses.map(({ layoutId }) => layoutId) ?? [],
+      );
+      if (witnessLayouts.size === 1) {
+        exclusivelyRepresentedLayouts.add([...witnessLayouts][0]);
+      }
+    }
+    const missingLayout = legalLayoutIdsForShape(round.targetShapeId).some(
+      (layoutId) => !exclusivelyRepresentedLayouts.has(layoutId),
+    );
+    if (missingLayout) {
+      errors.push(
+        "Hidden-seam choices must include exclusive evidence for every legal tiling.",
+      );
+    }
+  }
+  if (round.difficulty === "Expert" || round.difficulty === "Wizard") {
+    const impossibleSignature = exactMaskMultiplicitySignature(
+      round.options[round.correctIndex].design,
+    );
+    if (
+      !round.options.some(
+        (option, index) =>
+          index !== round.correctIndex &&
+          option.buildable &&
+          exactMaskMultiplicitySignature(option.design) ===
+            impossibleSignature,
+      )
     ) {
-      errors.push(`Option ${index + 1} needs a local impossible explanation.`);
+      errors.push(
+        `${round.difficulty}'s impossible option must share its face-count signature with a buildable choice.`,
+      );
     }
   }
   return errors;
@@ -1258,9 +1713,12 @@ export function buildCampaignRounds(): readonly DominoRound[] {
         `domino-${difficulty.toLowerCase()}-${String(index + 1).padStart(2, "0")}`,
         difficulty,
         piecesFromSpec(spec),
+        spec.targetShapeId,
         spec.layoutId,
         answers[index],
         spec.salt,
+        spec.preferredTrapPattern,
+        spec.preferredTrapTurn,
       ),
     );
   });
@@ -1294,8 +1752,50 @@ function shuffled<T>(values: readonly T[], random: () => number): T[] {
 function makeGeneratedPieces(
   difficulty: Difficulty,
   random: () => number,
+  preferredTrapPattern?: PipPatternName,
 ): readonly DominoPiece[] {
   const rules = DIFFICULTY_RULES[difficulty];
+  if (difficulty === "Wizard") {
+    if (
+      !preferredTrapPattern ||
+      !DIRECTIONAL_PATTERN_NAMES.includes(
+        preferredTrapPattern as (typeof DIRECTIONAL_PATTERN_NAMES)[number],
+      )
+    ) {
+      throw new Error("Wizard generation needs a directional trap family.");
+    }
+    const preferredMask = rotatePipMask(
+      PIP_PATTERNS[preferredTrapPattern],
+      randomInteger(random, 4),
+    );
+    const directionalMasks = [
+      ...new Set(
+        DIRECTIONAL_PATTERN_NAMES.flatMap((name) =>
+          [0, 1, 2, 3].map((turns) =>
+            rotatePipMask(PIP_PATTERNS[name], turns),
+          ),
+        ),
+      ),
+    ].filter((mask) => mask !== preferredMask);
+    const secondDirectional =
+      directionalMasks[randomInteger(random, directionalMasks.length)];
+    const firstSimple =
+      PIP_PATTERNS[
+        SIMPLE_PATTERN_NAMES[randomInteger(random, SIMPLE_PATTERN_NAMES.length)]
+      ];
+    const remainingSimpleNames = SIMPLE_PATTERN_NAMES.filter(
+      (name) => PIP_PATTERNS[name] !== firstSimple,
+    );
+    const secondSimple =
+      PIP_PATTERNS[
+        remainingSimpleNames[randomInteger(random, remainingSimpleNames.length)]
+      ];
+    return [
+      { id: "A", first: preferredMask, second: firstSimple },
+      { id: "B", first: secondDirectional, second: secondSimple },
+      { id: "C", first: preferredMask, second: secondDirectional },
+    ];
+  }
   const halfCount = rules.pieceCount * 2;
   const directionalCount =
     rules.minDirectionalHalves +
@@ -1347,11 +1847,30 @@ export function generateInfiniteRound(
     throw new Error(`Unknown difficulty: ${difficulty}`);
   }
   const rules = DIFFICULTY_RULES[difficulty];
-  const layoutIds = legalLayoutIds(rules.rows, rules.columns);
 
   for (let attempt = 0; attempt < GENERATOR_MAX_ATTEMPTS; attempt += 1) {
-    const pieces = makeGeneratedPieces(difficulty, random);
-    if (!isInterestingPieceSet(pieces, difficulty)) continue;
+    const preferredTrapPattern = (() => {
+      if (difficulty !== "Wizard") return undefined;
+      const phase = randomInteger(random, DIRECTIONAL_PATTERN_NAMES.length);
+      const selection = randomInteger(
+        random,
+        DIRECTIONAL_PATTERN_NAMES.length,
+      );
+      return DIRECTIONAL_PATTERN_NAMES[
+        (phase + selection) % DIRECTIONAL_PATTERN_NAMES.length
+      ];
+    })();
+    const pieces = makeGeneratedPieces(
+      difficulty,
+      random,
+      preferredTrapPattern,
+    );
+    // Choose geometry after piece generation has mixed a seeded source; this
+    // avoids adjacent numeric seeds clustering into one shape family.
+    const targetShapeId =
+      rules.targetShapeIds[randomInteger(random, rules.targetShapeIds.length)];
+    const layoutIds = legalLayoutIdsForShape(targetShapeId);
+    if (!isInterestingPieceSet(pieces, difficulty, targetShapeId)) continue;
     const layoutId = rules.seamsVisible
       ? layoutIds[randomInteger(random, layoutIds.length)]
       : null;
@@ -1363,9 +1882,11 @@ export function generateInfiniteRound(
         `infinite-${difficulty.toLowerCase()}-${salt.toString(36)}`,
         difficulty,
         pieces,
+        targetShapeId,
         layoutId,
         correctIndex,
         salt,
+        preferredTrapPattern,
       );
     } catch {
       continue;
@@ -1399,7 +1920,7 @@ export function roundFingerprint(round: DominoRound): string {
     .sort()
     .join("|");
   const impossible = designKey(round.options[round.correctIndex].design);
-  return `${round.difficulty}:${round.rows}x${round.columns}:${
+  return `${round.difficulty}:${round.targetShapeId}:${round.rows}x${round.columns}:${
     round.layoutId ?? "any-layout"
   }:${pieces}:${options}:!${impossible}`;
 }
@@ -1407,22 +1928,70 @@ export function roundFingerprint(round: DominoRound): string {
 export const ROUNDS = buildCampaignRounds();
 export const CAMPAIGN_ROUNDS = ROUNDS;
 
-const tutorialRound = ROUNDS[0];
-const tutorialPossible = tutorialRound.options.find(
-  ({ buildable }) => buildable,
+const tutorialPieces: readonly DominoPiece[] = [
+  {
+    id: "A",
+    first: PIP_PATTERNS["corner-l"],
+    second: PIP_PATTERNS.center,
+  },
+  {
+    id: "B",
+    first: PIP_PATTERNS["edge-single"],
+    second: PIP_PATTERNS.corners,
+  },
+];
+const tutorialWitness: BuildWitness = {
+  layoutId: "2x2-columns",
+  placements: [
+    { pieceId: "A", fromCell: 0, toCell: 2, quarterTurns: 1 },
+    { pieceId: "B", fromCell: 1, toCell: 3, quarterTurns: 1 },
+  ],
+};
+const tutorialPossible = renderWitness(
+  tutorialPieces,
+  2,
+  2,
+  tutorialWitness,
 );
-if (!tutorialPossible?.witness) {
-  throw new Error("The Domino Twist tutorial needs a buildable example.");
+const tutorialNearMiss = tutorialPossible.cells
+  .flatMap((mask, cell) => {
+    if (mask === null || !isDirectionalPipMask(mask)) return [];
+    return ([1, 3] as const).map((turns) => {
+      const cells = [...tutorialPossible.cells];
+      cells[cell] = rotatePipMask(mask, turns);
+      return { cells } satisfies DominoDesign;
+    });
+  })
+  .find(
+    (design) =>
+      !isDesignBuildable(tutorialPieces, design, 2, 2, null) &&
+      analyzeImpossibleDesign(
+        tutorialPieces,
+        design,
+        2,
+        2,
+        "2x2-columns",
+      ).differingCells.length === 1,
+  );
+if (!tutorialNearMiss) {
+  throw new Error("The Domino Twist tutorial needs a global rotation near-miss.");
 }
+const tutorialNearMissAnalysis = analyzeImpossibleDesign(
+  tutorialPieces,
+  tutorialNearMiss,
+  2,
+  2,
+  "2x2-columns",
+);
 
 export const TUTORIAL = {
-  pieces: tutorialRound.pieces,
-  rows: tutorialRound.rows,
-  columns: tutorialRound.columns,
-  layoutId: tutorialRound.layoutId,
-  possible: tutorialPossible.design,
-  witness: tutorialPossible.witness,
-  nearMiss: tutorialRound.options[tutorialRound.correctIndex].design,
-  nearMissReason:
-    tutorialRound.options[tutorialRound.correctIndex].mismatch?.message ?? "",
+  pieces: tutorialPieces,
+  targetShapeId: "2x2-rect",
+  rows: 2,
+  columns: 2,
+  layoutId: "2x2-columns",
+  possible: tutorialPossible,
+  witness: tutorialWitness,
+  nearMiss: tutorialNearMiss,
+  nearMissReason: tutorialNearMissAnalysis.message,
 } as const;

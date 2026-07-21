@@ -47,6 +47,7 @@ import {
   type DominoRound,
   type LayoutId,
   type PipMask,
+  type TargetShapeId,
 } from "./game-engine";
 import { dominoTwistGame } from "./game-info";
 import { progressionAdapter } from "./progression-adapter";
@@ -118,7 +119,6 @@ const LEVELS: readonly Difficulty[] = [
 const CAMPAIGN_PROBLEMS_PER_LEVEL = 12;
 const TEACHING_MS = 900;
 const REDUCED_TEACHING_MS = 140;
-const WIZARD_WRONG_CUE_MS = 180;
 const WRONG_TOTAL_MS = 2200;
 const REDUCED_WRONG_TOTAL_MS = 1300;
 const GHOST_STAGGER_MS = 70;
@@ -219,6 +219,19 @@ function gridPositionStyle(
       Math.max(firstRow, secondRow) + 2
     }`,
   };
+}
+
+function targetShapeDescription(targetShapeId: TargetShapeId): string {
+  switch (targetShapeId) {
+    case "2x2-rect":
+      return "four-cell square pip design";
+    case "2x3-rect":
+      return "six-cell rectangular pip design";
+    case "2x4-ledge":
+      return "six-cell ledge-shaped pip design";
+    case "3x3-stair":
+      return "six-cell stair-step pip design";
+  }
 }
 
 function PipFace({ mask }: { mask: PipMask }) {
@@ -361,7 +374,7 @@ function SeamOverlay({
   columns,
 }: {
   layoutId: LayoutId;
-  columns: 2 | 3;
+  columns: 2 | 3 | 4;
 }) {
   const layout = TILING_LAYOUTS[layoutId];
   return (
@@ -391,7 +404,7 @@ function WitnessOverlay({
 }: {
   witness: BuildWitness;
   pieces: readonly DominoPiece[];
-  columns: 2 | 3;
+  columns: 2 | 3 | 4;
 }) {
   return (
     <span className={styles.witnessOverlay} aria-hidden="true">
@@ -426,6 +439,7 @@ function WitnessOverlay({
 
 function DesignBoard({
   design,
+  targetShapeId,
   rows,
   columns,
   layoutId,
@@ -434,8 +448,9 @@ function DesignBoard({
   mismatchCells = [],
 }: {
   design: DominoDesign;
-  rows: 2;
-  columns: 2 | 3;
+  targetShapeId: TargetShapeId;
+  rows: 2 | 3;
+  columns: 2 | 3 | 4;
   layoutId?: LayoutId | null;
   witness?: BuildWitness | null;
   pieces?: readonly DominoPiece[];
@@ -446,20 +461,36 @@ function DesignBoard({
     <span
       className={styles.designBoard}
       data-columns={columns}
+      data-rows={rows}
+      data-shape={targetShapeId}
       data-size={`${rows}x${columns}`}
+      style={
+        {
+          "--columns": `${columns}`,
+          "--rows": `${rows}`,
+        } as CustomProperties
+      }
       aria-hidden="true"
     >
-      {design.cells.map((mask, index) => (
-        <span
-          className={`${styles.designCell} ${
-            mismatchSet.has(index) ? styles.mismatchCell : ""
-          }`}
-          data-cell-index={index}
-          key={`${mask}-${index}`}
-        >
-          <PipFace mask={mask} />
-        </span>
-      ))}
+      {design.cells.map((mask, index) =>
+        mask === null ? (
+          <span
+            className={styles.designHole}
+            aria-hidden="true"
+            key={`hole-${index}`}
+          />
+        ) : (
+          <span
+            className={`${styles.designCell} ${
+              mismatchSet.has(index) ? styles.mismatchCell : ""
+            }`}
+            data-cell-index={index}
+            key={`${mask}-${index}`}
+          >
+            <PipFace mask={mask} />
+          </span>
+        ),
+      )}
       {layoutId ? (
         <SeamOverlay layoutId={layoutId} columns={columns} />
       ) : null}
@@ -823,11 +854,8 @@ export default function DominoTwistGame() {
         }
       }
 
-      const suppressWizardWitness =
-        round.difficulty === "Wizard" && !isCorrect;
       const nextGhost =
         !isCorrect &&
-        !suppressWizardWitness &&
         chosenOption.witness &&
         optionButtonRefs.current[optionIndex]
           ? buildDominoGhost(
@@ -839,11 +867,9 @@ export default function DominoTwistGame() {
             )
           : null;
       setGhost(nextGhost);
-      const teachingDuration = suppressWizardWitness
-        ? WIZARD_WRONG_CUE_MS
-        : reducedMotion
-          ? REDUCED_TEACHING_MS
-          : TEACHING_MS;
+      const teachingDuration = reducedMotion
+        ? REDUCED_TEACHING_MS
+        : TEACHING_MS;
       const wrongTotalDuration = reducedMotion
         ? REDUCED_WRONG_TOTAL_MS
         : WRONG_TOTAL_MS;
@@ -1214,12 +1240,9 @@ export default function DominoTwistGame() {
         const reducedMotion = window.matchMedia(
           "(prefers-reduced-motion: reduce)",
         ).matches;
-        const teachingDuration =
-          currentRound.difficulty === "Wizard"
-            ? WIZARD_WRONG_CUE_MS
-            : reducedMotion
-              ? REDUCED_TEACHING_MS
-              : TEACHING_MS;
+        const teachingDuration = reducedMotion
+          ? REDUCED_TEACHING_MS
+          : TEACHING_MS;
         const wrongTotalDuration = reducedMotion
           ? REDUCED_WRONG_TOTAL_MS
           : WRONG_TOTAL_MS;
@@ -1550,6 +1573,7 @@ export default function DominoTwistGame() {
               <div className={styles.exampleAnswer}>
                 <DesignBoard
                   design={TUTORIAL.possible}
+                  targetShapeId={TUTORIAL.targetShapeId}
                   rows={TUTORIAL.rows}
                   columns={TUTORIAL.columns}
                   layoutId={TUTORIAL.layoutId}
@@ -1566,6 +1590,7 @@ export default function DominoTwistGame() {
               <div className={styles.exampleAnswer}>
                 <DesignBoard
                   design={TUTORIAL.nearMiss}
+                  targetShapeId={TUTORIAL.targetShapeId}
                   rows={TUTORIAL.rows}
                   columns={TUTORIAL.columns}
                   layoutId={TUTORIAL.layoutId}
@@ -1577,7 +1602,9 @@ export default function DominoTwistGame() {
                   ×
                 </span>
               </div>
-              <p className={styles.nearMissCaption}>A near-match breaks a pair.</p>
+              <p className={styles.nearMissCaption}>
+                {TUTORIAL.nearMissReason}
+              </p>
             </div>
 
             {controlledSession?.sectionIntro ? (
@@ -1929,7 +1956,9 @@ export default function DominoTwistGame() {
                             role="img"
                             aria-label={`Option ${
                               optionIndex + 1
-                            }. ${reviewLabel}.`}
+                            }, a ${targetShapeDescription(
+                              historicalSessionRound.round.targetShapeId,
+                            )}. ${reviewLabel}.`}
                             key={`${historicalSessionRound.id}-${optionIndex}`}
                           >
                             <span className={styles.historicalChoiceLabel}>
@@ -1942,6 +1971,9 @@ export default function DominoTwistGame() {
                             </span>
                             <DesignBoard
                               design={option.design}
+                              targetShapeId={
+                                historicalSessionRound.round.targetShapeId
+                              }
                               rows={historicalSessionRound.round.rows}
                               columns={historicalSessionRound.round.columns}
                               layoutId={
@@ -2101,10 +2133,8 @@ export default function DominoTwistGame() {
                           ((phase === "teaching" ||
                             phase === "wrong-review") &&
                             !isSelected);
-                        const showWizardWitness =
-                          round.difficulty !== "Wizard" || isCorrect;
                         const feedbackWitness =
-                          isSelected && showingFeedback && showWizardWitness
+                          isSelected && showingFeedback
                             ? isCorrect
                               ? option.mismatch?.closestWitness
                               : ghost
@@ -2133,9 +2163,9 @@ export default function DominoTwistGame() {
                             disabled={phase !== "idle"}
                             aria-label={`Option ${
                               optionIndex + 1
-                            }: a ${round.rows} by ${
-                              round.columns
-                            } visual pip design${stateLabel}`}
+                            }: a ${targetShapeDescription(
+                              round.targetShapeId,
+                            )}${stateLabel}`}
                             aria-keyshortcuts={`${optionIndex + 1}`}
                             ref={(node) => {
                               optionButtonRefs.current[optionIndex] = node;
@@ -2150,6 +2180,7 @@ export default function DominoTwistGame() {
                             </span>
                             <DesignBoard
                               design={option.design}
+                              targetShapeId={round.targetShapeId}
                               rows={round.rows}
                               columns={round.columns}
                               layoutId={
@@ -2193,9 +2224,8 @@ export default function DominoTwistGame() {
                     <>
                       <strong className={styles.wrongText}>Not quite</strong>
                       <p className={styles.feedbackDetail}>
-                        {round.difficulty === "Wizard"
-                          ? "This design can be made. A hidden arrangement keeps every domino whole."
-                          : "This design can be made—the ghost dominoes show how every whole pair fits."}
+                        This design can be made—the ghost dominoes show how
+                        every whole pair fits.
                       </p>
                     </>
                   ) : selectedIndex === round.correctIndex &&
@@ -2289,6 +2319,7 @@ export default function DominoTwistGame() {
                         <div className={styles.reviewWrong}>
                           <DesignBoard
                             design={missed.round.options[chosenIndex].design}
+                            targetShapeId={missed.round.targetShapeId}
                             rows={missed.round.rows}
                             columns={missed.round.columns}
                             layoutId={
@@ -2306,8 +2337,9 @@ export default function DominoTwistGame() {
                         </div>
                       </div>
                       <span className={styles.visuallyHidden}>
-                        You chose option {chosenIndex + 1}. That design can be
-                        built.
+                        You chose option {chosenIndex + 1}, a{" "}
+                        {targetShapeDescription(missed.round.targetShapeId)}.
+                        That design can be built.
                       </span>
                     </article>
                   ),

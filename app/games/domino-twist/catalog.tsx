@@ -30,7 +30,6 @@ export function ShelfIcon({ style, ...props }: ShelfIconProps) {
             y="35"
             width="82"
             height="36"
-            rx="9"
             fill="#f06f5f"
           />
           <path d="M71 35v36" />
@@ -45,7 +44,6 @@ export function ShelfIcon({ style, ...props }: ShelfIconProps) {
             y="85"
             width="82"
             height="36"
-            rx="9"
             fill="#35a999"
           />
           <path d="M91 85v36" />
@@ -60,7 +58,6 @@ export function ShelfIcon({ style, ...props }: ShelfIconProps) {
             y="92"
             width="36"
             height="82"
-            rx="9"
             fill="#7767d7"
           />
           <path d="M119 133h36" />
@@ -86,7 +83,6 @@ export function ShelfIcon({ style, ...props }: ShelfIconProps) {
           y="57"
           width="36"
           height="72"
-          rx="9"
           fill="#f06f5f"
         />
         <path d="M205 93h36" />
@@ -95,7 +91,6 @@ export function ShelfIcon({ style, ...props }: ShelfIconProps) {
           y="57"
           width="72"
           height="36"
-          rx="9"
           fill="#35a999"
         />
         <path d="M277 57v36" />
@@ -104,7 +99,6 @@ export function ShelfIcon({ style, ...props }: ShelfIconProps) {
           y="93"
           width="72"
           height="36"
-          rx="9"
           fill="#7767d7"
         />
         <path d="M277 93v36" />
