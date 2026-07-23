@@ -711,6 +711,84 @@
   flex: 0 0 auto;
 }
 
+.tangledBracelet {
+  --bracelet-surface: var(--panel);
+  aspect-ratio: 1.8;
+  border-radius: 0;
+}
+
+.tangledBracelet::before {
+  display: none;
+}
+
+.reviewBracelet.tangledBracelet {
+  width: 150px;
+}
+
+.reviewCard .tangledBracelet {
+  --bracelet-surface: #fff;
+}
+
+.tangleSvg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.tangleStrand,
+.tangleBridgeGap,
+.tangleBridge {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tangleStrand,
+.tangleBridge {
+  stroke: #767268;
+  stroke-width: 5.5;
+}
+
+.tangleBridgeGap {
+  stroke: var(--bracelet-surface);
+  stroke-width: 15;
+}
+
+.tangleBeadHalo {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 8;
+}
+
+.tangleBeadDisc {
+  fill: var(--bead-fill, #fff);
+  stroke: var(--ink);
+  stroke-width: 2.5;
+}
+
+.tangleBeadDot {
+  fill: var(--bead-mark, var(--ink));
+}
+
+.tangleBeadActive .tangleBeadHalo {
+  stroke: rgb(22 131 107 / 48%);
+}
+
+.tangleBeadActive .tangleBeadDisc {
+  stroke: var(--correct);
+  stroke-width: 3.5;
+}
+
+.tangleBeadWrong .tangleBeadHalo {
+  stroke: rgb(191 73 62 / 55%);
+}
+
+.tangleBeadWrong .tangleBeadDisc {
+  stroke: var(--incorrect);
+  stroke-width: 3.5;
+}
+
 .ringBead {
   --bead-size: clamp(34px, 10.7%, 44px);
   width: var(--bead-size);
@@ -794,12 +872,22 @@
   --bead-fill: var(--violet);
 }
 
+.beadBlack {
+  --bead-fill: #24262d;
+  --bead-mark: #d9d8d2;
+}
+
+.beadLightGray {
+  --bead-fill: #d9d8d2;
+  --bead-mark: var(--ink);
+}
+
 .beadMark {
   width: 38%;
   height: 38%;
   position: relative;
   display: block;
-  color: var(--ink);
+  color: var(--bead-mark, var(--ink));
 }
 
 .markDot {
@@ -861,6 +949,26 @@
 .ringBeadTrace {
   animation: beadTrace 620ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
   animation-delay: var(--trace-delay);
+}
+
+.tangleBeadTrace {
+  animation: tangleBeadTrace 620ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  animation-delay: var(--trace-delay);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes tangleBeadTrace {
+  0%,
+  100% {
+    filter: none;
+    transform: scale(1);
+  }
+
+  48% {
+    filter: saturate(1.1);
+    transform: scale(1.18);
+  }
 }
 
 @keyframes beadTrace {
@@ -1673,6 +1781,10 @@
   }
 
   .ringBeadTrace {
+    animation: none;
+  }
+
+  .tangleBeadTrace {
     animation: none;
   }
 

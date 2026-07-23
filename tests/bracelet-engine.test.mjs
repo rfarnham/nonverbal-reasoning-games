@@ -10,6 +10,7 @@ import {
   TUTORIAL,
   analyzeWrongAttempt,
   braceletClassKey,
+  braceletColorScheme,
   braceletOrbitSize,
   braceletViews,
   buildCampaignRounds,
@@ -18,6 +19,7 @@ import {
   decodeBracelet,
   decodePattern,
   distractorKindMatches,
+  encodeBracelet,
   encodePattern,
   findCompatibleSolutions,
   findOccurrences,
@@ -30,6 +32,13 @@ import {
   validateRound,
   visibleSegmentDistance,
 } from "../app/games/bracelet-search/game-engine.ts";
+import {
+  TANGLE_LAYOUT_IDS,
+  TANGLED_BRACELET_LAYOUTS,
+  braceletPresentationForRound,
+  tangledLayoutForPresentation,
+} from "../app/games/bracelet-search/tangle-layout.ts";
+import { progressionMetadata } from "../app/games/bracelet-search/progression-metadata.ts";
 
 const SIMPLE_DIFFICULTIES = new Set(["Easy", "Medium"]);
 const ADVANCED_DIFFICULTIES = new Set(["Hard", "Wizard"]);
@@ -404,6 +413,102 @@ test("the frozen Campaign is exact, balanced, nonperiodic, and deterministic", (
   }
 });
 
+test("a few advanced Campaign rounds use a real two-tone monochrome scheme", () => {
+  assert.equal(encodeBracelet(decodeBracelet("BLbl")), "BLbl");
+  assert.equal(encodeBracelet(decodeBracelet("CGtv")), "CGtv");
+  assert.equal(progressionMetadata.contentVersion, "2");
+  assert.equal(
+    progressionMetadata.generatorVersion,
+    "1",
+    "Campaign palettes do not rewrite saved Infinite streams",
+  );
+
+  for (const difficulty of DIFFICULTIES) {
+    const level = ROUNDS.filter((round) => round.difficulty === difficulty);
+    const monochromeIndexes = level.flatMap((round, index) =>
+      braceletColorScheme(round.bracelet) === "monochrome" ? [index] : [],
+    );
+    assert.equal(
+      monochromeIndexes.length,
+      ADVANCED_DIFFICULTIES.has(difficulty) ? 3 : 0,
+      `${difficulty} monochrome round count`,
+    );
+    assert.ok(
+      monochromeIndexes.every(
+        (index, position) =>
+          position === 0 || index - monochromeIndexes[position - 1] > 1,
+      ),
+      `${difficulty} monochrome rounds are spaced apart`,
+    );
+  }
+
+  const monochromeRounds = ROUNDS.filter(
+    (round) => braceletColorScheme(round.bracelet) === "monochrome",
+  );
+  for (const round of monochromeRounds) {
+    assert.deepEqual(
+      new Set(round.bracelet.map(({ color }) => color)),
+      new Set(["black", "lightGray"]),
+      `${round.id} uses only black and light gray`,
+    );
+    assert.equal(
+      round.bracelet.filter(({ mark }) => mark === "dot").length,
+      4,
+    );
+    for (const option of round.options) {
+      assert.ok(
+        option.pattern.every(
+          (token) =>
+            token.kind === "hidden" ||
+            token.bead.color === "black" ||
+            token.bead.color === "lightGray",
+        ),
+        `${round.id} options stay in the same two-tone scheme`,
+      );
+    }
+    if (round.difficulty === "Wizard") {
+      assert.deepEqual(
+        new Set(
+          round.options[round.correctIndex].pattern.flatMap((token) =>
+            token.kind === "bead" ? [token.bead.color] : [],
+          ),
+        ),
+        new Set(["black", "lightGray"]),
+        `${round.id} keeps both tones visible around its hidden center`,
+      );
+    }
+  }
+
+  const base = monochromeRounds[0];
+  const mixedBracelet = {
+    ...base,
+    bracelet: base.bracelet.map((bead, index) =>
+      index === 0 ? { ...bead, color: "coral" } : bead,
+    ),
+  };
+  assert.equal(validateRound(mixedBracelet).valid, false);
+
+  const wrongOptionIndex = (base.correctIndex + 1) % base.options.length;
+  const mixedOptions = base.options.map((option, optionIndex) => ({
+    ...option,
+    pattern:
+      optionIndex === wrongOptionIndex
+        ? option.pattern.map((token, tokenIndex) =>
+            tokenIndex === 0 && token.kind === "bead"
+              ? { ...token, bead: { ...token.bead, color: "coral" } }
+              : token,
+          )
+        : option.pattern,
+  }));
+  const invalidOptions = validateRound({ ...base, options: mixedOptions });
+  assert.equal(invalidOptions.valid, false);
+  assert.ok(
+    invalidOptions.issues.some((issue) =>
+      issue.includes("mixes bead color schemes"),
+    ),
+  );
+});
+
 test("Starter and Junior use generous content differences, never one-feature traps", () => {
   for (const round of ROUNDS.filter(({ difficulty }) =>
     SIMPLE_DIFFICULTIES.has(difficulty),
@@ -464,6 +569,114 @@ test("Expert and Wizard share the same base complexity profile", () => {
   }
 });
 
+test("advanced presentation selection is deterministic and view-invariant", () => {
+  for (const round of ROUNDS) {
+    const presentation = braceletPresentationForRound(round);
+    if (SIMPLE_DIFFICULTIES.has(round.difficulty)) {
+      assert.equal(presentation, "circle", round.id);
+      continue;
+    }
+
+    assert.ok(TANGLE_LAYOUT_IDS.includes(presentation), round.id);
+    assert.equal(
+      tangledLayoutForPresentation(presentation)?.id,
+      presentation,
+    );
+    assert.equal(braceletPresentationForRound(round), presentation);
+    for (const view of braceletViews(round.bracelet)) {
+      assert.equal(
+        braceletPresentationForRound({ ...round, bracelet: view }),
+        presentation,
+        `${round.id} remains on one layout from either side`,
+      );
+    }
+  }
+
+  for (const difficulty of ["Hard", "Wizard"]) {
+    assert.deepEqual(
+      new Set(
+        ROUNDS.filter((round) => round.difficulty === difficulty).map(
+          braceletPresentationForRound,
+        ),
+      ),
+      new Set(TANGLE_LAYOUT_IDS),
+      `${difficulty} Campaign covers every advanced strand layout`,
+    );
+  }
+});
+
+test("advanced layouts are distinct closed ordered cycles with explicit bridges", () => {
+  assert.deepEqual(TANGLE_LAYOUT_IDS, ["figure-eight", "labyrinth"]);
+  const strandPaths = new Set();
+  const slotGeometries = new Set();
+
+  for (const id of TANGLE_LAYOUT_IDS) {
+    const { beadSlots, cycleEdges, overpassPaths, strandPath } =
+      TANGLED_BRACELET_LAYOUTS[id];
+    assert.equal(beadSlots.length, 12, id);
+    assert.deepEqual(
+      beadSlots.map(({ braceletIndex }) => braceletIndex),
+      Array.from({ length: 12 }, (_, index) => index),
+      `${id} keeps traversal order`,
+    );
+    assert.equal(
+      new Set(
+        beadSlots.map(({ x, y }) => `${x.toFixed(3)},${y.toFixed(3)}`),
+      ).size,
+      12,
+      `${id} has twelve distinct bead positions`,
+    );
+
+    let minimumSpacing = Number.POSITIVE_INFINITY;
+    for (let left = 0; left < beadSlots.length; left += 1) {
+      assert.ok(Number.isFinite(beadSlots[left].x));
+      assert.ok(Number.isFinite(beadSlots[left].y));
+      for (let right = left + 1; right < beadSlots.length; right += 1) {
+        minimumSpacing = Math.min(
+          minimumSpacing,
+          Math.hypot(
+            beadSlots[left].x - beadSlots[right].x,
+            beadSlots[left].y - beadSlots[right].y,
+          ),
+        );
+      }
+    }
+    assert.ok(
+      minimumSpacing >= 45,
+      `${id} beads remain visibly separate`,
+    );
+
+    assert.deepEqual(
+      cycleEdges,
+      Array.from(
+        { length: 12 },
+        (_, index) => [index, (index + 1) % 12],
+      ),
+      `${id} is one closed cycle`,
+    );
+    assert.match(strandPath, /^M .* Z$/, `${id} closes its strand`);
+    assert.ok(overpassPaths.length >= 1, `${id} marks every crossing`);
+    assert.equal(new Set(overpassPaths).size, overpassPaths.length);
+    for (const overpassPath of overpassPaths) {
+      assert.match(overpassPath, /^M /);
+      assert.doesNotMatch(overpassPath, / Z$/);
+    }
+
+    strandPaths.add(strandPath);
+    slotGeometries.add(
+      beadSlots.map(({ x, y }) => `${x.toFixed(3)},${y.toFixed(3)}`).join("|"),
+    );
+  }
+
+  assert.equal(strandPaths.size, TANGLE_LAYOUT_IDS.length);
+  assert.equal(slotGeometries.size, TANGLE_LAYOUT_IDS.length);
+  assert.equal(TANGLED_BRACELET_LAYOUTS["figure-eight"].overpassPaths.length, 1);
+  assert.ok(
+    TANGLED_BRACELET_LAYOUTS.labyrinth.overpassPaths.length >= 5,
+    "labyrinth uses several explicit over/under crossings",
+  );
+});
+
 test("Wizard uses one centered wildcard and wrong feedback cannot leak it", () => {
   for (const round of ROUNDS.filter(
     ({ difficulty }) => difficulty === "Wizard",
@@ -493,54 +706,66 @@ test("Wizard uses one centered wildcard and wrong feedback cannot leak it", () =
   );
 });
 
-test("all Wizard Campaign and 400 deterministic Infinite rounds have one solution from every view", () => {
-  const campaign = ROUNDS.filter(
-    ({ difficulty }) => difficulty === "Wizard",
-  );
-  assert.equal(campaign.length, 12);
+test("all tangled Campaign and Infinite rounds have one solution from every view", () => {
+  for (const [difficultyIndex, difficulty] of ["Hard", "Wizard"].entries()) {
+    const seenLayouts = new Set();
+    const campaign = ROUNDS.filter(
+      (round) => round.difficulty === difficulty,
+    );
+    assert.equal(campaign.length, 12);
 
-  const generated = Array.from({ length: 400 }, (_, seed) =>
-    generateInfiniteRound(
-      "Wizard",
-      createSeededRandom(0x71a2_0000 + seed),
-    ),
-  );
+    const generated = Array.from({ length: 400 }, (_, seed) =>
+      generateInfiniteRound(
+        difficulty,
+        createSeededRandom(0x71a2_0000 + difficultyIndex * 0x1000 + seed),
+      ),
+    );
 
-  for (const [roundIndex, round] of [...campaign, ...generated].entries()) {
-    const source = roundIndex < campaign.length ? "Campaign" : "Infinite";
-    const number =
-      roundIndex < campaign.length
-        ? roundIndex + 1
-        : roundIndex - campaign.length + 1;
-    const label = `Wizard ${source} ${number}`;
-    assertWizardRound(round, label);
+    for (const [roundIndex, round] of [...campaign, ...generated].entries()) {
+      const source = roundIndex < campaign.length ? "Campaign" : "Infinite";
+      const number =
+        roundIndex < campaign.length
+          ? roundIndex + 1
+          : roundIndex - campaign.length + 1;
+      const presentation = braceletPresentationForRound(round);
+      assert.ok(TANGLE_LAYOUT_IDS.includes(presentation));
+      seenLayouts.add(presentation);
+      const label = `${difficulty} ${source} ${number} (${presentation})`;
+      assertOneExactAnswer(round, label);
+      if (difficulty === "Wizard") assertWizardRound(round, label);
 
-    for (const [viewIndex, view] of braceletViews(round.bracelet).entries()) {
-      const solutions = bruteSolutions(view, round.options);
-      assert.equal(
-        solutions.length,
-        1,
-        `${label}, bracelet view ${viewIndex + 1}: total compatible option/arc pairs`,
-      );
-      assert.equal(
-        solutions[0].optionIndex,
-        round.correctIndex,
-        `${label}, bracelet view ${viewIndex + 1}: compatible option`,
-      );
-      assert.equal(
-        brutePhysicalStarts(
-          view,
-          round.options[round.correctIndex].pattern,
-        ).length,
-        1,
-        `${label}, bracelet view ${viewIndex + 1}: physical placement`,
-      );
-      assert.equal(
-        findCompatibleSolutions(view, round.options).length,
-        1,
-        `${label}, bracelet view ${viewIndex + 1}: engine solution count`,
-      );
+      for (const [viewIndex, view] of braceletViews(round.bracelet).entries()) {
+        const solutions = bruteSolutions(view, round.options);
+        assert.equal(
+          solutions.length,
+          1,
+          `${label}, bracelet view ${viewIndex + 1}: total compatible option/arc pairs`,
+        );
+        assert.equal(
+          solutions[0].optionIndex,
+          round.correctIndex,
+          `${label}, bracelet view ${viewIndex + 1}: compatible option`,
+        );
+        assert.equal(
+          brutePhysicalStarts(
+            view,
+            round.options[round.correctIndex].pattern,
+          ).length,
+          1,
+          `${label}, bracelet view ${viewIndex + 1}: physical placement`,
+        );
+        assert.equal(
+          findCompatibleSolutions(view, round.options).length,
+          1,
+          `${label}, bracelet view ${viewIndex + 1}: engine solution count`,
+        );
+      }
     }
+    assert.deepEqual(
+      seenLayouts,
+      new Set(TANGLE_LAYOUT_IDS),
+      `${difficulty} corpus covers every tangle layout`,
+    );
   }
 });
 

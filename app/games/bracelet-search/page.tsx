@@ -51,6 +51,11 @@ import {
 import { braceletSearchGame } from "./game-info";
 import { progressionAdapter } from "./progression-adapter";
 import styles from "./bracelet-search.module.css";
+import {
+  braceletPresentationForRound,
+  tangledLayoutForPresentation,
+  type BraceletPresentation,
+} from "./tangle-layout";
 
 type GamePhase = "idle" | "animating" | "wrong-review" | "answered";
 type SessionMode = "campaign" | "infinite" | "redemption";
@@ -123,6 +128,8 @@ const COLOR_CLASSES: Readonly<Record<BeadColor, string>> = {
   gold: styles.beadGold,
   teal: styles.beadTeal,
   violet: styles.beadViolet,
+  black: styles.beadBlack,
+  lightGray: styles.beadLightGray,
 };
 
 function initialCampaignCursors(): CampaignCursors {
@@ -313,11 +320,13 @@ function BraceletVisual({
   bracelet,
   trace,
   size = "live",
+  presentation = "circle",
   label,
 }: {
   bracelet: Bracelet;
   trace?: TraceState | null;
   size?: "live" | "tutorial" | "review";
+  presentation?: BraceletPresentation;
   label: string;
 }) {
   const activeSet = new Set(trace?.indexes ?? []);
@@ -341,12 +350,96 @@ function BraceletVisual({
       : size === "review"
         ? styles.reviewBracelet
         : "";
+  const tangleLayout = tangledLayoutForPresentation(presentation);
+  const showTangle =
+    tangleLayout !== null &&
+    bracelet.length === tangleLayout.beadSlots.length;
+
+  if (showTangle) {
+    return (
+      <div
+        className={`${styles.bracelet} ${styles.tangledBracelet} ${sizeClass}`}
+        role="img"
+        aria-label={label}
+        data-presentation={tangleLayout.id}
+      >
+        <svg
+          className={styles.tangleSvg}
+          viewBox={tangleLayout.viewBox}
+          aria-hidden="true"
+          focusable="false"
+        >
+          <path
+            className={styles.tangleStrand}
+            d={tangleLayout.strandPath}
+          />
+          {tangleLayout.overpassPaths.map((overpassPath, index) => (
+            <path
+              className={styles.tangleBridgeGap}
+              d={overpassPath}
+              key={`gap-${index}`}
+            />
+          ))}
+          {tangleLayout.overpassPaths.map((overpassPath, index) => (
+            <path
+              className={styles.tangleBridge}
+              d={overpassPath}
+              key={`bridge-${index}`}
+            />
+          ))}
+          {tangleLayout.beadSlots.map(
+            ({ braceletIndex, x, y }) => {
+              const bead = bracelet[braceletIndex];
+              const step = traceSteps.get(braceletIndex);
+
+              return (
+                <g
+                  className={`${COLOR_CLASSES[bead.color]} ${
+                    activeSet.has(braceletIndex)
+                      ? styles.tangleBeadActive
+                      : ""
+                  } ${
+                    mismatchSet.has(braceletIndex)
+                      ? styles.tangleBeadWrong
+                      : ""
+                  }`}
+                  transform={`translate(${x} ${y})`}
+                  data-bracelet-index={braceletIndex}
+                  key={`${braceletIndex}-${bead.color}-${bead.mark}`}
+                >
+                  <g
+                    className={
+                      step !== undefined && size === "live"
+                        ? styles.tangleBeadTrace
+                        : undefined
+                    }
+                    style={
+                      {
+                        "--trace-delay": `${(step ?? 0) * 70}ms`,
+                      } as CustomProperties
+                    }
+                  >
+                    <circle className={styles.tangleBeadHalo} r="25" />
+                    <circle className={styles.tangleBeadDisc} r="20.5" />
+                    {bead.mark === "dot" ? (
+                      <circle className={styles.tangleBeadDot} r="6" />
+                    ) : null}
+                  </g>
+                </g>
+              );
+            },
+          )}
+        </svg>
+      </div>
+    );
+  }
 
   return (
     <div
       className={`${styles.bracelet} ${sizeClass}`}
       role="img"
       aria-label={label}
+      data-presentation="circle"
     >
       {bracelet.map((bead, index) => {
         const step = traceSteps.get(index);
@@ -494,6 +587,7 @@ export default function BraceletSearchPage() {
       ? campaignSessionRound
       : (roundQueue[roundCursor] ?? roundQueue[0]);
   const round = activeSessionRound?.round ?? ROUNDS[0];
+  const roundPresentation = braceletPresentationForRound(round);
   const sessionLength = roundQueue.length;
   const progress = roundCursor + (phase === "answered" ? 1 : 0);
   const isLastRedemptionRound =
@@ -1785,19 +1879,32 @@ export default function BraceletSearchPage() {
                         <div
                           className={styles.scanCue}
                           role="img"
-                          aria-label="Search around the bracelet in either direction."
+                          aria-label={
+                            roundPresentation !== "circle"
+                              ? "Follow the continuous strand in either direction."
+                              : "Search around the bracelet in either direction."
+                          }
                         >
                           <span
                             className={styles.scanCueIcon}
                             aria-hidden="true"
                           />
-                          <span aria-hidden="true">Either way</span>
+                          <span aria-hidden="true">
+                            {roundPresentation !== "circle"
+                              ? "Follow strand"
+                              : "Either way"}
+                          </span>
                         </div>
                       )}
                       <BraceletVisual
                         bracelet={round.bracelet}
                         trace={trace}
-                        label={`A circular bracelet with ${round.bracelet.length} colored beads. Inspect the visual sequence in either direction.`}
+                        presentation={roundPresentation}
+                        label={
+                          roundPresentation !== "circle"
+                            ? `One continuous tangled bracelet with ${round.bracelet.length} colored beads. Follow the strand in either direction.`
+                            : `A circular bracelet with ${round.bracelet.length} colored beads. Inspect the visual sequence in either direction.`
+                        }
                       />
                     </div>
                   </section>
@@ -1989,6 +2096,8 @@ export default function BraceletSearchPage() {
                 {visibleMistakes.map(
                   ({ sessionRound: missed, chosenIndex }) => {
                     const missedRound = missed.round;
+                    const missedPresentation =
+                      braceletPresentationForRound(missedRound);
                     const wrongPattern =
                       missedRound.options[chosenIndex].pattern;
                     const analysis = analyzeWrongAttempt(
@@ -2015,7 +2124,12 @@ export default function BraceletSearchPage() {
                           <BraceletVisual
                             bracelet={missedRound.bracelet}
                             size="review"
-                            label={`Bracelet from puzzle ${missed.ordinal}.`}
+                            presentation={missedPresentation}
+                            label={`${
+                              missedPresentation !== "circle"
+                                ? "Tangled bracelet"
+                                : "Bracelet"
+                            } from puzzle ${missed.ordinal}.`}
                           />
                           <span className={styles.reviewArrow} aria-hidden="true">
                             →
@@ -2102,6 +2216,9 @@ export default function BraceletSearchPage() {
             <div className={styles.historyVisual}>
               <BraceletVisual
                 bracelet={historicalReview.sessionRound.round.bracelet}
+                presentation={braceletPresentationForRound(
+                  historicalReview.sessionRound.round,
+                )}
                 trace={{
                   indexes: occurrenceIndexesInStripOrder(
                     historicalReview.sessionRound.round.occurrence,
@@ -2110,7 +2227,13 @@ export default function BraceletSearchPage() {
                   braceletMismatchIndexes: [],
                   wrong: false,
                 }}
-                label="Completed bracelet with the matching run highlighted."
+                label={`Completed ${
+                  braceletPresentationForRound(
+                    historicalReview.sessionRound.round,
+                  ) !== "circle"
+                    ? "tangled bracelet"
+                    : "bracelet"
+                } with the matching run highlighted.`}
               />
               <div className={styles.historyAnswers}>
                 {historicalReview.progress.firstAttempt === "incorrect" ? (

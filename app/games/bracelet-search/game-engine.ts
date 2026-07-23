@@ -1,5 +1,12 @@
 export type Difficulty = "Easy" | "Medium" | "Hard" | "Wizard";
-export type BeadColor = "coral" | "gold" | "teal" | "violet";
+export type BeadColor =
+  | "coral"
+  | "gold"
+  | "teal"
+  | "violet"
+  | "black"
+  | "lightGray";
+export type BraceletColorScheme = "color" | "monochrome";
 export type BeadMark = "plain" | "dot";
 
 export type Bead = Readonly<{
@@ -155,18 +162,28 @@ export const DIFFICULTY_RULES: Readonly<
 
 export const GENERATOR_MAX_ATTEMPTS = 256;
 
-const COLORS: readonly BeadColor[] = ["coral", "gold", "teal", "violet"];
+const COLOR_BEADS: readonly BeadColor[] = [
+  "coral",
+  "gold",
+  "teal",
+  "violet",
+];
+const MONOCHROME_BEADS: readonly BeadColor[] = ["black", "lightGray"];
 const COLOR_CODE: Readonly<Record<BeadColor, string>> = {
   coral: "C",
   gold: "G",
   teal: "T",
   violet: "V",
+  black: "B",
+  lightGray: "L",
 };
 const CODE_COLOR: Readonly<Record<string, BeadColor>> = {
   C: "coral",
   G: "gold",
   T: "teal",
   V: "violet",
+  B: "black",
+  L: "lightGray",
 };
 
 function modulo(value: number, modulus: number): number {
@@ -295,6 +312,20 @@ export function braceletClassKey(bracelet: Bracelet): string {
   return braceletViews(bracelet)
     .map((view) => view.map(beadKey).join(","))
     .sort()[0];
+}
+
+export function braceletColorScheme(
+  bracelet: Bracelet,
+): BraceletColorScheme | null {
+  if (bracelet.length === 0) return null;
+  const colors = new Set(bracelet.map(({ color }) => color));
+  if ([...colors].every((color) => COLOR_BEADS.includes(color))) {
+    return "color";
+  }
+  if ([...colors].every((color) => MONOCHROME_BEADS.includes(color))) {
+    return "monochrome";
+  }
+  return null;
 }
 
 export function braceletOrbitSize(bracelet: Bracelet): number {
@@ -515,9 +546,16 @@ function interestingBracelet(
   difficulty: Difficulty,
 ): boolean {
   const rules = DIFFICULTY_RULES[difficulty];
+  const colorScheme = braceletColorScheme(bracelet);
+  const expectedColorCount =
+    colorScheme === "monochrome" ? MONOCHROME_BEADS.length : rules.colorCount;
   return (
     bracelet.length === rules.braceletLength &&
-    new Set(bracelet.map(({ color }) => color)).size === rules.colorCount &&
+    colorScheme !== null &&
+    (colorScheme === "color" ||
+      difficulty === "Hard" ||
+      difficulty === "Wizard") &&
+    new Set(bracelet.map(({ color }) => color)).size === expectedColorCount &&
     bracelet.filter(({ mark }) => mark === "dot").length === rules.dotCount &&
     maximumCyclicColorRun(bracelet) <= 2 &&
     braceletOrbitSize(bracelet) === bracelet.length * 2
@@ -529,7 +567,10 @@ function makeGeneratedBracelet(
   random: () => number,
 ): Bracelet {
   const rules = DIFFICULTY_RULES[difficulty];
-  const selectedColors = shuffled(COLORS, random).slice(0, rules.colorCount);
+  const selectedColors = shuffled(COLOR_BEADS, random).slice(
+    0,
+    rules.colorCount,
+  );
   const beads: Bead[] = [];
   for (let index = 0; index < rules.braceletLength; index += 1) {
     beads.push({
@@ -562,6 +603,12 @@ function resolvedWindowIsInteresting(
       const visible = window.filter((_, index) => index !== 2);
       if (!visible.some(({ mark }) => mark === "dot")) return false;
       if (!visible.some(({ mark }) => mark === "plain")) return false;
+      if (
+        braceletColorScheme(window) === "monochrome" &&
+        new Set(visible.map(({ color }) => color)).size !== 2
+      ) {
+        return false;
+      }
     }
   }
   return true;
@@ -685,12 +732,18 @@ function candidatePool(
   difficulty: Difficulty,
 ): readonly SegmentPattern[] {
   if (kind === "one-color-off") {
+    const braceletColors =
+      braceletColorScheme(bracelet) === "monochrome"
+        ? MONOCHROME_BEADS
+        : COLOR_BEADS;
     return correctPattern.flatMap((token, index) =>
       token.kind === "hidden"
         ? []
-        : COLORS.filter((color) => color !== token.bead.color).map((color) =>
-            withChangedColor(correctPattern, index, color),
-          ),
+        : braceletColors
+            .filter((color) => color !== token.bead.color)
+            .map((color) =>
+              withChangedColor(correctPattern, index, color),
+            ),
     );
   }
   if (kind === "two-color-off") {
@@ -870,6 +923,9 @@ export function validateRound(round: BraceletRound): ValidationResult {
   const issues: string[] = [];
   const rules = DIFFICULTY_RULES[round.difficulty];
   if (!rules) return { valid: false, issues: ["Unknown difficulty."] };
+  const colorScheme = braceletColorScheme(round.bracelet);
+  const allowedColors =
+    colorScheme === "monochrome" ? MONOCHROME_BEADS : COLOR_BEADS;
   if (!interestingBracelet(round.bracelet, round.difficulty)) {
     issues.push("Bracelet does not satisfy its difficulty rules.");
   }
@@ -890,6 +946,15 @@ export function validateRound(round: BraceletRound): ValidationResult {
       (hiddenIndexes.length !== 1 || hiddenIndexes[0] !== rules.hiddenIndex)
     ) {
       issues.push(`Option ${index + 1} must hide only its center bead.`);
+    }
+    if (
+      option.pattern.some(
+        (token) =>
+          token.kind === "bead" &&
+          !allowedColors.includes(token.bead.color),
+      )
+    ) {
+      issues.push(`Option ${index + 1} mixes bead color schemes.`);
     }
   }
 
@@ -1700,18 +1765,18 @@ export const CAMPAIGN_SPECS: readonly EncodedRoundSpec[] = [
   {
     "id": "campaign:hard:03",
     "difficulty": "Hard",
-    "bracelet": "TcCgtGVCTGVv",
+    "bracelet": "lLBBlBLbLLbB",
     "options": [
-      "tgCcT",
-      "TgCcT",
-      "tvCcT",
-      "tgCcv"
+      "lBBLl",
+      "bBBLl",
+      "LBBLl",
+      "BlBLl"
     ],
     "optionKinds": [
       "correct",
-      "one-mark-off",
       "one-color-off",
-      "skipped-bead"
+      "one-mark-off",
+      "adjacent-swap"
     ]
   },
   {
@@ -1768,18 +1833,18 @@ export const CAMPAIGN_SPECS: readonly EncodedRoundSpec[] = [
   {
     "id": "campaign:hard:07",
     "difficulty": "Hard",
-    "bracelet": "VvTcVgCgTCTG",
+    "bracelet": "LLBBlLBBLlbb",
     "options": [
-      "vcVgC",
-      "TcVtC",
-      "TcVgC",
-      "TcVGC"
+      "LLlbb",
+      "bLlbb",
+      "BLlbb",
+      "LBlbb"
     ],
     "optionKinds": [
-      "skipped-bead",
       "one-color-off",
+      "one-mark-off",
       "correct",
-      "one-mark-off"
+      "adjacent-swap"
     ]
   },
   {
@@ -1836,17 +1901,17 @@ export const CAMPAIGN_SPECS: readonly EncodedRoundSpec[] = [
   {
     "id": "campaign:hard:11",
     "difficulty": "Hard",
-    "bracelet": "VVgtCGcTVTgC",
+    "bracelet": "BBLlBLlbLbBL",
     "options": [
-      "CVgtC",
-      "VVgTC",
-      "VVgtG",
-      "VVgtC"
+      "LBLlB",
+      "BbLlB",
+      "BBlLB",
+      "BBLlB"
     ],
     "optionKinds": [
       "one-color-off",
       "one-mark-off",
-      "skipped-bead",
+      "adjacent-swap",
       "correct"
     ]
   },
@@ -1887,18 +1952,18 @@ export const CAMPAIGN_SPECS: readonly EncodedRoundSpec[] = [
   {
     "id": "campaign:wizard:02",
     "difficulty": "Wizard",
-    "bracelet": "GVGVcvcTtGCT",
+    "bracelet": "LBLBBLblLbLb",
     "options": [
-      "vc?TG",
-      "vc?tG",
-      "cv?tG",
-      "vc?gG"
+      "LL?lL",
+      "BL?lL",
+      "Bl?lL",
+      "LB?lL"
     ],
     "optionKinds": [
-      "one-mark-off",
+      "one-color-off",
       "correct",
-      "skipped-bead",
-      "one-color-off"
+      "one-mark-off",
+      "adjacent-swap"
     ]
   },
   {
@@ -1972,16 +2037,16 @@ export const CAMPAIGN_SPECS: readonly EncodedRoundSpec[] = [
   {
     "id": "campaign:wizard:07",
     "difficulty": "Wizard",
-    "bracelet": "TCTVvgCVgTGc",
+    "bracelet": "LlbBLlBLBBlB",
     "options": [
-      "VV?CT",
-      "vV?CC",
-      "Vv?CT",
-      "vV?CT"
+      "LB?bL",
+      "Lb?lL",
+      "LB?Ll",
+      "LB?lL"
     ],
     "optionKinds": [
-      "one-mark-off",
       "one-color-off",
+      "one-mark-off",
       "adjacent-swap",
       "correct"
     ]
@@ -2006,18 +2071,18 @@ export const CAMPAIGN_SPECS: readonly EncodedRoundSpec[] = [
   {
     "id": "campaign:wizard:09",
     "difficulty": "Wizard",
-    "bracelet": "cTGCCtvVGgTV",
+    "bracelet": "BLbBLLBBLlbl",
     "options": [
-      "Gv?CC",
-      "GV?vC",
-      "GV?tC",
-      "gV?tC"
+      "lL?LL",
+      "lL?Bl",
+      "lL?BL",
+      "Ll?BL"
     ],
     "optionKinds": [
-      "skipped-bead",
       "one-color-off",
+      "one-mark-off",
       "correct",
-      "one-mark-off"
+      "adjacent-swap"
     ]
   },
   {
