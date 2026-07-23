@@ -31,6 +31,7 @@ test("exports the catalog and implemented game routes as refresh-safe pages", as
     shapeFoldGame,
     braidsGame,
     dominoGame,
+    changingStripsGame,
     braceletGame,
   ] = await Promise.all([
     readOutput("index.html"),
@@ -41,6 +42,7 @@ test("exports the catalog and implemented game routes as refresh-safe pages", as
     readOutput("games/shape-fold/index.html"),
     readOutput("games/braids/index.html"),
     readOutput("games/domino-twist/index.html"),
+    readOutput("games/changing-strips/index.html"),
     readOutput("games/bracelet-search/index.html"),
   ]);
 
@@ -53,6 +55,7 @@ test("exports the catalog and implemented game routes as refresh-safe pages", as
   assert.match(home, /Braids/);
   assert.match(home, /Shape Fold/);
   assert.match(home, /Domino Twist/);
+  assert.match(home, /Changing Strips/);
   assert.match(home, /Bracelet Search/);
   assert.match(rotationGame, /Transformation Match/);
   assert.match(rotationGame, />Campaign</);
@@ -81,6 +84,13 @@ test("exports the catalog and implemented game routes as refresh-safe pages", as
   assert.match(dominoGame, /Domino Twist/);
   assert.match(dominoGame, />Campaign</);
   assert.match(dominoGame, /Infinite/);
+  assert.match(changingStripsGame, /Changing Strips/);
+  assert.match(changingStripsGame, /Campaign/);
+  assert.match(changingStripsGame, /Infinite/);
+  assert.match(
+    changingStripsGame,
+    /<title>Changing Strips · Spatial Gym<\/title>/,
+  );
   assert.match(braceletGame, /Bracelet Search/);
   assert.match(braceletGame, />Campaign</);
   assert.match(braceletGame, />Infinite</);
@@ -101,6 +111,7 @@ test("applies the GitHub Pages project base path to internal assets and links", 
     shapeFoldGame,
     braidsGame,
     dominoGame,
+    changingStripsGame,
     braceletGame,
   ] = await Promise.all([
     readOutput("index.html"),
@@ -110,6 +121,7 @@ test("applies the GitHub Pages project base path to internal assets and links", 
     readOutput("games/shape-fold/index.html"),
     readOutput("games/braids/index.html"),
     readOutput("games/domino-twist/index.html"),
+    readOutput("games/changing-strips/index.html"),
     readOutput("games/bracelet-search/index.html"),
   ]);
 
@@ -130,6 +142,8 @@ test("applies the GitHub Pages project base path to internal assets and links", 
   assert.match(braidsGame, new RegExp(`["']${basePath}/_next/`));
   assert.match(dominoGame, new RegExp(`href=["']${basePath}/["']`));
   assert.match(dominoGame, new RegExp(`["']${basePath}/_next/`));
+  assert.match(changingStripsGame, new RegExp(`href=["']${basePath}/["']`));
+  assert.match(changingStripsGame, new RegExp(`["']${basePath}/_next/`));
   assert.match(braceletGame, new RegExp(`href=["']${basePath}/["']`));
   assert.match(braceletGame, new RegExp(`["']${basePath}/_next/`));
   assert.doesNotMatch(home, /(?:href|src)=["']\/_next\//);
@@ -139,6 +153,7 @@ test("applies the GitHub Pages project base path to internal assets and links", 
   assert.doesNotMatch(shapeFoldGame, /(?:href|src)=["']\/_next\//);
   assert.doesNotMatch(braidsGame, /(?:href|src)=["']\/_next\//);
   assert.doesNotMatch(dominoGame, /(?:href|src)=["']\/_next\//);
+  assert.doesNotMatch(changingStripsGame, /(?:href|src)=["']\/_next\//);
   assert.doesNotMatch(braceletGame, /(?:href|src)=["']\/_next\//);
 });
 
@@ -176,6 +191,10 @@ test("ships project metadata and contributor documentation", async () => {
   assert.match(
     readme,
     /\[Domino Twist\]\(https:\/\/rfarnham\.github\.io\/nonverbal-reasoning-games\/games\/domino-twist\/\).*Playable/,
+  );
+  assert.match(
+    readme,
+    /\[Changing Strips\]\(https:\/\/rfarnham\.github\.io\/nonverbal-reasoning-games\/games\/changing-strips\/\).*Playable/,
   );
   assert.match(
     readme,

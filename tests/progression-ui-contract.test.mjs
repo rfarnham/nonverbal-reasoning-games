@@ -39,7 +39,7 @@ test("homepage Journey CTA is prominent while the standalone shelf remains", asy
 
 test("every released game uses the same controlled progression hook", async () => {
   const slugs = await discoveredGameSlugs();
-  assert.equal(slugs.length, 8);
+  assert.equal(slugs.length, 9);
   for (const slug of slugs) {
     const entry =
       slug === "domino-twist"
