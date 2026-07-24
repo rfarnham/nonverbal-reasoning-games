@@ -102,6 +102,37 @@ test("every released game uses the same controlled progression hook", async () =
   }
 });
 
+test("every released game uses the shared Campaign level and problem styling", async () => {
+  const slugs = await discoveredGameSlugs();
+  for (const slug of slugs) {
+    const entry =
+      slug === "domino-twist"
+        ? "app/games/domino-twist/DominoTwistGame.tsx"
+        : `app/games/${slug}/page.tsx`;
+    const gameSource = await source(entry);
+    assert.match(
+      gameSource,
+      /import campaignStyles from "@\/components\/games\/campaign-progress\.module\.css"/,
+      `${slug} must import the shared Campaign progress styles`,
+    );
+    assert.match(
+      gameSource,
+      /className=\{campaignStyles\.campaignLevels\}/,
+      `${slug} must use the shared level selector`,
+    );
+    assert.match(
+      gameSource,
+      /className=\{campaignStyles\.campaignProblems\}/,
+      `${slug} must use the shared question progress bar`,
+    );
+    assert.doesNotMatch(
+      gameSource,
+      /styles\.campaign(?:Navigator|Levels|Level|Problems|Problem)/,
+      `${slug} must not fall back to game-specific Campaign control styles`,
+    );
+  }
+});
+
 test("Turbo timing is independent from input locks and pauses for real explanations", async () => {
   const hook = await source(
     "components/progression/useProgressionGameSession.ts",

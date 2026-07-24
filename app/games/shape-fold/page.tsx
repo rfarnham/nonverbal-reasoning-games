@@ -59,6 +59,7 @@ import { shapeFoldGame } from "./game-info";
 import { canOpenHistoricalReview } from "./historical-review";
 import { progressionAdapter } from "./progression-adapter";
 import styles from "./shape-fold.module.css";
+import campaignStyles from "@/components/games/campaign-progress.module.css";
 
 type GamePhase = "idle" | "animating" | "wrong-review" | "answered";
 type SessionMode = "campaign" | "infinite" | "redemption";
@@ -1533,10 +1534,10 @@ export default function ShapeFoldPage() {
               >
               {isCampaign ? (
                 <nav
-                  className={styles.campaignNavigator}
+                  className={campaignStyles.campaignNavigator}
                   aria-label="Campaign progress"
                 >
-                  <div className={styles.campaignLevels}>
+                  <div className={campaignStyles.campaignLevels}>
                     {CAMPAIGN_LEVELS.map((level) => {
                       const levelComplete = isCampaignLevelComplete(
                         campaignProgress,
@@ -1555,15 +1556,15 @@ export default function ShapeFoldPage() {
                           : "not done";
                       return (
                         <button
-                          className={`${styles.campaignLevel} ${
+                          className={`${campaignStyles.campaignLevel} ${
                             state === "correct"
-                              ? styles.campaignLevelCorrect
+                              ? campaignStyles.campaignLevelCorrect
                               : state === "incorrect"
-                                ? styles.campaignLevelIncorrect
-                                : styles.campaignLevelNotDone
+                                ? campaignStyles.campaignLevelIncorrect
+                                : campaignStyles.campaignLevelNotDone
                           } ${
                             activeCampaignLevel === level
-                              ? styles.campaignLevelActive
+                              ? campaignStyles.campaignLevelActive
                               : ""
                           }`}
                           type="button"
@@ -1583,7 +1584,7 @@ export default function ShapeFoldPage() {
                     })}
                   </div>
                   <div
-                    className={styles.campaignProblems}
+                    className={campaignStyles.campaignProblems}
                     role="group"
                     aria-label={`${activeCampaignLevel} problems`}
                   >
@@ -1612,14 +1613,14 @@ export default function ShapeFoldPage() {
                             problemIndex;
                         return (
                           <button
-                            className={`${styles.campaignProblem} ${
+                            className={`${campaignStyles.campaignProblem} ${
                               marker === "correct"
-                                ? styles.campaignProblemCorrect
+                                ? campaignStyles.campaignProblemCorrect
                                 : marker === "incorrect"
-                                  ? styles.campaignProblemIncorrect
-                                  : styles.campaignProblemNotDone
+                                  ? campaignStyles.campaignProblemIncorrect
+                                  : campaignStyles.campaignProblemNotDone
                             } ${
-                              isCurrent ? styles.campaignProblemCurrent : ""
+                              isCurrent ? campaignStyles.campaignProblemCurrent : ""
                             }`}
                             type="button"
                             aria-label={`${activeCampaignLevel} problem ${

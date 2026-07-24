@@ -52,6 +52,7 @@ import {
 } from "./route-board";
 import { progressionAdapter } from "./progression-adapter";
 import styles from "./whose-left.module.css";
+import campaignStyles from "@/components/games/campaign-progress.module.css";
 
 type GamePhase = "idle" | "correct-reveal" | "wrong-review" | "answered";
 type SessionMode = "campaign" | "infinite" | "redemption";
@@ -1225,11 +1226,11 @@ export default function WhoseLeftPage() {
             >
               {isCampaign ? (
                 <nav
-                  className={styles.campaignNavigator}
+                  className={campaignStyles.campaignNavigator}
                   aria-label="Campaign progress"
                 >
                   <div
-                    className={styles.campaignLevels}
+                    className={campaignStyles.campaignLevels}
                     aria-label="Campaign levels"
                   >
                     {CAMPAIGN_LEVELS.map((level) => {
@@ -1251,15 +1252,15 @@ export default function WhoseLeftPage() {
 
                       return (
                         <button
-                          className={`${styles.campaignLevel} ${
+                          className={`${campaignStyles.campaignLevel} ${
                             levelState === "correct"
-                              ? styles.campaignLevelCorrect
+                              ? campaignStyles.campaignLevelCorrect
                               : levelState === "incorrect"
-                                ? styles.campaignLevelIncorrect
-                                : styles.campaignLevelNotDone
+                                ? campaignStyles.campaignLevelIncorrect
+                                : campaignStyles.campaignLevelNotDone
                           } ${
                             activeCampaignLevel === level.id
-                              ? styles.campaignLevelActive
+                              ? campaignStyles.campaignLevelActive
                               : ""
                           }`}
                           type="button"
@@ -1285,7 +1286,7 @@ export default function WhoseLeftPage() {
                   </div>
 
                   <div
-                    className={styles.campaignProblems}
+                    className={campaignStyles.campaignProblems}
                     role="group"
                     aria-label={`${campaignLevel(activeCampaignLevel).label} problems`}
                   >
@@ -1315,14 +1316,14 @@ export default function WhoseLeftPage() {
 
                         return (
                           <button
-                            className={`${styles.campaignProblem} ${
+                            className={`${campaignStyles.campaignProblem} ${
                               marker === "correct"
-                                ? styles.campaignProblemCorrect
+                                ? campaignStyles.campaignProblemCorrect
                                 : marker === "incorrect"
-                                  ? styles.campaignProblemIncorrect
-                                  : styles.campaignProblemNotDone
+                                  ? campaignStyles.campaignProblemIncorrect
+                                  : campaignStyles.campaignProblemNotDone
                             } ${
-                              isCurrent ? styles.campaignProblemCurrent : ""
+                              isCurrent ? campaignStyles.campaignProblemCurrent : ""
                             }`}
                             type="button"
                             aria-label={`${campaignLevel(activeCampaignLevel).label} problem ${

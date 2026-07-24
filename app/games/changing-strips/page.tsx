@@ -53,6 +53,7 @@ import {
   stateDifferenceIndexes,
 } from "./transition-visual";
 import styles from "./changing-strips.module.css";
+import campaignStyles from "@/components/games/campaign-progress.module.css";
 
 type GamePhase = "idle" | "animating" | "wrong-review" | "answered";
 type SessionMode = "campaign" | "infinite" | "redemption";
@@ -1301,11 +1302,11 @@ export default function ChangingStripsPage() {
               >
                 {isCampaign ? (
                   <nav
-                    className={styles.campaignNavigator}
+                    className={campaignStyles.campaignNavigator}
                     aria-label="Campaign progress"
                   >
                     <div
-                      className={styles.campaignLevels}
+                      className={campaignStyles.campaignLevels}
                       aria-label="Campaign levels"
                     >
                       {CAMPAIGN_LEVELS.map((level) => {
@@ -1326,15 +1327,15 @@ export default function ChangingStripsPage() {
                             : "not done";
                         return (
                           <button
-                            className={`${styles.campaignLevel} ${
+                            className={`${campaignStyles.campaignLevel} ${
                               state === "correct"
-                                ? styles.campaignLevelCorrect
+                                ? campaignStyles.campaignLevelCorrect
                                 : state === "incorrect"
-                                  ? styles.campaignLevelIncorrect
+                                  ? campaignStyles.campaignLevelIncorrect
                                   : ""
                             } ${
                               activeCampaignLevel === level.id
-                                ? styles.campaignLevelActive
+                                ? campaignStyles.campaignLevelActive
                                 : ""
                             }`}
                             type="button"
@@ -1354,7 +1355,7 @@ export default function ChangingStripsPage() {
                       })}
                     </div>
                     <div
-                      className={styles.campaignProblems}
+                      className={campaignStyles.campaignProblems}
                       role="group"
                       aria-label={`${campaignLevel(activeCampaignLevel).label} problems`}
                     >
@@ -1379,14 +1380,14 @@ export default function ChangingStripsPage() {
                               problemIndex;
                           return (
                             <button
-                              className={`${styles.campaignProblem} ${
+                              className={`${campaignStyles.campaignProblem} ${
                                 marker === "correct"
-                                  ? styles.campaignProblemCorrect
+                                  ? campaignStyles.campaignProblemCorrect
                                   : marker === "incorrect"
-                                    ? styles.campaignProblemIncorrect
-                                    : ""
+                                    ? campaignStyles.campaignProblemIncorrect
+                                    : campaignStyles.campaignProblemNotDone
                               } ${
-                                isCurrent ? styles.campaignProblemCurrent : ""
+                                isCurrent ? campaignStyles.campaignProblemCurrent : ""
                               }`}
                               type="button"
                               aria-label={`${campaignLevel(activeCampaignLevel).label} problem ${
@@ -1411,21 +1412,7 @@ export default function ChangingStripsPage() {
                                 )
                               }
                               key={problemIndex}
-                            >
-                              <span className={styles.markerNumber}>
-                                {problemIndex + 1}
-                              </span>
-                              <span
-                                className={styles.markerSymbol}
-                                aria-hidden="true"
-                              >
-                                {marker === "correct"
-                                  ? "✓"
-                                  : marker === "incorrect"
-                                    ? "×"
-                                    : ""}
-                              </span>
-                            </button>
+                            />
                           );
                         },
                       )}
