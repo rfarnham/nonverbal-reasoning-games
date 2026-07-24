@@ -111,9 +111,12 @@ export function upgradePlayerProfileJourneyPlan(
   currentSnapshot: readonly JourneyGame[],
   nowMs?: number,
 ): PlayerProfile {
+  if (profile.journeyPlanVersion === CURRENT_JOURNEY_PLAN_VERSION) {
+    return profile;
+  }
   if (
-    profile.journeyPlanVersion === CURRENT_JOURNEY_PLAN_VERSION ||
-    profile.activeAttemptId !== null
+    profile.activeAttemptId !== null &&
+    !isJourneyTestProfile(profile)
   ) {
     return profile;
   }
