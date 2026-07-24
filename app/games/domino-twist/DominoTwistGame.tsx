@@ -46,6 +46,8 @@ import {
   type DominoDesign,
   type DominoPiece,
   type DominoRound,
+  type GridColumns,
+  type GridRows,
   type LayoutId,
   type PipMask,
   type TargetShapeId,
@@ -224,10 +226,6 @@ function targetShapeDescription(targetShapeId: TargetShapeId): string {
       return "four-cell square pip design";
     case "2x3-rect":
       return "six-cell rectangular pip design";
-    case "2x4-ledge":
-      return "six-cell ledge-shaped pip design";
-    case "3x3-stair":
-      return "six-cell stair-step pip design";
   }
 }
 
@@ -371,7 +369,7 @@ function SeamOverlay({
   columns,
 }: {
   layoutId: LayoutId;
-  columns: 2 | 3 | 4;
+  columns: GridColumns;
 }) {
   const layout = TILING_LAYOUTS[layoutId];
   return (
@@ -401,7 +399,7 @@ function WitnessOverlay({
 }: {
   witness: BuildWitness;
   pieces: readonly DominoPiece[];
-  columns: 2 | 3 | 4;
+  columns: GridColumns;
 }) {
   return (
     <span className={styles.witnessOverlay} aria-hidden="true">
@@ -446,8 +444,8 @@ function DesignBoard({
 }: {
   design: DominoDesign;
   targetShapeId: TargetShapeId;
-  rows: 2 | 3;
-  columns: 2 | 3 | 4;
+  rows: GridRows;
+  columns: GridColumns;
   layoutId?: LayoutId | null;
   witness?: BuildWitness | null;
   pieces?: readonly DominoPiece[];
@@ -1573,7 +1571,6 @@ export default function DominoTwistGame() {
                   targetShapeId={TUTORIAL.targetShapeId}
                   rows={TUTORIAL.rows}
                   columns={TUTORIAL.columns}
-                  layoutId={TUTORIAL.layoutId}
                   witness={TUTORIAL.witness}
                   pieces={TUTORIAL.pieces}
                 />
@@ -1590,7 +1587,6 @@ export default function DominoTwistGame() {
                   targetShapeId={TUTORIAL.targetShapeId}
                   rows={TUTORIAL.rows}
                   columns={TUTORIAL.columns}
-                  layoutId={TUTORIAL.layoutId}
                 />
                 <span
                   className={styles.nearMissMark}

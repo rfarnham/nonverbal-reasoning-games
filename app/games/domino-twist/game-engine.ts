@@ -12,20 +12,18 @@ export type DominoPiece = {
   second: PipMask;
 };
 
-export type GridRows = 2 | 3;
-export type GridColumns = 2 | 3 | 4;
+export type GridRows = 2;
+export type GridColumns = 2 | 3;
 
 export type TargetShapeId =
   | "2x2-rect"
-  | "2x3-rect"
-  | "2x4-ledge"
-  | "3x3-stair";
+  | "2x3-rect";
 
 export type TargetShape = {
   id: TargetShapeId;
   rows: GridRows;
   columns: GridColumns;
-  /** Row-major indexes occupied by the six-cell (or Starter four-cell) target. */
+  /** Row-major indexes occupied by the rectangular target. */
   occupiedCells: readonly number[];
 };
 
@@ -34,11 +32,7 @@ export type LayoutId =
   | "2x2-columns"
   | "2x3-columns"
   | "2x3-left-stack"
-  | "2x3-right-stack"
-  | "2x4-ledge-horizontal"
-  | "2x4-ledge-vertical"
-  | "3x3-stair-horizontal"
-  | "3x3-stair-vertical";
+  | "2x3-right-stack";
 
 export type TilingLayout = {
   id: LayoutId;
@@ -71,6 +65,7 @@ export type DominoDesign = {
 export type MismatchKind =
   | "seam-trap"
   | "twisted-half"
+  | "twisted-pair"
   | "broken-pair";
 
 export type MismatchAnalysis = {
@@ -186,6 +181,25 @@ const DIRECTIONAL_PATTERN_NAMES = [
   "six",
 ] as const satisfies readonly PipPatternName[];
 
+const DIAGONAL_PATTERN_NAMES = [
+  "diag-two",
+  "diag-three",
+] as const satisfies readonly PipPatternName[];
+
+const PHASE_PATTERN_NAMES = [
+  "top-pair",
+  "corner-l",
+  "edge-single",
+  "corner-single",
+  "top-bar",
+] as const satisfies readonly PipPatternName[];
+
+const JUNIOR_SUPPORT_PATTERN_NAMES = [
+  "top-pair",
+  "corner-l",
+  "top-bar",
+] as const satisfies readonly PipPatternName[];
+
 export const TARGET_SHAPES: Readonly<Record<TargetShapeId, TargetShape>> = {
   "2x2-rect": {
     id: "2x2-rect",
@@ -198,18 +212,6 @@ export const TARGET_SHAPES: Readonly<Record<TargetShapeId, TargetShape>> = {
     rows: 2,
     columns: 3,
     occupiedCells: [0, 1, 2, 3, 4, 5],
-  },
-  "2x4-ledge": {
-    id: "2x4-ledge",
-    rows: 2,
-    columns: 4,
-    occupiedCells: [0, 1, 2, 3, 4, 5],
-  },
-  "3x3-stair": {
-    id: "3x3-stair",
-    rows: 3,
-    columns: 3,
-    occupiedCells: [0, 1, 3, 4, 5, 8],
   },
 };
 
@@ -267,50 +269,6 @@ export const TILING_LAYOUTS: Readonly<Record<LayoutId, TilingLayout>> = {
       [4, 5],
     ],
   },
-  "2x4-ledge-horizontal": {
-    id: "2x4-ledge-horizontal",
-    targetShapeId: "2x4-ledge",
-    rows: 2,
-    columns: 4,
-    pairs: [
-      [0, 1],
-      [2, 3],
-      [4, 5],
-    ],
-  },
-  "2x4-ledge-vertical": {
-    id: "2x4-ledge-vertical",
-    targetShapeId: "2x4-ledge",
-    rows: 2,
-    columns: 4,
-    pairs: [
-      [0, 4],
-      [1, 5],
-      [2, 3],
-    ],
-  },
-  "3x3-stair-horizontal": {
-    id: "3x3-stair-horizontal",
-    targetShapeId: "3x3-stair",
-    rows: 3,
-    columns: 3,
-    pairs: [
-      [0, 1],
-      [3, 4],
-      [5, 8],
-    ],
-  },
-  "3x3-stair-vertical": {
-    id: "3x3-stair-vertical",
-    targetShapeId: "3x3-stair",
-    rows: 3,
-    columns: 3,
-    pairs: [
-      [0, 3],
-      [1, 4],
-      [5, 8],
-    ],
-  },
 };
 
 export const DIFFICULTY_RULES: Readonly<
@@ -319,41 +277,41 @@ export const DIFFICULTY_RULES: Readonly<
   Starter: {
     targetShapeIds: ["2x2-rect"],
     pieceCount: 2,
-    seamsVisible: true,
+    seamsVisible: false,
     minDirectionalHalves: 0,
     maxDirectionalHalves: 0,
     minDistinctHalves: 4,
     maxDistinctHalves: 4,
-    minReachableDesigns: 6,
+    minReachableDesigns: 16,
   },
   Junior: {
-    targetShapeIds: ["2x3-rect", "2x4-ledge", "3x3-stair"],
-    pieceCount: 3,
-    seamsVisible: false,
-    minDirectionalHalves: 0,
-    maxDirectionalHalves: 0,
-    minDistinctHalves: 5,
-    maxDistinctHalves: 6,
-    minReachableDesigns: 24,
-  },
-  Expert: {
-    targetShapeIds: ["2x3-rect", "2x4-ledge", "3x3-stair"],
-    pieceCount: 3,
+    targetShapeIds: ["2x2-rect"],
+    pieceCount: 2,
     seamsVisible: false,
     minDirectionalHalves: 4,
     maxDirectionalHalves: 4,
-    minDistinctHalves: 5,
+    minDistinctHalves: 4,
+    maxDistinctHalves: 4,
+    minReachableDesigns: 16,
+  },
+  Expert: {
+    targetShapeIds: ["2x3-rect"],
+    pieceCount: 3,
+    seamsVisible: false,
+    minDirectionalHalves: 6,
+    maxDirectionalHalves: 6,
+    minDistinctHalves: 6,
     maxDistinctHalves: 6,
     minReachableDesigns: 24,
   },
   Wizard: {
-    targetShapeIds: ["2x3-rect", "2x4-ledge", "3x3-stair"],
+    targetShapeIds: ["2x3-rect"],
     pieceCount: 3,
     seamsVisible: false,
-    minDirectionalHalves: 4,
-    maxDirectionalHalves: 4,
-    minDistinctHalves: 4,
-    maxDistinctHalves: 4,
+    minDirectionalHalves: 6,
+    maxDirectionalHalves: 6,
+    minDistinctHalves: 5,
+    maxDistinctHalves: 5,
     minReachableDesigns: 24,
   },
 };
@@ -403,6 +361,107 @@ export function rotatePipMask(mask: PipMask, quarterTurns: number): PipMask {
 
 export function isDirectionalPipMask(mask: PipMask): boolean {
   return rotatePipMask(mask, 1) !== mask;
+}
+
+export function pipRotationOrbit(mask: PipMask): readonly PipMask[] {
+  return [...new Set([0, 1, 2, 3].map((turns) => rotatePipMask(mask, turns)))]
+    .sort((left, right) => left - right);
+}
+
+export function pipRotationOrbitKey(mask: PipMask): string {
+  return pipRotationOrbit(mask)
+    .map((value) => value.toString(16).padStart(3, "0"))
+    .join(":");
+}
+
+function isDiagonalTwoAndThreePair(
+  firstMask: PipMask | null | undefined,
+  secondMask: PipMask | null | undefined,
+): boolean {
+  if (firstMask === null || firstMask === undefined) return false;
+  if (secondMask === null || secondMask === undefined) return false;
+  const diagonalTwoOrbit = pipRotationOrbitKey(PIP_PATTERNS["diag-two"]);
+  const diagonalThreeOrbit = pipRotationOrbitKey(PIP_PATTERNS["diag-three"]);
+  const firstOrbit = pipRotationOrbitKey(firstMask);
+  const secondOrbit = pipRotationOrbitKey(secondMask);
+  return (
+    (firstOrbit === diagonalTwoOrbit && secondOrbit === diagonalThreeOrbit) ||
+    (firstOrbit === diagonalThreeOrbit && secondOrbit === diagonalTwoOrbit)
+  );
+}
+
+function rotationPhase(mask: PipMask): 0 | 1 | 2 | 3 | null {
+  if (pipRotationOrbit(mask).length !== 4) return null;
+  const canonical = pipRotationOrbit(mask)[0];
+  const phase = [0, 1, 2, 3].find(
+    (turns) => rotatePipMask(canonical, turns) === mask,
+  );
+  return phase === undefined ? null : (phase as 0 | 1 | 2 | 3);
+}
+
+type WizardPhaseTwinInfo = {
+  fixedOrbitKey: string;
+  variableOrbitKey: string;
+  twinPieceIds: readonly [string, string];
+};
+
+function wizardPhaseTwinInfo(
+  pieces: readonly DominoPiece[],
+): WizardPhaseTwinInfo | null {
+  if (pieces.length !== 3) return null;
+  for (let firstIndex = 0; firstIndex < pieces.length; firstIndex += 1) {
+    for (
+      let secondIndex = firstIndex + 1;
+      secondIndex < pieces.length;
+      secondIndex += 1
+    ) {
+      const firstTwin = pieces[firstIndex];
+      const secondTwin = pieces[secondIndex];
+      const fixedOrbitKey = pipRotationOrbitKey(firstTwin.first);
+      const variableOrbitKey = pipRotationOrbitKey(firstTwin.second);
+      if (
+        fixedOrbitKey === variableOrbitKey ||
+        pipRotationOrbitKey(secondTwin.first) !== fixedOrbitKey ||
+        pipRotationOrbitKey(secondTwin.second) !== variableOrbitKey ||
+        firstTwin.first !== secondTwin.first
+      ) {
+        continue;
+      }
+      const firstPhase = rotationPhase(firstTwin.second);
+      const secondPhase = rotationPhase(secondTwin.second);
+      if (
+        firstPhase === null ||
+        secondPhase === null ||
+        ![1, 3].includes(normalizeQuarterTurns(secondPhase - firstPhase))
+      ) {
+        continue;
+      }
+      const thirdPiece = pieces.find(
+        (_, pieceIndex) =>
+          pieceIndex !== firstIndex && pieceIndex !== secondIndex,
+      );
+      if (!thirdPiece) continue;
+      const thirdOrbits = [
+        pipRotationOrbitKey(thirdPiece.first),
+        pipRotationOrbitKey(thirdPiece.second),
+      ];
+      if (
+        new Set(thirdOrbits).size !== 2 ||
+        thirdOrbits.some(
+          (orbitKey) =>
+            orbitKey === fixedOrbitKey || orbitKey === variableOrbitKey,
+        )
+      ) {
+        continue;
+      }
+      return {
+        fixedOrbitKey,
+        variableOrbitKey,
+        twinPieceIds: [firstTwin.id, secondTwin.id],
+      };
+    }
+  }
+  return null;
 }
 
 export function targetShapeIdForDimensions(
@@ -781,13 +840,19 @@ function isQuarterTurnDifference(
   buildable: DominoDesign,
   differences: readonly number[],
 ): boolean {
-  if (differences.length !== 1) return false;
-  const cell = differences[0];
-  const buildableMask = buildable.cells[cell];
-  const shownMask = shown.cells[cell];
-  if (buildableMask === null || shownMask === null) return false;
-  return ([1, 3] as const).some(
-    (turns) => rotatePipMask(buildableMask, turns) === shownMask,
+  return (
+    differences.length > 0 &&
+    differences.every((cell) => {
+      const buildableMask = buildable.cells[cell];
+      const shownMask = shown.cells[cell];
+      return (
+        buildableMask !== null &&
+        shownMask !== null &&
+        ([1, 3] as const).some(
+          (turns) => rotatePipMask(buildableMask, turns) === shownMask,
+        )
+      );
+    })
   );
 }
 
@@ -824,14 +889,28 @@ export function analyzeImpossibleDesign(
     isDesignBuildable(pieces, design, rows, columns, null);
   const kind: MismatchKind = buildableWithHiddenSeams
     ? "seam-trap"
-    : nearest.differences.length === 1
+    : nearest.differences.length === 1 &&
+        isQuarterTurnDifference(
+          design,
+          nearest.reachable.design,
+          nearest.differences,
+        )
       ? "twisted-half"
+      : nearest.differences.length === 2 &&
+          isQuarterTurnDifference(
+            design,
+            nearest.reachable.design,
+            nearest.differences,
+          )
+        ? "twisted-pair"
       : "broken-pair";
   const message =
     kind === "seam-trap"
       ? "Those halves can pair only by crossing one of the shown seams."
       : kind === "twisted-half"
         ? "One half is turned away from every whole-domino match."
+        : kind === "twisted-pair"
+          ? "Two pip faces turn independently; no whole-domino turns can make both."
         : "The unmatched neighboring halves never belong to the same domino.";
 
   return {
@@ -880,63 +959,63 @@ export type AuthoredDominoRoundSpec = Readonly<{
 }>;
 
 const STARTER_SPECS: readonly AuthoredDominoRoundSpec[] = [
-  { pieces: [["center", "corners"], ["edges", "center-corners"]], targetShapeId: "2x2-rect", layoutId: "2x2-rows", salt: 11 },
-  { pieces: [["center", "edges"], ["corners", "center-edges"]], targetShapeId: "2x2-rect", layoutId: "2x2-columns", salt: 23 },
-  { pieces: [["center", "center-corners"], ["edges", "ring"]], targetShapeId: "2x2-rect", layoutId: "2x2-rows", salt: 37 },
-  { pieces: [["center", "center-edges"], ["corners", "ring"]], targetShapeId: "2x2-rect", layoutId: "2x2-columns", salt: 41 },
-  { pieces: [["center", "ring"], ["center-corners", "all"]], targetShapeId: "2x2-rect", layoutId: "2x2-rows", salt: 53 },
-  { pieces: [["corners", "edges"], ["center-edges", "all"]], targetShapeId: "2x2-rect", layoutId: "2x2-columns", salt: 67 },
-  { pieces: [["corners", "center-corners"], ["edges", "all"]], targetShapeId: "2x2-rect", layoutId: "2x2-rows", salt: 71 },
-  { pieces: [["corners", "center-edges"], ["center-corners", "ring"]], targetShapeId: "2x2-rect", layoutId: "2x2-columns", salt: 83 },
-  { pieces: [["edges", "center-corners"], ["center-edges", "ring"]], targetShapeId: "2x2-rect", layoutId: "2x2-rows", salt: 97 },
-  { pieces: [["edges", "center-edges"], ["corners", "all"]], targetShapeId: "2x2-rect", layoutId: "2x2-columns", salt: 101 },
-  { pieces: [["center-corners", "center-edges"], ["center", "all"]], targetShapeId: "2x2-rect", layoutId: "2x2-rows", salt: 113 },
-  { pieces: [["center-edges", "ring"], ["edges", "all"]], targetShapeId: "2x2-rect", layoutId: "2x2-columns", salt: 127 },
+  { pieces: [["center", "corners"], ["edges", "center-corners"]], targetShapeId: "2x2-rect", layoutId: null, salt: 11 },
+  { pieces: [["center", "edges"], ["corners", "center-edges"]], targetShapeId: "2x2-rect", layoutId: null, salt: 24 },
+  { pieces: [["center", "center-corners"], ["edges", "ring"]], targetShapeId: "2x2-rect", layoutId: null, salt: 37 },
+  { pieces: [["center", "center-edges"], ["corners", "ring"]], targetShapeId: "2x2-rect", layoutId: null, salt: 42 },
+  { pieces: [["center", "ring"], ["center-corners", "all"]], targetShapeId: "2x2-rect", layoutId: null, salt: 53 },
+  { pieces: [["corners", "edges"], ["center-edges", "all"]], targetShapeId: "2x2-rect", layoutId: null, salt: 68 },
+  { pieces: [["corners", "center-corners"], ["edges", "all"]], targetShapeId: "2x2-rect", layoutId: null, salt: 71 },
+  { pieces: [["corners", "center-edges"], ["center-corners", "ring"]], targetShapeId: "2x2-rect", layoutId: null, salt: 84 },
+  { pieces: [["edges", "center-corners"], ["center-edges", "ring"]], targetShapeId: "2x2-rect", layoutId: null, salt: 97 },
+  { pieces: [["edges", "center-edges"], ["corners", "all"]], targetShapeId: "2x2-rect", layoutId: null, salt: 102 },
+  { pieces: [["center-corners", "center-edges"], ["center", "all"]], targetShapeId: "2x2-rect", layoutId: null, salt: 113 },
+  { pieces: [["center-edges", "ring"], ["edges", "all"]], targetShapeId: "2x2-rect", layoutId: null, salt: 128 },
 ];
 
 const JUNIOR_SPECS: readonly AuthoredDominoRoundSpec[] = [
-  { pieces: [["center", "corners"], ["edges", "center-corners"], ["center-edges", "ring"]], targetShapeId: "2x3-rect", layoutId: null, salt: 139 },
-  { pieces: [["center", "edges"], ["corners", "center-edges"], ["ring", "all"]], targetShapeId: "2x3-rect", layoutId: null, salt: 149 },
-  { pieces: [["center", "center-corners"], ["edges", "ring"], ["corners", "all"]], targetShapeId: "2x3-rect", layoutId: null, salt: 157 },
-  { pieces: [["center", "center-edges"], ["corners", "ring"], ["center-corners", "all"]], targetShapeId: "2x4-ledge", layoutId: null, salt: 167 },
-  { pieces: [["center", "ring"], ["edges", "all"], ["corners", "center-corners"]], targetShapeId: "3x3-stair", layoutId: null, salt: 179 },
-  { pieces: [["center", "all"], ["corners", "center-edges"], ["edges", "ring"]], targetShapeId: "2x4-ledge", layoutId: null, salt: 191 },
-  { pieces: [["corners", "edges"], ["center-corners", "center-edges"], ["ring", "all"]], targetShapeId: "2x3-rect", layoutId: null, salt: 197 },
-  { pieces: [["corners", "center-corners"], ["edges", "center-edges"], ["center", "all"]], targetShapeId: "3x3-stair", layoutId: null, salt: 211 },
-  { pieces: [["corners", "center-edges"], ["center-corners", "ring"], ["edges", "all"]], targetShapeId: "2x4-ledge", layoutId: null, salt: 223 },
-  { pieces: [["corners", "ring"], ["edges", "center-corners"], ["center-edges", "all"]], targetShapeId: "3x3-stair", layoutId: null, salt: 227 },
-  { pieces: [["corners", "all"], ["center", "center-edges"], ["center-corners", "ring"]], targetShapeId: "2x4-ledge", layoutId: null, salt: 239 },
-  { pieces: [["edges", "center-edges"], ["center", "ring"], ["center-corners", "all"]], targetShapeId: "3x3-stair", layoutId: null, salt: 251 },
+  { pieces: [["diag-two", "diag-three"], ["top-pair", "corner-l"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 139 },
+  { pieces: [["diag-two", "diag-three@1"], ["top-pair@1", "corner-l@2"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-three", salt: 149 },
+  { pieces: [["diag-two", "corner-l"], ["diag-three", "top-pair@1"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 157 },
+  { pieces: [["diag-two", "diag-three"], ["corner-l", "corner-l@1"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-three", salt: 167 },
+  { pieces: [["diag-two@1", "diag-three@1"], ["corner-l@2", "corner-l@3"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 179 },
+  { pieces: [["diag-two", "diag-three@1"], ["top-pair", "top-pair@1"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-three", salt: 191 },
+  { pieces: [["diag-two@1", "diag-three"], ["top-pair@2", "top-pair@3"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 197 },
+  { pieces: [["diag-two", "diag-three"], ["top-bar", "corner-l@1"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-three", salt: 211 },
+  { pieces: [["diag-two@1", "diag-three@1"], ["top-bar@1", "corner-l@2"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 223 },
+  { pieces: [["diag-two", "diag-three@1"], ["top-bar@2", "corner-l@3"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-three", salt: 227 },
+  { pieces: [["diag-two@1", "diag-three"], ["top-bar@3", "corner-l"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 239 },
+  { pieces: [["diag-two", "diag-three"], ["corner-l@1", "top-pair@2"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-three", salt: 251 },
 ];
 
 const EXPERT_SPECS: readonly AuthoredDominoRoundSpec[] = [
-  { pieces: [["diag-two", "center"], ["diag-three", "corners"], ["top-pair", "corner-l"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 263 },
-  { pieces: [["edge-single", "edges"], ["corner-single", "center-corners"], ["top-bar", "six"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "edge-single", preferredTrapTurn: 1, salt: 271 },
-  { pieces: [["diag-two@1", "center-edges"], ["top-pair@1", "ring"], ["corner-l@2", "edge-single@2"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 3, salt: 283 },
-  { pieces: [["diag-three@1", "all"], ["corner-single@1", "center"], ["top-bar@1", "six@1"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "diag-three", salt: 293 },
-  { pieces: [["diag-two", "corners"], ["corner-l@1", "edges"], ["edge-single@3", "top-bar@2"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "diag-two", salt: 307 },
-  { pieces: [["diag-three@1", "center-corners"], ["top-pair@2", "center-edges"], ["corner-single@2", "six@1"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "corner-single", preferredTrapTurn: 3, salt: 311 },
-  { pieces: [["edge-single@1", "ring"], ["top-bar@3", "all"], ["diag-two@1", "corner-l@3"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-bar", preferredTrapTurn: 1, salt: 331 },
-  { pieces: [["corner-single@3", "center"], ["six", "corners"], ["diag-three", "top-pair@1"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "six", salt: 347 },
-  { pieces: [["top-bar@2", "edges"], ["corner-l", "center-corners"], ["edge-single@2", "diag-two"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "edge-single", preferredTrapTurn: 3, salt: 353 },
-  { pieces: [["six@1", "center-edges"], ["diag-three@1", "ring"], ["top-pair@3", "corner-single"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "diag-three", salt: 367 },
-  { pieces: [["diag-two@1", "all"], ["edge-single@3", "center"], ["corner-l@2", "top-bar@1"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "corner-l", preferredTrapTurn: 1, salt: 379 },
-  { pieces: [["diag-three", "corners"], ["six@1", "edges"], ["corner-single@1", "top-pair@2"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 3, salt: 389 },
+  { pieces: [["diag-two", "diag-three"], ["top-bar", "edge-single"], ["top-pair", "corner-l"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 263 },
+  { pieces: [["diag-two@1", "diag-three@1"], ["corner-single@1", "top-bar@1"], ["top-pair@1", "corner-l@1"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "diag-three", salt: 271 },
+  { pieces: [["diag-two", "top-pair"], ["diag-three", "corner-l"], ["top-bar", "edge-single"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 283 },
+  { pieces: [["diag-two@1", "top-pair@1"], ["diag-three@1", "corner-l@1"], ["top-bar@1", "edge-single@1"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "diag-three", salt: 293 },
+  { pieces: [["diag-two", "corner-single"], ["diag-three@1", "top-bar@2"], ["corner-l@2", "edge-single@3"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 307 },
+  { pieces: [["diag-two@1", "corner-single@1"], ["diag-three", "top-bar@3"], ["corner-l@3", "edge-single@2"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "diag-three", salt: 311 },
+  { pieces: [["diag-two", "top-pair@2"], ["diag-three", "corner-l@3"], ["corner-single@1", "top-bar@1"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "corner-l", preferredTrapTurn: 1, salt: 331 },
+  { pieces: [["diag-two@1", "top-pair@3"], ["diag-three@1", "corner-l@2"], ["corner-single@3", "top-bar"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 3, salt: 347 },
+  { pieces: [["diag-two", "edge-single@2"], ["diag-three@1", "top-bar"], ["corner-l@1", "corner-single@2"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "edge-single", preferredTrapTurn: 3, salt: 353 },
+  { pieces: [["diag-two@1", "edge-single"], ["diag-three", "top-bar@1"], ["corner-l", "corner-single@3"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-bar", preferredTrapTurn: 1, salt: 367 },
+  { pieces: [["diag-two", "corner-l@2"], ["diag-three", "top-pair@1"], ["edge-single@3", "top-bar@2"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "corner-l", preferredTrapTurn: 1, salt: 379 },
+  { pieces: [["diag-two@1", "corner-l@3"], ["diag-three@1", "top-pair@2"], ["edge-single@1", "top-bar@3"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 3, salt: 389 },
 ];
 
 const WIZARD_SPECS: readonly AuthoredDominoRoundSpec[] = [
-  { pieces: [["diag-two", "center"], ["corner-l@1", "corners"], ["diag-two", "corner-l@1"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 401 },
-  { pieces: [["edge-single", "edges"], ["top-pair@1", "center-corners"], ["edge-single", "top-pair@1"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "edge-single", preferredTrapTurn: 1, salt: 419 },
-  { pieces: [["top-pair@1", "center-edges"], ["edge-single@2", "ring"], ["top-pair@1", "edge-single@2"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 3, salt: 431 },
-  { pieces: [["diag-three", "all"], ["corner-single@2", "center"], ["diag-three", "corner-single@2"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "diag-three", salt: 443 },
-  { pieces: [["diag-two", "corners"], ["top-bar@3", "edges"], ["diag-two", "top-bar@3"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "diag-two", salt: 457 },
-  { pieces: [["corner-single@3", "center-corners"], ["six@1", "center-edges"], ["corner-single@3", "six@1"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "corner-single", preferredTrapTurn: 3, salt: 463 },
-  { pieces: [["top-bar@2", "ring"], ["corner-l", "all"], ["top-bar@2", "corner-l"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-bar", preferredTrapTurn: 1, salt: 479 },
-  { pieces: [["six", "center"], ["top-pair@1", "corners"], ["six", "top-pair@1"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "six", salt: 487 },
-  { pieces: [["corner-l@2", "edges"], ["edge-single@2", "center-corners"], ["corner-l@2", "edge-single@2"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "corner-l", preferredTrapTurn: 3, salt: 499 },
-  { pieces: [["diag-three@1", "center-edges"], ["corner-single@1", "ring"], ["diag-three@1", "corner-single@1"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "diag-three", salt: 509 },
-  { pieces: [["edge-single@1", "all"], ["top-bar@2", "center"], ["edge-single@1", "top-bar@2"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "edge-single", preferredTrapTurn: 1, salt: 521 },
-  { pieces: [["top-pair@3", "corners"], ["six", "edges"], ["top-pair@3", "six"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 3, salt: 541 },
+  { pieces: [["top-pair", "corner-l"], ["top-pair", "corner-l@1"], ["edge-single", "top-bar"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "corner-l", preferredTrapTurn: 1, salt: 401 },
+  { pieces: [["top-pair@1", "corner-l@2"], ["top-pair@1", "corner-l@3"], ["corner-single@1", "top-bar@1"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "corner-l", preferredTrapTurn: 3, salt: 419 },
+  { pieces: [["corner-l", "top-pair"], ["corner-l", "top-pair@1"], ["edge-single@1", "corner-single@2"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 1, salt: 431 },
+  { pieces: [["edge-single", "corner-l@1"], ["edge-single", "corner-l@2"], ["top-pair@2", "top-bar@3"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "corner-l", preferredTrapTurn: 1, salt: 443 },
+  { pieces: [["corner-single", "top-bar"], ["corner-single", "top-bar@1"], ["top-pair@3", "corner-l@2"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-bar", preferredTrapTurn: 3, salt: 457 },
+  { pieces: [["top-bar", "edge-single"], ["top-bar", "edge-single@1"], ["corner-l@3", "corner-single@2"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "edge-single", preferredTrapTurn: 1, salt: 463 },
+  { pieces: [["top-pair@2", "corner-single@1"], ["top-pair@2", "corner-single@2"], ["corner-l", "top-bar@1"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "corner-single", preferredTrapTurn: 1, salt: 479 },
+  { pieces: [["corner-l@1", "top-bar@2"], ["corner-l@1", "top-bar@3"], ["edge-single@2", "top-pair"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-bar", preferredTrapTurn: 3, salt: 487 },
+  { pieces: [["edge-single@3", "top-pair@1"], ["edge-single@3", "top-pair@2"], ["corner-single@3", "corner-l@2"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 1, salt: 499 },
+  { pieces: [["corner-single@1", "corner-l@3"], ["corner-single@1", "corner-l"], ["top-bar@2", "edge-single@1"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "corner-l", preferredTrapTurn: 1, salt: 509 },
+  { pieces: [["top-bar@1", "corner-single@2"], ["top-bar@1", "corner-single@3"], ["top-pair@2", "edge-single"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "corner-single", preferredTrapTurn: 3, salt: 521 },
+  { pieces: [["corner-l@2", "edge-single@1"], ["corner-l@2", "edge-single@2"], ["top-pair@3", "top-bar"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "edge-single", preferredTrapTurn: 1, salt: 541 },
 ];
 
 const AUTHORED_SPECS: Readonly<
@@ -1169,6 +1248,39 @@ function twistedCandidates(
   return rotatedValues(candidates, salt * 7 + 5);
 }
 
+function twistedPairCandidates(
+  reachable: readonly ReachableDesign[],
+  salt: number,
+): DominoDesign[] {
+  const candidates: DominoDesign[] = [];
+  for (const item of rotatedValues(reachable, salt * 3 + 1)) {
+    for (let firstCell = 0; firstCell < item.design.cells.length; firstCell += 1) {
+      const firstMask = item.design.cells[firstCell];
+      if (firstMask === null || !isDirectionalPipMask(firstMask)) continue;
+      for (
+        let secondCell = firstCell + 1;
+        secondCell < item.design.cells.length;
+        secondCell += 1
+      ) {
+        const secondMask = item.design.cells[secondCell];
+        if (secondMask === null || !isDirectionalPipMask(secondMask)) continue;
+        if (!isDiagonalTwoAndThreePair(firstMask, secondMask)) continue;
+        // Junior near-misses turn the two visually confusable diagonal faces,
+        // so the decisive error cannot hide in an easier support pattern.
+        for (const firstTurn of [1, 3] as const) {
+          for (const secondTurn of [1, 3] as const) {
+            const cells = [...item.design.cells];
+            cells[firstCell] = rotatePipMask(firstMask, firstTurn);
+            cells[secondCell] = rotatePipMask(secondMask, secondTurn);
+            candidates.push({ cells });
+          }
+        }
+      }
+    }
+  }
+  return rotatedValues(candidates, salt * 11 + 7);
+}
+
 function chooseImpossibleDesign(
   pieces: readonly DominoPiece[],
   reachable: readonly ReachableDesign[],
@@ -1186,28 +1298,10 @@ function chooseImpossibleDesign(
   );
   const candidates: DominoDesign[] = [];
 
-  const teachesShownSeams = difficulty === "Starter";
-  const teachesBrokenPair = difficulty === "Junior";
+  const teachesBrokenPair = difficulty === "Starter";
+  const teachesCoupledOrientation = difficulty === "Junior";
   const teachesOrientationError =
     difficulty === "Expert" || difficulty === "Wizard";
-
-  if (layoutId !== null && teachesShownSeams) {
-    const seamTraps = enumerateBuildableDesigns(
-      pieces,
-      rows,
-      columns,
-      null,
-    )
-      .map(({ design }) => design)
-      .filter((design) => !reachableKeys.has(designKey(design)))
-      .sort(
-        (left, right) =>
-          distanceToReachable(left, reachable) -
-            distanceToReachable(right, reachable) ||
-          designKey(left).localeCompare(designKey(right)),
-      );
-    candidates.push(...rotatedValues(seamTraps, salt));
-  }
 
   const localFamilies = teachesOrientationError
     ? [
@@ -1218,6 +1312,8 @@ function chooseImpossibleDesign(
           preferredTrapTurn,
         ),
       ]
+    : teachesCoupledOrientation
+      ? [twistedPairCandidates(reachable, salt)]
     : teachesBrokenPair
       ? [swappedCandidates(reachable, salt)]
       : [];
@@ -1229,13 +1325,18 @@ function chooseImpossibleDesign(
     if (seen.has(key) || reachableKeys.has(key)) return false;
     seen.add(key);
     const distance = distanceToReachable(candidate, reachable);
-    const distanceIsSuitable = teachesOrientationError
-      ? distance === 1
-      : distance === 2;
+    const distanceIsSuitable =
+      teachesOrientationError
+        ? distance === 1
+        : teachesCoupledOrientation || teachesBrokenPair
+          ? distance === 2
+          : false;
     return distanceIsSuitable && isUsable(candidate);
   });
   if (!closeCandidate) {
-    throw new Error("Unable to construct a close impossible design.");
+    throw new Error(
+      `Unable to construct a close ${difficulty} impossible design for salt ${salt}.`,
+    );
   }
   return closeCandidate;
 }
@@ -1262,7 +1363,8 @@ function isInterestingPieceSet(
   }
   if (
     difficulty === "Wizard" &&
-    exactMaskMultiplicitySignature({ cells: halves }) !== "2,2,1,1"
+    (exactMaskMultiplicitySignature({ cells: halves }) !== "2,1,1,1,1" ||
+      wizardPhaseTwinInfo(pieces) === null)
   ) {
     return false;
   }
@@ -1332,7 +1434,9 @@ function assembleRound(
           salt,
           candidate,
           minimumOptionDistance,
-          difficulty === "Expert" || difficulty === "Wizard"
+          difficulty === "Junior" ||
+            difficulty === "Expert" ||
+            difficulty === "Wizard"
             ? exactMaskMultiplicitySignature(candidate)
             : undefined,
         );
@@ -1352,7 +1456,9 @@ function assembleRound(
     salt,
     impossibleDesign,
     minimumOptionDistance,
-    difficulty === "Expert" || difficulty === "Wizard"
+    difficulty === "Junior" ||
+      difficulty === "Expert" ||
+      difficulty === "Wizard"
       ? exactMaskMultiplicitySignature(impossibleDesign)
       : undefined,
   ).map<DominoOption>(({ design, witness }) => ({
@@ -1465,12 +1571,13 @@ export function validateRound(round: DominoRound): readonly string[] {
   }
   if (
     round.difficulty === "Wizard" &&
-    exactMaskMultiplicitySignature({
+    (exactMaskMultiplicitySignature({
       cells: round.pieces.flatMap(({ first, second }) => [first, second]),
-    }) !== "2,2,1,1"
+    }) !== "2,1,1,1,1" ||
+      wizardPhaseTwinInfo(round.pieces) === null)
   ) {
     errors.push(
-      "Wizard source pieces must repeat two face masks exactly twice each.",
+      "Wizard source pieces must form a relative-phase twin pair.",
     );
   }
   if (round.options.length !== 4) errors.push("A round must have four options.");
@@ -1532,22 +1639,6 @@ export function validateRound(round: DominoRound): readonly string[] {
       reachable,
     ]),
   );
-  let allLayoutReachableByKey = scopedReachableByKey;
-  if (round.difficulty === "Starter" && round.layoutId !== null) {
-    const allLayoutReachable = enumerateBuildableDesigns(
-      round.pieces,
-      round.rows,
-      round.columns,
-      null,
-    );
-    allLayoutReachableByKey = new Map(
-      allLayoutReachable.map((reachable) => [
-        designKey(reachable.design),
-        reachable,
-      ]),
-    );
-  }
-
   const actualBuildability = round.options.map(({ design }) =>
     scopedReachableByKey.has(designKey(design)),
   );
@@ -1617,26 +1708,35 @@ export function validateRound(round: DominoRound): readonly string[] {
         errors.push(`Option ${index + 1} needs a buildable comparison.`);
       }
 
-      const teachesShownSeams = round.difficulty === "Starter";
       if (
-        teachesShownSeams &&
-        (option.kind !== "seam-trap" ||
-          round.layoutId === null ||
-          !allLayoutReachableByKey.has(designKey(option.design)))
+        round.difficulty === "Starter" &&
+        (option.kind !== "broken-pair" ||
+          option.mismatch.differingCells.length !== 2 ||
+          scopedReachableByKey.has(designKey(option.design)) ||
+          [...option.design.cells].sort().join(",") !==
+            [...option.mismatch.closestBuildable.cells].sort().join(","))
       ) {
         errors.push(
-          `Option ${index + 1} must be a two-cell shown-seam trap.`,
+          `Option ${index + 1} must be a two-cell globally impossible broken pair.`,
         );
       }
 
       if (
         round.difficulty === "Junior" &&
-        (option.kind !== "broken-pair" ||
+        (option.kind !== "twisted-pair" ||
           option.mismatch.differingCells.length !== 2 ||
-          scopedReachableByKey.has(designKey(option.design)))
+          !isDiagonalTwoAndThreePair(
+            option.mismatch.closestBuildable.cells[actualDifferences[0]],
+            option.mismatch.closestBuildable.cells[actualDifferences[1]],
+          ) ||
+          !isQuarterTurnDifference(
+            option.design,
+            option.mismatch.closestBuildable,
+            actualDifferences,
+          ))
       ) {
         errors.push(
-          `Option ${index + 1} must be a two-cell globally impossible broken pair.`,
+          `Option ${index + 1} must quarter-turn the diagonal two- and three-pip faces.`,
         );
       }
 
@@ -1654,6 +1754,20 @@ export function validateRound(round: DominoRound): readonly string[] {
         errors.push(
           `Option ${index + 1} must be a one-face quarter-turn trap.`,
         );
+      }
+      if (round.difficulty === "Wizard") {
+        const twinInfo = wizardPhaseTwinInfo(round.pieces);
+        const buildableMask =
+          option.mismatch.closestBuildable.cells[actualDifferences[0]];
+        if (
+          !twinInfo ||
+          buildableMask === null ||
+          pipRotationOrbitKey(buildableMask) !== twinInfo.variableOrbitKey
+        ) {
+          errors.push(
+            `Option ${index + 1} must twist the variable face of a phase twin.`,
+          );
+        }
       }
     }
   }
@@ -1678,7 +1792,11 @@ export function validateRound(round: DominoRound): readonly string[] {
       );
     }
   }
-  if (round.difficulty === "Expert" || round.difficulty === "Wizard") {
+  if (
+    round.difficulty === "Junior" ||
+    round.difficulty === "Expert" ||
+    round.difficulty === "Wizard"
+  ) {
     const impossibleSignature = exactMaskMultiplicitySignature(
       round.options[round.correctIndex].design,
     );
@@ -1775,45 +1893,72 @@ function makeGeneratedPieces(
   preferredTrapPattern?: PipPatternName,
 ): readonly DominoPiece[] {
   const rules = DIFFICULTY_RULES[difficulty];
+  if (difficulty === "Junior") {
+    const [firstSupport, secondSupport] = shuffled(
+      JUNIOR_SUPPORT_PATTERN_NAMES,
+      random,
+    );
+    const halves = shuffled(
+      [
+        ...DIAGONAL_PATTERN_NAMES.map((name) =>
+          rotatePipMask(PIP_PATTERNS[name], randomInteger(random, 2)),
+        ),
+        rotatePipMask(
+          PIP_PATTERNS[firstSupport],
+          randomInteger(random, 4),
+        ),
+        rotatePipMask(
+          PIP_PATTERNS[secondSupport],
+          randomInteger(random, 4),
+        ),
+      ],
+      random,
+    );
+    return [
+      { id: "A", first: halves[0], second: halves[1] },
+      { id: "B", first: halves[2], second: halves[3] },
+    ];
+  }
   if (difficulty === "Wizard") {
     if (
       !preferredTrapPattern ||
-      !DIRECTIONAL_PATTERN_NAMES.includes(
-        preferredTrapPattern as (typeof DIRECTIONAL_PATTERN_NAMES)[number],
+      !PHASE_PATTERN_NAMES.includes(
+        preferredTrapPattern as (typeof PHASE_PATTERN_NAMES)[number],
       )
     ) {
-      throw new Error("Wizard generation needs a directional trap family.");
+      throw new Error("Wizard generation needs a phase-twin trap family.");
     }
-    const preferredMask = rotatePipMask(
-      PIP_PATTERNS[preferredTrapPattern],
+    const [fixedName, thirdFirstName, thirdSecondName] = shuffled(
+      PHASE_PATTERN_NAMES.filter((name) => name !== preferredTrapPattern),
+      random,
+    );
+    const fixedMask = rotatePipMask(
+      PIP_PATTERNS[fixedName],
       randomInteger(random, 4),
     );
-    const directionalMasks = [
-      ...new Set(
-        DIRECTIONAL_PATTERN_NAMES.flatMap((name) =>
-          [0, 1, 2, 3].map((turns) =>
-            rotatePipMask(PIP_PATTERNS[name], turns),
-          ),
-        ),
-      ),
-    ].filter((mask) => mask !== preferredMask);
-    const secondDirectional =
-      directionalMasks[randomInteger(random, directionalMasks.length)];
-    const firstSimple =
-      PIP_PATTERNS[
-        SIMPLE_PATTERN_NAMES[randomInteger(random, SIMPLE_PATTERN_NAMES.length)]
-      ];
-    const remainingSimpleNames = SIMPLE_PATTERN_NAMES.filter(
-      (name) => PIP_PATTERNS[name] !== firstSimple,
+    const variableTurns = randomInteger(random, 4);
+    const variableMask = rotatePipMask(
+      PIP_PATTERNS[preferredTrapPattern],
+      variableTurns,
     );
-    const secondSimple =
-      PIP_PATTERNS[
-        remainingSimpleNames[randomInteger(random, remainingSimpleNames.length)]
-      ];
+    const shiftedVariableMask = rotatePipMask(
+      PIP_PATTERNS[preferredTrapPattern],
+      variableTurns + (randomInteger(random, 2) === 0 ? 1 : 3),
+    );
     return [
-      { id: "A", first: preferredMask, second: firstSimple },
-      { id: "B", first: secondDirectional, second: secondSimple },
-      { id: "C", first: preferredMask, second: secondDirectional },
+      { id: "A", first: fixedMask, second: variableMask },
+      { id: "B", first: fixedMask, second: shiftedVariableMask },
+      {
+        id: "C",
+        first: rotatePipMask(
+          PIP_PATTERNS[thirdFirstName],
+          randomInteger(random, 4),
+        ),
+        second: rotatePipMask(
+          PIP_PATTERNS[thirdSecondName],
+          randomInteger(random, 4),
+        ),
+      },
     ];
   }
   const halfCount = rules.pieceCount * 2;
@@ -1870,15 +2015,19 @@ export function generateInfiniteRound(
 
   for (let attempt = 0; attempt < GENERATOR_MAX_ATTEMPTS; attempt += 1) {
     const preferredTrapPattern = (() => {
-      if (difficulty !== "Wizard") return undefined;
-      const phase = randomInteger(random, DIRECTIONAL_PATTERN_NAMES.length);
+      const names =
+        difficulty === "Junior"
+          ? DIAGONAL_PATTERN_NAMES
+          : difficulty === "Wizard"
+            ? PHASE_PATTERN_NAMES
+            : null;
+      if (!names) return undefined;
+      const phase = randomInteger(random, names.length);
       const selection = randomInteger(
         random,
-        DIRECTIONAL_PATTERN_NAMES.length,
+        names.length,
       );
-      return DIRECTIONAL_PATTERN_NAMES[
-        (phase + selection) % DIRECTIONAL_PATTERN_NAMES.length
-      ];
+      return names[(phase + selection) % names.length];
     })();
     const pieces = makeGeneratedPieces(
       difficulty,

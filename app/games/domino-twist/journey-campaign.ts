@@ -12,53 +12,54 @@ export type DominoJourneyExtraLevel =
   | "expert-2"
   | "wizard-2";
 
-// These authored inputs use the canonical v2 target-shape and pip grammar. The
+// These authored inputs use the canonical v3 rectangular-target and pip
+// grammar. The
 // engine calculates every design, build witness, impossible near-match, and
 // feedback classification. Alternate salts and answer schedules freeze a
 // second, fingerprint-distinct challenge for each underlying curriculum idea.
 const JUNIOR_2_SPECS: readonly AuthoredDominoRoundSpec[] = [
-  { pieces: [["center", "corners"], ["edges", "center-corners"], ["center-edges", "ring"]], targetShapeId: "2x3-rect", layoutId: null, salt: 170 },
-  { pieces: [["center", "edges"], ["corners", "center-edges"], ["ring", "all"]], targetShapeId: "2x3-rect", layoutId: null, salt: 197 },
-  { pieces: [["center", "center-corners"], ["edges", "ring"], ["corners", "all"]], targetShapeId: "2x3-rect", layoutId: null, salt: 222 },
-  { pieces: [["center", "center-edges"], ["corners", "ring"], ["center-corners", "all"]], targetShapeId: "2x4-ledge", layoutId: null, salt: 249 },
-  { pieces: [["center", "ring"], ["edges", "all"], ["corners", "center-corners"]], targetShapeId: "3x3-stair", layoutId: null, salt: 278 },
-  { pieces: [["center", "all"], ["corners", "center-edges"], ["edges", "ring"]], targetShapeId: "2x4-ledge", layoutId: null, salt: 307 },
-  { pieces: [["corners", "edges"], ["center-corners", "center-edges"], ["ring", "all"]], targetShapeId: "2x3-rect", layoutId: null, salt: 330 },
-  { pieces: [["corners", "center-corners"], ["edges", "center-edges"], ["center", "all"]], targetShapeId: "3x3-stair", layoutId: null, salt: 361 },
-  { pieces: [["corners", "center-edges"], ["center-corners", "ring"], ["edges", "all"]], targetShapeId: "2x4-ledge", layoutId: null, salt: 390 },
-  { pieces: [["corners", "ring"], ["edges", "center-corners"], ["center-edges", "all"]], targetShapeId: "3x3-stair", layoutId: null, salt: 411 },
-  { pieces: [["corners", "all"], ["center", "center-edges"], ["center-corners", "ring"]], targetShapeId: "2x4-ledge", layoutId: null, salt: 440 },
-  { pieces: [["edges", "center-edges"], ["center", "ring"], ["center-corners", "all"]], targetShapeId: "3x3-stair", layoutId: null, salt: 469 },
+  { pieces: [["diag-two", "diag-three"], ["top-pair@2", "corner-l@3"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 170 },
+  { pieces: [["diag-two", "diag-three@1"], ["top-pair@3", "corner-l"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-three", salt: 180 },
+  { pieces: [["diag-two", "corner-l"], ["diag-three", "top-pair@1"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 188 },
+  { pieces: [["diag-two", "diag-three"], ["corner-l", "corner-l@1"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-three", salt: 198 },
+  { pieces: [["diag-two@1", "diag-three@1"], ["corner-l@2", "corner-l@3"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 210 },
+  { pieces: [["diag-two", "diag-three@1"], ["top-pair", "top-pair@1"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-three", salt: 222 },
+  { pieces: [["diag-two@1", "diag-three"], ["top-pair@2", "top-pair@3"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 228 },
+  { pieces: [["diag-two", "diag-three"], ["top-bar", "corner-l@1"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-three", salt: 242 },
+  { pieces: [["diag-two@1", "diag-three@1"], ["top-bar@1", "corner-l@2"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 254 },
+  { pieces: [["diag-two", "diag-three@1"], ["top-bar@2", "corner-l@3"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-three", salt: 258 },
+  { pieces: [["diag-two@1", "diag-three"], ["top-bar@3", "corner-l"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 270 },
+  { pieces: [["diag-two", "diag-three"], ["corner-l@1", "top-pair@2"]], targetShapeId: "2x2-rect", layoutId: null, preferredTrapPattern: "diag-three", salt: 282 },
 ];
 
 const EXPERT_2_SPECS: readonly AuthoredDominoRoundSpec[] = [
-  { pieces: [["diag-two", "center"], ["diag-three", "corners"], ["top-pair", "corner-l"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 294 },
-  { pieces: [["edge-single", "edges"], ["corner-single", "center-corners"], ["top-bar", "six"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "edge-single", preferredTrapTurn: 1, salt: 319 },
-  { pieces: [["diag-two@1", "center-edges"], ["top-pair@1", "ring"], ["corner-l@2", "edge-single@2"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 3, salt: 348 },
-  { pieces: [["diag-three@1", "all"], ["corner-single@1", "center"], ["top-bar@1", "six@1"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "diag-three", salt: 375 },
-  { pieces: [["diag-two", "corners"], ["corner-l@1", "edges"], ["edge-single@3", "top-bar@2"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "diag-two", salt: 406 },
-  { pieces: [["diag-three@1", "center-corners"], ["top-pair@2", "center-edges"], ["corner-single@2", "six@1"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "corner-single", preferredTrapTurn: 3, salt: 427 },
-  { pieces: [["edge-single@1", "ring"], ["top-bar@3", "all"], ["diag-two@1", "corner-l@3"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-bar", preferredTrapTurn: 1, salt: 464 },
-  { pieces: [["corner-single@3", "center"], ["six", "corners"], ["diag-three", "top-pair@1"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "six", salt: 497 },
-  { pieces: [["top-bar@2", "edges"], ["corner-l", "center-corners"], ["edge-single@2", "diag-two"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "edge-single", preferredTrapTurn: 3, salt: 520 },
-  { pieces: [["six@1", "center-edges"], ["diag-three@1", "ring"], ["top-pair@3", "corner-single"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "diag-three", salt: 551 },
-  { pieces: [["diag-two@1", "all"], ["edge-single@3", "center"], ["corner-l@2", "top-bar@1"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "corner-l", preferredTrapTurn: 1, salt: 580 },
-  { pieces: [["diag-three", "corners"], ["six@1", "edges"], ["corner-single@1", "top-pair@2"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 3, salt: 607 },
+  { pieces: [["diag-two", "diag-three"], ["top-bar", "edge-single"], ["top-pair", "corner-l"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 294 },
+  { pieces: [["diag-two@1", "diag-three@1"], ["corner-single@1", "top-bar@1"], ["top-pair@1", "corner-l@1"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "diag-three", salt: 302 },
+  { pieces: [["diag-two", "top-pair"], ["diag-three", "corner-l"], ["top-bar", "edge-single"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 314 },
+  { pieces: [["diag-two@1", "top-pair@1"], ["diag-three@1", "corner-l@1"], ["top-bar@1", "edge-single@1"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "diag-three", salt: 324 },
+  { pieces: [["diag-two", "corner-single"], ["diag-three@1", "top-bar@2"], ["corner-l@2", "edge-single@3"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 338 },
+  { pieces: [["diag-two@1", "corner-single@1"], ["diag-three", "top-bar@3"], ["corner-l@3", "edge-single@2"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "diag-three", salt: 342 },
+  { pieces: [["diag-two", "top-pair@2"], ["diag-three", "corner-l@3"], ["corner-single@1", "top-bar@1"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "corner-l", preferredTrapTurn: 1, salt: 362 },
+  { pieces: [["diag-two@1", "top-pair@3"], ["diag-three@1", "corner-l@2"], ["corner-single@3", "top-bar"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 3, salt: 378 },
+  { pieces: [["diag-two", "edge-single@2"], ["diag-three@1", "top-bar"], ["corner-l@1", "corner-single@2"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "edge-single", preferredTrapTurn: 3, salt: 384 },
+  { pieces: [["diag-two@1", "edge-single"], ["diag-three", "top-bar@1"], ["corner-l", "corner-single@3"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-bar", preferredTrapTurn: 1, salt: 398 },
+  { pieces: [["diag-two", "corner-l@2"], ["diag-three", "top-pair@1"], ["edge-single@3", "top-bar@2"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "corner-l", preferredTrapTurn: 1, salt: 410 },
+  { pieces: [["diag-two@1", "corner-l@3"], ["diag-three@1", "top-pair@2"], ["edge-single@1", "top-bar@3"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 3, salt: 420 },
 ];
 
 const WIZARD_2_SPECS: readonly AuthoredDominoRoundSpec[] = [
-  { pieces: [["diag-two", "center"], ["corner-l@1", "corners"], ["diag-two", "corner-l@1"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 432 },
-  { pieces: [["edge-single", "edges"], ["top-pair@1", "center-corners"], ["edge-single", "top-pair@1"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "edge-single", preferredTrapTurn: 1, salt: 467 },
-  { pieces: [["top-pair@1", "center-edges"], ["edge-single@2", "ring"], ["top-pair@1", "edge-single@2"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 3, salt: 496 },
-  { pieces: [["diag-three", "all"], ["corner-single@2", "center"], ["diag-three", "corner-single@2"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "diag-three", salt: 525 },
-  { pieces: [["diag-two", "corners"], ["top-bar@3", "edges"], ["diag-two", "top-bar@3"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "diag-two", salt: 556 },
-  { pieces: [["corner-single@3", "center-corners"], ["six@1", "center-edges"], ["corner-single@3", "six@1"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "corner-single", preferredTrapTurn: 3, salt: 579 },
-  { pieces: [["top-bar@2", "ring"], ["corner-l", "all"], ["top-bar@2", "corner-l"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-bar", preferredTrapTurn: 1, salt: 612 },
-  { pieces: [["six", "center"], ["top-pair@1", "corners"], ["six", "top-pair@1"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "six", salt: 637 },
-  { pieces: [["corner-l@2", "edges"], ["edge-single@2", "center-corners"], ["corner-l@2", "edge-single@2"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "corner-l", preferredTrapTurn: 3, salt: 666 },
-  { pieces: [["diag-three@1", "center-edges"], ["corner-single@1", "ring"], ["diag-three@1", "corner-single@1"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "diag-three", salt: 693 },
-  { pieces: [["edge-single@1", "all"], ["top-bar@2", "center"], ["edge-single@1", "top-bar@2"]], targetShapeId: "2x4-ledge", layoutId: null, preferredTrapPattern: "edge-single", preferredTrapTurn: 1, salt: 722 },
-  { pieces: [["top-pair@3", "corners"], ["six", "edges"], ["top-pair@3", "six"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 3, salt: 759 },
+  { pieces: [["top-pair", "corner-l"], ["top-pair", "corner-l@1"], ["edge-single", "top-bar"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "corner-l", preferredTrapTurn: 1, salt: 432 },
+  { pieces: [["top-pair@1", "corner-l@2"], ["top-pair@1", "corner-l@3"], ["corner-single@1", "top-bar@1"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "corner-l", preferredTrapTurn: 3, salt: 450 },
+  { pieces: [["corner-l", "top-pair"], ["corner-l", "top-pair@1"], ["edge-single@1", "corner-single@2"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 1, salt: 462 },
+  { pieces: [["edge-single", "corner-l@1"], ["edge-single", "corner-l@2"], ["top-pair@2", "top-bar@3"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "corner-l", preferredTrapTurn: 1, salt: 474 },
+  { pieces: [["corner-single", "top-bar"], ["corner-single", "top-bar@1"], ["top-pair@3", "corner-l@2"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-bar", preferredTrapTurn: 3, salt: 488 },
+  { pieces: [["top-bar", "edge-single"], ["top-bar", "edge-single@1"], ["corner-l@3", "corner-single@2"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "edge-single", preferredTrapTurn: 1, salt: 494 },
+  { pieces: [["top-pair@2", "corner-single@1"], ["top-pair@2", "corner-single@2"], ["corner-l", "top-bar@1"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "corner-single", preferredTrapTurn: 1, salt: 510 },
+  { pieces: [["corner-l@1", "top-bar@2"], ["corner-l@1", "top-bar@3"], ["edge-single@2", "top-pair"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-bar", preferredTrapTurn: 3, salt: 518 },
+  { pieces: [["edge-single@3", "top-pair@1"], ["edge-single@3", "top-pair@2"], ["corner-single@3", "corner-l@2"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 1, salt: 530 },
+  { pieces: [["corner-single@1", "corner-l@3"], ["corner-single@1", "corner-l"], ["top-bar@2", "edge-single@1"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "corner-l", preferredTrapTurn: 1, salt: 540 },
+  { pieces: [["top-bar@1", "corner-single@2"], ["top-bar@1", "corner-single@3"], ["top-pair@2", "edge-single"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "corner-single", preferredTrapTurn: 3, salt: 552 },
+  { pieces: [["corner-l@2", "edge-single@1"], ["corner-l@2", "edge-single@2"], ["top-pair@3", "top-bar"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "edge-single", preferredTrapTurn: 1, salt: 572 },
 ];
 
 const ANSWERS: Readonly<

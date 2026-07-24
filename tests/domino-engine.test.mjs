@@ -25,6 +25,7 @@ import {
   makeSeededRandom,
   pipCount,
   pipDotIndexes,
+  pipRotationOrbitKey,
   renderWitness,
   rotatePipMask,
   roundFingerprint,
@@ -48,6 +49,50 @@ function physicalPieceKey(piece) {
     2,
   ).toString(16)}`;
   return forward < reversed ? forward : reversed;
+}
+
+function phaseTwinInfo(pieces) {
+  for (let firstIndex = 0; firstIndex < pieces.length; firstIndex += 1) {
+    for (
+      let secondIndex = firstIndex + 1;
+      secondIndex < pieces.length;
+      secondIndex += 1
+    ) {
+      const first = pieces[firstIndex];
+      const second = pieces[secondIndex];
+      const fixedOrbitKey = pipRotationOrbitKey(first.first);
+      const variableOrbitKey = pipRotationOrbitKey(first.second);
+      if (
+        fixedOrbitKey === variableOrbitKey ||
+        first.first !== second.first ||
+        pipRotationOrbitKey(second.first) !== fixedOrbitKey ||
+        pipRotationOrbitKey(second.second) !== variableOrbitKey ||
+        ![1, 3].some(
+          (turns) => rotatePipMask(first.second, turns) === second.second,
+        )
+      ) {
+        continue;
+      }
+      const third = pieces.find(
+        (_, index) => index !== firstIndex && index !== secondIndex,
+      );
+      if (!third) continue;
+      const thirdOrbits = [
+        pipRotationOrbitKey(third.first),
+        pipRotationOrbitKey(third.second),
+      ];
+      if (
+        new Set(thirdOrbits).size !== 2 ||
+        thirdOrbits.some(
+          (key) => key === fixedOrbitKey || key === variableOrbitKey,
+        )
+      ) {
+        continue;
+      }
+      return { fixedOrbitKey, variableOrbitKey };
+    }
+  }
+  return null;
 }
 
 function makeGeneratedCorpus() {
@@ -75,20 +120,20 @@ function makeGeneratedCorpus() {
 
 const GENERATED = makeGeneratedCorpus();
 
-test("Domino Twist v2 migrates saved questions to the revised curriculum", () => {
-  assert.equal(progressionMetadata.contentVersion, "2");
-  assert.equal(progressionMetadata.generatorVersion, "2");
-  assert.equal(progressionMetadata.journeyContentVersion, "1");
+test("Domino Twist v3 migrates saved questions to the revised curriculum", () => {
+  assert.equal(progressionMetadata.contentVersion, "3");
+  assert.equal(progressionMetadata.generatorVersion, "3");
+  assert.equal(progressionMetadata.journeyContentVersion, "2");
 
   const campaign = resolveProgressionQuestion(progressionAdapter, {
     source: "campaign",
     gameSlug: "domino-twist",
     level: "junior",
     questionIndex: 0,
-    contentVersion: "1",
+    contentVersion: "2",
   });
   assert.equal(campaign.resolution, "campaign-updated");
-  assert.equal(campaign.ref.contentVersion, "2");
+  assert.equal(campaign.ref.contentVersion, "3");
   assert.equal(campaign.round.difficulty, "Junior");
   assert.deepEqual(validateRound(campaign.round), []);
 
@@ -97,11 +142,11 @@ test("Domino Twist v2 migrates saved questions to the revised curriculum", () =>
     gameSlug: "domino-twist",
     level: "junior",
     seed: "legacy-domino-junior",
-    generatorVersion: "1",
+    generatorVersion: "2",
   });
   assert.equal(generated.resolution, "generated-fallback");
   assert.equal(generated.ref.source, "campaign");
-  assert.equal(generated.ref.contentVersion, "2");
+  assert.equal(generated.ref.contentVersion, "3");
   assert.equal(generated.round.difficulty, "Junior");
   assert.deepEqual(validateRound(generated.round), []);
 });
@@ -148,9 +193,10 @@ function assertDifficultyContract(round, label) {
   if (round.difficulty === "Wizard") {
     assert.equal(
       exactMaskMultiplicitySignature({ cells: halves }),
-      "2,2,1,1",
-      `${label} repeats exactly two source faces`,
+      "2,1,1,1,1",
+      `${label} repeats one fixed phase-twin face`,
     );
+    assert.ok(phaseTwinInfo(round.pieces), `${label} relative-phase twins`);
   }
   assert.equal(
     new Set(round.pieces.map(({ id }) => id)).size,
@@ -343,6 +389,20 @@ function assertRoundContract(round, label) {
       );
     } else if (option.kind === "twisted-half") {
       assert.equal(option.mismatch.differingCells.length, 1);
+    } else if (option.kind === "twisted-pair") {
+      assert.equal(option.mismatch.differingCells.length, 2);
+      for (const cell of option.mismatch.differingCells) {
+        assert.ok(
+          [1, 3].some(
+            (turns) =>
+              rotatePipMask(
+                option.mismatch.closestBuildable.cells[cell],
+                turns,
+              ) === option.design.cells[cell],
+          ),
+          `${label} coupled face ${cell} is a quarter-turn near-miss`,
+        );
+      }
     } else {
       assert.equal(option.kind, "broken-pair");
       assert.equal(option.mismatch.differingCells.length, 2);
@@ -371,7 +431,11 @@ function assertRoundContract(round, label) {
       `${label} has exclusive evidence for every hidden tiling`,
     );
   }
-  if (round.difficulty === "Expert" || round.difficulty === "Wizard") {
+  if (
+    round.difficulty === "Junior" ||
+    round.difficulty === "Expert" ||
+    round.difficulty === "Wizard"
+  ) {
     const impossibleSignature = exactMaskMultiplicitySignature(
       round.options[round.correctIndex].design,
     );
@@ -453,11 +517,17 @@ function enumeratePerfectMatchings(shape) {
 }
 
 test("target shapes are connected and declare every adjacent exact cover", () => {
+  assert.deepEqual(Object.keys(TARGET_SHAPES), ["2x2-rect", "2x3-rect"]);
   for (const shape of Object.values(TARGET_SHAPES)) {
     assert.equal(
       shape.occupiedCells.length,
       shape.id === "2x2-rect" ? 4 : 6,
       `${shape.id} occupied-cell count`,
+    );
+    assert.deepEqual(
+      shape.occupiedCells,
+      Array.from({ length: shape.rows * shape.columns }, (_, index) => index),
+      `${shape.id} is a full rectangle without rendering holes`,
     );
     const visited = new Set([shape.occupiedCells[0]]);
     const queue = [shape.occupiedCells[0]];
@@ -509,13 +579,10 @@ test("target shapes are connected and declare every adjacent exact cover", () =>
     "2x3-left-stack",
     "2x3-right-stack",
   ]);
-  assert.deepEqual(legalLayoutIdsForShape("2x4-ledge"), [
-    "2x4-ledge-horizontal",
-    "2x4-ledge-vertical",
-  ]);
-  assert.deepEqual(legalLayoutIdsForShape("3x3-stair"), [
-    "3x3-stair-horizontal",
-    "3x3-stair-vertical",
+  assert.deepEqual(legalLayoutIds(2, 3), [
+    "2x3-columns",
+    "2x3-left-stack",
+    "2x3-right-stack",
   ]);
 });
 
@@ -679,7 +746,9 @@ test("Journey-only Domino banks are frozen, valid, balanced, and disjoint", () =
   for (const [index, round] of juniorRounds.entries()) {
     const impossible = round.options[round.correctIndex];
     assert.equal(round.seamsVisible, false);
-    assert.equal(impossible.kind, "broken-pair");
+    assert.equal(round.targetShapeId, "2x2-rect");
+    assert.equal(round.pieces.length, 2);
+    assert.equal(impossible.kind, "twisted-pair");
     assert.equal(impossible.mismatch.differingCells.length, 2);
     assert.deepEqual(
       new Set(
@@ -696,12 +765,13 @@ test("Journey-only Domino banks are frozen, valid, balanced, and disjoint", () =
     const rounds = JOURNEY_EXTRA_CAMPAIGN_ROUNDS[level];
     assert.deepEqual(
       new Set(rounds.map(({ targetShapeId }) => targetShapeId)),
-      new Set(["2x3-rect", "2x4-ledge", "3x3-stair"]),
-      `${level}: target-shape coverage`,
+      new Set(["2x3-rect"]),
+      `${level}: rectangular target`,
     );
     for (const [index, round] of rounds.entries()) {
       const impossible = round.options[round.correctIndex];
       assert.equal(round.seamsVisible, false);
+      assert.equal(round.pieces.length, 3);
       assert.equal(impossible.kind, "twisted-half");
       assert.equal(impossible.mismatch.differingCells.length, 1);
       assert.deepEqual(
@@ -730,89 +800,102 @@ test("Journey-only Domino banks are frozen, valid, balanced, and disjoint", () =
   }
 });
 
-test("the difficulty ladder removes seams, adds orientation, then repeats faces", () => {
-  assert.equal(DIFFICULTY_RULES.Starter.seamsVisible, true);
-  assert.equal(DIFFICULTY_RULES.Junior.seamsVisible, false);
-  assert.equal(DIFFICULTY_RULES.Expert.seamsVisible, false);
-  assert.equal(DIFFICULTY_RULES.Wizard.seamsVisible, false);
+test("the curriculum adds diagonal rotation, then a third piece, then phase twins", () => {
+  for (const difficulty of DIFFICULTIES) {
+    assert.equal(
+      DIFFICULTY_RULES[difficulty].seamsVisible,
+      false,
+      `${difficulty} hides layout hints`,
+    );
+  }
 
-  assert.deepEqual(
-    DIFFICULTY_RULES.Starter.targetShapeIds,
-    ["2x2-rect"],
-    "Starter keeps one compact rectangle",
-  );
-  assert.equal(
-    DIFFICULTY_RULES.Junior.pieceCount >
-      DIFFICULTY_RULES.Starter.pieceCount,
-    true,
-    "Junior adds a third domino",
-  );
-  assert.deepEqual(
-    DIFFICULTY_RULES.Junior.targetShapeIds,
-    ["2x3-rect", "2x4-ledge", "3x3-stair"],
-    "Junior introduces rectangular and non-rectangular targets",
-  );
-  assert.deepEqual(
-    DIFFICULTY_RULES.Expert.targetShapeIds,
-    DIFFICULTY_RULES.Junior.targetShapeIds,
-    "Expert keeps Junior target geometry",
-  );
-  assert.deepEqual(
-    DIFFICULTY_RULES.Wizard.targetShapeIds,
-    DIFFICULTY_RULES.Expert.targetShapeIds,
-    "Wizard keeps Expert target geometry",
-  );
-  assert.equal(
-    DIFFICULTY_RULES.Junior.maxDirectionalHalves,
-    DIFFICULTY_RULES.Starter.maxDirectionalHalves,
-    "Junior keeps rotation-invariant faces",
-  );
-  assert.ok(
-    DIFFICULTY_RULES.Expert.minDirectionalHalves >
-      DIFFICULTY_RULES.Junior.maxDirectionalHalves,
-    "Expert adds orientation reasoning",
-  );
-  assert.equal(
-    DIFFICULTY_RULES.Wizard.maxDistinctHalves,
-    4,
-    "Wizard repeats two of six faces",
-  );
-  assert.ok(
-    DIFFICULTY_RULES.Wizard.maxDistinctHalves <
-      DIFFICULTY_RULES.Expert.minDistinctHalves,
-    "Wizard removes unique face identity as a scaffold",
-  );
+  assert.deepEqual(DIFFICULTY_RULES.Starter.targetShapeIds, ["2x2-rect"]);
+  assert.deepEqual(DIFFICULTY_RULES.Junior.targetShapeIds, ["2x2-rect"]);
+  assert.equal(DIFFICULTY_RULES.Starter.pieceCount, 2);
+  assert.equal(DIFFICULTY_RULES.Junior.pieceCount, 2);
+  assert.equal(DIFFICULTY_RULES.Starter.maxDirectionalHalves, 0);
+  assert.equal(DIFFICULTY_RULES.Junior.minDirectionalHalves, 4);
 
-  const threePieceShapeSequence = [
-    "2x3-rect",
-    "2x3-rect",
-    "2x3-rect",
-    "2x4-ledge",
-    "3x3-stair",
-    "2x4-ledge",
-    "2x3-rect",
-    "3x3-stair",
-    "2x4-ledge",
-    "3x3-stair",
-    "2x4-ledge",
-    "3x3-stair",
-  ];
-  for (const difficulty of ["Junior", "Expert", "Wizard"]) {
+  assert.deepEqual(DIFFICULTY_RULES.Expert.targetShapeIds, ["2x3-rect"]);
+  assert.deepEqual(DIFFICULTY_RULES.Wizard.targetShapeIds, ["2x3-rect"]);
+  assert.equal(DIFFICULTY_RULES.Expert.pieceCount, 3);
+  assert.equal(DIFFICULTY_RULES.Wizard.pieceCount, 3);
+  assert.equal(
+    DIFFICULTY_RULES.Expert.minDirectionalHalves,
+    DIFFICULTY_RULES.Wizard.minDirectionalHalves,
+    "Wizard keeps Expert visual density",
+  );
+  assert.equal(DIFFICULTY_RULES.Expert.minDistinctHalves, 6);
+  assert.equal(DIFFICULTY_RULES.Wizard.maxDistinctHalves, 5);
+
+  for (const difficulty of DIFFICULTIES) {
     const authored = ROUNDS.filter(({ difficulty: value }) => value === difficulty);
     assert.deepEqual(
-      authored.map(({ targetShapeId }) => targetShapeId),
-      threePieceShapeSequence,
-      `${difficulty} uses the same interleaved 4/4/4 target-shape sequence`,
+      new Set(authored.map(({ layoutId }) => layoutId)),
+      new Set([null]),
+      `${difficulty} Campaign hides every seam`,
     );
-    assert.deepEqual(new Set(authored.map(({ layoutId }) => layoutId)), new Set([null]));
+  }
+
+  const starterRounds = ROUNDS.filter(
+    ({ difficulty }) => difficulty === "Starter",
+  );
+  const aggregateLayouts = new Map([
+    ["2x2-rows", 0],
+    ["2x2-columns", 0],
+  ]);
+  const dominantLayouts = [];
+  for (const [index, round] of starterRounds.entries()) {
+    const counts = new Map([
+      ["2x2-rows", 0],
+      ["2x2-columns", 0],
+    ]);
+    for (const option of round.options.filter(({ buildable }) => buildable)) {
+      const layouts = new Set(
+        findBuildWitnesses(
+          round.pieces,
+          option.design,
+          round.rows,
+          round.columns,
+          null,
+        ).map(({ layoutId }) => layoutId),
+      );
+      assert.equal(layouts.size, 1, `Starter ${index + 1} exclusive layout`);
+      const layoutId = [...layouts][0];
+      counts.set(layoutId, counts.get(layoutId) + 1);
+      aggregateLayouts.set(layoutId, aggregateLayouts.get(layoutId) + 1);
+    }
+    assert.deepEqual(
+      new Set([...counts].filter(([, count]) => count > 0).map(([id]) => id)),
+      new Set(["2x2-rows", "2x2-columns"]),
+      `Starter ${index + 1} compares horizontal and vertical tilings`,
+    );
+    dominantLayouts.push(
+      [...counts].find(([, count]) => count === 2)[0],
+    );
   }
   assert.deepEqual(
-    new Set(
-      ROUNDS.filter(({ difficulty }) => difficulty === "Starter").map(
-        ({ layoutId }) => layoutId,
-      ),
+    aggregateLayouts,
+    new Map([
+      ["2x2-rows", 18],
+      ["2x2-columns", 18],
+    ]),
+    "Starter balances horizontal and vertical witnesses",
+  );
+  assert.equal(
+    dominantLayouts.filter((id) => id === "2x2-rows").length,
+    6,
+  );
+  assert.equal(
+    dominantLayouts.filter((id) => id === "2x2-columns").length,
+    6,
+  );
+
+  assert.ok(
+    ROUNDS.filter(({ difficulty }) => difficulty === "Wizard").every((round) =>
+      phaseTwinInfo(round.pieces),
     ),
-    new Set(["2x2-rows", "2x2-columns"]),
+    "every Wizard round removes unique orbit identity with phase twins",
   );
 });
 
@@ -840,12 +923,12 @@ test("1,600 independently seeded generated rounds satisfy every round invariant"
 
   assert.deepEqual(
     allMismatchKinds,
-    new Set(["seam-trap", "broken-pair", "twisted-half"]),
+    new Set(["broken-pair", "twisted-pair", "twisted-half"]),
     "the corpus exercises every taught misconception family",
   );
 });
 
-test("generated corpora cover answer positions, target shapes, and visible tilings", () => {
+test("generated corpora cover answer positions, target shapes, and hidden tiling hypotheses", () => {
   for (const difficulty of DIFFICULTIES) {
     const rounds = GENERATED[difficulty];
     assert.deepEqual(
@@ -859,41 +942,60 @@ test("generated corpora cover answer positions, target shapes, and visible tilin
       expectedShapes,
       `${difficulty} generated target-shape coverage`,
     );
-    if (difficulty === "Starter") {
-      assert.deepEqual(
-        new Set(rounds.map(({ layoutId }) => layoutId)),
-        new Set(legalLayoutIdsForShape("2x2-rect")),
-        "Starter generated visible-layout coverage",
-      );
-    } else {
-      assert.deepEqual(new Set(rounds.map(({ layoutId }) => layoutId)), new Set([null]));
-    }
+    assert.deepEqual(
+      new Set(rounds.map(({ layoutId }) => layoutId)),
+      new Set([null]),
+      `${difficulty} generated rounds hide seams`,
+    );
   }
 });
 
-test("Junior hides seams and uses globally impossible two-face swaps", () => {
+test("Junior uses diagonal two-face rotation traps without one-cell shortcuts", () => {
   const juniorRounds = [
     ...ROUNDS.filter(({ difficulty }) => difficulty === "Junior"),
+    ...JOURNEY_EXTRA_CAMPAIGN_ROUNDS["junior-2"],
     ...GENERATED.Junior,
   ];
 
   for (const [roundIndex, round] of juniorRounds.entries()) {
     assert.equal(round.layoutId, null, `Junior ${roundIndex + 1} hidden layout`);
     assert.equal(round.seamsVisible, false, `Junior ${roundIndex + 1} hidden seams`);
+    const halves = round.pieces.flatMap(({ first, second }) => [first, second]);
     assert.ok(
-      round.pieces
-        .flatMap(({ first, second }) => [first, second])
-        .every((mask) => !isDirectionalPipMask(mask)),
-      `Junior ${roundIndex + 1} faces stay rotation-invariant`,
+      halves.every(
+        (mask) => isDirectionalPipMask(mask) && [2, 3].includes(pipCount(mask)),
+      ),
+      `Junior ${roundIndex + 1} uses directional two- and three-pip faces`,
+    );
+    assert.ok(
+      halves.some((mask) => belongsToRotationFamily(mask, "diag-two")) &&
+        halves.some((mask) => belongsToRotationFamily(mask, "diag-three")),
+      `Junior ${roundIndex + 1} includes both diagonal families`,
     );
     const impossible = round.options[round.correctIndex];
-    assert.equal(impossible.kind, "broken-pair");
+    assert.equal(impossible.kind, "twisted-pair");
     assert.equal(impossible.mismatch.differingCells.length, 2);
     assert.deepEqual(
-      [...impossible.design.cells].sort(),
-      [...impossible.mismatch.closestBuildable.cells].sort(),
-      `Junior ${roundIndex + 1} trap preserves the face multiset`,
+      impossible.mismatch.differingCells
+        .map((cell) => {
+          const mask = impossible.mismatch.closestBuildable.cells[cell];
+          if (belongsToRotationFamily(mask, "diag-two")) return "diag-two";
+          if (belongsToRotationFamily(mask, "diag-three")) return "diag-three";
+          return "support";
+        })
+        .sort(),
+      ["diag-three", "diag-two"],
+      `Junior ${roundIndex + 1} trap turns the diagonal two- and three-pip faces`,
     );
+    for (const cell of impossible.mismatch.differingCells) {
+      const buildable = impossible.mismatch.closestBuildable.cells[cell];
+      const shown = impossible.design.cells[cell];
+      assert.equal(pipCount(buildable), pipCount(shown));
+      assert.ok(
+        [1, 3].some((turns) => rotatePipMask(buildable, turns) === shown),
+        `Junior ${roundIndex + 1} cell ${cell} is a quarter-turn`,
+      );
+    }
     assert.deepEqual(
       findBuildWitnesses(
         round.pieces,
@@ -903,12 +1005,12 @@ test("Junior hides seams and uses globally impossible two-face swaps", () => {
         null,
       ),
       [],
-      `Junior ${roundIndex + 1} trap fails every hidden tiling`,
+      `Junior ${roundIndex + 1} coupled trap fails every hidden tiling`,
     );
   }
 });
 
-test("Wizard hides the tiling while retaining one exact local answer", () => {
+test("Wizard phase twins require relative orientation without adding density", () => {
   const wizardRounds = [
     ...ROUNDS.filter(({ difficulty }) => difficulty === "Wizard"),
     ...GENERATED.Wizard,
@@ -920,10 +1022,20 @@ test("Wizard hides the tiling while retaining one exact local answer", () => {
     assert.equal(impossible.witness, null);
     assert.equal(impossible.kind, "twisted-half");
     assert.equal(impossible.mismatch.differingCells.length, 1);
+    const twinInfo = phaseTwinInfo(round.pieces);
+    assert.ok(twinInfo, `Wizard ${roundIndex + 1} phase-twin structure`);
     assert.equal(
       new Set(round.pieces.flatMap(({ first, second }) => [first, second])).size,
-      4,
-      `Wizard ${roundIndex + 1} repeats two face identities`,
+      5,
+      `Wizard ${roundIndex + 1} repeats one fixed twin phase`,
+    );
+    const differingCell = impossible.mismatch.differingCells[0];
+    assert.equal(
+      pipRotationOrbitKey(
+        impossible.mismatch.closestBuildable.cells[differingCell],
+      ),
+      twinInfo.variableOrbitKey,
+      `Wizard ${roundIndex + 1} twists the twin's relative phase`,
     );
     assert.deepEqual(
       findBuildWitnesses(
@@ -1027,14 +1139,12 @@ test("Expert and Wizard use one-cell orientation near-misses", () => {
       "top-pair",
       "corner-l",
       "edge-single",
-      "corner-single",
       "top-bar",
-      "six",
     ]),
-    "Expert Campaign covers every directional family",
+    "Expert Campaign covers diagonal and asymmetric directional families",
   );
-  assert.equal(expertFamilies.filter((name) => name === "diag-two").length, 2);
-  assert.equal(expertFamilies.filter((name) => name === "diag-three").length, 2);
+  assert.equal(expertFamilies.filter((name) => name === "diag-two").length, 3);
+  assert.equal(expertFamilies.filter((name) => name === "diag-three").length, 3);
   assert.deepEqual(
     new Set(
       ROUNDS.filter(({ difficulty }) => difficulty === "Expert")
@@ -1044,54 +1154,40 @@ test("Expert and Wizard use one-cell orientation near-misses", () => {
         })
         .map(({ targetShapeId }) => targetShapeId),
     ),
-    new Set(["2x3-rect", "2x4-ledge", "3x3-stair"]),
-    "Expert diagonal traps are distributed across every target family",
+    new Set(["2x3-rect"]),
+    "Expert diagonal traps stay on the harder three-tiling rectangle",
   );
 
   const wizardFamilies = ROUNDS.filter(
     ({ difficulty }) => difficulty === "Wizard",
   ).map(trapFamily);
-  assert.equal(wizardFamilies.filter((name) => name === "diag-two").length, 2);
-  assert.equal(wizardFamilies.filter((name) => name === "diag-three").length, 2);
   assert.deepEqual(
     new Set(wizardFamilies),
     new Set([
-      "diag-two",
-      "diag-three",
       "top-pair",
       "corner-l",
       "edge-single",
       "corner-single",
       "top-bar",
-      "six",
     ]),
-    "Wizard Campaign keeps diagonal depth without making the answer family guessable",
+    "Wizard Campaign covers every phase-twin family",
   );
   assert.deepEqual(
     new Set(GENERATED.Wizard.map(trapFamily)),
     new Set([
-      "diag-two",
-      "diag-three",
       "top-pair",
       "corner-l",
       "edge-single",
       "corner-single",
       "top-bar",
-      "six",
     ]),
-    "generated Wizard rounds retain broad directional variety",
+    "generated Wizard rounds cover every phase-twin family",
   );
-  assert.deepEqual(
-    new Set(
-      ROUNDS.filter(({ difficulty }) => difficulty === "Wizard")
-        .filter((round) => {
-          const family = trapFamily(round);
-          return family === "diag-two" || family === "diag-three";
-        })
-        .map(({ targetShapeId }) => targetShapeId),
+  assert.ok(
+    ROUNDS.filter(({ difficulty }) => difficulty === "Wizard").every(
+      ({ targetShapeId }) => targetShapeId === "2x3-rect",
     ),
-    new Set(["2x3-rect", "2x4-ledge", "3x3-stair"]),
-    "Wizard diagonal traps are distributed across every target family",
+    "Wizard keeps Expert geometry",
   );
 
   for (const difficulty of ["Expert", "Wizard"]) {
@@ -1135,8 +1231,8 @@ test("misconception metadata names the exact nearest buildable state", () => {
     ]),
   );
 
-  assert.deepEqual(kindsByDifficulty.Starter, new Set(["seam-trap"]));
-  assert.deepEqual(kindsByDifficulty.Junior, new Set(["broken-pair"]));
+  assert.deepEqual(kindsByDifficulty.Starter, new Set(["broken-pair"]));
+  assert.deepEqual(kindsByDifficulty.Junior, new Set(["twisted-pair"]));
   assert.deepEqual(kindsByDifficulty.Expert, new Set(["twisted-half"]));
   assert.deepEqual(kindsByDifficulty.Wizard, new Set(["twisted-half"]));
 });
@@ -1271,25 +1367,18 @@ test("the validator and witness renderer reject corrupted puzzle state", () => {
     wrongSizedErrors.some((message) => message.includes("target footprint")),
   );
 
-  const irregular = ROUNDS.find(
-    ({ targetShapeId }) => targetShapeId === "2x4-ledge",
-  );
-  assert.ok(irregular);
-  const holeIndex = irregular.options[0].design.cells.findIndex(
-    (mask) => mask === null,
-  );
-  const filledHoleOptions = [...irregular.options];
-  const filledHoleCells = [...filledHoleOptions[0].design.cells];
-  filledHoleCells[holeIndex] = PIP_PATTERNS.center;
-  filledHoleOptions[0] = {
-    ...filledHoleOptions[0],
-    design: { cells: filledHoleCells },
+  const missingCellOptions = [...round.options];
+  const missingCellDesign = [...missingCellOptions[0].design.cells];
+  missingCellDesign[0] = null;
+  missingCellOptions[0] = {
+    ...missingCellOptions[0],
+    design: { cells: missingCellDesign },
   };
   assert.ok(
-    validateRound({ ...irregular, options: filledHoleOptions }).some((message) =>
+    validateRound({ ...round, options: missingCellOptions }).some((message) =>
       message.includes("target footprint"),
     ),
-    "the validator rejects pips outside an irregular footprint",
+    "the validator rejects a hole in a rectangular target",
   );
 
   const junior = ROUNDS.find(({ difficulty }) => difficulty === "Junior");
