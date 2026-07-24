@@ -320,15 +320,12 @@ Math Kangaroo spatial review:
   question-scoped illustrations locally;
 - removes prompt text from illustration crops and relabels answer options 1–5;
 - verifies every answer against the official answer key;
-- provides a question-specific wrong-answer hint, at least two reviewed
-  solution steps, and a causal explanation animation grounded in the actual
-  local illustration;
-- uses named, normalized illustration regions or paths so the animation can
-  trace, exactly transform, compare, or count the specific evidence; a generic
-  highlight followed by an answer reveal is not sufficient;
-- ends every animation by revealing the official-key answer, using a real
-  image answer region for visual choices or the semantic answer card for an
-  OCR-only text, pair, number, or sequence choice;
+- retains its authored hints, solution steps, and grounded animation data for
+  editorial revision, but MUST NOT render that generated explanation content
+  in the player-facing UI until it has been approved through play-testing;
+- uses compact generic correct and incorrect feedback while explanations are
+  hidden, without changing retry, redemption, scoring, persistence, or
+  culmination behavior;
 - retains the same full-stop and redemption behavior as ordinary stops.
 
 Turbo Time:

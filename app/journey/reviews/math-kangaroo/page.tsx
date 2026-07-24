@@ -6,7 +6,7 @@ import { assertJourneyReviewReleaseReady } from "./progression-adapter";
 export const metadata: Metadata = {
   title: "Math Kangaroo Spatial Review",
   description:
-    "Journey-only visual-spatial Math Kangaroo practice with animated explanations.",
+    "Journey-only visual-spatial Math Kangaroo practice with answer-key-verified choices.",
 };
 
 export default function MathKangarooReviewPage() {

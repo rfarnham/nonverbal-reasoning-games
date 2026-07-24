@@ -567,6 +567,16 @@ test("semantic choice text is all-or-none and remains separate from its 1–5 in
     /feedbackCorrect[^]*?role="status"/,
     "correct visual feedback must be announced as a live status",
   );
+  assert.doesNotMatch(
+    client,
+    /MkExplanationAnimation|round\.explanation|styles\.explanationSteps/,
+    "generated Math Kangaroo explanations must stay out of the player-facing UI",
+  );
+  assert.match(client, /showWrong[^]*?onClick=\{retry\}[^]*?Try again/);
+  assert.match(
+    client,
+    /showCorrect[^]*?styles\.answerCorrect[^]*?onClick=\{advance\}[^]*?Continue/,
+  );
 });
 
 test("release readiness requires every reviewed explanation and exact asset digest", () => {
