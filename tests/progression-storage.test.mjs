@@ -645,3 +645,53 @@ test("schema-v2 profiles retain old clears and XP before an idle seven-board upg
     ),
   );
 });
+
+test("test mode discards an unfinished legacy run so every current stop is available", () => {
+  const legacyJourney = buildLegacyJourneyPlan(games);
+  const legacyNode = legacyJourney.boards[0].nodes[0];
+  const attempt = createNormalProgressionAttempt({
+    id: "legacy-test-run",
+    node: legacyNode,
+    campaignQuestions: questions(legacyNode.gameSlug, legacyNode.level),
+    nowMs: 2,
+  });
+  const baseProfile = createPlayerProfile({
+    id: "legacy-test-profile",
+    name: "testUser123",
+    avatarId: "hedgehog",
+    gameSnapshot: journeyGames,
+    nowMs: 1,
+  });
+  const legacyTestProfile = {
+    ...baseProfile,
+    journeyPlanVersion: 1,
+    gameSnapshot: games,
+    attempts: { [attempt.id]: attempt },
+    activeAttemptId: attempt.id,
+  };
+
+  const upgraded = upgradePlayerProfileJourneyPlan(
+    legacyTestProfile,
+    journeyGames,
+    3,
+  );
+  const upgradedJourney = buildJourneyPlan(upgraded.gameSnapshot);
+
+  assert.equal(upgraded.journeyPlanVersion, 2);
+  assert.equal(upgraded.activeAttemptId, null);
+  assert.deepEqual(upgraded.attempts, {});
+  assert.equal(upgradedJourney.boards[1].nodes.length, 15);
+  assert.equal(
+    upgradedJourney.boards[1].nodes.filter(({ kind }) => kind === "review")
+      .length,
+    2,
+  );
+
+  const protectedPlayer = upgradePlayerProfileJourneyPlan(
+    { ...legacyTestProfile, name: "Ada" },
+    journeyGames,
+    3,
+  );
+  assert.equal(protectedPlayer.journeyPlanVersion, 1);
+  assert.equal(protectedPlayer.activeAttemptId, attempt.id);
+});
