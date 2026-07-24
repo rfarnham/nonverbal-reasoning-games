@@ -15,6 +15,10 @@ function validateReview(
   if (
     !review.title.trim() ||
     !review.description.trim() ||
+    !review.stopLabel.trim() ||
+    !review.iconSrc.startsWith("/") ||
+    review.iconSrc.startsWith("//") ||
+    review.iconSrc.includes("..") ||
     !review.journeyContentVersion.trim() ||
     review.gradeBands.length === 0
   ) {

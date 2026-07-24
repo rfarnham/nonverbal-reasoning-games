@@ -44,9 +44,19 @@ test("the generated review catalog exposes local, versioned providers", () => {
     title: "Math Kangaroo Spatial Review",
     description:
       "Carefully selected visual-spatial Math Kangaroo problems with answer-key-verified choices.",
+    iconSrc: "/journey/math-kangaroo/stop-icon.png",
+    stopLabel: "Challenge!",
     journeyContentVersion: "mk-spatial-cyprus-2026.1",
     gradeBands: ["grades-1-2", "grades-3-4"],
   });
+  const icon = readFileSync(`public${journeyReviews[0].iconSrc}`);
+  assert.deepEqual(
+    [...icon.subarray(0, 8)],
+    [137, 80, 78, 71, 13, 10, 26, 10],
+    "the review icon must be a bundled PNG",
+  );
+  assert.equal(icon.readUInt32BE(16), 300);
+  assert.equal(icon.readUInt32BE(20), 250);
 });
 
 test("review discovery fails closed without adding release data to provider metadata", () => {

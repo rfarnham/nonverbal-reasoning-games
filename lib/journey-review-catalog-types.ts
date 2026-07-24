@@ -3,6 +3,8 @@ import type { JourneyReviewGradeBand } from "./progression/types";
 export type JourneyReviewInfo = Readonly<{
   title: string;
   description: string;
+  iconSrc: `/${string}`;
+  stopLabel: string;
   journeyContentVersion: string;
   gradeBands: readonly JourneyReviewGradeBand[];
 }>;
