@@ -22,7 +22,7 @@ function clipFromSource(cue: SourceCue): GameNarrationClip {
     // narration must never make the proof rush ahead.
     minimumVisualMs: Math.max(cue.audioDurationMs, cue.minVisualMs),
     lingerMs: cue.lingerMs,
-    transcript: cue.caption,
+    transcript: cue.speechText,
   };
 }
 

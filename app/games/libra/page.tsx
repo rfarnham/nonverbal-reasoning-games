@@ -229,7 +229,7 @@ function progressionTargetHref(
 function teachingProofFeedback(round: Round): string {
   return (
     buildTeachingProof(round).steps[0]?.text ??
-    "The same change on both trays keeps the scale balanced."
+    "The pictured loads stay balanced after this move."
   );
 }
 
@@ -403,7 +403,6 @@ export default function LibraPage() {
   >("settled");
   const [proofReplayKey, setProofReplayKey] = useState(0);
   const [proofReplaying, setProofReplaying] = useState(false);
-  const [proofPresented, setProofPresented] = useState(false);
   const [catalogueExpanded, setCatalogueExpanded] = useState(false);
   const [campaignReviewSelection, setCampaignReviewSelection] =
     useState<CampaignReviewSelection | null>(null);
@@ -441,7 +440,6 @@ export default function LibraPage() {
   const infiniteFingerprintsRef = useRef(new Set<string>());
   const infiniteAdaptiveRef = useRef(initialInfiniteAdaptiveState());
   const hydratedProgressionPlayIdRef = useRef<string | null>(null);
-  const reinforcementRoundIdsRef = useRef(new Set<string>());
 
   const controlledSession =
     progression.mode === "controlled" ? progression : null;
@@ -567,7 +565,6 @@ export default function LibraPage() {
     setSelectedIndex(null);
     setRetryReady(false);
     setProofReplaying(false);
-    setProofPresented(false);
     setPhase("idle");
   }, [clearAttemptTimers]);
 
@@ -600,12 +597,6 @@ export default function LibraPage() {
     }
 
     if (!activeLesson) return;
-    if (
-      activeLesson.focusTarget === "answers" &&
-      activeSessionRound
-    ) {
-      reinforcementRoundIdsRef.current.add(activeSessionRound.id);
-    }
     if (controlledSession?.current) {
       persistControlledLessonAcknowledgements(
         controlledSession.attemptId,
@@ -623,7 +614,6 @@ export default function LibraPage() {
     setPendingLessons((current) => current.slice(1));
   }, [
     activeLesson,
-    activeSessionRound,
     controlledSession,
     pendingLessons.length,
     proofNarrationPlayer,
@@ -661,12 +651,6 @@ export default function LibraPage() {
   const skipRemainingLessons = useCallback(() => {
     if (replayStrategyId || pendingLessons.length === 0) return;
     proofNarrationPlayer.cancel();
-    if (
-      pendingLessons.some(({ focusTarget }) => focusTarget === "answers") &&
-      activeSessionRound
-    ) {
-      reinforcementRoundIdsRef.current.add(activeSessionRound.id);
-    }
     if (controlledSession?.current) {
       persistControlledLessonAcknowledgements(
         controlledSession.attemptId,
@@ -683,7 +667,6 @@ export default function LibraPage() {
     );
     setPendingLessons([]);
   }, [
-    activeSessionRound,
     controlledSession,
     pendingLessons,
     proofNarrationPlayer,
@@ -729,7 +712,6 @@ export default function LibraPage() {
   const replayProof = useCallback((origin: "live" | "historical") => {
     proofNarrationPlayer.prime();
     proofReplayOriginRef.current = origin;
-    setProofPresented(true);
     setProofReplayKey((current) => current + 1);
     setProofReplaying(true);
   }, [proofNarrationPlayer]);
@@ -813,29 +795,12 @@ export default function LibraPage() {
         mistakes.some(
           ({ sessionRound }) => sessionRound.id === activeSessionRound.id,
         );
-      const shouldExplainCorrectAnswer =
-        isCorrect &&
-        (wasMissed ||
-          reinforcementRoundIdsRef.current.has(activeSessionRound.id) ||
-          orderedStrategyIdsForRound(round).some(
-            (strategyId) => !discoveredStrategyIds.includes(strategyId),
-          ));
-      if (shouldExplainCorrectAnswer) {
-        proofNarrationPlayer.prime();
-        controlledLessonPrimedRef.current = true;
-        setLessonPlaybackState("playing");
-      }
       controlledSession?.answer({
         correct: isCorrect,
         answerToken: `option-${optionIndex}`,
       });
       setSelectedIndex(optionIndex);
-      setProofPresented(isCorrect && shouldExplainCorrectAnswer);
-      setPhase(
-        isCorrect && !shouldExplainCorrectAnswer
-          ? "answered"
-          : "animating",
-      );
+      setPhase(isCorrect ? "answered" : "animating");
       const reducedMotion = window.matchMedia(
         "(prefers-reduced-motion: reduce)",
       ).matches;
@@ -896,10 +861,7 @@ export default function LibraPage() {
       animationTokenRef.current = token;
       clearAttemptTimers();
       if (isCorrect) {
-        reinforcementRoundIdsRef.current.delete(activeSessionRound.id);
-        if (!shouldExplainCorrectAnswer) {
-          queueStrategyLessons(orderedStrategyIdsForRound(round), "next");
-        }
+        queueStrategyLessons(orderedStrategyIdsForRound(round), "next");
         return;
       }
 
@@ -935,7 +897,6 @@ export default function LibraPage() {
       clearAttemptTimers,
       complete,
       controlledSession,
-      discoveredStrategyIds,
       generationError,
       isCampaign,
       isInfinite,
@@ -943,30 +904,11 @@ export default function LibraPage() {
       mistakes,
       phase,
       playFeedbackSound,
-      proofNarrationPlayer,
       queueStrategyLessons,
       round,
       hasStarted,
     ],
   );
-
-  const finishCorrectProof = useCallback(() => {
-    if (phase !== "animating" || !selectedCorrect || !round) return;
-    animationTokenRef.current += 1;
-    clearAttemptTimers();
-    if (activeSessionRound) {
-      reinforcementRoundIdsRef.current.delete(activeSessionRound.id);
-    }
-    setPhase("answered");
-    queueStrategyLessons(orderedStrategyIdsForRound(round), "next");
-  }, [
-    activeSessionRound,
-    clearAttemptTimers,
-    phase,
-    queueStrategyLessons,
-    round,
-    selectedCorrect,
-  ]);
 
   const finishProofReplay = useCallback(() => {
     setProofReplaying(false);
@@ -980,11 +922,6 @@ export default function LibraPage() {
     });
   }, []);
 
-  const skipCorrectProof = useCallback(() => {
-    proofNarrationPlayer.cancel();
-    finishCorrectProof();
-  }, [finishCorrectProof, proofNarrationPlayer]);
-
   const skipProofReplay = useCallback(() => {
     proofNarrationPlayer.cancel();
     finishProofReplay();
@@ -994,7 +931,6 @@ export default function LibraPage() {
     resumeAudio();
     proofNarrationPlayer.prime();
     infiniteFingerprintsRef.current.clear();
-    reinforcementRoundIdsRef.current.clear();
     const initialAdaptive = initialInfiniteAdaptiveState();
     const initialRound = buildCampaignSessionRound("starter", 0)?.round;
     infiniteAdaptiveRef.current = initialAdaptive;
@@ -1036,7 +972,6 @@ export default function LibraPage() {
     resumeAudio();
     proofNarrationPlayer.prime();
     infiniteFingerprintsRef.current.clear();
-    reinforcementRoundIdsRef.current.clear();
     const initialAdaptive = initialInfiniteAdaptiveState();
     infiniteAdaptiveRef.current = initialAdaptive;
     const generated = tryBuildInfiniteSessionRound(
@@ -1153,7 +1088,8 @@ export default function LibraPage() {
     if (
       phase !== "answered" ||
       activeLessonStrategyId !== null ||
-      campaignReviewSelection !== null
+      campaignReviewSelection !== null ||
+      proofReplaying
     ) {
       return;
     }
@@ -1259,6 +1195,7 @@ export default function LibraPage() {
     isLastRedemptionRound,
     phase,
     proofNarrationPlayer,
+    proofReplaying,
     redemptionMistakeIds,
     reviewLevelId,
     queueStrategyLessons,
@@ -1306,7 +1243,8 @@ export default function LibraPage() {
       completedCount === 0 ||
       phase === "animating" ||
       phase === "wrong-review" ||
-      activeLessonStrategyId !== null
+      activeLessonStrategyId !== null ||
+      proofReplaying
     ) {
       return;
     }
@@ -1318,6 +1256,7 @@ export default function LibraPage() {
     completedCount,
     isInfinite,
     phase,
+    proofReplaying,
     resetAttemptState,
   ]);
 
@@ -1418,10 +1357,6 @@ export default function LibraPage() {
     for (const strategyId of acknowledgedCurrentStrategies) {
       reconstructedStrategies.add(strategyId);
     }
-    const shouldReinforceAcknowledgedIntroduction =
-      acknowledgedCurrentStrategies.some((strategyId) =>
-        preRoundStrategyIds(currentRound).includes(strategyId),
-      );
     if (
       !controlledSession.isRedemption &&
       currentAttemptRound &&
@@ -1442,9 +1377,6 @@ export default function LibraPage() {
         controlledLessonPrimedRef.current ? "playing" : "ready",
       );
       controlledLessonPrimedRef.current = false;
-      if (shouldReinforceAcknowledgedIntroduction) {
-        reinforcementRoundIdsRef.current.add(currentPlayId);
-      }
       setDiscoveredStrategyIds(reconstructed);
       if (controlledSession.roundPhase === "solved") {
         setPendingLessons(
@@ -1520,6 +1452,7 @@ export default function LibraPage() {
       !controlledSession.current ||
       activeLessonStrategyId !== null ||
       campaignReviewSelection !== null ||
+      proofReplaying ||
       generationError
     ) {
       controlledSession.setTurboClockPaused(true);
@@ -1550,6 +1483,7 @@ export default function LibraPage() {
     controlledSession,
     generationError,
     phase,
+    proofReplaying,
   ]);
 
   useEffect(() => {
@@ -2122,7 +2056,8 @@ export default function LibraPage() {
                     completedCount === 0 ||
                     phase === "animating" ||
                     phase === "wrong-review" ||
-                    activeLessonStrategyId !== null
+                    activeLessonStrategyId !== null ||
+                    proofReplaying
                   }
                 >
                   End
@@ -2325,9 +2260,7 @@ export default function LibraPage() {
                         ]
                       }
                       outcome="correct"
-                      proofState={
-                        proofReplaying ? "animating" : "settled"
-                      }
+                      proofState={proofReplaying ? "animating" : "hidden"}
                       narrationEnabled={soundEnabled}
                       narrationPlayer={proofNarrationPlayer}
                       onProofPlaybackComplete={
@@ -2351,7 +2284,7 @@ export default function LibraPage() {
                       ref={historicalProofReplayButtonRef}
                     >
                       <span aria-hidden="true">↻</span>
-                      Watch explanation
+                      Explain problem
                     </button>
                   </div>
                   {historicalMistake ? (
@@ -2380,7 +2313,9 @@ export default function LibraPage() {
             ) : round ? (
               <>
                 <div
-                  className={styles.gameBoard}
+                  className={`${styles.gameBoard} ${
+                    proofReplaying ? styles.explanationBoard : ""
+                  }`}
                   id="libra-play-area"
                   aria-busy={
                     phase === "animating" ||
@@ -2431,23 +2366,17 @@ export default function LibraPage() {
                       candidate={candidateOnGoal}
                       outcome={answerOutcome}
                       proofState={
-                        selectedCorrect &&
-                        (phase === "animating" ||
-                          (phase === "answered" && proofPresented))
-                          ? phase === "animating" || proofReplaying
-                            ? "animating"
-                            : "settled"
+                        selectedCorrect && proofReplaying
+                          ? "animating"
                           : "hidden"
                       }
                       narrationEnabled={soundEnabled}
                       narrationPlayer={proofNarrationPlayer}
                       onProofPlaybackComplete={
-                        proofReplaying
-                          ? finishProofReplay
-                          : finishCorrectProof
+                        proofReplaying ? finishProofReplay : undefined
                       }
                       onProofSkip={
-                        proofReplaying ? skipProofReplay : skipCorrectProof
+                        proofReplaying ? skipProofReplay : undefined
                       }
                       revealDifferences={phase === "wrong-review"}
                       key={`live-proof-${proofReplayKey}`}
@@ -2574,13 +2503,14 @@ export default function LibraPage() {
                         ref={liveProofReplayButtonRef}
                       >
                         <span aria-hidden="true">↻</span>
-                        Explain
+                        Explain problem
                       </button>
                       <button
                         className={styles.nextButton}
                         type="button"
                         onClick={goNext}
                         ref={nextButtonRef}
+                        disabled={proofReplaying}
                       >
                         {isLastRedemptionRound
                           ? reviewLevelId
@@ -2590,7 +2520,7 @@ export default function LibraPage() {
                               campaignProblemIndex ===
                                 CAMPAIGN_PROBLEMS_PER_LEVEL - 1
                             ? "Finish level"
-                            : "Next"}
+                            : "Next problem"}
                         <span aria-hidden="true">→</span>
                       </button>
                     </>

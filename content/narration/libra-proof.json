@@ -14,7 +14,7 @@
       "file": "inspect-one.mp3",
       "audioDurationMs": 7650,
       "minVisualMs": 5200,
-      "lingerMs": 900,
+      "lingerMs": 1500,
       "sha256": "adaefbec8a9788c32796aaf846f66054e94abf5730ef825f1c2129aa4773e4d6"
     },
     "inspect-many": {
@@ -23,152 +23,152 @@
       "file": "inspect-many.mp3",
       "audioDurationMs": 7175,
       "minVisualMs": 5200,
-      "lingerMs": 900,
+      "lingerMs": 1500,
       "sha256": "2f7dc2506c461a2e7b5d48327cdcd43dc88a099880e06e0fbc7bd302c6750469"
     },
     "substitute": {
-      "caption": "Equal loads can trade places.",
-      "speechText": "The circled groups weigh exactly the same. Watch one equal group take the other group's place. The scale stays balanced.",
+      "caption": "Replace one equal load with the other.",
+      "speechText": "The highlighted loads weigh the same. We can replace one with the other, and the scale will stay balanced.",
       "file": "substitute.mp3",
-      "audioDurationMs": 8250,
-      "minVisualMs": 7000,
-      "lingerMs": 1000,
-      "sha256": "444bcaa25178848f3988b6caa133d5a9f0b9c856595da67ee4060f5876d9773a"
+      "audioDurationMs": 6675,
+      "minVisualMs": 6675,
+      "lingerMs": 1500,
+      "sha256": "6f13f10ac9b60bcfc04b3ed5b7e68aa2ce902c78f2c97ff7d78f9308ab235a2b"
     },
     "add-scales": {
-      "caption": "Add left to left, and right to right.",
-      "speechText": "Now we add the two balanced scales. The second left load joins the first left tray. At the same time, the second right load joins the first right tray. Because both sides change together, the larger scale stays balanced.",
+      "caption": "Move the second balance onto the first.",
+      "speechText": "Move the second balance onto the first: left tray to left tray and right tray to right tray. The combined scale will stay balanced.",
       "file": "add-scales.mp3",
-      "audioDurationMs": 15900,
-      "minVisualMs": 9000,
-      "lingerMs": 1000,
-      "sha256": "92d79d3e88ec23dce30aeb92a39d17334830b6abe7ff18ca4ab578791e101a8e"
+      "audioDurationMs": 9025,
+      "minVisualMs": 9025,
+      "lingerMs": 1500,
+      "sha256": "fbad7bfb73900e38cff2411b13d1b6bff9d19a5b39c9e54de9e04c31c19c4bb0"
     },
     "subtract-scales": {
-      "caption": "Take left from left, and right from right.",
-      "speechText": "Use the second balanced scale as a take-away guide. Match its left load on the first left tray, and its right load on the first right tray. Lift both matched loads together. What remains is still balanced.",
+      "caption": "Remove the second balance tray by tray.",
+      "speechText": "Remove the loads shown on the second balance from the matching trays of the first balance. The remaining loads will still balance.",
       "file": "subtract-scales.mp3",
-      "audioDurationMs": 14425,
-      "minVisualMs": 9000,
-      "lingerMs": 1000,
-      "sha256": "c32e6b9900c89e7581d89c3f6b32212b204edf556bf8c360b3abc7185989a5f6"
+      "audioDurationMs": 8300,
+      "minVisualMs": 8300,
+      "lingerMs": 1500,
+      "sha256": "b1d50403bec3aedd3608ba9574bdbdad395d5844b63d16212be45da4b948e81e"
     },
     "cancel-matches": {
-      "caption": "Lift the same load from both trays.",
-      "speechText": "The circled group is the same on both trays. Lift one matching group from each side at the same time. The scale stays balanced.",
+      "caption": "Remove the highlighted load from each tray.",
+      "speechText": "The highlighted animals appear on both trays. Remove them from each tray. The remaining loads will still balance.",
       "file": "cancel-matches.mp3",
-      "audioDurationMs": 8950,
-      "minVisualMs": 7200,
-      "lingerMs": 1000,
-      "sha256": "3782953f9f727fff892f3d0da9f58f2240460178383f123fce968dc4e9dcedaa"
+      "audioDurationMs": 7700,
+      "minVisualMs": 7700,
+      "lingerMs": 1500,
+      "sha256": "7f3f55ba6a5db01067f19af852cafdb6ce11c22730be03edf3658f69453903d9"
     },
     "regroup-2": {
-      "caption": "Circle 2 matching groups on each tray.",
-      "speechText": "Look at the animals as two equal groups on each tray. The ovals show the matching groups. Let that picture settle.",
+      "caption": "Circle 2 copies of the group we need.",
+      "speechText": "The left tray contains two copies of the group we need. Circle those groups. Then split the right tray into two equal groups.",
       "file": "regroup-2.mp3",
-      "audioDurationMs": 7775,
-      "minVisualMs": 6800,
-      "lingerMs": 1000,
-      "sha256": "e168e9427f38703949a939456f46a8c6ed81c475c9e33f5e349a953b0f284fff"
+      "audioDurationMs": 8675,
+      "minVisualMs": 8675,
+      "lingerMs": 1500,
+      "sha256": "d14441e92fdf24a983a2b85acd6a311bf4efc4dbb5167d175881aa8bd64187ab"
     },
     "regroup-3": {
-      "caption": "Circle 3 matching groups on each tray.",
-      "speechText": "Look at the animals as three equal groups on each tray. The ovals show the matching groups. Let that picture settle.",
+      "caption": "Circle 3 copies of the group we need.",
+      "speechText": "The left tray contains three copies of the group we need. Circle those groups. Then split the right tray into three equal groups.",
       "file": "regroup-3.mp3",
-      "audioDurationMs": 7875,
-      "minVisualMs": 6800,
-      "lingerMs": 1000,
-      "sha256": "773d905796213c0d5c9da2570c62290f7c60da18acc48ab3cad772a622ed4817"
+      "audioDurationMs": 9000,
+      "minVisualMs": 9000,
+      "lingerMs": 1500,
+      "sha256": "963142f25221674792c0a3875a20dfd698489af6ddef2f837cfe0ace3fcc2169"
     },
     "regroup-4": {
-      "caption": "Circle 4 matching groups on each tray.",
-      "speechText": "Look at the animals as four equal groups on each tray. The ovals show the matching groups. Let that picture settle.",
+      "caption": "Circle 4 copies of the group we need.",
+      "speechText": "The left tray contains four copies of the group we need. Circle those groups. Then split the right tray into four equal groups.",
       "file": "regroup-4.mp3",
-      "audioDurationMs": 7875,
-      "minVisualMs": 6800,
-      "lingerMs": 1000,
-      "sha256": "efeee4d4daff86ba2cffeeb7e2e9cb8f6e6d939a10d50a0e98f760b6fb4121af"
+      "audioDurationMs": 8825,
+      "minVisualMs": 8825,
+      "lingerMs": 1500,
+      "sha256": "2a3af7d4836d75ce1ac5322b260c184bb845110938d8ec58cc4addc95fd712a1"
     },
     "split-2": {
-      "caption": "Divide by 2, then keep one group on each tray.",
-      "speechText": "Now divide both trays into two equal groups. Keep one group on the left and one group on the right. One group still balances one group.",
+      "caption": "Keep 1 of the 2 equal groups on each tray.",
+      "speechText": "Each tray now has two equal groups. Keep one group on each tray. Those two groups will still balance.",
       "file": "split-2.mp3",
-      "audioDurationMs": 9325,
-      "minVisualMs": 7800,
-      "lingerMs": 1000,
-      "sha256": "c67584d2faeda6f0ac6613192d3162459bbe3553a212c1542f34ca3152b70c06"
+      "audioDurationMs": 6950,
+      "minVisualMs": 6950,
+      "lingerMs": 1500,
+      "sha256": "f78e2063c14cc3a9e7cd2dda7e2b70726d015769d646c6c6639f8195ff33557c"
     },
     "split-3": {
-      "caption": "Divide by 3, then keep one group on each tray.",
-      "speechText": "Now divide both trays into three equal groups. Keep one group on the left and one group on the right. One group still balances one group.",
+      "caption": "Keep 1 of the 3 equal groups on each tray.",
+      "speechText": "Each tray now has three equal groups. Keep one group on each tray. Those two groups will still balance.",
       "file": "split-3.mp3",
-      "audioDurationMs": 9450,
-      "minVisualMs": 7800,
-      "lingerMs": 1000,
-      "sha256": "0875b4485f2355195a1c5cfcf95918b4ed9393322e11508871c4681b12e4c772"
+      "audioDurationMs": 7075,
+      "minVisualMs": 7075,
+      "lingerMs": 1500,
+      "sha256": "cd31e6d839d53e58b564bbcd2b240534d5f9e17871194db0509503f5bf73a548"
     },
     "split-4": {
-      "caption": "Divide by 4, then keep one group on each tray.",
-      "speechText": "Now divide both trays into four equal groups. Keep one group on the left and one group on the right. One group still balances one group.",
+      "caption": "Keep 1 of the 4 equal groups on each tray.",
+      "speechText": "Each tray now has four equal groups. Keep one group on each tray. Those two groups will still balance.",
       "file": "split-4.mp3",
-      "audioDurationMs": 9425,
-      "minVisualMs": 7800,
-      "lingerMs": 1000,
-      "sha256": "a55b75c9ebdcb99e9127415ee36157be395dc81aed5b2a89317fd896f015d9b1"
+      "audioDurationMs": 7050,
+      "minVisualMs": 7050,
+      "lingerMs": 1500,
+      "sha256": "f0611520ac4d9b49653f2027b2d41a8d3a292d3e354f17b885014dc430041b62"
     },
     "strategy-split-evenly": {
-      "caption": "Two rabbits mean two equal groups.",
-      "speechText": "There are two rabbits on the left, so make two equal groups on both trays. Keep one group. One rabbit balances two chicks.",
+      "caption": "Make 2 equal groups on each tray.",
+      "speechText": "There are two rabbits on the left and four chicks on the right. Make two equal groups on each tray. Each group has one rabbit and two chicks, so one rabbit balances two chicks.",
       "file": "strategy-split-evenly.mp3",
-      "audioDurationMs": 8400,
-      "minVisualMs": 8400,
-      "lingerMs": 900,
-      "sha256": "a330378599aebaec386aa8085c6cdec1f33816377714b1ffa015ee683187e6b2"
+      "audioDurationMs": 11525,
+      "minVisualMs": 11525,
+      "lingerMs": 1500,
+      "sha256": "4544a1f5a394cf033576aa0748b705b820bfecf3d7599376c6dc86d2d3917387"
     },
     "strategy-cancel-matches": {
-      "caption": "One fox on each tray means lift one from each.",
-      "speechText": "Like splitting, we do the same thing to both trays. A fox appears on each tray, so lift one fox from each. The cat now balances three chicks.",
+      "caption": "A fox is on both trays. Remove one from each.",
+      "speechText": "A fox appears on each tray. Remove one fox from the left and one fox from the right. The remaining cat balances three chicks.",
       "file": "strategy-cancel-matches.mp3",
-      "audioDurationMs": 10300,
-      "minVisualMs": 10300,
-      "lingerMs": 900,
-      "sha256": "93b5c90c93d11cf582382c96f5a1d271159d525c3f3cebc1c55dcf9dcbfde7be"
+      "audioDurationMs": 9000,
+      "minVisualMs": 9000,
+      "lingerMs": 1500,
+      "sha256": "5ef00d1aa0f79752346ba910639735cbdcd3588e4780e1c3894df6d45e541e6b"
     },
     "strategy-substitution": {
-      "caption": "Each fox equals two chicks, so replace both foxes.",
-      "speechText": "We know one fox equals two chicks. The other scale has two foxes, so replace each fox with two chicks. The rabbit now balances four chicks.",
+      "caption": "Replace each fox with 2 chicks.",
+      "speechText": "One fox balances two chicks. On the second scale, replace each fox with two chicks. Two foxes become four chicks, so the rabbit balances four chicks.",
       "file": "strategy-substitution.mp3",
-      "audioDurationMs": 10075,
-      "minVisualMs": 10075,
-      "lingerMs": 900,
-      "sha256": "f52eb3e38a8b5ec23536e383e71a2c0dbc5a2c29a5f3a710a9aed30d520a252e"
+      "audioDurationMs": 11075,
+      "minVisualMs": 11075,
+      "lingerMs": 1500,
+      "sha256": "aa16b9bfef124b1262f0c73f04cc2017efb459672f59ef18b59105ef251d5158"
     },
     "strategy-create-combo": {
-      "caption": "Three cats and three bears make three equal combos.",
-      "speechText": "There are three cats and three bears on the left, so make three equal cat and bear groups. Divide both trays by three. One combo balances five beetles.",
+      "caption": "Circle 3 cat-and-bear groups.",
+      "speechText": "The left tray has three cats and three bears. Circle three groups with one cat and one bear in each. Split the fifteen beetles into three equal groups. One cat-and-bear group balances five beetles.",
       "file": "strategy-create-combo.mp3",
-      "audioDurationMs": 10700,
-      "minVisualMs": 10700,
-      "lingerMs": 900,
-      "sha256": "71be39d483ac7cbae4ae0fc9385000d33457e1f318135829b6f8ff2698adc6e3"
+      "audioDurationMs": 14100,
+      "minVisualMs": 14100,
+      "lingerMs": 1500,
+      "sha256": "cbe11221df1a47f30b0998133a857fa6e5178329f370250821491d3ca7d42198"
     },
     "strategy-add-scales": {
-      "caption": "The combo is missing, so join the balanced scales.",
-      "speechText": "Neither scale has the cat and bear combo we need. Join left tray to left tray, and right tray to right tray. The new scale stays balanced and makes three equal combos.",
+      "caption": "Add the scales to put cats and bears together.",
+      "speechText": "We need a cat and a bear together, but neither scale has that group. Move scale two onto scale one, left tray to left tray and right tray to right tray. Because both scales balance, the combined scale balances too.",
       "file": "strategy-add-scales.mp3",
-      "audioDurationMs": 11825,
-      "minVisualMs": 11825,
-      "lingerMs": 900,
-      "sha256": "c4cb4c877152f1918e8fbf6cff5a5e11870615ddf71004124e9140e5995bdc5f"
+      "audioDurationMs": 14750,
+      "minVisualMs": 14750,
+      "lingerMs": 1500,
+      "sha256": "dd004cee1056fc1c560eafc6aa263077940747aa02c954a1df266f090d585019"
     },
     "strategy-subtract-scales": {
-      "caption": "Take the second balance away from the first.",
-      "speechText": "You added scales to make a useful load. Subtracting works backwards. Take the second balance away from the first, left from left and right from right. What remains stays balanced.",
+      "caption": "Remove scale 2's loads from scale 1.",
+      "speechText": "Scale one has three cats and four bears balancing seven beetles. Remove the loads from scale two: one cat and two bears from the left, and three beetles from the right. Two cats and two bears still balance four beetles.",
       "file": "strategy-subtract-scales.mp3",
-      "audioDurationMs": 12650,
-      "minVisualMs": 12650,
-      "lingerMs": 900,
-      "sha256": "43f578994e618c939d470067b0bf840ca7fa23a101c350603bf3915d8e4c6126"
+      "audioDurationMs": 15075,
+      "minVisualMs": 15075,
+      "lingerMs": 1500,
+      "sha256": "fa31413f6d8d5defa9bdfb293d76f203a343db657fc1813f6f9fe04e3af9274a"
     },
     "conclude": {
       "caption": "Balanced — we found the answer.",
@@ -176,7 +176,7 @@
       "file": "conclude.mp3",
       "audioDurationMs": 3625,
       "minVisualMs": 3600,
-      "lingerMs": 1000,
+      "lingerMs": 1500,
       "sha256": "f20e4c5d4403ae01f01deb6d0c2175220e450eef8b758e54b568e6c7043ff8a3"
     }
   }

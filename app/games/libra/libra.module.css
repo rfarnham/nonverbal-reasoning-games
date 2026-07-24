@@ -1546,7 +1546,7 @@
 
 .solutionProof {
   width: min(100%, 720px);
-  min-height: 560px;
+  min-height: 0;
   padding: 12px;
   background: #f2eee5;
 }
@@ -1578,14 +1578,13 @@
 }
 
 .proofSceneViewport {
-  min-height: 534px;
+  min-height: 468px;
 }
 
 .proofPersistentStage {
-  min-height: 534px;
+  min-height: 468px;
   position: relative;
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  display: block;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 17px;
@@ -1597,20 +1596,41 @@
   position: relative;
 }
 
+.proofStepFooter {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  margin-top: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--panel);
+}
+
+.proofStepProgress {
+  margin: 0;
+  padding: 8px 14px 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
 .proofNarrationCaption {
   min-height: 64px;
+  width: 100%;
   margin: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   padding: 12px 18px 14px;
-  border-top: 1px solid rgb(207 202 189 / 75%);
+  border: 0;
   background: rgb(251 248 240 / 82%);
-  color: var(--muted);
-  font-size: 0.78rem;
+  color: var(--ink);
+  font-size: clamp(0.82rem, 1.8vw, 0.98rem);
   font-weight: 760;
-  line-height: 1.35;
+  line-height: 1.45;
   text-align: center;
 }
 
@@ -1624,6 +1644,34 @@
   background: rgb(119 103 215 / 11%);
   color: var(--violet);
   font-size: 0.72rem;
+}
+
+.proofContinueButton {
+  min-width: 112px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 12px 12px;
+  padding: 7px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.proofContinueButton:hover {
+  transform: translateY(-2px);
+}
+
+.proofContinueButton:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 4px;
 }
 
 .proofPhaseLayer {
@@ -4072,6 +4120,36 @@
     transform: translate(-50%, -50%) scale(1);
   }
 
+  .solutionProof[data-proof-step-state="ready"]
+    .proofPhaseLayer[data-proof-cue-state="active"]
+    .proofMorphBefore {
+    opacity: 0;
+  }
+
+  .solutionProof[data-proof-step-state="ready"]
+    .proofPhaseLayer[data-proof-cue-state="active"]
+    .proofMorphAfter {
+    opacity: 1;
+    transform: none;
+  }
+
+  .solutionProof[data-proof-step-state="ready"]
+    .proofPhaseLayer[data-proof-cue-state="active"]
+    :is(
+      .proofDonorScale,
+      .proofGuideScale,
+      .proofScaleLoadGroup[data-proof-load-state="remove"],
+      .proofScaleTraveler
+    ) {
+    opacity: 0;
+  }
+
+  .solutionProof[data-proof-step-state="ready"]
+    .proofPhaseLayer[data-proof-cue-state="active"]
+    .proofScaleLoadGroup[data-proof-load-state="fade"] {
+    opacity: 0.18;
+  }
+
   .teaching .clueScaleWrap {
     background: rgb(243 189 78 / 18%);
   }
@@ -4725,6 +4803,24 @@
 .teaching > .goalDivider,
 .teaching > .goalScale {
   display: none;
+}
+
+.explanationBoard {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.explanationBoard .cluePanel {
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.explanationBoard .answerPanel,
+.explanationBoard .activeTools {
+  display: none;
+}
+
+.explanationBoard .puzzleVisual {
+  width: min(100%, 760px);
 }
 
 @media (max-width: 620px) {

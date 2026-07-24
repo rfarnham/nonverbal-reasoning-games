@@ -563,23 +563,64 @@ test("proof copy explains why each operation helps using the pictured loads", ()
   const direct = ROUNDS.find(({ family }) => family === "direct");
   const directText = buildTeachingProof(direct).steps[0].text;
   assert.match(directText, /there are \d+ (?:rabbits|geese|foxes|frogs|turtles|cats|owls|beetles|bears|chicks) on the left/i);
-  assert.match(directText, /so make \d+ equal groups/i);
+  assert.match(directText, /so split .+ on the right into \d+ equal groups/i);
+  assert.match(directText, /keep one group from each tray/i);
   assert.doesNotMatch(directText, /\d+\s*×/);
 
   const substitution = ROUNDS.find(({ family }) => family === "chain");
   const substitutionText = buildTeachingProof(substitution).steps[0].text;
-  assert.match(substitutionText, /\bbalances?\b.+, so replace/i);
+  assert.match(
+    substitutionText,
+    /the highlighted balance shows that .+ balances? .+\.(?: the .+ tray has .+\.)? replace/i,
+  );
 
   const combo = ROUNDS.find(({ family }) => family === "combo-primer");
   const comboText = buildTeachingProof(combo).steps[0].text;
-  assert.match(comboText, /there are \d+ equal groups/i);
-  assert.match(comboText, /so make \d+ equal groups/i);
+  assert.match(comboText, /the left tray has .+/i);
+  assert.match(comboText, /circle \d+ groups, each with .+/i);
+  assert.match(comboText, /split .+ on the right into \d+ equal groups/i);
 
   for (const round of ROUNDS) {
-    for (const { text } of buildTeachingProof(round).steps) {
+    for (const { kind, text } of buildTeachingProof(round).steps) {
       assert.doesNotMatch(text, /\ba (?:owl)\b/i);
       assert.doesNotMatch(text, /\b(?:gooses|foxs)\b/i);
+      assert.doesNotMatch(text, /\breplace each (?:a|an)\b/i);
+      assert.doesNotMatch(text, /(?:^|[.!?]\s+)(?:a|an)\s/);
+      assert.doesNotMatch(text, /\bbalances?\b[^.!?]*\bremains\b/i);
+      assert.doesNotMatch(
+        text,
+        /\b(?:like splitting|you added scales|works backwards|as before|as we saw|use what you know)\b/i,
+      );
+
+      if (kind === "add-scales") {
+        assert.match(
+          text,
+          /(?:neither scale has .+ together\. add the scales|add the scales so .+ on both trays)\./i,
+        );
+        assert.match(text, /move the second balance's loads/i);
+      } else if (kind === "subtract-scales") {
+        assert.match(text, /the second balance's loads appear inside the first/i);
+        assert.match(text, /remove .+ from the left tray and .+ from the right tray/i);
+        assert.match(text, /\bnow .+ balances? .+\.$/i);
+      } else if (kind === "cancel-matches") {
+        assert.match(text, /appear(?:s)? on both trays/i);
+        assert.match(text, /remove .+ from each tray/i);
+        assert.match(text, /\bnow .+ balances? .+\.$/i);
+      } else if (kind === "regroup") {
+        assert.match(text, /the left tray has .+/i);
+        assert.match(text, /circle \d+ groups, each with .+/i);
+      } else if (kind === "split-evenly") {
+        assert.match(text, /keep one group from each tray/i);
+      }
     }
+  }
+
+  for (const strategy of STRATEGY_CATALOGUE) {
+    assert.doesNotMatch(
+      strategy.description,
+      /\b(?:like splitting|you added scales|works backwards|as before|as we saw|use what you know)\b/i,
+      `${strategy.id} explains itself directly`,
+    );
   }
 });
 
