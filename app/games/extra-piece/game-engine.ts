@@ -1,12 +1,23 @@
 export type Difficulty = "Easy" | "Medium" | "Hard" | "Wizard";
 export type Scaffold =
   | "silhouette"
+  | "symbols"
   | "color"
   | "color-orientation"
   | "orientation"
   | "monochrome";
 export type AccentColor = "coral" | "gold" | "teal" | "violet" | "ink";
-export type Motif = "none" | "chevron";
+export type Motif =
+  | "none"
+  | "chevron"
+  | "star"
+  | "diamond"
+  | "circle"
+  | "arrow";
+export type StarterSymbol = "star" | "diamond" | "circle" | "arrow";
+export type StarterSymbolInventory = Readonly<
+  Record<StarterSymbol, number>
+>;
 export type QuarterTurn = 0 | 1 | 2 | 3;
 export type ExtraKind = "one-cell-near-miss" | "mirror-trap";
 
@@ -98,7 +109,7 @@ export const DIFFICULTY_RULES: Readonly<
   Easy: {
     boardSize: 4,
     regionSizes: [3, 4, 4, 5],
-    scaffold: "silhouette",
+    scaffold: "symbols",
     extraKind: "one-cell-near-miss",
   },
   Medium: {
@@ -129,6 +140,38 @@ const COLORS: readonly AccentColor[] = [
   "teal",
   "violet",
 ];
+const STARTER_SYMBOLS = [
+  "star",
+  "diamond",
+  "circle",
+  "arrow",
+] as const satisfies readonly Motif[];
+const STARTER_SYMBOL_TEMPLATES = [
+  [
+    "S", "S", "D", "A",
+    "S", "D", "D", "A",
+    "S", "C", "D", "A",
+    "S", "C", "C", "C",
+  ],
+  [
+    "S", "S", "S", "A",
+    "S", "D", "S", "A",
+    "D", "D", "C", "A",
+    "D", "C", "C", "C",
+  ],
+  [
+    "S", "S", "D", "D",
+    "S", "C", "D", "A",
+    "S", "C", "D", "A",
+    "C", "C", "A", "A",
+  ],
+  [
+    "S", "D", "D", "A",
+    "S", "S", "D", "A",
+    "C", "S", "D", "A",
+    "C", "C", "C", "A",
+  ],
+] as const;
 
 function clampRandom(value: number): number {
   if (!Number.isFinite(value)) return 0;
@@ -163,7 +206,82 @@ function markKey(mark: Mark): string {
     violet: "V",
     ink: "I",
   };
-  return `${colorCode[mark.color]}${mark.motif === "chevron" ? mark.orientation : "-"}`;
+  const motifCode: Record<Motif, string> = {
+    none: "-",
+    chevron: "V",
+    star: "S",
+    diamond: "D",
+    circle: "O",
+    arrow: "A",
+  };
+  const directional =
+    mark.motif === "chevron" || mark.motif === "arrow";
+  return `${colorCode[mark.color]}${motifCode[mark.motif]}${
+    directional ? mark.orientation : "-"
+  }`;
+}
+
+function isStarterSymbol(motif: Motif): motif is StarterSymbol {
+  return STARTER_SYMBOLS.includes(motif as StarterSymbol);
+}
+
+function emptyStarterInventory(): Record<StarterSymbol, number> {
+  return { star: 0, diamond: 0, circle: 0, arrow: 0 };
+}
+
+export function starterSymbolInventory(
+  cells: readonly Pick<PieceCell, "mark">[],
+): StarterSymbolInventory {
+  const inventory = emptyStarterInventory();
+  for (const { mark } of cells) {
+    if (isStarterSymbol(mark.motif)) {
+      inventory[mark.motif] += 1;
+    }
+  }
+  return inventory;
+}
+
+function starterInventoryKey(
+  inventory: StarterSymbolInventory,
+): string {
+  return STARTER_SYMBOLS.map(
+    (symbol) => `${symbol}:${inventory[symbol]}`,
+  ).join("|");
+}
+
+export function starterInventoryResidual(
+  round: Pick<ExtraPieceRound, "board" | "pieces">,
+): StarterSymbolInventory | null {
+  const residual = emptyStarterInventory();
+  for (const piece of round.pieces) {
+    const inventory = starterSymbolInventory(piece.cells);
+    for (const symbol of STARTER_SYMBOLS) {
+      residual[symbol] += inventory[symbol];
+    }
+  }
+  const boardInventory = starterSymbolInventory(round.board);
+  for (const symbol of STARTER_SYMBOLS) {
+    residual[symbol] -= boardInventory[symbol];
+    if (residual[symbol] < 0) return null;
+  }
+  return residual;
+}
+
+export function starterInventoryMatchIndexes(
+  round: Pick<ExtraPieceRound, "board" | "pieces">,
+): readonly number[] {
+  const residual = starterInventoryResidual(round);
+  if (!residual) return [];
+  const residualKey = starterInventoryKey(residual);
+  return round.pieces
+    .map((piece, index) => ({
+      index,
+      key: starterInventoryKey(
+        starterSymbolInventory(piece.cells),
+      ),
+    }))
+    .filter(({ key }) => key === residualKey)
+    .map(({ index }) => index);
 }
 
 function normalizeCells(cells: readonly PieceCell[]): PieceCell[] {
@@ -369,10 +487,48 @@ function hamiltonianPath(
 function marksForRegions(
   regions: readonly (readonly PlacementCell[])[],
   scaffold: Scaffold,
+  random: RandomSource,
 ): readonly (readonly MutableCell[])[] {
+  const starterTemplate =
+    scaffold === "symbols"
+      ? STARTER_SYMBOL_TEMPLATES[
+          randomIndex(STARTER_SYMBOL_TEMPLATES.length, random)
+        ]
+      : STARTER_SYMBOL_TEMPLATES[0];
+  const symmetricSymbols =
+    scaffold === "symbols"
+      ? shuffled(
+          ["star", "diamond", "circle"] as const,
+          random,
+        )
+      : (["star", "diamond", "circle"] as const);
+  const starterSymbolByCode: Readonly<Record<string, Motif>> = {
+    S: symmetricSymbols[0],
+    D: symmetricSymbols[1],
+    C: symmetricSymbols[2],
+    A: "arrow",
+  };
+  const arrowOrientation =
+    scaffold === "symbols"
+      ? (randomIndex(4, random) as QuarterTurn)
+      : 0;
+
   return regions.map((region, regionIndex) =>
     region.map(({ x, y }, cellIndex) => {
       const color = "ink";
+      if (scaffold === "symbols") {
+        const code = starterTemplate[y * 4 + x];
+        const motif = starterSymbolByCode[code] ?? "circle";
+        return {
+          x,
+          y,
+          mark: {
+            color,
+            motif,
+            orientation: motif === "arrow" ? arrowOrientation : 0,
+          },
+        };
+      }
       const showMotif =
         scaffold === "color-orientation" ||
         scaffold === "orientation" ||
@@ -398,6 +554,13 @@ function marksForRegions(
 
 function marksMatch(left: Mark, right: Mark, scaffold: Scaffold): boolean {
   if (scaffold === "silhouette") return true;
+  if (scaffold === "symbols") {
+    return (
+      left.motif === right.motif &&
+      (left.motif !== "arrow" ||
+        left.orientation === right.orientation)
+    );
+  }
   if (
     (scaffold === "color" || scaffold === "color-orientation") &&
     left.color !== right.color
@@ -624,6 +787,52 @@ function mutatePiece(
   return null;
 }
 
+function relabelStarterExtra(
+  cells: readonly PieceCell[],
+  usedPieces: readonly Piece[],
+  random: RandomSource,
+): PieceCell[] | null {
+  const usedInventoryKeys = new Set(
+    usedPieces.map((piece) =>
+      starterInventoryKey(starterSymbolInventory(piece.cells)),
+    ),
+  );
+  const candidates = shuffled(
+    cells.flatMap((cell, cellIndex) =>
+      STARTER_SYMBOLS.filter(
+        (symbol) => symbol !== cell.mark.motif,
+      ).map((symbol) => ({ cellIndex, symbol })),
+    ),
+    random,
+  );
+
+  for (const { cellIndex, symbol } of candidates) {
+    const relabeled = cells.map((cell, index) =>
+      index === cellIndex
+        ? {
+            ...cell,
+            mark: {
+              color: "ink" as const,
+              motif: symbol,
+              orientation:
+                symbol === "arrow"
+                  ? (randomIndex(4, random) as QuarterTurn)
+                  : 0,
+            },
+          }
+        : {
+            ...cell,
+            mark: { ...cell.mark },
+          },
+    );
+    const key = starterInventoryKey(
+      starterSymbolInventory(relabeled),
+    );
+    if (!usedInventoryKeys.has(key)) return relabeled;
+  }
+  return null;
+}
+
 function rotateBoard(
   board: readonly BoardCell[],
   boardSize: number,
@@ -682,7 +891,11 @@ export function buildCandidate(
     regionOffset += regionSize;
     return region;
   });
-  const markedRegions = marksForRegions(rawRegions, rules.scaffold);
+  const markedRegions = marksForRegions(
+    rawRegions,
+    rules.scaffold,
+    random,
+  );
   const board = markedRegions
     .flat()
     .map(({ x, y, mark }) => ({ x, y, mark: { ...mark } }))
@@ -719,10 +932,18 @@ export function buildCandidate(
         : solutionPieces;
   if (extraSources.length === 0) return null;
   const source = extraSources[randomIndex(extraSources.length, random)];
-  const extraCells =
+  const rawExtraCells =
     rules.extraKind === "mirror-trap"
       ? reflectPieceCells(source.cells)
       : mutatePiece(source, random);
+  const extraCells =
+    difficulty === "Easy" && rawExtraCells
+      ? relabelStarterExtra(
+          rawExtraCells,
+          solutionPieces,
+          random,
+        )
+      : rawExtraCells;
   if (!extraCells) return null;
   const rotatedExtra = rotatePieceCells(
     extraCells,
@@ -772,7 +993,37 @@ export function buildCandidate(
   ) {
     return null;
   }
-  const solutions = solveRound(partialRound, 1, correctIndex);
+  if (
+    difficulty === "Easy" &&
+    (new Set(board.map(({ mark }) => mark.motif)).size !==
+      STARTER_SYMBOLS.length ||
+      starterInventoryMatchIndexes(partialRound).length !== 1 ||
+      starterInventoryMatchIndexes(partialRound)[0] !== correctIndex)
+  ) {
+    return null;
+  }
+  if (difficulty === "Easy") {
+    const shapeOnlyRound = {
+      ...partialRound,
+      scaffold: "silhouette" as const,
+    };
+    const forcedUsedPieces = partialRound.pieces.filter(
+      (_, pieceIndex) =>
+        pieceIndex !== correctIndex &&
+        enumeratePiecePlacements(partialRound, pieceIndex).length === 1,
+    ).length;
+    if (
+      possibleExtraIndexes(shapeOnlyRound).length < 2 ||
+      forcedUsedPieces < 2
+    ) {
+      return null;
+    }
+  }
+  const solutions = solveRound(
+    partialRound,
+    difficulty === "Easy" ? 2 : 1,
+    correctIndex,
+  );
   if (solutions.length !== 1) return null;
 
   return {
@@ -1106,10 +1357,53 @@ export function validateRound(round: ExtraPieceRound): ValidationResult {
   if (
     round.difficulty === "Easy" &&
     round.board.some(
-      ({ mark }) => mark.color !== "ink" || mark.motif !== "none",
+      ({ mark }) =>
+        mark.color !== "ink" || !isStarterSymbol(mark.motif),
     )
   ) {
-    issues.push("Starter must use clean monochrome silhouettes.");
+    issues.push("Starter must use monochrome picture symbols.");
+  }
+  if (
+    round.difficulty === "Easy" &&
+    new Set(round.board.map(({ mark }) => mark.motif)).size !==
+      STARTER_SYMBOLS.length
+  ) {
+    issues.push("Starter must show all four picture-symbol families.");
+  }
+  if (
+    round.difficulty === "Easy" &&
+    (starterInventoryMatchIndexes(round).length !== 1 ||
+      starterInventoryMatchIndexes(round)[0] !== round.correctIndex)
+  ) {
+    issues.push(
+      "Starter symbol subtraction must identify the extra without backtracking.",
+    );
+  }
+  if (round.difficulty === "Easy") {
+    const shapeOnlyRound = {
+      ...round,
+      scaffold: "silhouette" as const,
+    };
+    if (possibleExtraIndexes(shapeOnlyRound).length < 2) {
+      issues.push(
+        "Starter patterns must remove an ambiguity left by the silhouettes.",
+      );
+    }
+    const forcedUsedPieces = round.pieces.filter(
+      (_, pieceIndex) =>
+        pieceIndex !== round.correctIndex &&
+        enumeratePiecePlacements(round, pieceIndex).length === 1,
+    ).length;
+    if (forcedUsedPieces < 2) {
+      issues.push(
+        "Starter must offer at least two pattern-anchored pieces.",
+      );
+    }
+    if (solveRound(round, 2, round.correctIndex).length !== 1) {
+      issues.push(
+        "Starter must confirm with one unambiguous marked tiling.",
+      );
+    }
   }
   return { valid: issues.length === 0, issues };
 }
@@ -1125,6 +1419,14 @@ export function analyzeWrongAttempt(
     throw new Error("The selected piece is not part of the solved tiling.");
   }
   const needsTurn = placement.rotation !== 0;
+  if (round.difficulty === "Easy") {
+    return {
+      placement,
+      message: needsTurn
+        ? `Piece ${selectedIndex + 1}'s symbols match after a turn, so the square still needs it.`
+        : `Piece ${selectedIndex + 1}'s symbols match the square, so it is not the extra piece.`,
+    };
+  }
   return {
     placement,
     message: needsTurn
