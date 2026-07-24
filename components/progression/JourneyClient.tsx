@@ -23,6 +23,7 @@ import {
   writeSoundPreference,
 } from "@/lib/game-audio";
 import { games } from "@/lib/games";
+import { journeyReviews } from "@/lib/journey-reviews";
 import {
   JOURNEY_LEVELS,
   PROGRESSION_STORAGE_KEY,
@@ -63,6 +64,8 @@ import {
 } from "./journey-launch";
 
 import styles from "@/app/journey/journey.module.css";
+
+const basePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
 
 function profileId() {
   try {
@@ -605,8 +608,14 @@ function JourneyBoard({
           {board.nodes.map((node, index) => {
             const gameSlug =
               node.kind === "culmination" ? undefined : node.gameSlug;
+            const isReview = node.kind === "review";
             const game = gameSlug
               ? games.find((candidate) => candidate.slug === gameSlug)
+              : undefined;
+            const review = isReview && gameSlug
+              ? journeyReviews.find(
+                  (candidate) => candidate.slug === gameSlug,
+                )
               : undefined;
             const savedProvider = gameSlug
               ? profile.gameSnapshot.find(
@@ -614,8 +623,10 @@ function JourneyBoard({
                 )
               : undefined;
             const providerTitle =
-              savedProvider?.title ?? game?.title ?? "Journey activity";
-            const isReview = node.kind === "review";
+              savedProvider?.title ??
+              game?.title ??
+              review?.title ??
+              "Journey activity";
             const unlocked = canPlayerAccessJourneyNode(
               profile,
               journey,
@@ -648,6 +659,8 @@ function JourneyBoard({
                 ? `Turbo Time · ${providerTitle}`
                 : node.kind === "culmination"
                   ? `${journeyLevelLabel(node.journeyLevel)} level challenge`
+                  : isReview
+                    ? review?.stopLabel ?? providerTitle
                   : providerTitle;
             const detail = isActive
               ? "Continue your saved stop"
@@ -701,13 +714,20 @@ function JourneyBoard({
                   >
                     {ShelfIcon && node.kind === "normal" ? (
                       <ShelfIcon aria-hidden="true" focusable="false" />
+                    ) : isReview && review?.iconSrc ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        className={styles.nodeReviewIcon}
+                        src={`${basePath}${review.iconSrc}`}
+                        alt=""
+                        aria-hidden="true"
+                        draggable={false}
+                      />
                     ) : (
                       <span className={styles.nodeSymbol} aria-hidden="true">
                         {node.kind === "turbo"
                           ? "⚡"
-                          : node.kind === "review"
-                            ? "◆"
-                            : "★"}
+                          : "★"}
                       </span>
                     )}
                     {isCleared ? (

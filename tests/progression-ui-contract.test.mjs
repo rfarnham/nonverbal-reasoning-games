@@ -366,6 +366,13 @@ test("Journey map keeps cleared stops non-gating and animates finite avatar trav
   assert.doesNotMatch(client, /displayedLevel !== trailNode\.level/);
   assert.match(client, /profile\.gameSnapshot\.find/);
   assert.doesNotMatch(client, /Math Kangaroo spatial review/);
+  assert.match(client, /journeyReviews\.find/);
+  assert.match(client, /review\?\.iconSrc/);
+  assert.match(client, /review\?\.stopLabel \?\? providerTitle/);
+  assert.match(client, /styles\.nodeReviewIcon/);
+  assert.match(client, /src=\{`\$\{basePath\}\$\{review\.iconSrc\}`\}/);
+  assert.doesNotMatch(client, /"◆"/);
+  assert.match(journeyStyles, /\.nodeReviewIcon/);
   assert.match(client, /Restart stop/);
   assert.match(client, /discardActiveProgressionAttempt/);
   assert.match(journeyStyles, /\.walkerArriving/);

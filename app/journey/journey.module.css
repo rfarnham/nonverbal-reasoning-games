@@ -517,6 +517,14 @@
   height: 66px;
 }
 
+.nodeReviewIcon {
+  width: 72px;
+  height: 60px;
+  display: block;
+  object-fit: contain;
+  pointer-events: none;
+}
+
 .nodeCurrent {
   background: #dced72;
 }
@@ -940,6 +948,11 @@
   .nodeButton svg {
     width: 59px;
     height: 59px;
+  }
+
+  .nodeReviewIcon {
+    width: 64px;
+    height: 54px;
   }
 
   .summaryStats {
