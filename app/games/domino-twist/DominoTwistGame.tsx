@@ -27,6 +27,7 @@ import {
   progressionOptionIndexFromAnswerToken,
   useProgressionGameSession,
 } from "@/components/progression/useProgressionGameSession";
+import { journeyLevelLabel } from "@/lib/progression/types";
 import {
   MAX_ENERGY_COMBO,
   comboEnergyPercent,
@@ -143,10 +144,6 @@ function progressionTargetHref(
 ): string {
   const query = new URLSearchParams(target.query).toString();
   return query ? `${target.pathname}?${query}` : target.pathname;
-}
-
-function progressionLevelLabel(level: string): string {
-  return `${level.charAt(0).toUpperCase()}${level.slice(1)}`;
 }
 
 function initialCampaignCursors(): CampaignCursors {
@@ -1642,7 +1639,9 @@ export default function DominoTwistGame() {
             {controlledSession ? (
               <ProgressionGameHud
                 mode={controlledSession.runKind}
-                levelLabel={progressionLevelLabel(controlledSession.level)}
+                levelLabel={journeyLevelLabel(
+                  controlledSession.attempt.journeyLevel,
+                )}
                 current={controlledSession.currentQuestionNumber}
                 total={controlledSession.totalQuestions}
                 remainingMs={

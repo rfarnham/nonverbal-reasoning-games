@@ -1,0 +1,1182 @@
+{
+  "schemaVersion": 1,
+  "reviewBasis": "Manual contact-sheet and targeted final-asset inspection; approval is invalidated by any decoded-pixel change.",
+  "items": {
+    "mk-cyprus-2012-12-q02": {
+      "pixelSha256": "bc0e86b1a6c0048e226bd001a5c532d22afa7785ac259d1fbc37e9b3913c0cca",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2012-12-q08": {
+      "pixelSha256": "fd553d315f167e5da0a8d822c02801a2f91d5aba16ca31a675a9a252ff9b9709",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2012-34-q09": {
+      "pixelSha256": "af3702db777418b4a5229ae61602a56e676f35b7e7bee2a2750b2d84de5e66e5",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2012-34-q15": {
+      "pixelSha256": "2aafb89643b48279fcb1f674a6f65d876ceeb0f39164be82bb07546c158f989c",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2013-12-q07": {
+      "pixelSha256": "0952ef26570b9809690edda72dedabe9fdd9fb96a142a54100d45f10eb1f8e34",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2013-12-q12": {
+      "pixelSha256": "4ea245d9ffbd326396f247f2ff24ecc94bcbad7222a6b7c915353ebe540406b7",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2013-12-q16": {
+      "pixelSha256": "b188b951d58e1071460c05076c146153b1ee6068fd5a6b5e75935cef67dca841",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2013-12-q21": {
+      "pixelSha256": "f24c8ba50e658e9bb7ade564f8769c4df323056cd81d350f4b45a7b39024c686",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2013-12-q23": {
+      "pixelSha256": "18f5e97fba43c4750b391d6dffb94e8e506c1453f3bdcf6af90c93eb2abaa2ed",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2013-34-q09": {
+      "pixelSha256": "1823bebcfb7dc620300677aba24dd14a2a9633ba5a3197a9816abb1ee0af6238",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2014-12-q02": {
+      "pixelSha256": "14ce134b15a6e694faedef0696e7d0c3bea104735b8d96a79aa029ffc865cf15",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2014-12-q06": {
+      "pixelSha256": "ff977e7e332e58660b139fe62b6bd6c236219a0fc20a3f97a2f4e089767bd39a",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2014-12-q09": {
+      "pixelSha256": "ad8a2ad7b1edc2aab90dd244aed8b19ad3eedd7c00488d4dc6b61fce423c5f63",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2014-12-q11": {
+      "pixelSha256": "ac70891ffcae1be189250f67a8e2f4b128a28a9c0f83bb8c3d9907445f90bd19",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2014-12-q12": {
+      "pixelSha256": "b3754992cd17b44336d8600008b694f67846cf3ddc9278bc196582c55f23958e",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2014-12-q21": {
+      "pixelSha256": "e3626a56746237ebe74808866576d5f0a7b47a8db4ef3fd7e3295a067c28f1c7",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2014-34-q01": {
+      "pixelSha256": "11cd7c3b476e992d184073cc99c625e9d7fc26cec7b9216e2fcfc7aaf4652810",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2014-34-q09": {
+      "pixelSha256": "2833d181a87db01edf593b843edf8506db8878e9ee774733721644275607e07a",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2014-34-q13": {
+      "pixelSha256": "97561724bad3021614cb236542e835bde962aa7f8908ea582243ae03a747b142",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2014-34-q23": {
+      "pixelSha256": "5ce2f60ab97dcdd6efc5917b72938fd99e1ffa085c6ebaea6928d7277abf38b3",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2015-12-q03": {
+      "pixelSha256": "3aec8b2cc6e51e18ae6e6892532ee82f0a85adbdfe94dd6dc2331aeeed06c2eb",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2015-12-q06": {
+      "pixelSha256": "fbd04ed0a5e83ee3d9a1888fcd87e7a78e0626ab333500bf6ebea7cbb53f253a",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2015-12-q07": {
+      "pixelSha256": "24c32e98fb726370e325b84901f5fedd6f397b92d87d52509a4e4b0e55f5e47b",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2015-12-q10": {
+      "pixelSha256": "d37186650fa8fb06828d863312ce724ce2f2166ca933bbfede25f87799e0a675",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2015-34-q08": {
+      "pixelSha256": "f642a55b07e126c89b9b7c93bb840dd16c5e61d5b5d311a90e94881bf4bebf8e",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2015-34-q14": {
+      "pixelSha256": "6d1d879eecc2d5574028fdb557d099f1118e820f27c99760da0fd908b9faf2d5",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2015-34-q16": {
+      "pixelSha256": "aee4470d745136635d4ebdcde9fb1fd84f95896cba0283659412585657524dad",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2015-34-q17": {
+      "pixelSha256": "7e8befb0d99ecf395fd36338e3db8bfd656d30da48dbc6fea0bfb2eebe912696",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2015-34-q18": {
+      "pixelSha256": "9ecc9cbdeca39121a244a740a09f382459d1f91c2e6a0de6716ad991c220f140",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2015-34-q21": {
+      "pixelSha256": "dc087588637b333848eeed749e08e24a7fb51b27027be03b2dc146bf12d259ab",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2016-12-q05": {
+      "pixelSha256": "ff0bf4f89c7adada7adee46af4c1e17c2f1783e1a8741be425c55296b36be65e",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2016-12-q13": {
+      "pixelSha256": "bdfa436b46029ad24f6147a56e31db51162661ec678677b79823ddb9a8e52ccf",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2016-12-q15": {
+      "pixelSha256": "8ca5d0c5422ff0422d76daa7611b62829513ecdbe696983342e9c32ace66e43d",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2016-12-q17": {
+      "pixelSha256": "e1bed1e7553f4346084ce8023d91dbd0db1eeeee045949af584c0be758d5327e",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2016-12-q18": {
+      "pixelSha256": "595495a2edb2de158546dbf37fc648b879e4033d79afac1424e7267703cb5d27",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2016-12-q21": {
+      "pixelSha256": "651a32340d9f84d5c4316bdf6419cb2d2bebbdade915fcfb7c6ab2c30b237706",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2016-34-q04": {
+      "pixelSha256": "dcdc73e9dd74875739780c6f5d70c909730cee0c1858c9e48dff0a9b496c9d62",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2016-34-q12": {
+      "pixelSha256": "8d7de144dbd1565cab6582b28c3c41645998160f30086a0188f6e63def1a10d6",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2016-34-q14": {
+      "pixelSha256": "5966726507d1118041d6c9c22575f658f68e914e6af642de2a56a2221c4d9fbb",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2016-34-q17": {
+      "pixelSha256": "022d1d8082101ad1ff379490a764ae79f7c1cbe5f30061b51c1d3a371802eeca",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2016-34-q21": {
+      "pixelSha256": "93d51c8aa6d9668aedc61cb1bab5683d50bffd8d6e6a02cece93fa7b6338da0b",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2017-12-q01": {
+      "pixelSha256": "f89bcb758c67748c706f8ca241e22d0d04f57087db75c52ed6f2170f4d487ee6",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2017-12-q05": {
+      "pixelSha256": "f7e158aa8c02720958b34ce65769f021fccaeb4c0cfc61c9ea429eadfe560146",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2017-12-q07": {
+      "pixelSha256": "e66006b3f4af2424133f7717aee8842397e06fb908eb6f244fd983efba3e249d",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2017-12-q10": {
+      "pixelSha256": "0d9200504d7caf57d825dfb880a5f196b5455fb2de98f9c1a67ed648920225b8",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2017-12-q12": {
+      "pixelSha256": "55ef2f5169eba380ad4f2cbae0d4a16510874df301d83b7620e1bfed8bb294fc",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2017-12-q19": {
+      "pixelSha256": "51468eee37dbf5a416ee21c6116506d04ed4cda0f9036c421594a9f657841f0c",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2017-12-q21": {
+      "pixelSha256": "2d00558077afbdee3204ee3dcb6c7fcd6521f3058d7d17e3db89fedf58ddde84",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2017-12-q24": {
+      "pixelSha256": "c985ebaa43e0c4a84924d581b7d1a1a3922192f0f110299ff0c8e551d802b7cf",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2017-34-q03": {
+      "pixelSha256": "b58d656c9fa067793faeca7510e2f459f928e37cf9509aa3e6e4ffaff0513cce",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2017-34-q08": {
+      "pixelSha256": "6fa1a22d248b7df11ca19eae077c208ee4b0711412989b2178c12e64d305c4da",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2017-34-q09": {
+      "pixelSha256": "222dcc944ba912d0e6af59e9ecb2e965dab1886aa9d12e6dda28a610fc3e3a78",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2017-34-q12": {
+      "pixelSha256": "8aab431b135f7ce85c05ee2953c22d266774d97e796eeace871193c540ed0624",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2017-34-q17": {
+      "pixelSha256": "50957acadae96b336c54dd19bbb56c03eb2d2b088250768e9945e52170e0900a",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2018-12-q01": {
+      "pixelSha256": "220535946a8944e7d0a3d4440f26bdff1109454dbbe8ba1505a608496faa1714",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2018-12-q02": {
+      "pixelSha256": "946c59f997e64ac44db02449804c8cc6f04a6c2d42ad703be9f3e56a0210b744",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2018-12-q08": {
+      "pixelSha256": "e7d3274c1cd31756fd03215077878cae9fd6d2b201ed1dd8b476194fb837672e",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2018-12-q09": {
+      "pixelSha256": "3d0c8b89d7a7e10fb836246d144adead220406252479f987f26f86ede44b4803",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2018-12-q10": {
+      "pixelSha256": "0669529553a924a8aa3a5da154a3c9d821e6ffad1ca9eb591e0308d05818d09a",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2018-12-q11": {
+      "pixelSha256": "a065dbf140dac516eab980baecdccdfe5b575c972500a95d71eda3bd41878880",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2018-12-q12": {
+      "pixelSha256": "d5308201faf44261c6f8516104fd3093133dcfb422202a3756159a729bdad72b",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2018-12-q14": {
+      "pixelSha256": "3162607c4f638dd2a609714621dda276932778d65fb45528e365900c815b556f",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2018-34-q02": {
+      "pixelSha256": "16f7d284137357c5e1197775ce81603bbf6472148a903d130ab6b240b49d0235",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2018-34-q05": {
+      "pixelSha256": "2fceff60407ae84ac2141ede726b5b6573e44361d34014aaf9b1b104f48a4e04",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2018-34-q06": {
+      "pixelSha256": "af1ce9572baee411454403128345930cdd2d542e32866d6f263799750677ed07",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2018-34-q08": {
+      "pixelSha256": "ffe6f69dcf7bdd64ebb301e00f07cfef09608b15bd324e760437ae55adde9c24",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2018-34-q10": {
+      "pixelSha256": "b775b5ef2fc470deab350c066a94a13a443df141e246e1319caf60af265c1c26",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2018-34-q11": {
+      "pixelSha256": "ef791c08c6831dd3d401f96cb9341f6b9df3c34c119e1c2f94515a18159f4552",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2018-34-q12": {
+      "pixelSha256": "555600d131c3044518a63d5f1ec6b1fb252ccc7dfcf83a06e69f8956f77fd354",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2018-34-q21": {
+      "pixelSha256": "1417be07bb8a0a99097893afa305166e20a9c67b92785b281616bb381935e0e6",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2019-12-q02": {
+      "pixelSha256": "9acdc9790f0a8a9cc65b36608c0eeebb11e99c07fcb811761fb7d74d23314774",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2019-12-q09": {
+      "pixelSha256": "3c23843f07735127526d1d4fce4e262e8ead957a429631bb2e32b438b8600ba9",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2019-12-q13": {
+      "pixelSha256": "3662d18f212550997562214c9f1770cf95cf76c995eb1526231990799c942bb7",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2019-12-q18": {
+      "pixelSha256": "708228fe3e9cdcb662ed87bdc1d45d463926da4bb1351e679c9fc79709da2680",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2019-34-q06": {
+      "pixelSha256": "ebc934f6acb83ba939e6503e9eb26ac8c0f5e2ee340c6fe9fbdff664427c9af5",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2019-34-q10": {
+      "pixelSha256": "c049aff595e8cd503ebc30fdf83d0f85ed093e193505983ec9c6a4f58b9e945f",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2019-34-q11": {
+      "pixelSha256": "5f1f8cfb9d28ed337e6be205479e799b39b464ce57915de269256b7bf7e3ffa7",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2019-34-q22": {
+      "pixelSha256": "eeaa21d1027a565c57d5bfe3bd5ff1edc95e799a7dd3a304c7cf3fbfbd873216",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2020-12-a-q02": {
+      "pixelSha256": "26473a67ca6d115926456005c284be1923919974df5d32d54660ba5e1f81293f",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2020-12-a-q03": {
+      "pixelSha256": "f95495990556bb25ea11bc2514a1164061df8356b556e0d7fd2b985c7efe049b",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2020-12-a-q05": {
+      "pixelSha256": "6e92d73d21be602d12c0ce990422e04790a6f3bb90a1e0ccce46eb221a4fba5c",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2020-12-a-q08": {
+      "pixelSha256": "2349bbfb22a3f82686b9f2e645aaa932089fa3748376e4d485f8ad448cac459b",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2020-12-a-q09": {
+      "pixelSha256": "06f637663782ecb9190fd862dbcd71aa0c449ed95221d41a4e2ac6474104051e",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2020-12-a-q15": {
+      "pixelSha256": "2793fb58cb7ed28cee1ab5580cd3ded8af4af4a510dc3848908a87795a9abf85",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2020-12-a-q17": {
+      "pixelSha256": "3fb02c80feb227fc72d3dc1637112182cb558a92ddd83bd71408ccc38af5ebcc",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2020-34-a-q02": {
+      "pixelSha256": "66560604f1a662b8f02b93f1c983358e76dad6d7065f3009f4fbe59193bf58b9",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2020-34-a-q05": {
+      "pixelSha256": "28825f5ea8cd1f3a4db3960c51c7e124a52aa4a9ad13eac39cb948710dde9275",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2020-34-a-q07": {
+      "pixelSha256": "37e2239aa486b12cd27b27ddea049947942e35ff98287066da27bf404b065b06",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2020-34-a-q08": {
+      "pixelSha256": "194c419c223ba77e2cfd30b229aef96119f84d1635a4018e32f32901ff481bac",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2020-34-a-q10": {
+      "pixelSha256": "0d7788c11325ce49a2ece5206b2350eba6e9ed463f2b4480d970e16f3cc1aaad",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2020-34-a-q15": {
+      "pixelSha256": "0fdfbf6e334430b7eda1c5ad6c58be5e88fca4fa5eb20aea345b7a1ecd3fcc4c",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2021-12-q04": {
+      "pixelSha256": "4674acf040e8576cdbd8b7bc3307fe251f8a5486914edf2d6b069347b187a7e3",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2021-12-q05": {
+      "pixelSha256": "df8733f6bf8e1bd1313ec9cdd8394d2a3ce7c3b3bfdbd3c3e4dce8452c66d57a",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2021-12-q07": {
+      "pixelSha256": "c6cb641a2b941b3f92365704459252df509f8035949e2fd80cfaa0a85dc2ceff",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2021-12-q13": {
+      "pixelSha256": "7cf84f97363c1f40a0329b88ac58850f9eb8dbf7e5e4617792ca18873867c8c8",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2021-12-q20": {
+      "pixelSha256": "c402e816d257f5088e3de096bfa6566ae9a131dcc220a3c691e51dec840190cf",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2021-34-q06": {
+      "pixelSha256": "e88d9c2ae930b826bb6fd6fdddb0ca09112489c5b6455082b422fe4754d392fb",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2021-34-q08": {
+      "pixelSha256": "1fc015e5c2de76ec88ace778758a05c6de7045242d6841db2042a26364e6f0d8",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2021-34-q11": {
+      "pixelSha256": "d9c3199b8a91a9fdf5b08e7ef08f26f62c6550819b948ef7374594e62f655357",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2021-34-q16": {
+      "pixelSha256": "f09e09aecc647a723c3a272526b8b63c5f5c7f64afa927656d3589f4d4658390",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2021-34-q24": {
+      "pixelSha256": "20725960ef85742c0dc8ff696dd6660c53db162406a92c57faa7e0b15f3754b9",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2022-12-q06": {
+      "pixelSha256": "2c69e1ee4e178cc6546d29356fc3d1efcb10f189d7c34ebc9aab45c8d4db49c0",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2022-12-q07": {
+      "pixelSha256": "593a953543862a57a9301dbf8249d3e810ccd431170acf9ea37de75c58ff21d0",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2022-12-q11": {
+      "pixelSha256": "4171eb171d5f010ce16a7ba746f4910c44aee193b3d2072e2ceaf96b01d1e0bd",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2022-12-q12": {
+      "pixelSha256": "20071685395c46ebe40d80a2a1915346b720fcb73134e2ad376cf6a05c1c9028",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2022-12-q13": {
+      "pixelSha256": "255e147f5ef33efab726da478477a953353c3c1107e3d64058625d9b645c2336",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2022-12-q16": {
+      "pixelSha256": "3cbcc2d276827fb74aaeeda38a8689edc8f3702f894484396f5d130f8fdd5eeb",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2022-12-q23": {
+      "pixelSha256": "942eb0027dffaf84b39eaeaeb5c91a02905fef9ea40648fa6b249765948bfd38",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2022-34-q02": {
+      "pixelSha256": "037897f35c8239bee0c7ecf6ed2d86833bcf446ef8839b35c15940d5c69666e4",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2022-34-q04": {
+      "pixelSha256": "9e0e92057aa83f5d0efb066ea22b16d8cec4e1ddeafc450f4fc957ae46dbc7d5",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2022-34-q06": {
+      "pixelSha256": "1a450c4de01bdb34950793b09ffaf00018b4a86a3236f92f00c75114dbd3b25a",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2022-34-q08": {
+      "pixelSha256": "66a7d26f1e7082fd5c5b35234fc50dd96f00133a720fa8d053879f252d9dfe11",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2022-34-q20": {
+      "pixelSha256": "c89bfc865f0bb77f56d7376398f18be48fefec38986a2c235a5db69796cea0b1",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2022-34-q23": {
+      "pixelSha256": "d0933af623570eb4d142a369b52ae0c7a4f890d9668a858cca215d6e6c7f3878",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2023-12-q02": {
+      "pixelSha256": "2d83a485f68aeee6d2d6786c57ecdda3223c1099ebaf5c323a794f1a420905f5",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2023-12-q04": {
+      "pixelSha256": "f5f134cd4f2f3e38076191e04842d5e3207c54a179af72393767adc0d6cf0f4f",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2023-12-q09": {
+      "pixelSha256": "4e5db860cbca7cb893c7db4482486175a2bdbd58a439edeac059f8bb67b029ce",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2023-12-q14": {
+      "pixelSha256": "79d1630cbb41351d482e9a72c8ba76df0e5d95746169b968ea5a04628217c34a",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2023-12-q20": {
+      "pixelSha256": "4d1bdf1f73d9ee5d42de6a7707615fb9a3be603ba5a90e232b58e8788530e4f0",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2023-34-q03": {
+      "pixelSha256": "a1ac10561a91938e49445ebe2bd416dbf68d6bbbad59b004218c0da6a5f4eb03",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2023-34-q04": {
+      "pixelSha256": "58c7088e3e1faedaeb969e791f088b0037e72b946941b3ecff4fc8ca8348215b",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2023-34-q06": {
+      "pixelSha256": "cf5a8e8f58c95681ec60ab7a54dce8c77dc63d86362293a23b6c97824e3eaec3",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2023-34-q08": {
+      "pixelSha256": "172a16bfe7a01e01b686bbca8d27094576772b44448db5f135463f1d49fbe8c7",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2023-34-q16": {
+      "pixelSha256": "1f23a9d7071f5da7ad70b98141d9b44a0efdeda039a0d4c881ab2b62e16427bd",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2023-34-q18": {
+      "pixelSha256": "a5bab4094138d061c2afbe875588fe9dadaa52280844c72c88ca18e3a9b9020d",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2023-34-q22": {
+      "pixelSha256": "69e6a1c39682b2644e85bf2f419c6665240b58c97c2429d9f78877503a17bf59",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2024-12-q02": {
+      "pixelSha256": "5a5523305bc45017fc16997031977e246393a1d149d661a1b7bf10504737eaa0",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2024-12-q04": {
+      "pixelSha256": "0daa783ab83266cbf11b2ef251c1e42982cb19bdd9593fd6fa869124864cae36",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2024-12-q08": {
+      "pixelSha256": "075be3d42afa2f0ae22cdb3deeff032b3a277896f59f7f746f6d58de233d41c2",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2024-12-q09": {
+      "pixelSha256": "3090c47ac2ff4da6954a00b3848e1c09c024826b497cd7f198e6f4fb0fd98a71",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2024-12-q17": {
+      "pixelSha256": "b946f2c8c55594ceb47ceebd8a32c7de1aebf221cb957c7fd97b3b0e69d6dd13",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2024-12-q19": {
+      "pixelSha256": "a4302eb120bfb81ef351321a67b89cbe7a77cb0bb9dd8a6584c9cb44314ec2af",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2024-34-q01": {
+      "pixelSha256": "daaa5a658e8d973939a79baec376e5a1fccc64755fbe22e7369fa1bb3c8ad4c6",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2024-34-q07": {
+      "pixelSha256": "38bda93b36a435910ca5ea6b464282130206de6ac27dc8a90ed5a9553640b4eb",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2024-34-q18": {
+      "pixelSha256": "ac4d347903f4f2af0e0699bc72716143498da8aa778480c008910aad80b30903",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2024-34-q22": {
+      "pixelSha256": "e49213c3020ba5d5725dd3160bca3441598a63d5752253fb934c3a202177fa2f",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2025-12-q08": {
+      "pixelSha256": "26f0ed098f26504bd3bb3e34d6d9e12924c1c47e82194ad39cb85b5177b1a42a",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2025-12-q09": {
+      "pixelSha256": "7b8b0f72c07724a4f0c2dd15c1d4cfb0fd6cd8196f73842b0c54feb9a18974ca",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2025-12-q16": {
+      "pixelSha256": "9c0a3c182ba272a7eed948949318525e9e174271e5fae64952b84b1f339cfdcc",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2025-34-q01": {
+      "pixelSha256": "988d8c6bd368ef77d915fc54814c6938e883cdd30ead173c8c4ee529b9256442",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2025-34-q03": {
+      "pixelSha256": "cbc4abead54befab3d3e7185a33d7257742bd1cd02f85606cd8eaa7ac25593dd",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2025-34-q04": {
+      "pixelSha256": "50b8bb2e574b1274e2bcccc6630d3323d14dc693254a3dfb699487a0c60a8888",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2025-34-q05": {
+      "pixelSha256": "39021d122536383f3d112fe3bdcd0ef87b757939bc71dbc1860bf04058387b88",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2025-34-q06": {
+      "pixelSha256": "212da2172ee673385882012e2b00b5f5a41fb8a8af02e5934904b7c9cf435c14",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2025-34-q07": {
+      "pixelSha256": "c028edef4fcf170b290cfd47a9e9f7da1efbf1f8dde28ef36169dd3734543f3e",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2025-34-q08": {
+      "pixelSha256": "ae099e7a8f1798d0c45d0ff6c32fa89d4c5b3c2650c936219e392f6b162ff8bf",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2025-34-q12": {
+      "pixelSha256": "bf0bddcfa87fcaa2f0d97381d335beb7c9a9bcd3b4ee6062d93b05a2f6110449",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2025-34-q16": {
+      "pixelSha256": "23a3e6655a4dcbb838948f9180ffa696b588de99151af62e597e7f9292f1af03",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2025-34-q18": {
+      "pixelSha256": "6e261a8e3ebb8ea10ae629c5bac4b708baf6934f14cbcb6b1a093d392bbcd4f4",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2025-34-q19": {
+      "pixelSha256": "6bc3b429875b78e5e332c2d4cba82c493c1f29305c1b425952e8111433a7e634",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2025-34-q24": {
+      "pixelSha256": "18c4deee085ee2e47dadd673506956d7cd1c2dbbf87383df42a47a9d4016e552",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2026-12-q02": {
+      "pixelSha256": "378c22de36dbef83f46f8a42218c57c32af5e59eb04966c512cf119ae8a3f411",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2026-12-q03": {
+      "pixelSha256": "10414bcc37a6995e2f0cda8812ee3211e16748091de5281b332f3565fdc23fb3",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2026-12-q06": {
+      "pixelSha256": "074bd98b6b657a9336a505a0ceadd2e5d27240cb8055c0f50f340303d408a7fc",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2026-12-q09": {
+      "pixelSha256": "f3ac2498cc4352ff524dec201d7d8ec77a4de6d4becc7a454977c94802d90b59",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2026-12-q13": {
+      "pixelSha256": "66b14be60cd2d9dae28ba39948428f7779cafb123cf2b9b7f545e239b3b05589",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2026-12-q16": {
+      "pixelSha256": "912994aacbf4444cc6602f31f7584ec33d280f3ff5cff585d64b42e37cc66e2b",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2026-12-q19": {
+      "pixelSha256": "b47fcff3ce71572e16c7004663f9eccc1eb2d50dbea534ea5614c65d19c8c505",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2026-12-q20": {
+      "pixelSha256": "9dc01eb281e26cd94d7bc252b1433a70ee69173a1bb527a60e5b4566cfbdc576",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2026-34-q03": {
+      "pixelSha256": "0e09fe82a1c543b30258a791b745a7a1026d0b09fd5170c05e40d094aa7d6b4a",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2026-34-q06": {
+      "pixelSha256": "22893ad39e4578072338c2415da0127c3a29d899ce3a3669d72545940bd433de",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2026-34-q07": {
+      "pixelSha256": "f3fa7267073eb6d8456b1a5848ced4101b18ed4d6c0af7e0f7b36f3184fd54c8",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2026-34-q09": {
+      "pixelSha256": "929004bc69e2d3de35881c9d3b430d3ee1e13d88bac7a115900b6e4da1c76ec9",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2026-34-q10": {
+      "pixelSha256": "41cd8ec03e8e4f685f577d7b2ca880a19d5285c6f449be1549cf9befb51b3db7",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2026-34-q11": {
+      "pixelSha256": "82e0deb764ca0799613a2757fe015f7aaaf2a3e199211cd66981149d383a0e52",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2026-34-q12": {
+      "pixelSha256": "92a08b11b1e53442b252bb75d27c3c22b014b163b78d0d61a0be94f6bb8f6765",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2026-34-q15": {
+      "pixelSha256": "40d051e8f513a8b1268f6f5b7ff9c372e9eb94d31260a098100dcfbb82093904",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    },
+    "mk-cyprus-2026-34-q19": {
+      "pixelSha256": "7db9075a00dcee3afc1f1d8fd700677536a790d528ba215e45105fa62bafbf4f",
+      "promptFree": true,
+      "optionsRelabeled": true,
+      "diagramComplete": true,
+      "reviewed": true
+    }
+  }
+}

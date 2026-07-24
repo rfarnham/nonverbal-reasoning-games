@@ -182,7 +182,11 @@ test("controlled game progress and redemption focus use truthful semantics", asy
   assert.match(hud, /mode === "turbo" && !redemption/);
   assert.match(hud, /Turbo Time · Redemption/);
   assert.doesNotMatch(hud, /Questions solved/);
-  assert.match(panels, /primaryButtonRef\.current\?\.focus\(\)/);
+  assert.match(
+    panels,
+    /primaryButtonRef\.current\?\.focus\(\{\s*preventScroll:\s*true\s*\}\)/,
+    "the section action receives focus without scrolling the solved example away",
+  );
   assert.match(panels, /ref=\{primaryButtonRef\}/);
 });
 
@@ -327,6 +331,10 @@ test("Journey map keeps cleared stops non-gating and animates finite avatar trav
   assert.match(client, /aria-current=\{isTrailPosition \? "step" : undefined\}/);
   assert.match(client, /setArrivalNodeId\(null\), 950/);
   assert.match(client, /scrollIntoView/);
+  assert.match(client, /viewedLevel !== trailNode\.journeyLevel/);
+  assert.doesNotMatch(client, /viewedLevel !== trailNode\.level/);
+  assert.match(client, /profile\.gameSnapshot\.find/);
+  assert.doesNotMatch(client, /Math Kangaroo spatial review/);
   assert.match(client, /Restart stop/);
   assert.match(client, /discardActiveProgressionAttempt/);
   assert.match(journeyStyles, /\.walkerArriving/);

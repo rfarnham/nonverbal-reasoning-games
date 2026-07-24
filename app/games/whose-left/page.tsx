@@ -24,6 +24,7 @@ import {
   progressionOptionIndexFromAnswerToken,
   useProgressionGameSession,
 } from "@/components/progression/useProgressionGameSession";
+import { journeyLevelLabel } from "@/lib/progression/types";
 
 import {
   CAMPAIGN_ROUNDS,
@@ -1207,10 +1208,9 @@ export default function WhoseLeftPage() {
             {progressionControlled ? (
               <ProgressionGameHud
                 mode={progression.runKind}
-                levelLabel={
-                  progression.level[0].toUpperCase() +
-                  progression.level.slice(1)
-                }
+                levelLabel={journeyLevelLabel(
+                  progression.attempt.journeyLevel,
+                )}
                 current={progression.currentQuestionNumber}
                 total={progression.totalQuestions}
                 remainingMs={progression.turboRemainingMs ?? undefined}

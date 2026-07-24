@@ -24,9 +24,16 @@ import {
   solutionStrategyFeedback,
   validateRound,
 } from "../app/games/libra/game-engine.ts";
+import {
+  JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+  buildLibraJourneyExtraCampaignRounds,
+} from "../app/games/libra/journey-campaign.ts";
 import { progressionAdapter } from "../app/games/libra/progression-adapter.ts";
 import { progressionMetadata } from "../app/games/libra/progression-metadata.ts";
-import { buildTeachingProof } from "../app/games/libra/strategy-curriculum.ts";
+import {
+  assertSoundTeachingRound,
+  buildTeachingProof,
+} from "../app/games/libra/strategy-curriculum.ts";
 import { resolveProgressionQuestion } from "../lib/progression/game-adapter.ts";
 
 const SEEDS_PER_DIFFICULTY = 400;
@@ -275,6 +282,248 @@ test("each Campaign level balances answer positions without a visible cycle", ()
       positions.slice(start, start + 4).join(","),
     );
     assert.notEqual(new Set(blocks).size, 1, `${difficulty} repeated four-cycle`);
+  }
+});
+
+test("Journey-only Libra banks are valid, diverse, disjoint, and never divide by one", () => {
+  const expectations = {
+    "junior-2": "Junior",
+    "expert-2": "Expert",
+    "wizard-2": "Wizard",
+  };
+  const standaloneFingerprints = new Set(ROUNDS.map(roundFingerprint));
+  const journeyFingerprints = new Set();
+
+  assert.deepEqual(
+    Object.keys(JOURNEY_EXTRA_CAMPAIGN_ROUNDS),
+    Object.keys(expectations),
+  );
+  assert.equal(Object.isFrozen(JOURNEY_EXTRA_CAMPAIGN_ROUNDS), true);
+  assert.deepEqual(
+    buildLibraJourneyExtraCampaignRounds(),
+    JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+  );
+
+  for (const [level, difficulty] of Object.entries(expectations)) {
+    const rounds = JOURNEY_EXTRA_CAMPAIGN_ROUNDS[level];
+    const positions = rounds.map(({ correctIndex }) => correctIndex);
+
+    assert.equal(rounds.length, 12, `${level}: round count`);
+    assert.equal(Object.isFrozen(rounds), true, `${level}: frozen bank`);
+    assert.ok(
+      rounds.every((round) => round.difficulty === difficulty),
+      `${level}: mapped difficulty`,
+    );
+    assert.deepEqual(
+      [0, 1, 2, 3].map(
+        (position) =>
+          positions.filter((value) => value === position).length,
+      ),
+      [3, 3, 3, 3],
+      `${level}: answer balance`,
+    );
+    assert.ok(
+      positions.every(
+        (position, index) =>
+          index === 0 || positions[index - 1] !== position,
+      ),
+      `${level}: no adjacent answer-position repeat`,
+    );
+    assert.ok(
+      new Set(
+        [0, 4, 8].map((start) =>
+          positions.slice(start, start + 4).join(","),
+        ),
+      ).size > 1,
+      `${level}: no repeated four-position cycle`,
+    );
+
+    for (const [index, round] of rounds.entries()) {
+      assertValidRound(round, `${level} round ${index + 1}`);
+
+      const targetKey = expressionKey(round.question.target);
+      const directlyRevealsSingleTarget =
+        round.question.target.length === 1 &&
+        round.question.target[0].count === 1 &&
+        round.equations.some(({ left, right }) => {
+          const leftIsTarget = expressionKey(left) === targetKey;
+          const rightIsTarget = expressionKey(right) === targetKey;
+          const leftIsKnownUnits = left.every(
+            ({ creature }) => creature === round.question.unit,
+          );
+          const rightIsKnownUnits = right.every(
+            ({ creature }) => creature === round.question.unit,
+          );
+          return (
+            (leftIsTarget && rightIsKnownUnits) ||
+            (rightIsTarget && leftIsKnownUnits)
+          );
+        });
+      assert.equal(
+        directlyRevealsSingleTarget,
+        false,
+        `${level} round ${index + 1}: no lone requested unknown against known units`,
+      );
+
+      const teaching = buildTeachingProof(round);
+      const splitSteps = teaching.steps.filter(
+        (step) => step.kind === "split-evenly",
+      );
+      for (const step of splitSteps) {
+        assert.ok(
+          step.divisor >= 2,
+          `${level} round ${index + 1}: never divide by one`,
+        );
+        if ("groupCount" in step.before) {
+          assert.equal(
+            step.before.groupCount,
+            step.divisor,
+            `${level} round ${index + 1}: grouped divisor`,
+          );
+        } else {
+          assert.ok(
+            [...step.before.left, ...step.before.right].every(
+              ({ count }) => count % step.divisor === 0,
+            ),
+            `${level} round ${index + 1}: divisor applies to every pictured load`,
+          );
+          assert.notEqual(
+            expressionKey(step.before.left),
+            targetKey,
+            `${level} round ${index + 1}: division starts with repeated target bundles`,
+          );
+        }
+      }
+      if (round.optionKinds.includes("forgot-to-divide")) {
+        assert.ok(
+          splitSteps.length > 0,
+          `${level} round ${index + 1}: division distractor has a real split`,
+        );
+      }
+
+      const fingerprint = roundFingerprint(round);
+      assert.equal(
+        standaloneFingerprints.has(fingerprint),
+        false,
+        `${level} round ${index + 1}: standalone disjointness`,
+      );
+      assert.equal(
+        journeyFingerprints.has(fingerprint),
+        false,
+        `${level} round ${index + 1}: Journey disjointness`,
+      );
+      journeyFingerprints.add(fingerprint);
+    }
+  }
+
+  assert.equal(journeyFingerprints.size, 36);
+
+  const familyCounts = (level) =>
+    Object.fromEntries(
+      [...new Set(JOURNEY_EXTRA_CAMPAIGN_ROUNDS[level].map(({ family }) => family))]
+        .sort()
+        .map((family) => [
+          family,
+          JOURNEY_EXTRA_CAMPAIGN_ROUNDS[level].filter(
+            (round) => round.family === family,
+          ).length,
+        ]),
+    );
+  assert.deepEqual(familyCounts("junior-2"), {
+    "add-combo": 3,
+    chain: 2,
+    "combo-primer": 3,
+    "offset-chain": 2,
+    "subtract-combo": 2,
+  });
+  assert.deepEqual(familyCounts("expert-2"), {
+    "combo-bridge": 2,
+    cross: 2,
+    difference: 2,
+    fork: 2,
+    parallel: 2,
+    "sum-combo": 2,
+  });
+  assert.deepEqual(familyCounts("wizard-2"), {
+    "sealed-cancellation": 4,
+    "sealed-difference": 4,
+    "sealed-sum": 4,
+  });
+
+  const visibleStrategies = (level) =>
+    new Set(
+      JOURNEY_EXTRA_CAMPAIGN_ROUNDS[level].flatMap(
+        (round) => buildTeachingProof(round).strategyIds,
+      ),
+    );
+  assert.deepEqual(
+    visibleStrategies("junior-2"),
+    new Set([
+      "substitution",
+      "cancel-matches",
+      "create-combo",
+      "split-evenly",
+      "add-scales",
+      "subtract-scales",
+    ]),
+  );
+  for (const level of ["expert-2", "wizard-2"]) {
+    assert.deepEqual(
+      visibleStrategies(level),
+      new Set([
+        "substitution",
+        "cancel-matches",
+        "add-scales",
+        "create-combo",
+        "split-evenly",
+        "subtract-scales",
+      ]),
+      `${level}: full strategy coverage`,
+    );
+  }
+
+  const wizardRounds = JOURNEY_EXTRA_CAMPAIGN_ROUNDS["wizard-2"];
+  assert.equal(
+    wizardRounds.filter(({ question }) => question.target.length === 1)
+      .length,
+    6,
+    "Wizard II balances single and composite questions",
+  );
+  assert.equal(
+    wizardRounds.filter(({ question }) => question.target.length === 2)
+      .length,
+    6,
+    "Wizard II balances single and composite questions",
+  );
+
+  const originalRandom = Math.random;
+  Math.random = () => {
+    throw new Error("Journey campaign construction cannot consult randomness.");
+  };
+  try {
+    assert.deepEqual(
+      buildLibraJourneyExtraCampaignRounds(),
+      JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+    );
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+test("Journey Turbo generation rejects trivial scales and dishonest division", () => {
+  for (const [difficultyIndex, difficulty] of DIFFICULTIES.entries()) {
+    for (let seedIndex = 0; seedIndex < SEEDS_PER_DIFFICULTY; seedIndex += 1) {
+      const round = progressionAdapter.generate(
+        difficulty,
+        createSeededRandom(
+          0x71b0_0000 + difficultyIndex * 0x1_0000 + seedIndex,
+        ),
+      );
+      assert.doesNotThrow(
+        () => assertSoundTeachingRound(round),
+        `${difficulty} Turbo seed ${seedIndex + 1}`,
+      );
+    }
   }
 });
 

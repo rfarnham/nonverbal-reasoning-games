@@ -18,6 +18,10 @@ import {
   weaveDifferences,
   weaveKey,
 } from "../app/games/braids/game-engine.ts";
+import {
+  JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+  buildBraidJourneyExtraCampaignRounds,
+} from "../app/games/braids/journey-campaign.ts";
 
 const DIFFICULTIES = ["Starter", "Junior", "Expert", "Wizard"];
 const SEEDS_PER_DIFFICULTY = 400;
@@ -313,6 +317,156 @@ test("Campaign answer positions are balanced without repeats or a repeated cycle
         .size > 1,
       `${difficulty}: not one four-position permutation repeated three times`,
     );
+  }
+});
+
+test("Journey-only Braids banks are frozen, valid, balanced, and disjoint", () => {
+  const expectations = {
+    "junior-2": "Junior",
+    "expert-2": "Expert",
+    "wizard-2": "Wizard",
+  };
+  const standaloneFingerprints = new Set(ROUNDS.map(roundFingerprint));
+  const journeyFingerprints = new Set();
+
+  assert.deepEqual(
+    Object.keys(JOURNEY_EXTRA_CAMPAIGN_ROUNDS),
+    Object.keys(expectations),
+  );
+  assert.equal(Object.isFrozen(JOURNEY_EXTRA_CAMPAIGN_ROUNDS), true);
+  assert.deepEqual(
+    buildBraidJourneyExtraCampaignRounds(),
+    JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+  );
+
+  for (const [level, difficulty] of Object.entries(expectations)) {
+    const rounds = JOURNEY_EXTRA_CAMPAIGN_ROUNDS[level];
+    const positions = rounds.map(({ correctIndex }) => correctIndex);
+
+    assert.equal(rounds.length, 12, `${level}: round count`);
+    assert.equal(Object.isFrozen(rounds), true, `${level}: frozen bank`);
+    assert.ok(
+      rounds.every((round) => round.difficulty === difficulty),
+      `${level}: mapped difficulty`,
+    );
+    assert.deepEqual(
+      [0, 1, 2, 3].map(
+        (position) =>
+          positions.filter((value) => value === position).length,
+      ),
+      [3, 3, 3, 3],
+      `${level}: answer balance`,
+    );
+    assert.ok(
+      positions.every(
+        (position, index) =>
+          index === 0 || positions[index - 1] !== position,
+      ),
+      `${level}: no adjacent answer-position repeat`,
+    );
+    assert.ok(
+      new Set(
+        [0, 4, 8].map((start) =>
+          positions.slice(start, start + 4).join(","),
+        ),
+      ).size > 1,
+      `${level}: no repeated four-position cycle`,
+    );
+
+    for (const [index, round] of rounds.entries()) {
+      assertValidRound(round, `${level} round ${index + 1}`);
+      const fingerprint = roundFingerprint(round);
+      assert.equal(
+        standaloneFingerprints.has(fingerprint),
+        false,
+        `${level} round ${index + 1}: standalone disjointness`,
+      );
+      assert.equal(
+        journeyFingerprints.has(fingerprint),
+        false,
+        `${level} round ${index + 1}: Journey disjointness`,
+      );
+      journeyFingerprints.add(fingerprint);
+    }
+  }
+
+  assert.equal(journeyFingerprints.size, 36);
+
+  const juniorRounds = JOURNEY_EXTRA_CAMPAIGN_ROUNDS["junior-2"];
+  assert.deepEqual(
+    ["3x2", "2x3"].map(
+      (dimensions) =>
+        juniorRounds.filter(
+          ({ clue }) =>
+            `${clue.verticalRibbons.length}x${clue.horizontalRibbons.length}` ===
+            dimensions,
+        ).length,
+    ),
+    [6, 6],
+    "Junior II balances wide and tall panes",
+  );
+  assert.deepEqual(
+    new Set(
+      juniorRounds.map(
+        ({ clue }) =>
+          clue.crossings.filter((crossing) => crossing === "vertical").length,
+      ),
+    ),
+    new Set([2, 3, 4]),
+    "Junior II varies crossing density across its permitted range",
+  );
+
+  const expertRounds = JOURNEY_EXTRA_CAMPAIGN_ROUNDS["expert-2"];
+  const wizardRounds = JOURNEY_EXTRA_CAMPAIGN_ROUNDS["wizard-2"];
+  for (const round of [...expertRounds, ...wizardRounds]) {
+    const localTraps = round.options.filter(
+      (option, optionIndex) =>
+        optionIndex !== round.correctIndex &&
+        weaveDifferences(option, round.correctPattern).total === 1,
+    );
+    assert.equal(localTraps.length, 2);
+  }
+  for (const [level, rounds] of [
+    ["Expert II", expertRounds],
+    ["Wizard II", wizardRounds],
+  ]) {
+    assert.deepEqual(
+      new Set(
+        rounds.map(
+          ({ clue }) =>
+            clue.crossings.filter(
+              (crossing) => crossing === "vertical",
+            ).length,
+        ),
+      ),
+      new Set([3, 4, 5, 6]),
+      `${level} varies crossing density across its permitted range`,
+    );
+  }
+  assert.ok(
+    expertRounds.every((round) =>
+      ribbons(round.clue).every(({ color }) => color !== "neutral"),
+    ),
+    "Expert II keeps the body-color scaffold",
+  );
+  assert.ok(
+    wizardRounds.every((round) =>
+      ribbons(round.clue).every(({ color }) => color === "neutral"),
+    ),
+    "Wizard II removes the body-color scaffold",
+  );
+
+  const originalRandom = Math.random;
+  Math.random = () => {
+    throw new Error("Journey campaign construction cannot consult randomness.");
+  };
+  try {
+    assert.deepEqual(
+      buildBraidJourneyExtraCampaignRounds(),
+      JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+    );
+  } finally {
+    Math.random = originalRandom;
   }
 });
 

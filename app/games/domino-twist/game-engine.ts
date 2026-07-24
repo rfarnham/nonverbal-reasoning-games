@@ -866,7 +866,7 @@ function tokenMask(token: string): PipMask {
   return rotatePipMask(PIP_PATTERNS[name as PipPatternName], turns);
 }
 
-type AuthoredSpec = {
+export type AuthoredDominoRoundSpec = Readonly<{
   pieces: readonly [
     readonly [string, string],
     readonly [string, string],
@@ -877,9 +877,9 @@ type AuthoredSpec = {
   preferredTrapPattern?: PipPatternName;
   preferredTrapTurn?: 1 | 3;
   salt: number;
-};
+}>;
 
-const STARTER_SPECS: readonly AuthoredSpec[] = [
+const STARTER_SPECS: readonly AuthoredDominoRoundSpec[] = [
   { pieces: [["center", "corners"], ["edges", "center-corners"]], targetShapeId: "2x2-rect", layoutId: "2x2-rows", salt: 11 },
   { pieces: [["center", "edges"], ["corners", "center-edges"]], targetShapeId: "2x2-rect", layoutId: "2x2-columns", salt: 23 },
   { pieces: [["center", "center-corners"], ["edges", "ring"]], targetShapeId: "2x2-rect", layoutId: "2x2-rows", salt: 37 },
@@ -894,7 +894,7 @@ const STARTER_SPECS: readonly AuthoredSpec[] = [
   { pieces: [["center-edges", "ring"], ["edges", "all"]], targetShapeId: "2x2-rect", layoutId: "2x2-columns", salt: 127 },
 ];
 
-const JUNIOR_SPECS: readonly AuthoredSpec[] = [
+const JUNIOR_SPECS: readonly AuthoredDominoRoundSpec[] = [
   { pieces: [["center", "corners"], ["edges", "center-corners"], ["center-edges", "ring"]], targetShapeId: "2x3-rect", layoutId: null, salt: 139 },
   { pieces: [["center", "edges"], ["corners", "center-edges"], ["ring", "all"]], targetShapeId: "2x3-rect", layoutId: null, salt: 149 },
   { pieces: [["center", "center-corners"], ["edges", "ring"], ["corners", "all"]], targetShapeId: "2x3-rect", layoutId: null, salt: 157 },
@@ -909,7 +909,7 @@ const JUNIOR_SPECS: readonly AuthoredSpec[] = [
   { pieces: [["edges", "center-edges"], ["center", "ring"], ["center-corners", "all"]], targetShapeId: "3x3-stair", layoutId: null, salt: 251 },
 ];
 
-const EXPERT_SPECS: readonly AuthoredSpec[] = [
+const EXPERT_SPECS: readonly AuthoredDominoRoundSpec[] = [
   { pieces: [["diag-two", "center"], ["diag-three", "corners"], ["top-pair", "corner-l"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 263 },
   { pieces: [["edge-single", "edges"], ["corner-single", "center-corners"], ["top-bar", "six"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "edge-single", preferredTrapTurn: 1, salt: 271 },
   { pieces: [["diag-two@1", "center-edges"], ["top-pair@1", "ring"], ["corner-l@2", "edge-single@2"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 3, salt: 283 },
@@ -924,7 +924,7 @@ const EXPERT_SPECS: readonly AuthoredSpec[] = [
   { pieces: [["diag-three", "corners"], ["six@1", "edges"], ["corner-single@1", "top-pair@2"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 3, salt: 389 },
 ];
 
-const WIZARD_SPECS: readonly AuthoredSpec[] = [
+const WIZARD_SPECS: readonly AuthoredDominoRoundSpec[] = [
   { pieces: [["diag-two", "center"], ["corner-l@1", "corners"], ["diag-two", "corner-l@1"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "diag-two", salt: 401 },
   { pieces: [["edge-single", "edges"], ["top-pair@1", "center-corners"], ["edge-single", "top-pair@1"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "edge-single", preferredTrapTurn: 1, salt: 419 },
   { pieces: [["top-pair@1", "center-edges"], ["edge-single@2", "ring"], ["top-pair@1", "edge-single@2"]], targetShapeId: "2x3-rect", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 3, salt: 431 },
@@ -939,7 +939,9 @@ const WIZARD_SPECS: readonly AuthoredSpec[] = [
   { pieces: [["top-pair@3", "corners"], ["six", "edges"], ["top-pair@3", "six"]], targetShapeId: "3x3-stair", layoutId: null, preferredTrapPattern: "top-pair", preferredTrapTurn: 3, salt: 541 },
 ];
 
-const AUTHORED_SPECS: Readonly<Record<Difficulty, readonly AuthoredSpec[]>> = {
+const AUTHORED_SPECS: Readonly<
+  Record<Difficulty, readonly AuthoredDominoRoundSpec[]>
+> = {
   Starter: STARTER_SPECS,
   Junior: JUNIOR_SPECS,
   Expert: EXPERT_SPECS,
@@ -953,7 +955,9 @@ const ANSWER_SEQUENCES: Readonly<Record<Difficulty, readonly number[]>> = {
   Wizard: [0, 2, 0, 1, 2, 1, 3, 2, 3, 1, 0, 3],
 };
 
-function piecesFromSpec(spec: AuthoredSpec): readonly DominoPiece[] {
+function piecesFromSpec(
+  spec: AuthoredDominoRoundSpec,
+): readonly DominoPiece[] {
   return spec.pieces.map(([first, second], index) => ({
     id: String.fromCharCode(65 + index),
     first: tokenMask(first),
@@ -1695,33 +1699,49 @@ export function validateRound(round: DominoRound): readonly string[] {
   return errors;
 }
 
+export function buildAuthoredDominoRounds(
+  collectionId: string,
+  difficulty: Difficulty,
+  specs: readonly AuthoredDominoRoundSpec[],
+  answers: readonly number[],
+): readonly DominoRound[] {
+  if (specs.length !== 12 || answers.length !== 12) {
+    throw new Error(`${collectionId} must contain exactly 12 authored rounds.`);
+  }
+  const sequenceErrors = answerSequenceErrors(difficulty, answers);
+  if (sequenceErrors.length > 0) {
+    throw new Error(sequenceErrors.join(" "));
+  }
+  const rounds = specs.map((spec, index) =>
+    assembleRound(
+      `${collectionId}-${String(index + 1).padStart(2, "0")}`,
+      difficulty,
+      piecesFromSpec(spec),
+      spec.targetShapeId,
+      spec.layoutId,
+      answers[index],
+      spec.salt,
+      spec.preferredTrapPattern,
+      spec.preferredTrapTurn,
+    ),
+  );
+  if (new Set(rounds.map(roundFingerprint)).size !== rounds.length) {
+    throw new Error(`${collectionId} fingerprints must be unique.`);
+  }
+  return rounds;
+}
+
 export function buildCampaignRounds(): readonly DominoRound[] {
   const rounds = (
     ["Starter", "Junior", "Expert", "Wizard"] as const
-  ).flatMap((difficulty) => {
-    const specs = AUTHORED_SPECS[difficulty];
-    const answers = ANSWER_SEQUENCES[difficulty];
-    if (specs.length !== 12 || answers.length !== 12) {
-      throw new Error(`${difficulty} must contain exactly 12 authored rounds.`);
-    }
-    const sequenceErrors = answerSequenceErrors(difficulty, answers);
-    if (sequenceErrors.length > 0) {
-      throw new Error(sequenceErrors.join(" "));
-    }
-    return specs.map((spec, index) =>
-      assembleRound(
-        `domino-${difficulty.toLowerCase()}-${String(index + 1).padStart(2, "0")}`,
-        difficulty,
-        piecesFromSpec(spec),
-        spec.targetShapeId,
-        spec.layoutId,
-        answers[index],
-        spec.salt,
-        spec.preferredTrapPattern,
-        spec.preferredTrapTurn,
-      ),
-    );
-  });
+  ).flatMap((difficulty) =>
+    buildAuthoredDominoRounds(
+      `domino-${difficulty.toLowerCase()}`,
+      difficulty,
+      AUTHORED_SPECS[difficulty],
+      ANSWER_SEQUENCES[difficulty],
+    ),
+  );
   if (new Set(rounds.map(roundFingerprint)).size !== rounds.length) {
     throw new Error("Authored Domino Twist fingerprints must be unique.");
   }

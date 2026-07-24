@@ -22,6 +22,11 @@ import {
   stripDistance,
   validateRound,
 } from "../app/games/changing-strips/game-engine.ts";
+import {
+  JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+  buildChangingStripsJourneyExtraCampaignRounds,
+} from "../app/games/changing-strips/journey-campaign.ts";
+import { progressionAdapter } from "../app/games/changing-strips/progression-adapter.ts";
 
 const GENERATED_COUNT_PER_DIFFICULTY = 400;
 
@@ -336,7 +341,17 @@ test("the photographed solved example uses the exact nine cells and an honest tr
 
 test("Campaign has 48 validated rounds with balanced, non-patterned answer positions", () => {
   assert.equal(ROUNDS.length, 48);
-  assert.equal(buildCampaignRounds().Starter.length, 12);
+  const rebuiltCampaign = buildCampaignRounds();
+  assert.deepEqual(
+    rebuiltCampaign,
+    CAMPAIGN_ROUNDS_BY_DIFFICULTY,
+    "the canonical authored builder reproduces standalone Campaign",
+  );
+  assert.deepEqual(
+    DIFFICULTIES.flatMap((difficulty) => rebuiltCampaign[difficulty]),
+    ROUNDS,
+    "Journey extensions do not alter the standalone 48-round sequence",
+  );
 
   const allFingerprints = new Set();
   for (const difficulty of DIFFICULTIES) {
@@ -453,6 +468,175 @@ test("Campaign has 48 validated rounds with balanced, non-patterned answer posit
     ],
     "Junior teaches each atomic family in a coherent four-round block",
   );
+});
+
+test("Journey-only banks add 36 deterministic, validated, disjoint rounds", () => {
+  const expectations = {
+    "junior-2": {
+      difficulty: "Junior",
+      positions: [1, 3, 0, 2, 1, 0, 3, 2, 0, 2, 1, 3],
+    },
+    "expert-2": {
+      difficulty: "Expert",
+      positions: [2, 0, 3, 1, 2, 1, 0, 3, 1, 3, 2, 0],
+    },
+    "wizard-2": {
+      difficulty: "Wizard",
+      positions: [0, 2, 3, 1, 3, 0, 1, 2, 1, 3, 0, 2],
+    },
+  };
+  const standaloneFingerprints = new Set(ROUNDS.map(roundFingerprint));
+  const journeyFingerprints = new Set();
+
+  assert.deepEqual(
+    Object.keys(JOURNEY_EXTRA_CAMPAIGN_ROUNDS),
+    Object.keys(expectations),
+  );
+  assert.equal(Object.isFrozen(JOURNEY_EXTRA_CAMPAIGN_ROUNDS), true);
+  assert.deepEqual(
+    buildChangingStripsJourneyExtraCampaignRounds(),
+    JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+    "Journey authored construction is deterministic",
+  );
+
+  for (const [level, expectation] of Object.entries(expectations)) {
+    const rounds = JOURNEY_EXTRA_CAMPAIGN_ROUNDS[level];
+    const positions = rounds.map(({ correctIndex }) => correctIndex);
+
+    assert.equal(rounds.length, 12, `${level}: round count`);
+    assert.equal(Object.isFrozen(rounds), true, `${level}: frozen bank`);
+    assert.ok(
+      rounds.every(
+        ({ difficulty }) => difficulty === expectation.difficulty,
+      ),
+      `${level}: mapped difficulty`,
+    );
+    assert.deepEqual(
+      positions,
+      expectation.positions,
+      `${level}: frozen answer schedule`,
+    );
+    assert.deepEqual(
+      [0, 1, 2, 3].map(
+        (position) =>
+          positions.filter((value) => value === position).length,
+      ),
+      [3, 3, 3, 3],
+      `${level}: answer balance`,
+    );
+    assert.ok(
+      positions.every(
+        (position, index) =>
+          index === 0 || positions[index - 1] !== position,
+      ),
+      `${level}: no adjacent answer-position repeat`,
+    );
+    assert.equal(
+      new Set(
+        [0, 4, 8].map((start) =>
+          positions.slice(start, start + 4).join(","),
+        ),
+      ).size,
+      3,
+      `${level}: no repeated four-position cycle`,
+    );
+
+    for (const [index, round] of rounds.entries()) {
+      assert.equal(
+        round.id,
+        `changing-strips-journey-${level}-${String(index + 1).padStart(2, "0")}`,
+      );
+      assertRoundContract(round, `${level} Journey ${index + 1}`);
+      assert.ok(
+        curriculumAllows(round),
+        `${level} family ${executionKinds(round).join(" then ")}`,
+      );
+
+      const fingerprint = roundFingerprint(round);
+      assert.equal(
+        standaloneFingerprints.has(fingerprint),
+        false,
+        `${level} round ${index + 1}: standalone disjointness`,
+      );
+      assert.equal(
+        journeyFingerprints.has(fingerprint),
+        false,
+        `${level} round ${index + 1}: Journey disjointness`,
+      );
+      journeyFingerprints.add(fingerprint);
+    }
+  }
+  assert.equal(journeyFingerprints.size, 36);
+  assert.deepEqual(
+    JOURNEY_EXTRA_CAMPAIGN_ROUNDS["junior-2"].map(
+      (round) => executionKinds(round)[0],
+    ),
+    [
+      "swap",
+      "swap",
+      "swap",
+      "swap",
+      "shift",
+      "shift",
+      "shift",
+      "shift",
+      "neighbor",
+      "neighbor",
+      "neighbor",
+      "neighbor",
+    ],
+    "Junior II repeats the taught atomic-family progression",
+  );
+
+  const originalRandom = Math.random;
+  Math.random = () => {
+    throw new Error("Authored Journey construction cannot use randomness.");
+  };
+  try {
+    assert.deepEqual(
+      buildChangingStripsJourneyExtraCampaignRounds(),
+      JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+    );
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+test("the adapter exposes seven explicit Journey banks and keeps Campaign separate", () => {
+  const expectedBanks = {
+    starter: CAMPAIGN_ROUNDS_BY_DIFFICULTY.Starter,
+    "junior-1": CAMPAIGN_ROUNDS_BY_DIFFICULTY.Junior,
+    "junior-2": JOURNEY_EXTRA_CAMPAIGN_ROUNDS["junior-2"],
+    "expert-1": CAMPAIGN_ROUNDS_BY_DIFFICULTY.Expert,
+    "expert-2": JOURNEY_EXTRA_CAMPAIGN_ROUNDS["expert-2"],
+    "wizard-1": CAMPAIGN_ROUNDS_BY_DIFFICULTY.Wizard,
+    "wizard-2": JOURNEY_EXTRA_CAMPAIGN_ROUNDS["wizard-2"],
+  };
+  const journeyFingerprints = new Set();
+
+  assert.equal(progressionAdapter.journeyContentVersion, "1");
+  assert.equal(progressionAdapter.campaignRounds.length, 48);
+  assert.deepEqual(progressionAdapter.campaignRounds, ROUNDS);
+  assert.deepEqual(
+    Object.keys(progressionAdapter.journeyCampaignRounds),
+    Object.keys(expectedBanks),
+  );
+
+  for (const [level, expectedRounds] of Object.entries(expectedBanks)) {
+    const rounds = progressionAdapter.journeyCampaignRounds[level];
+    assert.equal(rounds.length, 12, `${level}: adapter round count`);
+    assert.deepEqual(rounds, expectedRounds, `${level}: explicit bank`);
+    for (const round of rounds) {
+      const fingerprint = roundFingerprint(round);
+      assert.equal(
+        journeyFingerprints.has(fingerprint),
+        false,
+        `${level}: Journey fingerprint uniqueness`,
+      );
+      journeyFingerprints.add(fingerprint);
+    }
+  }
+  assert.equal(journeyFingerprints.size, 84);
 });
 
 test("fingerprints ignore answer placement and normalize equivalent card presentation", () => {

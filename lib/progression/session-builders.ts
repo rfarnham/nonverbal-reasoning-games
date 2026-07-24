@@ -9,11 +9,13 @@ import {
   type CampaignQuestionReference,
   type CulminationJourneyNode,
   type GeneratedQuestionReference,
+  type JourneyQuestionReference,
   type MissedQuestion,
   type NormalJourneyNode,
   type ProgressionAttempt,
   type ProgressionLevel,
   type QuestionReference,
+  type ReviewJourneyNode,
   type TurboJourneyNode,
 } from "./types.ts";
 
@@ -24,7 +26,13 @@ type TimedBuilderInput = {
 
 type NormalAttemptInput = TimedBuilderInput & {
   node: NormalJourneyNode;
-  campaignQuestions: readonly CampaignQuestionReference[];
+  campaignQuestions?: readonly CampaignQuestionReference[];
+  journeyQuestions?: readonly JourneyQuestionReference[];
+};
+
+type ReviewAttemptInput = TimedBuilderInput & {
+  node: ReviewJourneyNode;
+  journeyQuestions: readonly JourneyQuestionReference[];
 };
 
 type TurboAttemptInput = TimedBuilderInput & {
@@ -37,6 +45,7 @@ export type CulminationQuestionPool = {
   approachableQuestion: CampaignQuestionReference;
   campaignQuestions: readonly CampaignQuestionReference[];
   currentContentVersion: string;
+  currentJourneyContentVersion?: string;
   currentGeneratorVersion?: string;
 };
 
@@ -44,6 +53,10 @@ type CulminationAttemptInput = TimedBuilderInput & {
   node: CulminationJourneyNode;
   missedQuestions: readonly MissedQuestion[];
   questionPools: readonly CulminationQuestionPool[];
+  fixedSections?: readonly {
+    gameSlug: string;
+    questions: readonly JourneyQuestionReference[];
+  }[];
 };
 
 function requiredVersion(value: string, label: string): string {
@@ -119,19 +132,25 @@ export function createNormalProgressionAttempt({
   id,
   node,
   campaignQuestions,
+  journeyQuestions,
   nowMs,
 }: NormalAttemptInput): ProgressionAttempt {
-  if (campaignQuestions.length !== CAMPAIGN_QUESTIONS_PER_STOP) {
+  const questions = journeyQuestions ?? campaignQuestions ?? [];
+  if (questions.length !== CAMPAIGN_QUESTIONS_PER_STOP) {
     throw new Error(
       `A normal stop needs ${CAMPAIGN_QUESTIONS_PER_STOP} campaign questions.`,
     );
   }
   if (
-    campaignQuestions.some(
-      (question) =>
+    questions.some(
+      (question, index) =>
         question.gameSlug !== node.gameSlug ||
         question.level !== node.level ||
-        question.source !== "campaign",
+        (question.source === "journey"
+          ? question.journeyLevel !== node.journeyLevel ||
+            question.collectionId !== node.collectionId ||
+            question.questionIndex !== node.questionOffset + index
+          : question.source !== "campaign"),
     )
   ) {
     throw new Error(
@@ -141,7 +160,35 @@ export function createNormalProgressionAttempt({
   return createProgressionAttempt({
     id,
     node,
-    questions: campaignQuestions,
+    questions,
+    nowMs,
+  });
+}
+
+export function createReviewProgressionAttempt({
+  id,
+  node,
+  journeyQuestions,
+  nowMs,
+}: ReviewAttemptInput): ProgressionAttempt {
+  if (
+    journeyQuestions.length !== node.questionCount ||
+    journeyQuestions.some(
+      (question, index) =>
+        question.source !== "journey" ||
+        question.gameSlug !== node.gameSlug ||
+        question.level !== node.level ||
+        question.journeyLevel !== node.journeyLevel ||
+        question.collectionId !== node.collectionId ||
+        question.questionIndex !== node.questionOffset + index,
+    )
+  ) {
+    throw new Error("Review questions must match the Journey review stop.");
+  }
+  return createProgressionAttempt({
+    id,
+    node,
+    questions: journeyQuestions,
     nowMs,
   });
 }
@@ -204,6 +251,11 @@ function currentMissReference(
       ? question
       : undefined;
   }
+  if (question.source === "journey") {
+    return pool.currentJourneyContentVersion === question.contentVersion
+      ? question
+      : undefined;
+  }
 
   return pool.currentContentVersion === question.contentVersion
     ? question
@@ -262,6 +314,7 @@ export function createCulminationProgressionAttempt({
   node,
   missedQuestions,
   questionPools,
+  fixedSections = [],
   nowMs,
 }: CulminationAttemptInput): ProgressionAttempt {
   const poolsBySlug = new Map(
@@ -271,12 +324,41 @@ export function createCulminationProgressionAttempt({
     throw new Error("Culmination question pools must have unique game slugs.");
   }
 
-  const questions = node.gameSlugs.flatMap((gameSlug) => {
-    const pool = poolsBySlug.get(gameSlug);
-    if (!pool) {
-      throw new Error(`Missing culmination question pool for ${gameSlug}.`);
+  const fixedBySlug = new Map(
+    fixedSections.map((section) => [section.gameSlug, section.questions]),
+  );
+  if (fixedBySlug.size !== fixedSections.length) {
+    throw new Error("Fixed culmination sections must have unique game slugs.");
+  }
+  const questions = node.sections.flatMap((section) => {
+    if (section.selection === "mistakes") {
+      const pool = poolsBySlug.get(section.gameSlug);
+      if (!pool) {
+        throw new Error(
+          `Missing culmination question pool for ${section.gameSlug}.`,
+        );
+      }
+      return culminationSectionQuestions(id, node, pool, missedQuestions);
     }
-    return culminationSectionQuestions(id, node, pool, missedQuestions);
+    const fixed = fixedBySlug.get(section.gameSlug);
+    if (
+      !fixed ||
+      fixed.length !== section.questionCount ||
+      fixed.some(
+        (question, index) =>
+          question.source !== "journey" ||
+          question.gameSlug !== section.gameSlug ||
+          question.level !== node.level ||
+          question.journeyLevel !== node.journeyLevel ||
+          question.collectionId !== section.collectionId ||
+          question.questionIndex !== section.questionOffset + index,
+      )
+    ) {
+      throw new Error(
+        `Fixed culmination questions do not match ${section.gameSlug}.`,
+      );
+    }
+    return fixed;
   });
   const attempt = createProgressionAttempt({
     id,
@@ -285,11 +367,11 @@ export function createCulminationProgressionAttempt({
     nowMs,
   });
   if (
-    attempt.sections.length !== node.gameSlugs.length ||
+    attempt.sections.length !== node.sections.length ||
     attempt.sections.some(
       (section, index) =>
-        section.gameSlug !== node.gameSlugs[index] ||
-        section.questionCount !== node.questionsPerGame,
+        section.gameSlug !== node.sections[index]?.gameSlug ||
+        section.questionCount !== node.sections[index]?.questionCount,
     )
   ) {
     throw new Error("Culmination sections are not aligned to journey games.");

@@ -318,7 +318,12 @@ type WizardSpec =
 
 type AdvancedSpec = ExpertSpec | WizardSpec;
 
-type CampaignSpec = StarterSpec | JuniorSpec | AdvancedSpec;
+export type AuthoredLibraRoundSpec =
+  | StarterSpec
+  | JuniorSpec
+  | AdvancedSpec;
+
+type CampaignSpec = AuthoredLibraRoundSpec;
 
 type JuniorBlueprint = JuniorSpec extends infer Spec
   ? Spec extends JuniorSpec
@@ -2425,45 +2430,54 @@ function assertAnswerPositionSequence(
   }
 }
 
-export function buildRounds(): readonly Round[] {
-  const specs = campaignSpecs();
-  const levelIndexes: Record<Difficulty, number> = {
-    Starter: 0,
-    Junior: 0,
-    Expert: 0,
-    Wizard: 0,
-  };
+export function buildAuthoredLibraRounds(
+  collectionId: string,
+  difficulty: Difficulty,
+  specs: readonly AuthoredLibraRoundSpec[],
+  saltOffset = 0,
+): readonly Round[] {
+  if (specs.length !== 12) {
+    throw new Error(`${collectionId} must contain exactly 12 authored rounds.`);
+  }
+  if (specs.some((spec) => spec.difficulty !== difficulty)) {
+    throw new Error(`${collectionId} contains a round at the wrong difficulty.`);
+  }
   const rounds = specs.map((spec, index) => {
-    const levelIndex = levelIndexes[spec.difficulty];
-    levelIndexes[spec.difficulty] += 1;
     const round = assembleRound(
-      spec.difficulty,
+      difficulty,
       templateForSpec(spec),
       spec.correctIndex,
-      index,
-      `campaign-${spec.difficulty.toLowerCase()}-${String(levelIndex + 1).padStart(2, "0")}`,
+      saltOffset + index,
+      `${collectionId}-${String(index + 1).padStart(2, "0")}`,
     );
     const validation = validateRound(round);
     if (!validation.valid) {
       throw new Error(
-        `Invalid authored ${spec.difficulty} round ${levelIndex + 1}: ${validation.errors.join(" ")}`,
+        `Invalid ${collectionId} round ${index + 1}: ${validation.errors.join(" ")}`,
       );
     }
     return round;
   });
-
-  for (const difficulty of DIFFICULTIES) {
-    const levelRounds = rounds.filter(
-      (round) => round.difficulty === difficulty,
-    );
-    if (levelRounds.length !== 12) {
-      throw new Error(`${difficulty} must contain exactly 12 authored rounds.`);
-    }
-    assertAnswerPositionSequence(
-      difficulty,
-      levelRounds.map(({ correctIndex }) => correctIndex),
-    );
+  assertAnswerPositionSequence(
+    difficulty,
+    rounds.map(({ correctIndex }) => correctIndex),
+  );
+  if (new Set(rounds.map(roundFingerprint)).size !== rounds.length) {
+    throw new Error(`${collectionId} fingerprints must be unique.`);
   }
+  return rounds;
+}
+
+export function buildRounds(): readonly Round[] {
+  const specs = campaignSpecs();
+  const rounds = DIFFICULTIES.flatMap((difficulty, difficultyIndex) =>
+    buildAuthoredLibraRounds(
+      `campaign-${difficulty.toLowerCase()}`,
+      difficulty,
+      specs.filter((spec) => spec.difficulty === difficulty),
+      difficultyIndex * 12,
+    ),
+  );
   if (new Set(rounds.map(roundFingerprint)).size !== rounds.length) {
     throw new Error("Authored round fingerprints must be unique.");
   }

@@ -33,6 +33,10 @@ import {
 import { progressionAdapter } from "../app/games/domino-twist/progression-adapter.ts";
 import { progressionMetadata } from "../app/games/domino-twist/progression-metadata.ts";
 import { resolveProgressionQuestion } from "../lib/progression/game-adapter.ts";
+import {
+  JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+  buildDominoJourneyExtraCampaignRounds,
+} from "../app/games/domino-twist/journey-campaign.ts";
 
 const DIFFICULTIES = ["Starter", "Junior", "Expert", "Wizard"];
 const GENERATED_COUNT_PER_DIFFICULTY = 400;
@@ -74,6 +78,7 @@ const GENERATED = makeGeneratedCorpus();
 test("Domino Twist v2 migrates saved questions to the revised curriculum", () => {
   assert.equal(progressionMetadata.contentVersion, "2");
   assert.equal(progressionMetadata.generatorVersion, "2");
+  assert.equal(progressionMetadata.journeyContentVersion, "1");
 
   const campaign = resolveProgressionQuestion(progressionAdapter, {
     source: "campaign",
@@ -580,6 +585,148 @@ test("Campaign answer positions are balanced and resist guessable sequences", ()
         `${difficulty} block ${blockStart / 4 + 1} does not expose a full answer-position permutation`,
       );
     }
+  }
+});
+
+test("Journey-only Domino banks are frozen, valid, balanced, and disjoint", () => {
+  const expectations = {
+    "junior-2": "Junior",
+    "expert-2": "Expert",
+    "wizard-2": "Wizard",
+  };
+  const standaloneFingerprints = new Set(ROUNDS.map(roundFingerprint));
+  const journeyFingerprints = new Set();
+  const journeyIds = new Set();
+
+  assert.deepEqual(
+    Object.keys(JOURNEY_EXTRA_CAMPAIGN_ROUNDS),
+    Object.keys(expectations),
+  );
+  assert.equal(Object.isFrozen(JOURNEY_EXTRA_CAMPAIGN_ROUNDS), true);
+  assert.deepEqual(
+    buildDominoJourneyExtraCampaignRounds(),
+    JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+  );
+
+  for (const [level, difficulty] of Object.entries(expectations)) {
+    const rounds = JOURNEY_EXTRA_CAMPAIGN_ROUNDS[level];
+    const positions = rounds.map(({ correctIndex }) => correctIndex);
+
+    assert.equal(rounds.length, 12, `${level}: round count`);
+    assert.equal(Object.isFrozen(rounds), true, `${level}: frozen bank`);
+    assert.ok(
+      rounds.every((round) => round.difficulty === difficulty),
+      `${level}: mapped difficulty`,
+    );
+    assert.deepEqual(
+      [0, 1, 2, 3].map(
+        (position) =>
+          positions.filter((value) => value === position).length,
+      ),
+      [3, 3, 3, 3],
+      `${level}: answer balance`,
+    );
+    assert.ok(
+      positions.every(
+        (position, index) =>
+          index === 0 || positions[index - 1] !== position,
+      ),
+      `${level}: no adjacent answer-position repeat`,
+    );
+    assert.ok(
+      new Set(
+        [0, 4, 8].map((start) =>
+          positions.slice(start, start + 4).join(","),
+        ),
+      ).size > 1,
+      `${level}: no repeated four-position cycle`,
+    );
+    for (let blockStart = 0; blockStart < positions.length; blockStart += 4) {
+      assert.ok(
+        new Set(positions.slice(blockStart, blockStart + 4)).size < 4,
+        `${level}: block ${blockStart / 4 + 1} does not expose every answer position`,
+      );
+    }
+
+    for (const [index, round] of rounds.entries()) {
+      assert.equal(
+        round.id,
+        `journey-${level}-${String(index + 1).padStart(2, "0")}`,
+      );
+      assertRoundContract(round, `${level} round ${index + 1}`);
+      assert.equal(journeyIds.has(round.id), false);
+      journeyIds.add(round.id);
+
+      const fingerprint = roundFingerprint(round);
+      assert.equal(
+        standaloneFingerprints.has(fingerprint),
+        false,
+        `${level} round ${index + 1}: standalone disjointness`,
+      );
+      assert.equal(
+        journeyFingerprints.has(fingerprint),
+        false,
+        `${level} round ${index + 1}: Journey disjointness`,
+      );
+      journeyFingerprints.add(fingerprint);
+    }
+  }
+
+  assert.equal(journeyIds.size, 36);
+  assert.equal(journeyFingerprints.size, 36);
+
+  const juniorRounds = JOURNEY_EXTRA_CAMPAIGN_ROUNDS["junior-2"];
+  for (const [index, round] of juniorRounds.entries()) {
+    const impossible = round.options[round.correctIndex];
+    assert.equal(round.seamsVisible, false);
+    assert.equal(impossible.kind, "broken-pair");
+    assert.equal(impossible.mismatch.differingCells.length, 2);
+    assert.deepEqual(
+      new Set(
+        round.options
+          .filter(({ buildable }) => buildable)
+          .map(({ witness }) => witness.layoutId),
+      ),
+      new Set(legalLayoutIdsForShape(round.targetShapeId)),
+      `Junior II round ${index + 1}: possible choices span every legal hidden tiling`,
+    );
+  }
+
+  for (const level of ["expert-2", "wizard-2"]) {
+    const rounds = JOURNEY_EXTRA_CAMPAIGN_ROUNDS[level];
+    assert.deepEqual(
+      new Set(rounds.map(({ targetShapeId }) => targetShapeId)),
+      new Set(["2x3-rect", "2x4-ledge", "3x3-stair"]),
+      `${level}: target-shape coverage`,
+    );
+    for (const [index, round] of rounds.entries()) {
+      const impossible = round.options[round.correctIndex];
+      assert.equal(round.seamsVisible, false);
+      assert.equal(impossible.kind, "twisted-half");
+      assert.equal(impossible.mismatch.differingCells.length, 1);
+      assert.deepEqual(
+        new Set(
+          round.options
+            .filter(({ buildable }) => buildable)
+            .map(({ witness }) => witness.layoutId),
+        ),
+        new Set(legalLayoutIdsForShape(round.targetShapeId)),
+        `${level} round ${index + 1}: possible choices span every legal hidden tiling`,
+      );
+    }
+  }
+
+  const originalRandom = Math.random;
+  Math.random = () => {
+    throw new Error("Journey campaign construction cannot consult randomness.");
+  };
+  try {
+    assert.deepEqual(
+      buildDominoJourneyExtraCampaignRounds(),
+      JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+    );
+  } finally {
+    Math.random = originalRandom;
   }
 });
 

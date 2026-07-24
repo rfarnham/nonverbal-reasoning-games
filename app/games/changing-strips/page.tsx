@@ -27,6 +27,7 @@ import {
   readSoundPreference,
   writeSoundPreference,
 } from "@/lib/game-audio";
+import { journeyLevelLabel } from "@/lib/progression/types";
 import {
   ROUNDS,
   TUTORIAL,
@@ -197,10 +198,6 @@ function progressionTargetHref(
 ): string {
   const query = new URLSearchParams(target.query).toString();
   return query ? `${target.pathname}?${query}` : target.pathname;
-}
-
-function progressionLevelLabel(level: string): string {
-  return `${level.charAt(0).toUpperCase()}${level.slice(1)}`;
 }
 
 function isEditableShortcutTarget(target: EventTarget | null): boolean {
@@ -1299,7 +1296,9 @@ export default function ChangingStripsPage() {
             {controlledSession ? (
               <ProgressionGameHud
                 mode={controlledSession.runKind}
-                levelLabel={progressionLevelLabel(controlledSession.level)}
+                levelLabel={journeyLevelLabel(
+                  controlledSession.attempt.journeyLevel,
+                )}
                 current={controlledSession.currentQuestionNumber}
                 total={controlledSession.totalQuestions}
                 remainingMs={controlledSession.turboRemainingMs ?? undefined}

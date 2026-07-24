@@ -316,7 +316,7 @@
 
 .boardTabs {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
   gap: 7px;
   margin-bottom: 16px;
 }
@@ -518,6 +518,12 @@
 .nodeTurbo {
   border-radius: 22px;
   background: #f3bd4e;
+}
+
+.nodeReview:not(.nodeCleared) {
+  border-radius: 24px;
+  background: #bde9df;
+  color: #0b654f;
 }
 
 .nodeCulmination {
@@ -875,10 +881,6 @@
 
   .avatarGrid {
     grid-template-columns: repeat(3, 1fr);
-  }
-
-  .boardTabs {
-    grid-template-columns: repeat(2, 1fr);
   }
 
   .onboardingCard {

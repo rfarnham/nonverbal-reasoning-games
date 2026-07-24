@@ -5,7 +5,7 @@ import { JourneyClient } from "@/components/progression/JourneyClient";
 export const metadata: Metadata = {
   title: "Journey",
   description:
-    "Follow a four-level path through Spatial Gym's visual reasoning games.",
+    "Follow a seven-board path through Spatial Gym games and visual-spatial review.",
 };
 
 export default function JourneyPage() {

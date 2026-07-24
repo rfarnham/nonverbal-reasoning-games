@@ -41,6 +41,9 @@ yarn-error.log*
 /.wrangler/
 /outputs/
 /work/
+/tmp/
+__pycache__/
+*.py[cod]
 
 # local editor and tooling state
 .idea/

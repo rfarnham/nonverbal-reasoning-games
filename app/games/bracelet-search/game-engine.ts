@@ -2138,8 +2138,10 @@ export const CAMPAIGN_SPECS: readonly EncodedRoundSpec[] = [
   }
 ];
 
-export function buildCampaignRounds(): readonly BraceletRound[] {
-  return CAMPAIGN_SPECS.map((spec) => {
+export function buildEncodedBraceletRounds(
+  specs: readonly EncodedRoundSpec[],
+): readonly BraceletRound[] {
+  const rounds = specs.map((spec) => {
     const bracelet = decodeBracelet(spec.bracelet);
     const options = spec.options.map((encoded, index) => ({
       pattern: decodePattern(encoded),
@@ -2155,6 +2157,18 @@ export function buildCampaignRounds(): readonly BraceletRound[] {
     assertValidRound(round, spec.id);
     return round;
   });
+
+  if (new Set(rounds.map(({ id }) => id)).size !== rounds.length) {
+    throw new Error("Bracelet Search round IDs must be unique.");
+  }
+  if (new Set(rounds.map(roundFingerprint)).size !== rounds.length) {
+    throw new Error("Bracelet Search round fingerprints must be unique.");
+  }
+  return rounds;
+}
+
+export function buildCampaignRounds(): readonly BraceletRound[] {
+  return buildEncodedBraceletRounds(CAMPAIGN_SPECS);
 }
 
 export const ROUNDS = buildCampaignRounds();

@@ -1,0 +1,202 @@
+{
+  "schemaVersion": 1,
+  "rounds": {
+    "mk-cyprus-2026-12-q03": ["8", "9", "10", "11", "12"],
+    "mk-cyprus-2014-12-q02": [
+      "Triangle, square, circle",
+      "Triangle, circle, square",
+      "Circle, triangle, square",
+      "Square, triangle, circle",
+      "Square, circle, triangle"
+    ],
+    "mk-cyprus-2017-12-q01": ["Adam", "Basil", "Charlie", "David", "Edgar"],
+    "mk-cyprus-2021-12-q04": [
+      "Point A",
+      "Point B",
+      "Point C",
+      "Point D",
+      "Point E"
+    ],
+    "mk-cyprus-2016-12-q05": [
+      "Point A",
+      "Point B",
+      "Point C",
+      "Point D",
+      "Point E"
+    ],
+    "mk-cyprus-2023-12-q09": [
+      "Point A",
+      "Point B",
+      "Point C",
+      "Point D",
+      "Point E"
+    ],
+    "mk-cyprus-2016-12-q15": ["KNAO", "KNGO", "KNR", "AGRO", "KAO"],
+    "mk-cyprus-2018-12-q09": [
+      "Broomstick A",
+      "Broomstick B",
+      "Broomstick C",
+      "Broomstick D",
+      "Broomstick E"
+    ],
+    "mk-cyprus-2021-12-q07": ["2 children", "3 children", "4 children", "5 children", "6 children"],
+    "mk-cyprus-2018-12-q11": [
+      "Point A",
+      "Point B",
+      "Point C",
+      "Point D",
+      "Point E"
+    ],
+    "mk-cyprus-2020-12-a-q08": [
+      "A is blue, B is green, and C is red",
+      "A is green, B is red, and C is blue",
+      "A is red, B is blue, and C is green",
+      "A is green, B is blue, and C is red",
+      "A is blue, B is red, and C is green"
+    ],
+    "mk-cyprus-2018-12-q08": ["1", "2", "3", "4", "5"],
+    "mk-cyprus-2016-12-q13": ["3 doors", "4 doors", "5 doors", "6 doors", "7 doors"],
+    "mk-cyprus-2018-12-q12": ["Piece A", "Piece B", "Piece C", "Piece D", "Piece C or D"],
+    "mk-cyprus-2025-12-q09": ["6 cubes", "8 cubes", "9 cubes", "10 cubes", "12 cubes"],
+    "mk-cyprus-2019-12-q09": [
+      "Gates 1 and 2",
+      "Gates 2 and 3",
+      "Gates 3 and 4",
+      "Gates 3 and 5",
+      "Gates 4 and 5"
+    ],
+    "mk-cyprus-2024-12-q19": [
+      "Pieces 1 and 2",
+      "Pieces 1 and 3",
+      "Pieces 3 and 4",
+      "Pieces 2 and 4",
+      "Pieces 2 and 3"
+    ],
+    "mk-cyprus-2013-12-q23": ["1 stamp", "2 stamps", "3 stamps", "4 stamps", "5 stamps"],
+    "mk-cyprus-2013-12-q21": [
+      "Tiles A and C",
+      "Tiles A and B",
+      "Tiles B and C",
+      "Only tile B",
+      "All three tiles"
+    ],
+    "mk-cyprus-2013-12-q12": ["7 carrots", "8 carrots", "9 carrots", "15 carrots", "16 carrots"],
+    "mk-cyprus-2023-34-q04": [
+      "Pieces 1 and 2",
+      "Pieces 1 and 3",
+      "Pieces 1 and 4",
+      "Pieces 2 and 3",
+      "Pieces 2 and 4"
+    ],
+    "mk-cyprus-2025-34-q12": [
+      "Pieces 1 and 2",
+      "Pieces 1 and 5",
+      "Pieces 3 and 4",
+      "Pieces 3 and 5",
+      "Pieces 4 and 5"
+    ],
+    "mk-cyprus-2023-34-q03": [
+      "4 and 9",
+      "5 and 9",
+      "5 and 10",
+      "6 and 9",
+      "7 and 12"
+    ],
+    "mk-cyprus-2021-34-q08": ["3 kg", "4 kg", "5 kg", "6 kg", "7 kg"],
+    "mk-cyprus-2026-34-q03": [
+      "X to P",
+      "Y to P",
+      "Z to P",
+      "X to Q",
+      "Z to Q"
+    ],
+    "mk-cyprus-2022-34-q04": ["Move 3 boxes", "Move 4 boxes", "Move 5 boxes", "Move 6 boxes", "Move 7 boxes"],
+    "mk-cyprus-2022-34-q02": [
+      "Letter A",
+      "Letter B",
+      "Letter C",
+      "Letter D",
+      "Letter E"
+    ],
+    "mk-cyprus-2021-34-q06": ["33", "42", "48", "53", "69"],
+    "mk-cyprus-2026-34-q09": [
+      "Lion, ostrich, tiger, kangaroo",
+      "Lion, tiger, ostrich, kangaroo",
+      "Tiger, ostrich, kangaroo, lion",
+      "Ostrich, kangaroo, lion, tiger",
+      "Tiger, kangaroo, lion, ostrich"
+    ],
+    "mk-cyprus-2018-34-q02": ["2 balloons", "3 balloons", "4 balloons", "5 balloons", "6 balloons"],
+    "mk-cyprus-2020-34-a-q08": ["3 pieces", "4 pieces", "5 pieces", "6 pieces", "7 pieces"],
+    "mk-cyprus-2020-34-a-q15": ["1", "2", "3", "4", "5"],
+    "mk-cyprus-2018-34-q08": ["5 people", "4 people", "6 people", "2 people", "3 people"],
+    "mk-cyprus-2026-34-q15": ["8 towers", "9 towers", "10 towers", "11 towers", "12 towers"],
+    "mk-cyprus-2019-34-q10": ["1 shape", "2 shapes", "3 shapes", "4 shapes", "5 shapes"],
+    "mk-cyprus-2014-34-q13": ["Stick 1", "Stick 3", "Stick 4", "Stick 5", "Stick 7"],
+    "mk-cyprus-2016-34-q14": [
+      "Pieces V, X, and Y",
+      "Pieces V, U, and Y",
+      "Pieces V, Z, and Y",
+      "Pieces X, Z, and Y",
+      "Pieces U, X, and Y"
+    ],
+    "mk-cyprus-2026-34-q12": [
+      "Square A1",
+      "Square B1",
+      "Square C2",
+      "Square D2",
+      "Square A3"
+    ],
+    "mk-cyprus-2015-34-q14": [
+      "Sign A",
+      "Sign B",
+      "Sign C",
+      "Sign D",
+      "Sign E"
+    ],
+    "mk-cyprus-2018-34-q11": ["5 pieces", "6 pieces", "7 pieces", "8 pieces", "9 pieces"],
+    "mk-cyprus-2017-34-q17": ["3", "4", "5", "6", "7"],
+    "mk-cyprus-2015-34-q18": ["5 squares", "6 squares", "7 squares", "8 squares", "9 squares"],
+    "mk-cyprus-2024-34-q18": ["270 g", "280 g", "290 g", "300 g", "310 g"],
+    "mk-cyprus-2015-34-q17": [
+      "Remove square 1",
+      "Remove square 2",
+      "Remove square 3",
+      "Remove square 6",
+      "Remove square 7"
+    ],
+    "mk-cyprus-2026-34-q19": [
+      "Harry and Chris",
+      "Harry and Maria",
+      "Thomas and Maria",
+      "Chris and Maria",
+      "Thomas and Chris"
+    ],
+    "mk-cyprus-2023-34-q22": ["SRR", "RSR", "RSS", "RRS", "SRS"],
+    "mk-cyprus-2022-34-q20": [
+      "Pieces 1 and 2",
+      "Pieces 2 and 3",
+      "Pieces 1 and 4",
+      "Pieces 4 and 5",
+      "Pieces 1 and 5"
+    ],
+    "mk-cyprus-2014-34-q23": ["18 squares", "19 squares", "20 squares", "21 squares", "22 squares"],
+    "mk-cyprus-2024-34-q22": ["4 cells", "5 cells", "6 cells", "7 cells", "8 cells"],
+    "mk-cyprus-2016-34-q21": [
+      "To the left of Q",
+      "Between Q and R",
+      "Between R and S",
+      "Between S and T",
+      "To the right of T"
+    ],
+    "mk-cyprus-2021-34-q24": [
+      "1 square",
+      "2 squares",
+      "1 hexagon",
+      "1 triangle",
+      "2 triangles"
+    ],
+    "mk-cyprus-2025-34-q24": ["1 kg", "2 kg", "3 kg", "4 kg", "5 kg"],
+    "mk-cyprus-2012-34-q09": ["0 shapes", "1 shape", "2 shapes", "3 shapes", "4 shapes"]
+  }
+}

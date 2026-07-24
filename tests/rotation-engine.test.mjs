@@ -16,7 +16,13 @@ import {
   reflectPattern,
   rotatePattern,
   roundFingerprint,
+  validateRound,
 } from "../app/games/rotation-match/game-engine.ts";
+import {
+  JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+  buildRotationJourneyExtraCampaignRounds,
+} from "../app/games/rotation-match/journey-campaign.ts";
+import { progressionAdapter } from "../app/games/rotation-match/progression-adapter.ts";
 
 const DIFFICULTIES = ["Easy", "Medium", "Hard", "Wizard"];
 const CAMPAIGN_DIFFICULTIES = DIFFICULTIES;
@@ -66,6 +72,7 @@ function assertValidRound(round, label) {
     `${label} must have exactly one exact answer`,
   );
   assert.equal(round.optionKinds[round.correctIndex], "correct");
+  assert.deepEqual(validateRound(round), [], `${label} validator`);
 }
 
 function generatedCorpus(countPerDifficulty = 400) {
@@ -117,6 +124,260 @@ test("each campaign level balances the correct answer across all four positions"
       `${difficulty} answer position distribution`,
     );
   }
+});
+
+test("Journey II Rotation Match banks are frozen, validated, balanced, and disjoint", () => {
+  const expectations = {
+    "junior-2": "Medium",
+    "expert-2": "Hard",
+    "wizard-2": "Wizard",
+  };
+  const standaloneIds = ROUNDS.map(roundFingerprint);
+  const fingerprints = new Set(standaloneIds);
+
+  assert.equal(ROUNDS.length, 48);
+  assert.deepEqual(
+    Object.keys(JOURNEY_EXTRA_CAMPAIGN_ROUNDS),
+    Object.keys(expectations),
+  );
+  assert.equal(Object.isFrozen(JOURNEY_EXTRA_CAMPAIGN_ROUNDS), true);
+
+  for (const [level, difficulty] of Object.entries(expectations)) {
+    const rounds = JOURNEY_EXTRA_CAMPAIGN_ROUNDS[level];
+    const positions = rounds.map(({ correctIndex }) => correctIndex);
+    assert.equal(rounds.length, 12, `${level} round count`);
+    assert.equal(Object.isFrozen(rounds), true, `${level} frozen bank`);
+    assert.ok(
+      rounds.every((round) => round.difficulty === difficulty),
+      `${level} canonical difficulty`,
+    );
+    assert.deepEqual(
+      [0, 1, 2, 3].map(
+        (position) =>
+          positions.filter((value) => value === position).length,
+      ),
+      [3, 3, 3, 3],
+      `${level} answer balance`,
+    );
+    assert.ok(
+      positions.every(
+        (position, index) =>
+          index === 0 || positions[index - 1] !== position,
+      ),
+      `${level} adjacent answer repeat`,
+    );
+    const blocks = [0, 4, 8].map((start) =>
+      positions.slice(start, start + 4).join(","),
+    );
+    assert.equal(
+      new Set(blocks).size,
+      blocks.length,
+      `${level} repeated four-answer cycle`,
+    );
+
+    for (const [index, round] of rounds.entries()) {
+      assertValidRound(round, `${level} round ${index + 1}`);
+      const fingerprint = roundFingerprint(round);
+      assert.equal(
+        fingerprints.has(fingerprint),
+        false,
+        `${level} round ${index + 1} repeats content`,
+      );
+      fingerprints.add(fingerprint);
+    }
+  }
+
+  assert.equal(fingerprints.size, 84);
+  assert.deepEqual(ROUNDS.map(roundFingerprint), standaloneIds);
+});
+
+test("Journey II rounds cover every transform with honest tier mechanics", () => {
+  const transformKey = ({ transform }) =>
+    transform.kind === "rotation"
+      ? `${transform.direction}:${transform.degrees}`
+      : `reflection:${transform.axis}`;
+  const expectedTransforms = new Set([
+    "clockwise:90",
+    "clockwise:180",
+    "clockwise:270",
+    "counterclockwise:90",
+    "counterclockwise:180",
+    "counterclockwise:270",
+    "reflection:vertical",
+    "reflection:horizontal",
+    "reflection:main-diagonal",
+    "reflection:anti-diagonal",
+  ]);
+  const junior = JOURNEY_EXTRA_CAMPAIGN_ROUNDS["junior-2"];
+  const expert = JOURNEY_EXTRA_CAMPAIGN_ROUNDS["expert-2"];
+  const wizard = JOURNEY_EXTRA_CAMPAIGN_ROUNDS["wizard-2"];
+
+  for (const [level, rounds] of Object.entries(
+    JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+  )) {
+    assert.deepEqual(
+      new Set(rounds.map(transformKey)),
+      expectedTransforms,
+      `${level} transform coverage`,
+    );
+    assert.ok(
+      rounds.every(
+        ({ clue }) =>
+          new Set(
+            clue
+              .filter(({ color }) => color !== "empty")
+              .map(({ color }) => color),
+          ).size >= 3,
+      ),
+      `${level} should use varied, legible colors`,
+    );
+  }
+
+  assert.deepEqual(
+    junior.map(({ clue }) =>
+      clue.filter(({ color }) => color !== "empty").length,
+    ),
+    [6, 5, 6, 5, 6, 5, 6, 5, 6, 5, 6, 5],
+  );
+  assert.ok(
+    junior.every(({ clue }) =>
+      clue.every(({ motif }) => motif === "none"),
+    ),
+  );
+  assert.ok(
+    junior.every(({ optionKinds }) =>
+      optionKinds.includes("one-block-off"),
+    ),
+  );
+
+  const complexityProfile = (rounds) =>
+    rounds.map(({ clue }) => {
+      const filled = clue.filter(({ color }) => color !== "empty");
+      return `${filled.length}:${
+        filled.filter(({ motif }) => motif === "cap").length
+      }`;
+    });
+  assert.deepEqual(
+    complexityProfile(expert),
+    complexityProfile(wizard),
+    "Wizard II must deepen inference without adding visual density",
+  );
+  assert.deepEqual(complexityProfile(expert), [
+    "6:2",
+    "7:3",
+    "6:4",
+    "7:2",
+    "6:3",
+    "7:4",
+    "6:2",
+    "7:3",
+    "6:4",
+    "7:2",
+    "6:3",
+    "7:4",
+  ]);
+  assert.ok(
+    expert.every(
+      ({ optionKinds }) =>
+        optionKinds.includes("one-motif-off") &&
+        optionKinds.includes("one-block-off"),
+    ),
+  );
+
+  for (const [index, round] of wizard.entries()) {
+    assert.equal(
+      round.optionKinds.filter((kind) => kind === "one-motif-off")
+        .length,
+      2,
+    );
+    assert.ok(round.optionKinds.includes("one-block-off"));
+    assert.deepEqual(
+      hiddenTransformOptionIndexes(round.clue, round.options),
+      [round.correctIndex],
+      `Wizard II ${index + 1} hidden answer`,
+    );
+    for (const [optionIndex, option] of round.options.entries()) {
+      if (optionIndex === round.correctIndex) continue;
+      const differenceCount = differingTileIndexes(
+        option,
+        round.correctPattern,
+      ).length;
+      assert.ok(
+        differenceCount >= 1 && differenceCount <= 2,
+        `Wizard II ${index + 1} option ${optionIndex + 1}`,
+      );
+    }
+  }
+});
+
+test("Journey II banks rebuild without randomness and wire all seven adapter levels", () => {
+  const originalRandom = Math.random;
+  Math.random = () => {
+    throw new Error("Authored Journey rounds cannot consult randomness.");
+  };
+  try {
+    assert.deepEqual(
+      buildRotationJourneyExtraCampaignRounds(),
+      JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+    );
+  } finally {
+    Math.random = originalRandom;
+  }
+
+  assert.equal(progressionAdapter.campaignRounds.length, 48);
+  assert.equal(progressionAdapter.journeyContentVersion, "1");
+  assert.deepEqual(
+    Object.keys(progressionAdapter.journeyCampaignRounds),
+    [
+      "starter",
+      "junior-1",
+      "junior-2",
+      "expert-1",
+      "expert-2",
+      "wizard-1",
+      "wizard-2",
+    ],
+  );
+  for (const [journeyLevel, rounds] of Object.entries(
+    progressionAdapter.journeyCampaignRounds,
+  )) {
+    assert.equal(rounds.length, 12, `${journeyLevel} adapter bank`);
+  }
+  for (const level of ["junior-2", "expert-2", "wizard-2"]) {
+    assert.deepEqual(
+      progressionAdapter.journeyCampaignRounds[level].map(
+        roundFingerprint,
+      ),
+      JOURNEY_EXTRA_CAMPAIGN_ROUNDS[level].map(roundFingerprint),
+    );
+  }
+});
+
+test("the complete round validator rejects corrupted authored state", () => {
+  const source = JOURNEY_EXTRA_CAMPAIGN_ROUNDS["expert-2"][0];
+  const duplicateOptions = [...source.options];
+  const wrongIndex = source.correctIndex === 0 ? 1 : 0;
+  duplicateOptions[wrongIndex] = source.correctPattern;
+  const duplicateErrors = validateRound({
+    ...source,
+    options: duplicateOptions,
+  });
+  assert.ok(
+    duplicateErrors.some((error) =>
+      error.includes("Exactly one option"),
+    ),
+  );
+  assert.ok(
+    duplicateErrors.some((error) =>
+      error.includes("distinct"),
+    ),
+  );
+
+  assert.ok(
+    validateRound({ ...source, turn: "incorrect label" }).some(
+      (error) => error.includes("label"),
+    ),
+  );
 });
 
 test("each authored difficulty covers every turn length, direction, and reflection axis", () => {

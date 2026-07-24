@@ -3,6 +3,10 @@ import test from "node:test";
 
 import { CAMPAIGN_ROUNDS } from "../app/games/pattern-matrix/campaign-data.ts";
 import {
+  JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+  buildPatternMatrixJourneyExtraCampaignRounds,
+} from "../app/games/pattern-matrix/journey-campaign.ts";
+import {
   ALL_RULES,
   DIFFICULTIES,
   OPERATIONS,
@@ -11,6 +15,8 @@ import {
   applyGridRule,
   applyMatrixRule,
   applySequenceStep,
+  blueprintFromRound,
+  buildRound,
   combinePatterns,
   compatiblePrograms,
   compatibleRules,
@@ -871,6 +877,223 @@ test("Campaign is a balanced, unique, fully validated 48-round curriculum", () =
   assert.deepEqual([...patternScales].sort(), [0, 1, 2]);
   assert.ok(operations.has("match"), "Campaign needs the agreement rule");
   assert.ok(operations.has("neither"), "Campaign needs NOR complement");
+});
+
+test("Journey II banks add 36 balanced rounds without changing standalone Campaign", () => {
+  const levels = {
+    "junior-2": "Medium",
+    "expert-2": "Hard",
+    "wizard-2": "Wizard",
+  };
+  const standaloneIds = CAMPAIGN_ROUNDS.map(({ id }) => id);
+
+  assert.deepEqual(
+    Object.keys(JOURNEY_EXTRA_CAMPAIGN_ROUNDS),
+    Object.keys(levels),
+  );
+  assert.equal(Object.isFrozen(JOURNEY_EXTRA_CAMPAIGN_ROUNDS), true);
+  assert.equal(CAMPAIGN_ROUNDS.length, 48);
+
+  const fingerprints = new Set(CAMPAIGN_ROUNDS.map(roundFingerprint));
+  for (const [level, difficulty] of Object.entries(levels)) {
+    const rounds = JOURNEY_EXTRA_CAMPAIGN_ROUNDS[level];
+    assert.equal(rounds.length, 12, `${level} must have 12 rounds`);
+    assert.equal(Object.isFrozen(rounds), true);
+    assert.ok(
+      rounds.every((round) => round.difficulty === difficulty),
+      `${level} has the wrong canonical difficulty`,
+    );
+
+    const positions = rounds.map(({ correctIndex }) => correctIndex);
+    assert.deepEqual(
+      [0, 1, 2, 3].map(
+        (position) =>
+          positions.filter((value) => value === position).length,
+      ),
+      [3, 3, 3, 3],
+      `${level} answer positions are not balanced`,
+    );
+    for (let index = 1; index < positions.length; index += 1) {
+      assert.notEqual(
+        positions[index - 1],
+        positions[index],
+        `${level} repeats adjacent answer positions`,
+      );
+    }
+    const fourRoundBlocks = [0, 4, 8].map((start) =>
+      positions.slice(start, start + 4).join(","),
+    );
+    assert.equal(
+      new Set(fourRoundBlocks).size,
+      fourRoundBlocks.length,
+      `${level} repeats a four-answer cycle`,
+    );
+
+    for (const round of rounds) {
+      assert.deepEqual(validateRound(round), [], round.id);
+      assert.deepEqual(correctIndexes(round), [round.correctIndex]);
+      assert.deepEqual(
+        inferenceOptionIndexes(round.matrix, round.options),
+        [round.correctIndex],
+        `${round.id} must expose exactly one valid option`,
+      );
+
+      const compatible = compatiblePrograms(round.matrix);
+      const rawCompatible = PLAYER_RULE_PROGRAMS.filter((program) =>
+        programMatchesEvidence(round.matrix, program),
+      );
+      assert.deepEqual(
+        compatible.map(programKey),
+        rawCompatible.map(programKey),
+        `${round.id} must enumerate the complete normalized grammar`,
+      );
+      assert.deepEqual(
+        compatible.map(programKey),
+        [programKey(round.rule)],
+        `${round.id} must have one provable rule`,
+      );
+
+      const fingerprint = roundFingerprint(round);
+      assert.ok(
+        !fingerprints.has(fingerprint),
+        `${round.id} repeats standalone or Journey content`,
+      );
+      fingerprints.add(fingerprint);
+    }
+  }
+
+  assert.equal(fingerprints.size, 84);
+  assert.deepEqual(
+    CAMPAIGN_ROUNDS.map(({ id }) => id),
+    standaloneIds,
+    "Journey content must not mutate the standalone 48",
+  );
+});
+
+test("Journey II tier mechanics preserve teaching order and meaningful distractors", () => {
+  const junior = JOURNEY_EXTRA_CAMPAIGN_ROUNDS["junior-2"];
+  const expert = JOURNEY_EXTRA_CAMPAIGN_ROUNDS["expert-2"];
+  const wizard = JOURNEY_EXTRA_CAMPAIGN_ROUNDS["wizard-2"];
+  const familyCounts = (rounds) =>
+    Object.fromEntries(
+      ["combine", "sequence", "grid"].map((family) => [
+        family,
+        rounds.filter(({ rule }) => rule.family === family).length,
+      ]),
+    );
+
+  assert.deepEqual(familyCounts(junior), {
+    combine: 6,
+    sequence: 6,
+    grid: 0,
+  });
+  assert.deepEqual(familyCounts(expert), {
+    combine: 6,
+    sequence: 4,
+    grid: 2,
+  });
+  assert.deepEqual(familyCounts(wizard), {
+    combine: 6,
+    sequence: 4,
+    grid: 2,
+  });
+
+  assert.ok(
+    junior.every(
+      ({ rule }) =>
+        rule.family !== "combine" ||
+        (rule.operation !== "match" && rule.operation !== "neither"),
+    ),
+    "Junior II must not introduce complement operations",
+  );
+  assert.ok(
+    expert.some(
+      ({ rule }) =>
+        rule.family === "combine" && rule.operation === "match",
+    ),
+  );
+  assert.ok(
+    expert.some(
+      ({ rule }) =>
+        rule.family === "combine" && rule.operation === "neither",
+    ),
+  );
+  assert.deepEqual(
+    [...new Set(expert.map(({ rule }) => rule.family))].sort(),
+    ["combine", "grid", "sequence"],
+  );
+  assert.ok(
+    wizard.every(({ hintPolicy }) => hintPolicy === "never"),
+    "Wizard II rules must remain hidden after a miss",
+  );
+
+  for (const round of junior) {
+    assertGenerousOptionSeparation(round);
+    assert.equal(new Set(round.options.map(({ mask }) => mask)).size, 4);
+    const sizeIsTheRule =
+      round.rule.family === "sequence" &&
+      (round.rule.step === "grow" || round.rule.step === "shrink");
+    for (const [index, option] of round.options.entries()) {
+      if (index === round.correctIndex) continue;
+      assert.equal(option.shape, round.correctPattern.shape, round.id);
+      assert.equal(option.fill, round.correctPattern.fill, round.id);
+      if (!sizeIsTheRule) {
+        assert.equal(option.scale, round.correctPattern.scale, round.id);
+      }
+      assert.ok(
+        maskDifferenceCount(option, round.correctPattern) >= 2,
+        round.id,
+      );
+    }
+  }
+  for (const round of [...expert, ...wizard]) {
+    assert.ok(
+      round.optionKinds.includes("one-feature-off"),
+      `${round.id} needs a close local misconception`,
+    );
+    assert.ok(
+      round.optionKinds.includes("wrong-rule"),
+      `${round.id} needs a plausible wrong-rule distractor`,
+    );
+  }
+
+  const introducedBeforeWizard = new Set(
+    [
+      ...CAMPAIGN_ROUNDS.slice(0, 36),
+      ...junior,
+      ...expert,
+    ].flatMap(({ rule }) => rulePartIds(rule)),
+  );
+  for (const round of wizard) {
+    for (const partId of rulePartIds(round.rule)) {
+      assert.ok(
+        introducedBeforeWizard.has(partId),
+        `${round.id} introduces untaught ${partId}`,
+      );
+    }
+  }
+});
+
+test("Journey II frozen inputs rebuild deterministically through the canonical builder", () => {
+  const originalRandom = Math.random;
+  Math.random = () => {
+    throw new Error("Journey authored rounds must not consult randomness.");
+  };
+  try {
+    const rebuilt = buildPatternMatrixJourneyExtraCampaignRounds();
+    assert.deepEqual(rebuilt, JOURNEY_EXTRA_CAMPAIGN_ROUNDS);
+    for (const rounds of Object.values(rebuilt)) {
+      for (const round of rounds) {
+        assert.deepEqual(
+          buildRound(blueprintFromRound(round)),
+          round,
+          `${round.id} did not rebuild exactly`,
+        );
+      }
+    }
+  } finally {
+    Math.random = originalRandom;
+  }
 });
 
 test("every authored cascade needs the intersection of ambiguous evidence", () => {

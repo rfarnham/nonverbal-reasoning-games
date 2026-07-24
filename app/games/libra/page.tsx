@@ -31,6 +31,7 @@ import {
   useProgressionGameSession,
 } from "@/components/progression/useProgressionGameSession";
 import { resolveProgressionQuestion } from "@/lib/progression/game-adapter";
+import { journeyLevelLabel } from "@/lib/progression/types";
 import {
   AnswerLoad,
   BalanceScale,
@@ -64,6 +65,7 @@ import {
   buildTeachingProof,
   canOpenHistoricalReview,
   discoveredStrategyIdsAfterLesson,
+  hasSoundTeachingRound,
   isInfiniteCurriculumCandidate,
   orderedStrategyIdsForRound,
   preRoundStrategyIds,
@@ -143,10 +145,6 @@ function progressionTargetHref(
 ): string {
   const query = new URLSearchParams(target.query).toString();
   return query ? `${target.pathname}?${query}` : target.pathname;
-}
-
-function progressionLevelLabel(level: string): string {
-  return `${level.charAt(0).toUpperCase()}${level.slice(1)}`;
 }
 
 function teachingProofFeedback(round: Round): string {
@@ -254,6 +252,9 @@ function tryBuildInfiniteSessionRound(
       );
       const fingerprint = roundFingerprint(round);
       rejectedFingerprints.add(fingerprint);
+      if (!hasSoundTeachingRound(round)) {
+        continue;
+      }
       if (!isInfiniteCurriculumCandidate(round, discoveredStrategyIds)) {
         continue;
       }
@@ -1625,7 +1626,9 @@ export default function LibraPage() {
             {controlledSession ? (
               <ProgressionGameHud
                 mode={controlledSession.runKind}
-                levelLabel={progressionLevelLabel(controlledSession.level)}
+                levelLabel={journeyLevelLabel(
+                  controlledSession.attempt.journeyLevel,
+                )}
                 current={controlledSession.currentQuestionNumber}
                 total={controlledSession.totalQuestions}
                 remainingMs={

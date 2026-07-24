@@ -9,6 +9,7 @@ import {
   TUTORIAL,
   PuzzleGenerationError,
   applyFolds,
+  buildAuthoredShapeFoldRounds,
   buildRounds,
   describePattern,
   difficultyPunchBounds,
@@ -23,6 +24,11 @@ import {
   unfoldStages,
   validateRound,
 } from "../app/games/shape-fold/game-engine.ts";
+import {
+  JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+  buildShapeFoldJourneyExtraCampaignRounds,
+} from "../app/games/shape-fold/journey-campaign.ts";
+import { progressionAdapter } from "../app/games/shape-fold/progression-adapter.ts";
 
 const DIFFICULTIES = ["Easy", "Medium", "Hard", "Wizard"];
 const FOLD_COUNTS = {
@@ -77,6 +83,243 @@ test("campaign answer positions are balanced without exploitable sequences", () 
     assert.notDeepEqual(positions.slice(0, 4), positions.slice(4, 8));
     assert.notDeepEqual(positions.slice(4, 8), positions.slice(8, 12));
   }
+});
+
+test("Journey II Shape Fold banks are frozen, balanced, valid, and globally disjoint", () => {
+  const expectations = {
+    "junior-2": "Medium",
+    "expert-2": "Hard",
+    "wizard-2": "Wizard",
+  };
+  const standaloneFingerprints = ROUNDS.map(roundFingerprint);
+  const fingerprints = new Set(standaloneFingerprints);
+
+  assert.deepEqual(
+    Object.keys(JOURNEY_EXTRA_CAMPAIGN_ROUNDS),
+    Object.keys(expectations),
+  );
+  assert.equal(Object.isFrozen(JOURNEY_EXTRA_CAMPAIGN_ROUNDS), true);
+  assert.equal(ROUNDS.length, 48);
+
+  for (const [level, difficulty] of Object.entries(expectations)) {
+    const rounds = JOURNEY_EXTRA_CAMPAIGN_ROUNDS[level];
+    const positions = rounds.map(({ correctIndex }) => correctIndex);
+    assert.equal(rounds.length, 12, `${level} round count`);
+    assert.equal(Object.isFrozen(rounds), true, `${level} frozen bank`);
+    assert.ok(
+      rounds.every((round) => round.difficulty === difficulty),
+      `${level} difficulty mapping`,
+    );
+    assert.deepEqual(
+      [0, 1, 2, 3].map(
+        (position) =>
+          positions.filter((value) => value === position).length,
+      ),
+      [3, 3, 3, 3],
+      `${level} answer balance`,
+    );
+    assert.ok(
+      positions.every(
+        (position, index) =>
+          index === 0 || positions[index - 1] !== position,
+      ),
+      `${level} adjacent answer repeat`,
+    );
+    const blocks = [0, 4, 8].map((start) =>
+      positions.slice(start, start + 4).join(","),
+    );
+    assert.equal(
+      new Set(blocks).size,
+      blocks.length,
+      `${level} repeated four-answer cycle`,
+    );
+
+    for (const round of rounds) {
+      assert.deepEqual(validateRound(round), [], level);
+      assert.equal(new Set(round.options.map(patternKey)).size, 4);
+      assert.equal(
+        round.options.filter((option) =>
+          patternsEqual(option, round.correctPattern),
+        ).length,
+        1,
+      );
+      const fingerprint = roundFingerprint(round);
+      assert.equal(
+        fingerprints.has(fingerprint),
+        false,
+        `${level} repeats standalone or Journey content`,
+      );
+      fingerprints.add(fingerprint);
+    }
+  }
+
+  assert.equal(fingerprints.size, 84);
+  assert.deepEqual(ROUNDS.map(roundFingerprint), standaloneFingerprints);
+});
+
+test("Journey II fold geometry deepens reasoning without adding visual clutter", () => {
+  const axis = (direction) =>
+    direction === "left" || direction === "right"
+      ? "vertical"
+      : "horizontal";
+  const junior = JOURNEY_EXTRA_CAMPAIGN_ROUNDS["junior-2"];
+  const expert = JOURNEY_EXTRA_CAMPAIGN_ROUNDS["expert-2"];
+  const wizard = JOURNEY_EXTRA_CAMPAIGN_ROUNDS["wizard-2"];
+
+  assert.equal(new Set(junior.map(({ folds }) => folds.join(","))).size, 12);
+  assert.deepEqual(
+    new Set(junior.flatMap(({ folds }) => folds)),
+    new Set(["left", "right", "up", "down"]),
+  );
+  assert.equal(
+    junior.filter(
+      ({ folds }) => new Set(folds.map(axis)).size === 1,
+    ).length,
+    4,
+  );
+  for (const round of junior) {
+    assert.equal(round.folds.length, 2);
+    assert.equal(round.punches.length, 1);
+    assert.equal(round.correctPattern.length, 4);
+  }
+
+  assert.deepEqual(
+    expert.map(({ folds }) => folds.join(",")),
+    wizard.map(({ folds }) => folds.join(",")),
+    "Wizard II should use the same fold-stack profile as Expert II",
+  );
+  assert.deepEqual(
+    expert.map(({ punches }) => punches.length),
+    [2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
+  );
+  assert.deepEqual(
+    wizard.map(({ punches }) => punches.length),
+    expert.map(({ punches }) => punches.length),
+    "Wizard II should match Expert II punch density",
+  );
+
+  for (const round of [...expert, ...wizard]) {
+    assert.equal(round.folds.length, 3);
+    assert.equal(new Set(round.folds.map(axis)).size, 2);
+    assert.equal(
+      round.correctPattern.length,
+      round.punches.length * 8,
+    );
+    assert.ok(
+      new Set(round.punches.map(({ x }) => x)).size >= 2,
+      "advanced punches should span columns",
+    );
+    assert.ok(
+      new Set(round.punches.map(({ y }) => y)).size >= 2,
+      "advanced punches should span rows",
+    );
+  }
+  for (const round of wizard) {
+    for (const step of round.foldSteps) {
+      assert.deepEqual(
+        foldDirectionCandidates(step),
+        [step.direction],
+      );
+    }
+  }
+});
+
+test("Journey II distractors preserve exact near-miss and wrong-punch misconceptions", () => {
+  for (const [level, rounds] of Object.entries(
+    JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+  )) {
+    for (const [roundIndex, round] of rounds.entries()) {
+      assert.equal(
+        round.optionKinds.filter((kind) => kind === "near-miss").length,
+        1,
+      );
+      assert.equal(
+        round.optionKinds.filter((kind) => kind === "wrong-punch")
+          .length,
+        2,
+      );
+      for (const [optionIndex, option] of round.options.entries()) {
+        if (optionIndex === round.correctIndex) continue;
+        const difference = patternDifference(
+          option,
+          round.correctPattern,
+        );
+        if (round.optionKinds[optionIndex] === "near-miss") {
+          assert.equal(
+            difference.missing.length,
+            1,
+            `${level} ${roundIndex + 1} near-miss`,
+          );
+          assert.equal(difference.extra.length, 1);
+        } else {
+          const orbitSize = 2 ** round.folds.length;
+          assert.equal(
+            difference.missing.length,
+            orbitSize,
+            `${level} ${roundIndex + 1} wrong punch`,
+          );
+          assert.equal(difference.extra.length, orbitSize);
+        }
+      }
+    }
+  }
+});
+
+test("Journey II banks rebuild without randomness and wire all seven adapter levels", () => {
+  const originalRandom = Math.random;
+  Math.random = () => {
+    throw new Error("Authored Journey construction cannot use randomness.");
+  };
+  try {
+    assert.deepEqual(
+      buildShapeFoldJourneyExtraCampaignRounds(),
+      JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+    );
+  } finally {
+    Math.random = originalRandom;
+  }
+
+  assert.equal(progressionAdapter.campaignRounds.length, 48);
+  assert.equal(progressionAdapter.journeyContentVersion, "1");
+  assert.deepEqual(
+    Object.keys(progressionAdapter.journeyCampaignRounds),
+    [
+      "starter",
+      "junior-1",
+      "junior-2",
+      "expert-1",
+      "expert-2",
+      "wizard-1",
+      "wizard-2",
+    ],
+  );
+  for (const [level, rounds] of Object.entries(
+    progressionAdapter.journeyCampaignRounds,
+  )) {
+    assert.equal(rounds.length, 12, `${level} adapter bank`);
+  }
+  for (const level of ["junior-2", "expert-2", "wizard-2"]) {
+    assert.deepEqual(
+      progressionAdapter.journeyCampaignRounds[level].map(
+        roundFingerprint,
+      ),
+      JOURNEY_EXTRA_CAMPAIGN_ROUNDS[level].map(roundFingerprint),
+    );
+  }
+
+  assert.throws(
+    () =>
+      buildAuthoredShapeFoldRounds([
+        {
+          difficulty: "Medium",
+          folds: ["left", "up"],
+          punches: [{ x: -1, y: -1 }],
+          correctIndex: 0,
+          distractorSalt: 0,
+        },
+      ]),
+    /invalid|punch/i,
+  );
 });
 
 test("authored rounds calculate one exact answer with distinct close options", () => {

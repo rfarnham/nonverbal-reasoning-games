@@ -1,8 +1,13 @@
 import { questionReferenceKey } from "./questions.ts";
 import {
+  JOURNEY_LEVELS,
   PROGRESSION_LEVELS,
+  journeyCampaignCollectionId,
+  journeyLevelDifficulty,
   type CampaignQuestionReference,
   type GeneratedQuestionReference,
+  type JourneyLevel,
+  type JourneyQuestionReference,
   type ProgressionLevel,
   type QuestionReference,
 } from "./types.ts";
@@ -10,7 +15,7 @@ import {
 const GAME_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const DEFAULT_GENERATION_CANDIDATES = 48;
 
-export type ProgressionGameAdapter<
+type ProgressionGameAdapterBase<
   Round,
   EngineDifficulty extends string,
 > = Readonly<{
@@ -29,10 +34,45 @@ export type ProgressionGameAdapter<
   ): Round;
 }>;
 
+export type JourneyQuestionCollection<Round> = Readonly<{
+  id: string;
+  journeyLevel: JourneyLevel;
+  rounds: readonly Round[];
+}>;
+
+export type ProgressionGameAdapter<
+  Round,
+  EngineDifficulty extends string,
+> = ProgressionGameAdapterBase<Round, EngineDifficulty> &
+  Readonly<{
+    journeyContentVersion: string;
+    journeyCampaignRounds: Readonly<
+      Record<JourneyLevel, readonly Round[]>
+    >;
+    journeyCollections: readonly JourneyQuestionCollection<Round>[];
+  }>;
+
+export type ProgressionGameAdapterDefinition<
+  Round,
+  EngineDifficulty extends string,
+> = ProgressionGameAdapterBase<Round, EngineDifficulty> &
+  Readonly<{
+    /**
+     * Optional only during the staged migration. New adapters must provide an
+     * explicit seven-level bank and independent Journey content version.
+     */
+    journeyContentVersion?: string;
+    journeyCampaignRounds?: Readonly<
+      Partial<Record<JourneyLevel, readonly Round[]>>
+    >;
+    journeyCollections?: readonly JourneyQuestionCollection<Round>[];
+  }>;
+
 export type QuestionResolutionKind =
   | "current"
   | "materialized"
   | "campaign-updated"
+  | "journey-updated"
   | "generated-fallback";
 
 export type ResolvedProgressionQuestion<Round> = Readonly<{
@@ -98,7 +138,7 @@ export function defineProgressionGameAdapter<
   Round,
   EngineDifficulty extends string,
 >(
-  adapter: ProgressionGameAdapter<Round, EngineDifficulty>,
+  adapter: ProgressionGameAdapterDefinition<Round, EngineDifficulty>,
 ): ProgressionGameAdapter<Round, EngineDifficulty> {
   const gameSlug = requiredText(adapter.gameSlug, "Game slug");
   if (!GAME_SLUG.test(gameSlug)) {
@@ -112,8 +152,16 @@ export function defineProgressionGameAdapter<
     adapter.generatorVersion,
     "Generator version",
   );
+  const journeyContentVersion = requiredText(
+    adapter.journeyContentVersion ?? contentVersion,
+    "Journey content version",
+  );
 
   const seenFingerprints = new Set<string>();
+  const campaignRoundsByLevel = {} as Record<
+    ProgressionLevel,
+    readonly Round[]
+  >;
   for (const level of PROGRESSION_LEVELS) {
     const difficulty = adapter.difficultyByLevel[level];
     if (typeof difficulty !== "string" || !difficulty.trim()) {
@@ -122,6 +170,7 @@ export function defineProgressionGameAdapter<
     const rounds = adapter.campaignRounds.filter(
       (round) => adapter.difficultyOf(round) === difficulty,
     );
+    campaignRoundsByLevel[level] = rounds;
     if (rounds.length !== 12) {
       throw new Error(
         `${gameSlug} needs exactly 12 ${level} Campaign rounds; found ${rounds.length}.`,
@@ -138,11 +187,104 @@ export function defineProgressionGameAdapter<
     }
   }
 
+  const explicitJourneyBank = adapter.journeyCampaignRounds !== undefined;
+  const journeyCampaignRounds = {} as Record<
+    JourneyLevel,
+    readonly Round[]
+  >;
+  const journeyFingerprints = new Set<string>();
+  for (const journeyLevel of JOURNEY_LEVELS) {
+    const level = journeyLevelDifficulty(journeyLevel);
+    const rounds =
+      adapter.journeyCampaignRounds?.[journeyLevel] ??
+      campaignRoundsByLevel[level];
+    if (!rounds || (explicitJourneyBank && !adapter.journeyCampaignRounds?.[journeyLevel])) {
+      throw new Error(
+        `${gameSlug} is missing its explicit ${journeyLevel} Journey bank.`,
+      );
+    }
+    if (rounds.length !== 12) {
+      throw new Error(
+        `${gameSlug} needs exactly 12 ${journeyLevel} Journey rounds; found ${rounds.length}.`,
+      );
+    }
+    const difficulty = adapter.difficultyByLevel[level];
+    for (const round of rounds) {
+      if (adapter.difficultyOf(round) !== difficulty) {
+        throw new Error(
+          `${gameSlug} ${journeyLevel} contains a round outside ${level} difficulty.`,
+        );
+      }
+      if (explicitJourneyBank) {
+        const fingerprint = checkedFingerprint(adapter.fingerprint(round));
+        if (journeyFingerprints.has(fingerprint)) {
+          throw new Error(
+            `${gameSlug} has a duplicate Journey fingerprint: ${fingerprint}`,
+          );
+        }
+        journeyFingerprints.add(fingerprint);
+      }
+    }
+    journeyCampaignRounds[journeyLevel] = [...rounds];
+  }
+
+  const collectionIds = new Set<string>();
+  const journeyCollections: JourneyQuestionCollection<Round>[] =
+    JOURNEY_LEVELS.map((journeyLevel) => {
+      const id = journeyCampaignCollectionId(journeyLevel);
+      collectionIds.add(id);
+      return {
+        id,
+        journeyLevel,
+        rounds: journeyCampaignRounds[journeyLevel],
+      };
+    });
+  for (const collection of adapter.journeyCollections ?? []) {
+    const id = requiredText(collection.id, "Journey collection ID");
+    if (collectionIds.has(id)) {
+      throw new Error(`${gameSlug} has a duplicate Journey collection: ${id}`);
+    }
+    if (!JOURNEY_LEVELS.includes(collection.journeyLevel)) {
+      throw new Error(`${gameSlug} has an unknown Journey collection level.`);
+    }
+    if (!collection.rounds.length) {
+      throw new Error(`${gameSlug} Journey collection ${id} is empty.`);
+    }
+    const difficulty =
+      adapter.difficultyByLevel[
+        journeyLevelDifficulty(collection.journeyLevel)
+      ];
+    const collectionFingerprints = new Set<string>();
+    for (const round of collection.rounds) {
+      if (adapter.difficultyOf(round) !== difficulty) {
+        throw new Error(
+          `${gameSlug} Journey collection ${id} has the wrong difficulty.`,
+        );
+      }
+      const fingerprint = checkedFingerprint(adapter.fingerprint(round));
+      if (collectionFingerprints.has(fingerprint)) {
+        throw new Error(
+          `${gameSlug} Journey collection ${id} has a duplicate fingerprint.`,
+        );
+      }
+      collectionFingerprints.add(fingerprint);
+    }
+    collectionIds.add(id);
+    journeyCollections.push({
+      id,
+      journeyLevel: collection.journeyLevel,
+      rounds: [...collection.rounds],
+    });
+  }
+
   return {
     ...adapter,
     gameSlug,
     contentVersion,
     generatorVersion,
+    journeyContentVersion,
+    journeyCampaignRounds,
+    journeyCollections,
   };
 }
 
@@ -174,6 +316,73 @@ export function campaignQuestionReferences<
     contentVersion: adapter.contentVersion,
     fingerprint: checkedFingerprint(adapter.fingerprint(round)),
   }));
+}
+
+export function journeyCampaignRoundsForLevel<
+  Round,
+  EngineDifficulty extends string,
+>(
+  adapter: ProgressionGameAdapter<Round, EngineDifficulty>,
+  journeyLevel: JourneyLevel,
+): readonly Round[] {
+  return adapter.journeyCampaignRounds[journeyLevel];
+}
+
+export type JourneyQuestionReferenceInput = Readonly<{
+  collectionId: string;
+  questionOffset?: number;
+  questionCount?: number;
+}>;
+
+export function journeyQuestionReferences<
+  Round,
+  EngineDifficulty extends string,
+>(
+  adapter: ProgressionGameAdapter<Round, EngineDifficulty>,
+  journeyLevel: JourneyLevel,
+  input: JourneyQuestionReferenceInput = {
+    collectionId: journeyCampaignCollectionId(journeyLevel),
+  },
+): readonly JourneyQuestionReference[] {
+  const collectionId = requiredText(
+    input.collectionId,
+    "Journey collection ID",
+  );
+  const collection = adapter.journeyCollections.find(
+    ({ id }) => id === collectionId,
+  );
+  if (!collection || collection.journeyLevel !== journeyLevel) {
+    throw new ProgressionQuestionResolutionError(
+      `Journey collection ${collectionId} is unavailable at ${journeyLevel}.`,
+    );
+  }
+  const questionOffset = input.questionOffset ?? 0;
+  const questionCount =
+    input.questionCount ?? collection.rounds.length - questionOffset;
+  if (
+    !Number.isInteger(questionOffset) ||
+    questionOffset < 0 ||
+    !Number.isInteger(questionCount) ||
+    questionCount < 1 ||
+    questionOffset + questionCount > collection.rounds.length
+  ) {
+    throw new ProgressionQuestionResolutionError(
+      `Journey collection ${collectionId} does not contain that question range.`,
+    );
+  }
+  const level = journeyLevelDifficulty(journeyLevel);
+  return collection.rounds
+    .slice(questionOffset, questionOffset + questionCount)
+    .map((round, index) => ({
+      source: "journey",
+      gameSlug: adapter.gameSlug,
+      level,
+      journeyLevel,
+      collectionId,
+      questionIndex: questionOffset + index,
+      contentVersion: adapter.journeyContentVersion,
+      fingerprint: checkedFingerprint(adapter.fingerprint(round)),
+    }));
 }
 
 /**
@@ -248,6 +457,58 @@ function campaignResolution<
     fingerprint,
     resolution: updated
       ? "campaign-updated"
+      : materialized
+        ? "materialized"
+        : "current",
+    migrated: !sameReference(ref, normalized),
+  };
+}
+
+function journeyResolution<
+  Round,
+  EngineDifficulty extends string,
+>(
+  adapter: ProgressionGameAdapter<Round, EngineDifficulty>,
+  ref: JourneyQuestionReference,
+): ResolvedProgressionQuestion<Round> {
+  const collection = adapter.journeyCollections.find(
+    ({ id }) => id === ref.collectionId,
+  );
+  if (!collection || collection.journeyLevel !== ref.journeyLevel) {
+    throw new ProgressionQuestionResolutionError(
+      `Journey collection ${ref.collectionId} is unavailable at ${ref.journeyLevel}.`,
+    );
+  }
+  const round = collection.rounds[ref.questionIndex];
+  if (!round) {
+    throw new ProgressionQuestionResolutionError(
+      `Journey question ${ref.questionIndex + 1} is unavailable in ${ref.collectionId}.`,
+    );
+  }
+  const level = journeyLevelDifficulty(collection.journeyLevel);
+  const fingerprint = checkedFingerprint(adapter.fingerprint(round));
+  const normalized: JourneyQuestionReference = {
+    source: "journey",
+    gameSlug: adapter.gameSlug,
+    level,
+    journeyLevel: collection.journeyLevel,
+    collectionId: collection.id,
+    questionIndex: ref.questionIndex,
+    contentVersion: adapter.journeyContentVersion,
+    fingerprint,
+  };
+  const materialized = ref.fingerprint === undefined;
+  const updated =
+    ref.contentVersion !== normalized.contentVersion ||
+    ref.level !== normalized.level ||
+    (ref.fingerprint !== undefined && ref.fingerprint !== fingerprint);
+  return {
+    ref: normalized,
+    round,
+    playId: questionReferenceKey(normalized),
+    fingerprint,
+    resolution: updated
+      ? "journey-updated"
       : materialized
         ? "materialized"
         : "current",
@@ -357,9 +618,13 @@ export function resolveProgressionQuestion<
   options: ResolveQuestionOptions = {},
 ): ResolvedProgressionQuestion<Round> {
   assertMatchingGame(adapter, ref);
-  return ref.source === "campaign"
-    ? campaignResolution(adapter, ref)
-    : generatedResolution(adapter, ref, options);
+  if (ref.source === "campaign") {
+    return campaignResolution(adapter, ref);
+  }
+  if (ref.source === "journey") {
+    return journeyResolution(adapter, ref);
+  }
+  return generatedResolution(adapter, ref, options);
 }
 
 export function createFreshGeneratedQuestion<

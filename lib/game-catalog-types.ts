@@ -10,6 +10,7 @@ export type GameInfo = {
   progression: {
     contentVersion: string;
     generatorVersion: string;
+    journeyContentVersion?: string;
   };
   shelfOrder?: number;
   featured?: boolean;

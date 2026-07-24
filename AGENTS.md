@@ -291,17 +291,45 @@ Journey is generic:
   change cannot rearrange earned progress;
 - store compact question references and content versions, not rendered rounds.
 
-Each profile advances through four boards: Starter, Junior, Expert, and Wizard.
-Every board contains eight ordinary stops, four **Turbo Time** stops, and one
-culmination. The cadence is:
+Each profile advances through seven Journey boards:
 
-`ordinary, ordinary, turbo` repeated four times, then culmination.
+`Starter → Junior I → Junior II → Expert I → Expert II → Wizard I → Wizard II`.
+
+Starter contains eight ordinary stops, four **Turbo Time** stops, and one
+culmination. Junior I and above add two Math Kangaroo spatial-review stops, one
+after each half of the ordinary/Turbo path. Their cadence is:
+
+`(ordinary, ordinary, turbo) × 2, spatial review` repeated twice, then
+culmination.
 
 An ordinary stop runs the selected game's 12-question Campaign level for the
-board difficulty. One stop contains only one game. Intermediate state MUST be
-saved after every answer and transition so a reload or later visit resumes the
-exact stop, question, first-attempt history, redemption queue, and active
-practice time.
+board difficulty. Junior II, Expert II, and Wizard II use separate,
+Journey-only authored 12-question banks owned and validated by each game; they
+MUST NOT expand or alter the standalone 48-question Campaign. One stop contains
+only one game. Intermediate state MUST be saved after every answer and
+transition so a reload or later visit resumes the exact stop, question,
+first-attempt history, redemption queue, and active practice time.
+
+Math Kangaroo spatial review:
+
+- appears exactly twice on every board from Junior I onward;
+- uses 12 distinct questions per stop;
+- uses grades 1–2 on Junior I through Expert I;
+- uses grades 3–4 on Expert II through Wizard II;
+- keeps question prompts as semantic HTML and bundles only selected,
+  question-scoped illustrations locally;
+- removes prompt text from illustration crops and relabels answer options 1–5;
+- verifies every answer against the official answer key;
+- provides a question-specific wrong-answer hint, at least two reviewed
+  solution steps, and a causal explanation animation grounded in the actual
+  local illustration;
+- uses named, normalized illustration regions or paths so the animation can
+  trace, exactly transform, compare, or count the specific evidence; a generic
+  highlight followed by an answer reveal is not sufficient;
+- ends every animation by revealing the official-key answer, using a real
+  image answer region for visual choices or the semantic answer card for an
+  OCR-only text, pair, number, or sequence choice;
+- retains the same full-stop and redemption behavior as ordinary stops.
 
 Turbo Time:
 
@@ -316,30 +344,37 @@ Turbo Time:
 - finishes with the same untimed redemption loop as other sessions;
 - requires at least one solved puzzle to be eligible to clear.
 
-A board culmination runs three questions per snapshotted game: one Starter
-Campaign question and two prior missed questions from that game. If there are
-not enough distinct misses, fill from the current Campaign level. Culmination
-sections are sequential and resumable. Before the first question of every game
-section, keep that game’s canonical solved Example visible with explicit
-section context and a player-triggered Continue action; never flash through it
-or auto-dismiss it. Persist that acknowledgement, and do not count time spent
-reading the Example as active practice. A non-Wizard culmination advances the
-avatar only after the complete test and redemption are finished; Wizard ends
-with a mastery celebration. Question selection MUST treat a reference as the
-same question before and after its optional fingerprint is materialized, and a
-saved culmination with an untouched legacy collision MUST repair generically
-without discarding already solved sections.
+A board culmination runs three questions per snapshotted canonical game: one
+Starter Campaign question and two prior missed questions from that game. If
+there are not enough distinct misses, fill from the current Campaign level.
+From Junior I onward, append four fresh Math Kangaroo questions that were not
+used in either review stop on that board. Culmination sections are sequential
+and resumable. Before the first question of every section, keep that provider’s
+canonical solved Example visible with explicit section context and a
+player-triggered Continue action; never flash through it or auto-dismiss it.
+Persist that acknowledgement, and do not count time spent reading the Example
+as active practice. A non-Wizard-II culmination advances the avatar only after
+the complete test and redemption are finished; Wizard II ends with a mastery
+celebration. Question selection MUST treat a reference as the same question
+before and after its optional fingerprint is materialized, and a saved
+culmination with an untouched legacy collision MUST repair generically without
+discarding already solved sections.
 
 Only first attempts affect Journey accuracy. Always let the player finish and
 redeem the entire stop. Accuracy strictly greater than 70% clears it. A cleared
 stop earns its XP once and unlocks the next node. A result at or below 70%
 receives encouraging feedback, earns no XP, and may retry the stop. Every
 first-attempt miss is retained as a compact, versioned question reference for
-future culminations, whether or not the stop clears.
+future culminations, whether or not the stop clears. Each miss observation MUST
+also retain the stop, board, attempt, timestamp, and active practice time
+elapsed before that first answer.
 
 XP is celebratory, not a gate. Every cleared node on a board awards a constant
-amount: Starter 25, Junior 50, Expert 100, and Wizard 200. Awards MUST be
-idempotent by stop ID. With 13 nodes, board totals are 325, 650, 1300, and 2600.
+amount, doubling each board: Starter 25, Junior I 50, Junior II 100, Expert I
+200, Expert II 400, Wizard I 800, and Wizard II 1600. Awards MUST be idempotent
+by stop ID and retained in a write-once amount ledger so later balance changes
+cannot rewrite earned XP. Starter’s 13 nodes total 325 XP; each later board has
+15 nodes and totals 750, 1500, 3000, 6000, 12000, and 24000 XP respectively.
 Show total XP on the board and pair acquisition with a brief locally
 synthesized jingle when sound is enabled.
 

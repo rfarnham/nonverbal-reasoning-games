@@ -15,9 +15,10 @@ import {
 } from "@/lib/game-audio";
 import {
   activePlayerProfile,
-  buildJourneyPlan,
+  buildJourneyPlanForVersion,
   closeAttemptSummary,
   findJourneyNode,
+  journeyLevelLabel,
   loadProgressionStateDiagnostic,
   nextIncompleteJourneyNode,
   profileXpTotal,
@@ -147,7 +148,10 @@ export function JourneySummaryClient() {
   const preview = useMemo(() => {
     if (!loaded) return null;
     const { profile, attempt } = loaded;
-    const journey = buildJourneyPlan(profile.gameSnapshot);
+    const journey = buildJourneyPlanForVersion(
+      profile.gameSnapshot,
+      profile.journeyPlanVersion,
+    );
     const node = findJourneyNode(journey, attempt.stopId);
     if (!node) return null;
     const basic = attempt.settlement ?? summarizeAttempt(attempt);
@@ -241,7 +245,8 @@ export function JourneySummaryClient() {
     attempt.phase === "retry-required";
   const passed = settlement.passed;
   const isCulmination = node.kind === "culmination";
-  const isFinalMastery = isCulmination && node.level === "wizard";
+  const isFinalMastery =
+    isCulmination && node.journeyLevel === "wizard-2";
   const avatarId = isAvatarId(profile.avatarId)
     ? profile.avatarId
     : DEFAULT_AVATAR_ID;
@@ -257,7 +262,7 @@ export function JourneySummaryClient() {
   const message = passed
     ? isCulmination
       ? isFinalMastery
-        ? "Four boards, every challenge, and a mountain of brave practice. That deserves a celebration."
+        ? "Seven boards, every challenge, and a mountain of brave practice. That deserves a celebration."
         : "Every skill on this board came together. Your next trail is ready whenever you are."
       : "Every question is complete, every miss is redeemed, and the next stop is ready."
     : "You completed the whole stop and made every miss right. One more pass will make this trail feel familiar.";
@@ -359,7 +364,10 @@ export function JourneySummaryClient() {
         currentAttempt.phase === "retry-required" &&
         currentProfile.clearedStopIds.includes(currentAttempt.stopId);
       if (currentAttempt.phase === "retry-required" && !practiceReplay) {
-        const journey = buildJourneyPlan(closedProfile.gameSnapshot);
+        const journey = buildJourneyPlanForVersion(
+          closedProfile.gameSnapshot,
+          closedProfile.journeyPlanVersion,
+        );
         const retryNode = findJourneyNode(journey, currentAttempt.stopId);
         if (!retryNode) throw new Error("Retry stop is no longer available.");
         const retryAttempt = createJourneyAttempt(closedProfile, retryNode);
@@ -422,7 +430,9 @@ export function JourneySummaryClient() {
             />
           </div>
           <p className={styles.kicker}>
-            {passed ? "Stop complete" : "Practice complete"}
+            {passed
+              ? `${journeyLevelLabel(node.journeyLevel)} · Stop complete`
+              : "Practice complete"}
           </p>
           <h1 id="summary-title" ref={summaryTitleRef} tabIndex={-1}>
             {title}

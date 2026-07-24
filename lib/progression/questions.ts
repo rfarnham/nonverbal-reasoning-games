@@ -1,5 +1,8 @@
 import {
+  JOURNEY_LEVELS,
   PROGRESSION_LEVELS,
+  journeyLevelDifficulty,
+  type JourneyLevel,
   type QuestionReference,
 } from "./types.ts";
 
@@ -40,6 +43,21 @@ export function isQuestionReference(
     );
   }
 
+  if (question.source === "journey") {
+    return (
+      typeof question.journeyLevel === "string" &&
+      JOURNEY_LEVELS.includes(question.journeyLevel as JourneyLevel) &&
+      question.level ===
+        journeyLevelDifficulty(question.journeyLevel as JourneyLevel) &&
+      typeof question.collectionId === "string" &&
+      Boolean(question.collectionId.trim()) &&
+      Number.isInteger(question.questionIndex) &&
+      Number(question.questionIndex) >= 0 &&
+      typeof question.contentVersion === "string" &&
+      Boolean(question.contentVersion.trim())
+    );
+  }
+
   return false;
 }
 
@@ -68,6 +86,16 @@ export function questionReferenceIdentityKey(
     return [
       ...prefix,
       encodeURIComponent(question.contentVersion),
+      question.questionIndex,
+    ].join(":");
+  }
+
+  if (question.source === "journey") {
+    return [
+      ...prefix,
+      question.journeyLevel,
+      encodeURIComponent(question.contentVersion),
+      encodeURIComponent(question.collectionId),
       question.questionIndex,
     ].join(":");
   }

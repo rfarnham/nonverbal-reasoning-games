@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  PROGRESSION_LEVELS,
+  JOURNEY_LEVELS,
+  journeyLevelDifficulty,
+  journeyLevelLabel,
   addAttemptActiveTime,
   addPlayerProfile,
   advanceAttemptQuestion,
@@ -40,6 +42,13 @@ const games = Array.from({ length: 8 }, (_, index) => ({
   contentVersion: "campaign-v1",
   generatorVersion: "generator-v1",
 }));
+const reviewGame = {
+  slug: "spatial-review",
+  title: "Spatial Review",
+  journeyContentVersion: "review-v1",
+  role: "review",
+};
+const gamesWithReview = [...games, reviewGame];
 
 function campaignQuestion(gameSlug, level, questionIndex, version = "v1") {
   return {
@@ -52,17 +61,51 @@ function campaignQuestion(gameSlug, level, questionIndex, version = "v1") {
   };
 }
 
+function journeyQuestion(
+  gameSlug,
+  journeyLevel,
+  level,
+  collectionId,
+  questionIndex,
+) {
+  return {
+    source: "journey",
+    gameSlug,
+    journeyLevel,
+    level,
+    collectionId,
+    questionIndex,
+    contentVersion: "journey-v1",
+  };
+}
+
 function campaignLevel(gameSlug, level, version = "v1") {
   return Array.from({ length: 12 }, (_, questionIndex) =>
     campaignQuestion(gameSlug, level, questionIndex, version),
   );
 }
 
-test("journey is four generic 13-stop boards with exact cadence and doubling XP", () => {
-  const journey = buildJourneyPlan(games);
+test("journey is seven generic boards with balanced review cadence and doubling XP", () => {
+  const journey = buildJourneyPlan(gamesWithReview);
   assert.deepEqual(
-    journey.boards.map(({ level }) => level),
-    PROGRESSION_LEVELS,
+    JOURNEY_LEVELS.map(journeyLevelLabel),
+    [
+      "Starter",
+      "Junior I",
+      "Junior II",
+      "Expert I",
+      "Expert II",
+      "Wizard I",
+      "Wizard II",
+    ],
+  );
+  assert.deepEqual(
+    JOURNEY_LEVELS.map(journeyLevelDifficulty),
+    ["starter", "junior", "junior", "expert", "expert", "wizard", "wizard"],
+  );
+  assert.deepEqual(
+    journey.boards.map(({ journeyLevel }) => journeyLevel),
+    JOURNEY_LEVELS,
   );
   assert.deepEqual(
     journey.boards[0].nodes.map(({ kind }) => kind),
@@ -83,8 +126,28 @@ test("journey is four generic 13-stop boards with exact cadence and doubling XP"
     ],
   );
   assert.deepEqual(
+    journey.boards[1].nodes.map(({ kind }) => kind),
+    [
+      "normal",
+      "normal",
+      "turbo",
+      "normal",
+      "normal",
+      "turbo",
+      "review",
+      "normal",
+      "normal",
+      "turbo",
+      "normal",
+      "normal",
+      "turbo",
+      "review",
+      "culmination",
+    ],
+  );
+  assert.deepEqual(
     journey.boards.map(({ availableXp }) => availableXp),
-    [325, 650, 1300, 2600],
+    [325, 750, 1500, 3000, 6000, 12000, 24000],
   );
 
   const turboCounts = new Map(games.map(({ slug }) => [slug, 0]));
@@ -93,11 +156,33 @@ test("journey is four generic 13-stop boards with exact cadence and doubling XP"
       turboCounts.set(node.gameSlug, turboCounts.get(node.gameSlug) + 1);
     }
   }
-  assert.deepEqual([...turboCounts.values()], Array(8).fill(2));
+  assert.deepEqual([...turboCounts.values()], [4, 3, 4, 3, 4, 3, 4, 3]);
+
+  const juniorCulmination = journey.boards[1].nodes.at(-1);
+  assert.equal(juniorCulmination.kind, "culmination");
+  assert.equal(juniorCulmination.sections.length, 9);
+  assert.deepEqual(juniorCulmination.sections.at(-1), {
+    selection: "fixed",
+    gameSlug: reviewGame.slug,
+    collectionId: "review:junior-1",
+    questionOffset: 24,
+    questionCount: 4,
+  });
+
+  const firstNormal = journey.boards[1].nodes[0];
+  const sameNormalPosition = { ...firstNormal, position: 99 };
+  assert.equal(firstNormal.id, sameNormalPosition.id);
 });
 
-test("journey construction fills eight stops, caps future catalogs, and snapshots immutably", () => {
-  const partialJourney = buildJourneyPlan(games.slice(0, 7));
+test("journey construction caps core games, snapshots review content, and stays immutable", () => {
+  assert.throws(
+    () => buildJourneyPlan(games),
+    /needs one discovered review provider/,
+  );
+  const partialJourney = buildJourneyPlan([
+    ...games.slice(0, 7),
+    reviewGame,
+  ]);
   assert.equal(
     partialJourney.boards[0].nodes.filter(({ kind }) => kind === "normal")
       .length,
@@ -115,16 +200,21 @@ test("journey construction fills eight stops, caps future catalogs, and snapshot
       contentVersion: "campaign-v1",
       generatorVersion: "generator-v1",
     },
+    reviewGame,
   ]);
-  assert.equal(expandedJourney.gameSnapshot.length, 8);
+  assert.equal(expandedJourney.gameSnapshot.length, 9);
   assert.equal(expandedJourney.gameSnapshot.some(({ slug }) => slug === "game-9"), false);
+  assert.equal(
+    expandedJourney.gameSnapshot.some(({ slug }) => slug === reviewGame.slug),
+    true,
+  );
   assert.throws(
     () => buildJourneyPlan([...games.slice(0, 7), games[0]]),
     /Duplicate/,
   );
 
   const input = games.map((game) => ({ ...game }));
-  const journey = buildJourneyPlan(input);
+  const journey = buildJourneyPlan([...input, reviewGame]);
   input[0].slug = "changed-later";
   assert.equal(journey.gameSnapshot[0].slug, "game-1");
 });
@@ -140,7 +230,7 @@ test("only a result strictly greater than 70 percent clears", () => {
 });
 
 test("profile boundaries reject shortened, mismatched, locked, and early-ended attempts", () => {
-  const journey = buildJourneyPlan(games);
+  const journey = buildJourneyPlan(gamesWithReview);
   const firstNode = journey.boards[0].nodes[0];
   const secondNode = journey.boards[0].nodes[1];
   const turboNode = journey.boards[0].nodes[2];
@@ -148,7 +238,7 @@ test("profile boundaries reject shortened, mismatched, locked, and early-ended a
     id: "integrity-profile",
     name: "Ada",
     avatarId: "hedgehog",
-    gameSnapshot: games,
+    gameSnapshot: gamesWithReview,
     nowMs: 1,
   });
 
@@ -283,14 +373,14 @@ function redeemAll(attempt) {
 }
 
 test("normal attempts resume round state, redeem misses, and gate XP idempotently", () => {
-  const journey = buildJourneyPlan(games);
+  const journey = buildJourneyPlan(gamesWithReview);
   const node = journey.boards[0].nodes[0];
   assert.equal(node.kind, "normal");
   let profile = createPlayerProfile({
     id: "p1",
     name: "Ada",
     avatarId: "hedgehog",
-    gameSnapshot: games,
+    gameSnapshot: gamesWithReview,
     nowMs: 1,
   });
 
@@ -373,14 +463,14 @@ test("profile state supports several named local users and closes summaries", ()
     id: "first",
     name: "Ada",
     avatarId: "hedgehog",
-    gameSnapshot: games,
+    gameSnapshot: gamesWithReview,
     nowMs: 1,
   });
   const second = createPlayerProfile({
     id: "second",
     name: "Grace",
     avatarId: "otter",
-    gameSnapshot: games,
+    gameSnapshot: gamesWithReview,
     nowMs: 2,
   });
   let state = addPlayerProfile(createProgressionState(), first);
@@ -388,7 +478,7 @@ test("profile state supports several named local users and closes summaries", ()
   state = switchPlayerProfile(state, first.id);
   assert.equal(state.activeProfileId, "first");
 
-  const journey = buildJourneyPlan(games);
+  const journey = buildJourneyPlan(gamesWithReview);
   const node = journey.boards[0].nodes[0];
   const attempt = finishNormalAttempt(
     createNormalProgressionAttempt({
@@ -408,26 +498,40 @@ test("profile state supports several named local users and closes summaries", ()
 });
 
 test("restarting an active stop preserves recorded misses without changing XP", () => {
-  const journey = buildJourneyPlan(games);
+  const journey = buildJourneyPlan(gamesWithReview);
   const node = journey.boards[0].nodes[0];
   let attempt = createNormalProgressionAttempt({
     id: "restart-me",
     node,
     campaignQuestions: campaignLevel(node.gameSlug, node.level),
   });
+  attempt = addAttemptActiveTime(attempt, 3_456, 9, {
+    countTowardFirstAnswer: true,
+  });
   attempt = recordQuestionAttempt(attempt, {
     correct: false,
     answerToken: "option-2",
     nowMs: 10,
   });
+  assert.equal(attempt.rounds[0].firstAnsweredAtMs, 10);
   let profile = createPlayerProfile({
     id: "restart-profile",
     name: "Ada",
     avatarId: "hedgehog",
-    gameSnapshot: games,
+    gameSnapshot: gamesWithReview,
     nowMs: 1,
   });
   profile = upsertProfileAttempt(profile, attempt);
+  assert.equal(profile.missedQuestions.length, 1);
+  assert.deepEqual(profile.missedQuestions[0].observations, [
+    {
+      attemptId: attempt.id,
+      stopId: node.id,
+      journeyLevel: node.journeyLevel,
+      elapsedMs: 3_456,
+      missedAtMs: 10,
+    },
+  ]);
 
   const restarted = discardActiveProgressionAttempt(
     profile,
@@ -438,12 +542,22 @@ test("restarting an active stop preserves recorded misses without changing XP", 
   assert.equal(restarted.attempts[attempt.id], undefined);
   assert.equal(restarted.missedQuestions.length, 1);
   assert.equal(restarted.missedQuestions[0].missCount, 1);
+  assert.deepEqual(restarted.missedQuestions[0].observations, [
+    {
+      attemptId: attempt.id,
+      stopId: node.id,
+      journeyLevel: node.journeyLevel,
+      elapsedMs: 3_456,
+      missedAtMs: 10,
+    },
+  ]);
   assert.deepEqual(restarted.clearedStopIds, []);
   assert.deepEqual(restarted.awardedStopIds, []);
+  assert.deepEqual(restarted.xpAwards, []);
 });
 
 test("Turbo refs use deterministic seeds and enforce the avatar level cap", () => {
-  const node = buildJourneyPlan(games).boards[2].nodes[2];
+  const node = buildJourneyPlan(gamesWithReview).boards[3].nodes[2];
   assert.equal(node.kind, "turbo");
   const attempt = createTurboProgressionAttempt({
     id: "turbo-1",
@@ -498,9 +612,11 @@ test("Turbo refs use deterministic seeds and enforce the avatar level cap", () =
 });
 
 test("culmination keeps ordered three-question game sections and replaces stale misses", () => {
-  const journey = buildJourneyPlan(games);
+  const journey = buildJourneyPlan(gamesWithReview);
   const node = journey.boards[1].nodes.at(-1);
   assert.equal(node.kind, "culmination");
+  const fixedSection = node.sections.at(-1);
+  assert.equal(fixedSection.selection, "fixed");
   const pools = games.map(({ slug }) => {
     const campaignQuestions = campaignLevel(slug, "junior", "current");
     return {
@@ -548,15 +664,32 @@ test("culmination keeps ordered three-question game sections and replaces stale 
       },
     ],
     questionPools: pools,
+    fixedSections: [
+      {
+        gameSlug: fixedSection.gameSlug,
+        questions: Array.from({ length: 4 }, (_, index) =>
+          journeyQuestion(
+            fixedSection.gameSlug,
+            node.journeyLevel,
+            node.level,
+            fixedSection.collectionId,
+            fixedSection.questionOffset + index,
+          ),
+        ),
+      },
+    ],
     nowMs: 40,
   });
-  assert.equal(attempt.rounds.length, 24);
+  assert.equal(attempt.rounds.length, 28);
   assert.deepEqual(
     attempt.sections.map(({ gameSlug, questionCount }) => ({
       gameSlug,
       questionCount,
     })),
-    games.map(({ slug }) => ({ gameSlug: slug, questionCount: 3 })),
+    [
+      ...games.map(({ slug }) => ({ gameSlug: slug, questionCount: 3 })),
+      { gameSlug: reviewGame.slug, questionCount: 4 },
+    ],
   );
   assert.equal(attempt.rounds[0].question.questionIndex, 0);
   assert.equal(attempt.rounds[1].question.questionIndex, 7);
@@ -610,7 +743,7 @@ test("culmination keeps ordered three-question game sections and replaces stale 
 });
 
 test("culmination treats a materialized miss as the same approachable question", () => {
-  const node = buildJourneyPlan(games).boards[0].nodes.at(-1);
+  const node = buildJourneyPlan(gamesWithReview).boards[0].nodes.at(-1);
   const duplicateMiss = campaignQuestion(
     "game-1",
     "starter",
@@ -657,4 +790,51 @@ test("culmination treats a materialized miss as the same approachable question",
     ).length,
     1,
   );
+});
+
+test("expanded culmination appends four unseen fixed review questions", () => {
+  const journey = buildJourneyPlan(gamesWithReview);
+  const node = journey.boards.find(
+    ({ journeyLevel }) => journeyLevel === "junior-1",
+  ).nodes.at(-1);
+  assert.equal(node.kind, "culmination");
+  const fixed = node.sections.find(
+    ({ selection }) => selection === "fixed",
+  );
+  assert.ok(fixed);
+
+  const attempt = createCulminationProgressionAttempt({
+    id: "culmination-with-review",
+    node,
+    missedQuestions: [],
+    questionPools: games.map(({ slug }) => ({
+      gameSlug: slug,
+      approachableQuestion: campaignQuestion(slug, "starter", 0),
+      campaignQuestions: campaignLevel(slug, "junior"),
+      currentContentVersion: "v1",
+      currentJourneyContentVersion: "journey-v1",
+      currentGeneratorVersion: "generator-v1",
+    })),
+    fixedSections: [
+      {
+        gameSlug: fixed.gameSlug,
+        questions: Array.from({ length: 4 }, (_, index) =>
+          journeyQuestion(
+            fixed.gameSlug,
+            node.journeyLevel,
+            node.level,
+            fixed.collectionId,
+            fixed.questionOffset + index,
+          ),
+        ),
+      },
+    ],
+  });
+
+  assert.equal(attempt.rounds.length, 28);
+  assert.equal(attempt.sections.length, 9);
+  assert.equal(attempt.sections.at(-1).gameSlug, reviewGame.slug);
+  assert.equal(attempt.sections.at(-1).questionCount, 4);
+  assert.equal(attempt.rounds.at(-1).question.questionIndex, 27);
+  assertProgressionAttemptIntegrity(attempt, node);
 });

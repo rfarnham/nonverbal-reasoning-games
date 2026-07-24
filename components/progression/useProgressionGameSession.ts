@@ -223,6 +223,8 @@ export function useProgressionGameSession<
   const mountedRef = useRef(false);
   const sessionRef = useRef<BrowserProgressionSession<Round> | null>(null);
   const turboClockPauseRequestedRef = useRef(true);
+  const interactionStateRef =
+    useRef<ProgressionInteractionState>("blocked");
   const visibleRef = useRef(false);
   const practiceClockStartedAtRef = useRef<number | null>(null);
 
@@ -271,6 +273,10 @@ export function useProgressionGameSession<
             visibleRef.current,
             turboClockPauseRequestedRef.current,
           ),
+          countTowardFirstAnswer:
+            visibleRef.current &&
+            interactionStateRef.current === "answering" &&
+            !turboClockPauseRequestedRef.current,
         },
       );
       sessionRef.current = next;
@@ -361,6 +367,7 @@ export function useProgressionGameSession<
   const setInteractionState = useCallback(
     (nextState: ProgressionInteractionState) => {
       flushClock(true);
+      interactionStateRef.current = nextState;
       setInteractionStateValue(nextState);
     },
     [flushClock],

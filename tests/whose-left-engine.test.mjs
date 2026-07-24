@@ -7,6 +7,7 @@ import {
   DIFFICULTY_RULES,
   EXAMPLE,
   GENERATOR_MAX_ATTEMPTS,
+  buildAuthoredWhoseLeftRounds,
   buildCampaignRounds,
   correctSequenceForRound,
   generateInfiniteRound,
@@ -23,6 +24,11 @@ import {
   validateRoute,
   validateRound,
 } from "../app/games/whose-left/game-engine.ts";
+import {
+  JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+  buildWhoseLeftJourneyExtraCampaignRounds,
+} from "../app/games/whose-left/journey-campaign.ts";
+import { progressionAdapter } from "../app/games/whose-left/progression-adapter.ts";
 
 function sequenceKey(sequence) {
   return sequence.join(">");
@@ -335,6 +341,285 @@ test("Campaign answer positions are balanced without exploitable repetition", ()
       difficulty,
     );
   }
+});
+
+test("Journey II Whose Left banks are frozen, balanced, valid, and globally disjoint", () => {
+  const expectations = {
+    "junior-2": "Junior",
+    "expert-2": "Expert",
+    "wizard-2": "Wizard",
+  };
+  const standaloneFingerprints = CAMPAIGN_ROUNDS.map(roundFingerprint);
+  const fingerprints = new Set(standaloneFingerprints);
+
+  assert.deepEqual(
+    Object.keys(JOURNEY_EXTRA_CAMPAIGN_ROUNDS),
+    Object.keys(expectations),
+  );
+  assert.equal(Object.isFrozen(JOURNEY_EXTRA_CAMPAIGN_ROUNDS), true);
+  assert.equal(CAMPAIGN_ROUNDS.length, 48);
+
+  for (const [level, difficulty] of Object.entries(expectations)) {
+    const rounds = JOURNEY_EXTRA_CAMPAIGN_ROUNDS[level];
+    const positions = rounds.map(({ correctIndex }) => correctIndex);
+    assert.equal(rounds.length, 12, `${level} round count`);
+    assert.equal(Object.isFrozen(rounds), true, `${level} frozen bank`);
+    assert.ok(rounds.every(Object.isFrozen), `${level} frozen rounds`);
+    assert.ok(
+      rounds.every((round) => round.difficulty === difficulty),
+      `${level} difficulty mapping`,
+    );
+    assert.deepEqual(
+      [0, 1, 2, 3].map(
+        (position) =>
+          positions.filter((value) => value === position).length,
+      ),
+      [3, 3, 3, 3],
+      `${level} answer balance`,
+    );
+    assert.ok(
+      positions.every(
+        (position, index) =>
+          index === 0 || positions[index - 1] !== position,
+      ),
+      `${level} adjacent answer repeat`,
+    );
+    const blocks = [0, 4, 8].map((start) =>
+      positions.slice(start, start + 4).join(","),
+    );
+    assert.equal(
+      new Set(blocks).size,
+      blocks.length,
+      `${level} repeated four-answer cycle`,
+    );
+
+    for (const round of rounds) {
+      assert.deepEqual(validateRound(round).errors, [], round.id);
+      assert.deepEqual(
+        round.correctSequence,
+        correctSequenceForRound(round),
+        round.id,
+      );
+      assert.equal(new Set(round.options.map(sequenceKey)).size, 4);
+      assertExactLandmarkLinks(round);
+      const fingerprint = roundFingerprint(round);
+      assert.equal(
+        fingerprints.has(fingerprint),
+        false,
+        `${round.id} repeats standalone or Journey content`,
+      );
+      fingerprints.add(fingerprint);
+    }
+  }
+
+  assert.equal(fingerprints.size, 84);
+  assert.deepEqual(
+    CAMPAIGN_ROUNDS.map(roundFingerprint),
+    standaloneFingerprints,
+  );
+});
+
+test("Journey II preserves route density while Wizard removes repeated direction cues", () => {
+  const junior = JOURNEY_EXTRA_CAMPAIGN_ROUNDS["junior-2"];
+  const expert = JOURNEY_EXTRA_CAMPAIGN_ROUNDS["expert-2"];
+  const wizard = JOURNEY_EXTRA_CAMPAIGN_ROUNDS["wizard-2"];
+  const topologyProfile = (rounds) =>
+    rounds.map(({ route }) => {
+      const topology = routeTopology(route);
+      return `${topology.crossingCount}:${topology.headingReversals}`;
+    });
+  const sidePattern = (round) =>
+    [...round.people]
+      .sort((first, second) => first.segmentIndex - second.segmentIndex)
+      .map(({ side }) => (side === "left" ? "L" : "R"))
+      .join("");
+
+  assert.deepEqual(topologyProfile(junior), [
+    "0:1",
+    "0:1",
+    "0:2",
+    "0:2",
+    "1:2",
+    "1:2",
+    "1:2",
+    "1:2",
+    "1:3",
+    "1:3",
+    "1:3",
+    "1:3",
+  ]);
+  assert.equal(new Set(junior.map(sidePattern)).size, 12);
+  assert.deepEqual(
+    new Set(junior.map(({ route }) => route.segments[0].direction)),
+    new Set(["north", "east", "south", "west"]),
+  );
+
+  const advancedProfile = [
+    "1:2",
+    "1:2",
+    "1:4",
+    "1:4",
+    "2:3",
+    "2:3",
+    "2:3",
+    "2:3",
+    "2:3",
+    "2:3",
+    "2:3",
+    "2:3",
+  ];
+  assert.deepEqual(topologyProfile(expert), advancedProfile);
+  assert.deepEqual(topologyProfile(wizard), advancedProfile);
+
+  for (const round of junior) {
+    assert.equal(round.route.segments.length, 6);
+    assert.equal(peopleOnSide(round, "left").length, 3);
+    assert.equal(peopleOnSide(round, "right").length, 3);
+    assert.equal(round.scaffold.showIntermediateChevrons, true);
+    assert.deepEqual(
+      round.scaffold.directionCueSegmentIndexes,
+      [0, 1, 2, 3, 4, 5],
+    );
+  }
+  for (const round of expert) {
+    assert.equal(round.route.segments.length, 8);
+    assert.equal(peopleOnSide(round, "left").length, 4);
+    assert.equal(peopleOnSide(round, "right").length, 4);
+    assert.equal(round.scaffold.showIntermediateChevrons, true);
+    assert.deepEqual(
+      round.scaffold.directionCueSegmentIndexes,
+      [0, 1, 2, 3, 4, 5, 6, 7],
+    );
+  }
+  for (const round of wizard) {
+    assert.equal(round.route.segments.length, 8);
+    assert.equal(peopleOnSide(round, "left").length, 4);
+    assert.equal(peopleOnSide(round, "right").length, 4);
+    assert.equal(round.scaffold.showIntermediateChevrons, false);
+    assert.deepEqual(round.scaffold.directionCueSegmentIndexes, [0]);
+  }
+  for (const rounds of [junior, expert, wizard]) {
+    assert.deepEqual(
+      [
+        rounds.filter(({ querySide }) => querySide === "left").length,
+        rounds.filter(({ querySide }) => querySide === "right").length,
+      ],
+      [6, 6],
+    );
+    assert.deepEqual(
+      new Set(rounds.map(({ route }) => route.segments[0].direction)),
+      new Set(["north", "east", "south", "west"]),
+    );
+  }
+});
+
+test("Journey II options retain all three exact misconception models", () => {
+  for (const rounds of Object.values(JOURNEY_EXTRA_CAMPAIGN_ROUNDS)) {
+    for (const round of rounds) {
+      const expected = correctSequenceForRound(round);
+      const oppositeSequence = peopleOnSide(
+        round,
+        opposite(round.querySide),
+      ).map(({ id }) => id);
+      assert.deepEqual(
+        optionOfKind(round, "opposite-side"),
+        oppositeSequence,
+      );
+      assert.deepEqual(
+        optionOfKind(round, "reversed-order"),
+        [...expected].reverse(),
+      );
+
+      const nearMiss = optionOfKind(round, "one-person-off");
+      const differences = nearMiss.flatMap((id, index) =>
+        id === expected[index] ? [] : [index],
+      );
+      assert.equal(differences.length, 1);
+      const target = round.people.find(
+        ({ id }) => id === expected[differences[0]],
+      );
+      const replacement = round.people.find(
+        ({ id }) => id === nearMiss[differences[0]],
+      );
+      assert.ok(target);
+      assert.ok(replacement);
+      assert.equal(replacement.side, opposite(round.querySide));
+      const nearestDistance = Math.min(
+        ...peopleOnSide(round, opposite(round.querySide)).map(
+          ({ segmentIndex }) =>
+            Math.abs(segmentIndex - target.segmentIndex),
+        ),
+      );
+      assert.equal(
+        Math.abs(replacement.segmentIndex - target.segmentIndex),
+        nearestDistance,
+      );
+    }
+  }
+});
+
+test("Journey II rebuilds without randomness and wires all seven adapter banks", () => {
+  const originalRandom = Math.random;
+  Math.random = () => {
+    throw new Error("Authored Journey construction cannot use randomness.");
+  };
+  try {
+    assert.deepEqual(
+      buildWhoseLeftJourneyExtraCampaignRounds(),
+      JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+    );
+  } finally {
+    Math.random = originalRandom;
+  }
+
+  assert.equal(progressionAdapter.campaignRounds.length, 48);
+  assert.equal(progressionAdapter.journeyContentVersion, "1");
+  assert.deepEqual(
+    Object.keys(progressionAdapter.journeyCampaignRounds),
+    [
+      "starter",
+      "junior-1",
+      "junior-2",
+      "expert-1",
+      "expert-2",
+      "wizard-1",
+      "wizard-2",
+    ],
+  );
+  for (const [level, rounds] of Object.entries(
+    progressionAdapter.journeyCampaignRounds,
+  )) {
+    assert.equal(rounds.length, 12, `${level} adapter bank`);
+  }
+  for (const level of ["junior-2", "expert-2", "wizard-2"]) {
+    assert.deepEqual(
+      progressionAdapter.journeyCampaignRounds[level].map(
+        roundFingerprint,
+      ),
+      JOURNEY_EXTRA_CAMPAIGN_ROUNDS[level].map(roundFingerprint),
+    );
+  }
+
+  assert.throws(
+    () =>
+      buildAuthoredWhoseLeftRounds([
+        {
+          id: "bad-sides",
+          difficulty: "Junior",
+          points: [
+            { x: 0, y: 0 },
+            { x: 8, y: 0 },
+          ],
+          sides: "X",
+          querySide: "left",
+          correctIndex: 0,
+          nameOffset: 0,
+          nearMissSalt: 0,
+          distractorRotation: 0,
+        },
+      ]),
+    /side assignments/,
+  );
 });
 
 test("distractors encode the opposite side, reverse order, and one local miss", () => {

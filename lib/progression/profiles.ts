@@ -1,15 +1,16 @@
 import { summarizeAttempt } from "./attempts.ts";
 import {
   buildJourneyPlan,
+  buildJourneyPlanForVersion,
   findJourneyNode,
   isJourneyNodeUnlocked,
   nextJourneyNode,
 } from "./journey.ts";
 import {
   questionReferenceIdentityKey,
-  questionReferenceKey,
 } from "./questions.ts";
 import {
+  CURRENT_JOURNEY_PLAN_VERSION,
   PROGRESSION_SCHEMA_VERSION,
   type AttemptSettlement,
   type JourneyGame,
@@ -53,6 +54,13 @@ function uniqueStrings(values: readonly string[]): readonly string[] {
   return [...new Set(values)];
 }
 
+function profileJourney(profile: PlayerProfile): JourneyPlan {
+  return buildJourneyPlanForVersion(
+    profile.gameSnapshot,
+    profile.journeyPlanVersion,
+  );
+}
+
 export function createProgressionState(): ProgressionState {
   return {
     schemaVersion: PROGRESSION_SCHEMA_VERSION,
@@ -76,13 +84,118 @@ export function createPlayerProfile({
     avatarId: requiredText(avatarId, "Avatar ID"),
     createdAtMs: now,
     updatedAtMs: now,
+    journeyPlanVersion: CURRENT_JOURNEY_PLAN_VERSION,
     gameSnapshot: journey.gameSnapshot,
     clearedStopIds: [],
+    xpAwards: [],
     awardedStopIds: [],
     settledAttemptIds: [],
     missedQuestions: [],
     attempts: {},
     activeAttemptId: null,
+  };
+}
+
+/**
+ * Moves an idle four-board profile onto the expanded seven-board plan without
+ * rewriting history. Existing clears map to their matching I boards, and the
+ * write-once XP amounts remain exactly what the player originally earned.
+ * An in-flight legacy attempt deliberately stays on plan v1 until it closes.
+ */
+export function upgradePlayerProfileJourneyPlan(
+  profile: PlayerProfile,
+  currentSnapshot: readonly JourneyGame[],
+  nowMs?: number,
+): PlayerProfile {
+  if (
+    profile.journeyPlanVersion === CURRENT_JOURNEY_PLAN_VERSION ||
+    profile.activeAttemptId !== null
+  ) {
+    return profile;
+  }
+  const reviewProvider = currentSnapshot.find(
+    ({ role }) => role === "review",
+  );
+  if (!reviewProvider) return profile;
+
+  const coreSnapshot = profile.gameSnapshot.filter(
+    ({ role }) => (role ?? "game") === "game",
+  );
+  const expandedSnapshot = [...coreSnapshot, reviewProvider];
+  const legacyJourney = buildJourneyPlanForVersion(coreSnapshot, 1);
+  const expandedJourney = buildJourneyPlan(expandedSnapshot);
+
+  const stopIdMap = new Map<string, string>();
+  for (const legacyBoard of legacyJourney.boards) {
+    const targetBoard = expandedJourney.boards.find(
+      ({ journeyLevel }) =>
+        journeyLevel === legacyBoard.journeyLevel,
+    );
+    if (!targetBoard) continue;
+    for (const legacyNode of legacyBoard.nodes) {
+      const legacyKindNodes = legacyBoard.nodes.filter(
+        ({ kind }) => kind === legacyNode.kind,
+      );
+      const ordinal = legacyKindNodes.findIndex(
+        ({ id }) => id === legacyNode.id,
+      );
+      const target = targetBoard.nodes.filter(
+        ({ kind }) => kind === legacyNode.kind,
+      )[ordinal];
+      if (!target) continue;
+      if (
+        "gameSlug" in legacyNode &&
+        "gameSlug" in target &&
+        legacyNode.gameSlug !== target.gameSlug
+      ) {
+        continue;
+      }
+      stopIdMap.set(legacyNode.id, target.id);
+    }
+  }
+
+  const mapStopId = (stopId: string) => stopIdMap.get(stopId);
+  const clearedStopIds = uniqueStrings(
+    profile.clearedStopIds.flatMap((stopId) => {
+      const mapped = mapStopId(stopId);
+      return mapped ? [mapped] : [];
+    }),
+  );
+  const cleared = new Set(clearedStopIds);
+  const xpAwards = profile.xpAwards.flatMap((award) => {
+    const stopId = mapStopId(award.stopId);
+    return stopId && cleared.has(stopId)
+      ? [{ stopId, amount: award.amount }]
+      : [];
+  });
+  const awardedStopIds = xpAwards.map(({ stopId }) => stopId);
+  const missedQuestions = profile.missedQuestions.map((missed) => ({
+    ...missed,
+    observations: missed.observations.map((observation) => {
+      const stopId = mapStopId(observation.stopId);
+      const node = stopId
+        ? findJourneyNode(expandedJourney, stopId)
+        : undefined;
+      return {
+        ...observation,
+        ...(stopId ? { stopId } : {}),
+        ...(node ? { journeyLevel: node.journeyLevel } : {}),
+      };
+    }),
+  }));
+
+  return {
+    ...profile,
+    journeyPlanVersion: CURRENT_JOURNEY_PLAN_VERSION,
+    gameSnapshot: expandedJourney.gameSnapshot,
+    clearedStopIds,
+    xpAwards,
+    awardedStopIds,
+    settledAttemptIds: [],
+    missedQuestions,
+    attempts: {},
+    activeAttemptId: null,
+    updatedAtMs: nowOrCurrent(nowMs),
   };
 }
 
@@ -171,11 +284,12 @@ export function upsertProfileAttempt(
   attempt: ProgressionAttempt,
   options: { makeActive?: boolean; nowMs?: number } = {},
 ): PlayerProfile {
-  const journey = buildJourneyPlan(profile.gameSnapshot);
+  const journey = profileJourney(profile);
   const node = findJourneyNode(journey, attempt.stopId);
   if (
     !node ||
     node.kind !== attempt.kind ||
+    node.journeyLevel !== attempt.journeyLevel ||
     node.level !== attempt.level
   ) {
     throw new Error("Attempt does not match a stop in this profile's journey.");
@@ -196,15 +310,24 @@ export function upsertProfileAttempt(
   ) {
     throw new Error("Finish the active journey attempt before starting another.");
   }
+  const now = nowOrCurrent(options.nowMs);
   return {
     ...profile,
     attempts: {
       ...profile.attempts,
       [attempt.id]: attempt,
     },
+    // Keep the extractable profile history current after every saved answer.
+    // mergeMissedQuestions is idempotent by attempt ID, so later settlement,
+    // reload, or restart cannot double-count the same observation.
+    missedQuestions: mergeMissedQuestions(
+      profile.missedQuestions,
+      attempt,
+      now,
+    ),
     activeAttemptId:
       options.makeActive === false ? profile.activeAttemptId : attempt.id,
-    updatedAtMs: nowOrCurrent(options.nowMs),
+    updatedAtMs: now,
   };
 }
 
@@ -216,13 +339,31 @@ function mergeMissedQuestions(
   const byKey = new Map(existing.map((missed) => [missed.key, missed]));
   for (const round of attempt.rounds) {
     if (round.firstTryCorrect !== false) continue;
-    const key = questionReferenceKey(round.question);
+    const key = questionReferenceIdentityKey(round.question);
     const previous = byKey.get(key);
+    const observation = {
+      attemptId: attempt.id,
+      stopId: attempt.stopId,
+      journeyLevel: attempt.journeyLevel,
+      elapsedMs: round.firstAnswerActiveTimeMs ?? null,
+      missedAtMs: round.firstAnsweredAtMs ?? nowMs,
+    };
+    const observations = previous?.observations ?? [];
+    const alreadyObserved = observations.some(
+      (candidate) => candidate.attemptId === attempt.id,
+    );
     byKey.set(key, {
       key,
       question: round.question,
-      missCount: (previous?.missCount ?? 0) + 1,
-      lastMissedAtMs: nowMs,
+      missCount:
+        (previous?.missCount ?? 0) + (alreadyObserved ? 0 : 1),
+      lastMissedAtMs: Math.max(
+        previous?.lastMissedAtMs ?? 0,
+        observation.missedAtMs,
+      ),
+      observations: alreadyObserved
+        ? observations
+        : [...observations, observation],
     });
   }
   return [...byKey.values()].sort(
@@ -247,7 +388,7 @@ export function discardActiveProgressionAttempt(
   if (attempt.settlement) {
     throw new Error("Close this attempt's summary instead of restarting it.");
   }
-  const journey = buildJourneyPlan(profile.gameSnapshot);
+  const journey = profileJourney(profile);
   const node = findJourneyNode(journey, attempt.stopId);
   if (!node) {
     throw new Error("The active attempt no longer belongs to this journey.");
@@ -276,10 +417,10 @@ export function discardActiveProgressionAttempt(
 export function settleProgressionAttempt(
   profile: PlayerProfile,
   attempt: ProgressionAttempt,
-  journey: JourneyPlan = buildJourneyPlan(profile.gameSnapshot),
+  journey: JourneyPlan = profileJourney(profile),
   nowMs?: number,
 ): SettleAttemptResult {
-  const canonicalJourney = buildJourneyPlan(profile.gameSnapshot);
+  const canonicalJourney = profileJourney(profile);
   const canonicalNode = findJourneyNode(canonicalJourney, attempt.stopId);
   const suppliedNode = findJourneyNode(journey, attempt.stopId);
   if (
@@ -349,6 +490,12 @@ export function settleProgressionAttempt(
     awardedStopIds: firstAward
       ? [...profile.awardedStopIds, canonicalNode.id]
       : profile.awardedStopIds,
+    xpAwards: firstAward
+      ? [
+          ...profile.xpAwards,
+          { stopId: canonicalNode.id, amount: canonicalNode.xp },
+        ]
+      : profile.xpAwards,
     settledAttemptIds: [...profile.settledAttemptIds, attempt.id],
     missedQuestions: mergeMissedQuestions(
       profile.missedQuestions,
@@ -384,7 +531,7 @@ export function closeAttemptSummary(
   if (profile.activeAttemptId !== attemptId) {
     throw new Error("Only the active attempt summary can be closed.");
   }
-  const journey = buildJourneyPlan(profile.gameSnapshot);
+  const journey = profileJourney(profile);
   const node = findJourneyNode(journey, attempt.stopId);
   if (!node || !profile.settledAttemptIds.includes(attemptId)) {
     throw new Error("Attempt summary is not part of settled journey history.");
@@ -411,17 +558,17 @@ export function closeAttemptSummary(
 
 export function profileXpTotal(
   profile: PlayerProfile,
-  journey: JourneyPlan = buildJourneyPlan(profile.gameSnapshot),
+  journey: JourneyPlan = profileJourney(profile),
 ): number {
-  const awarded = new Set(profile.awardedStopIds);
-  return journey.boards
-    .flatMap(({ nodes }) => nodes)
-    .reduce((sum, node) => sum + (awarded.has(node.id) ? node.xp : 0), 0);
+  // Keep the historical optional argument for callers migrating from
+  // plan-derived XP; earned totals now come solely from the write-once ledger.
+  void journey;
+  return profile.xpAwards.reduce((sum, award) => sum + award.amount, 0);
 }
 
 export function nextIncompleteJourneyNode(
   profile: PlayerProfile,
-  journey: JourneyPlan = buildJourneyPlan(profile.gameSnapshot),
+  journey: JourneyPlan = profileJourney(profile),
 ): JourneyNode | undefined {
   const cleared = new Set(profile.clearedStopIds);
   return journey.boards
@@ -432,7 +579,7 @@ export function nextIncompleteJourneyNode(
 export function nodeAfterClearedStop(
   profile: PlayerProfile,
   stopId: string,
-  journey: JourneyPlan = buildJourneyPlan(profile.gameSnapshot),
+  journey: JourneyPlan = profileJourney(profile),
 ): JourneyNode | undefined {
   if (!profile.clearedStopIds.includes(stopId)) return undefined;
   return nextJourneyNode(journey, stopId);
