@@ -14,6 +14,10 @@ const pageSource = await readFile(
   new URL("../app/games/libra/page.tsx", import.meta.url),
   "utf8",
 );
+const curriculumSource = await readFile(
+  new URL("../app/games/libra/strategy-curriculum.ts", import.meta.url),
+  "utf8",
+);
 
 function componentSource(name, nextName) {
   const startMarker = `function ${name}(`;
@@ -154,43 +158,13 @@ test("a morph keeps one scale frame and changes only its cargo layers", () => {
   assert.match(animatedReturn, /className=\{styles\.proofMorphAfter\}/);
 });
 
-test("the conclusion decorates the prior result instead of mounting a new scale", () => {
-  const conclusion = componentSource(
-    "ConclusionScaleScene",
-    "TeachingProofSceneVisual",
-  );
-  const animatedReturn = conclusion.slice(conclusion.lastIndexOf("\n  return ("));
-
-  assert.match(animatedReturn, /styles\.proofConclusionOverlay/);
-  assert.doesNotMatch(animatedReturn, /<ProofBalanceScale\b/);
-  assert.match(
-    visualSource,
-    /data-proof-holds-final=\{[\s\S]{0,100}stepIndex === stepCount - 2/,
-  );
-  assert.match(
-    stylesSource,
-    /\.proofPhaseLayer\[data-proof-holds-final="true"\]/,
-  );
-  assert.match(
-    stylesSource,
-    /data-proof-state="settled"[\s\S]*?data-proof-holds-final="true"[\s\S]*?\.proofMorphBefore\s*\{[^}]*opacity:\s*0/s,
-  );
-  assert.match(
-    stylesSource,
-    /data-proof-state="settled"[\s\S]*?data-proof-holds-final="true"[\s\S]*?\.proofMorphAfter\s*\{[^}]*opacity:\s*1/s,
-  );
-  for (const helperClass of [
-    "proofDonorScale",
-    "proofGuideScale",
-    "substitution-source",
-  ]) {
-    assert.match(
-      stylesSource,
-      new RegExp(
-        `data-proof-state="settled"[\\s\\S]*?data-proof-holds-final="true"[\\s\\S]*?${helperClass}[\\s\\S]*?opacity:\\s*0`,
-      ),
-    );
-  }
+test("routine proofs begin with the useful operation and end on its result", () => {
+  const builder = curriculumSource.match(
+    /export function buildTeachingProof[\s\S]*?\n\}\n\n\/\*\*/,
+  )?.[0] ?? "";
+  assert.doesNotMatch(builder, /\binspect\(/);
+  assert.doesNotMatch(builder, /nextId\("conclude"\)/);
+  assert.match(visualSource, /proofState === "settled" \? plan\.steps\.length - 1/);
 });
 
 test("one calm caption replaces cycling callouts and the cursor bar", () => {
@@ -214,9 +188,61 @@ test("the page primes one reusable narrator from direct gestures", () => {
   assert.match(pageSource, /proofNarrationPlayer\.prime\(\)/);
   assert.match(
     pageSource,
-    /if \(isCorrect\) proofNarrationPlayer\.prime\(\)/,
+    /if \(shouldExplainCorrectAnswer\) \{[\s\S]*?proofNarrationPlayer\.prime\(\)/,
   );
   assert.match(pageSource, /narrationPlayer=\{proofNarrationPlayer\}/);
+});
+
+test("proofs are optional after mastery and skippable whenever they play", () => {
+  assert.match(pageSource, /const shouldExplainCorrectAnswer =/);
+  assert.match(pageSource, /reinforcementRoundIdsRef/);
+  assert.match(pageSource, /wasMissed \|\|/);
+  assert.match(
+    pageSource,
+    /isCorrect && !shouldExplainCorrectAnswer[\s\S]*?"answered"/,
+  );
+  assert.match(pageSource, /phase === "answered" && proofPresented/);
+  assert.match(pageSource, /setProofPresented\(isCorrect && shouldExplainCorrectAnswer\)/);
+  assert.match(visualSource, />\s*Skip explanation\s*</);
+  assert.match(pageSource, /proofNarrationPlayer\.cancel\(\);[\s\S]*?finishCorrectProof\(\)/);
+  assert.match(pageSource, />\s*Explain\s*</);
+});
+
+test("strategy introductions use the same narrator and can be skipped immediately", () => {
+  assert.match(visualSource, /strategyLessonNarrationCueId\(strategy\)/);
+  assert.match(visualSource, /player\.play\(\[cueId\]\)/);
+  assert.match(pageSource, /onPlaybackStateChange=\{setLessonPlaybackState\}/);
+  assert.match(pageSource, /Skip & start/);
+  assert.match(pageSource, /Skip all introductions/);
+  assert.match(pageSource, /Watch & listen/);
+  assert.match(pageSource, /controlledLessonPrimedRef/);
+  assert.match(pageSource, /spatial-gym-libra-lesson-acknowledgements-v1/);
+  assert.match(pageSource, /persistControlledLessonAcknowledgements\(/);
+  assert.match(pageSource, /controlledLessonAcknowledgements\(/);
+  assert.match(pageSource, /shouldReinforceAcknowledgedIntroduction/);
+  assert.match(
+    pageSource,
+    /shouldReinforceAcknowledgedIntroduction[\s\S]*?reinforcementRoundIdsRef\.current\.add\(currentPlayId\)/,
+  );
+  assert.match(visualSource, /if \(!playbackRequested\) return/);
+  assert.match(stylesSource, /--lesson-after-delay/);
+  assert.match(stylesSource, /data-lesson-ready="true"/);
+  assert.doesNotMatch(stylesSource, /lessonAfterIn 700ms 1\.72s/);
+});
+
+test("proof replay cannot race a strategy lesson and restores keyboard focus", () => {
+  assert.match(
+    pageSource,
+    /phase === "wrong-review" \|\|[\s\S]*?proofReplaying \|\|[\s\S]*?pendingLessons/,
+  );
+  assert.match(pageSource, /proofReplayOriginRef/);
+  assert.match(pageSource, /replayButton\?\.focus\(\)/);
+  assert.match(pageSource, /skipProofReplay[\s\S]*?finishProofReplay\(\)/);
+  assert.match(
+    pageSource,
+    /closeCampaignReview[\s\S]*?proofNarrationPlayer\.cancel\(\)[\s\S]*?setProofReplaying\(false\)/,
+  );
+  assert.match(pageSource, /onClick=\{closeCampaignReview\}[\s\S]*?disabled=\{proofReplaying\}/);
 });
 
 test("reduced motion keeps the narrated persistent scale focus", () => {

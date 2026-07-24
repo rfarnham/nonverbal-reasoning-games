@@ -346,8 +346,12 @@ function assertTeachingPlan(round, label) {
   };
 
   equationMatches(plan.finalEquation, expectedGoal);
-  assert.equal(plan.steps.at(-1).kind, "conclude", `${label}: concludes`);
-  equationMatches(plan.steps.at(-1).equation, expectedGoal);
+  assert.ok(plan.steps.length > 0, `${label}: has a direct operation`);
+  assert.ok(
+    plan.steps.every(({ kind }) => kind !== "inspect" && kind !== "conclude"),
+    `${label}: omits repeated opening and closing boilerplate`,
+  );
+  equationMatches(plan.steps.at(-1).after, expectedGoal);
   assert.deepEqual(plan.timeline, teachingProofTimeline(plan.steps));
   assert.equal(plan.timeline.length, plan.steps.length);
   let expectedDelayMs = 0;
@@ -502,7 +506,7 @@ test("substitution replaces loads in place without adding whole scales", () => {
   assert.equal(juniorTwo.family, "chain");
   assert.deepEqual(
     plan.steps.map(({ kind }) => kind),
-    ["inspect", "substitute", "conclude"],
+    ["substitute"],
   );
   assert.deepEqual(plan.strategyIds, ["substitution"]);
 
@@ -519,7 +523,7 @@ test("offset chains cancel only after the bridge has been substituted", () => {
   const plan = buildTeachingProof(offset);
   assert.deepEqual(
     plan.steps.map(({ kind }) => kind),
-    ["inspect", "substitute", "cancel-matches", "conclude"],
+    ["substitute", "cancel-matches"],
   );
   assert.deepEqual(plan.strategyIds, ["substitution", "cancel-matches"]);
 });
@@ -540,9 +544,9 @@ test("combo primers use one scale before add-scale combos are introduced", () =>
     assert.equal(round.question.target.length, 2);
     assert.deepEqual(
       plan.steps.map(({ kind }) => kind),
-      ["inspect", "regroup", "split-evenly", "conclude"],
+      ["regroup", "split-evenly"],
     );
-    assert.deepEqual(plan.steps[0].sources.map(({ sourceIndex }) => sourceIndex), [0]);
+    equationMatches(plan.steps[0].before, round.equations[0]);
     assert.ok(!plan.strategyIds.includes("add-scales"));
     assert.ok(!plan.strategyIds.includes("subtract-scales"));
   }
@@ -551,8 +555,32 @@ test("combo primers use one scale before add-scale combos are introduced", () =>
   assert.equal(juniorRounds.indexOf(addCombo) + 1, 11);
   assert.deepEqual(
     buildTeachingProof(addCombo).steps.map(({ kind }) => kind),
-    ["inspect", "add-scales", "regroup", "split-evenly", "conclude"],
+    ["add-scales", "regroup", "split-evenly"],
   );
+});
+
+test("proof copy explains why each operation helps using the pictured loads", () => {
+  const direct = ROUNDS.find(({ family }) => family === "direct");
+  const directText = buildTeachingProof(direct).steps[0].text;
+  assert.match(directText, /there are \d+ (?:rabbits|geese|foxes|frogs|turtles|cats|owls|beetles|bears|chicks) on the left/i);
+  assert.match(directText, /so make \d+ equal groups/i);
+  assert.doesNotMatch(directText, /\d+\s*×/);
+
+  const substitution = ROUNDS.find(({ family }) => family === "chain");
+  const substitutionText = buildTeachingProof(substitution).steps[0].text;
+  assert.match(substitutionText, /\bbalances?\b.+, so replace/i);
+
+  const combo = ROUNDS.find(({ family }) => family === "combo-primer");
+  const comboText = buildTeachingProof(combo).steps[0].text;
+  assert.match(comboText, /there are \d+ equal groups/i);
+  assert.match(comboText, /so make \d+ equal groups/i);
+
+  for (const round of ROUNDS) {
+    for (const { text } of buildTeachingProof(round).steps) {
+      assert.doesNotMatch(text, /\ba (?:owl)\b/i);
+      assert.doesNotMatch(text, /\b(?:gooses|foxs)\b/i);
+    }
+  }
 });
 
 test("plain one-animal targets divide directly instead of pretending to form a combo", () => {
@@ -589,14 +617,12 @@ test("every authored proof uses only tools available by that point in Campaign",
 
 test("proof operations linger long enough to inspect the scales and moving loads", () => {
   const minimumMsByKind = {
-    inspect: 2_000,
     substitute: 4_600,
     "add-scales": 4_600,
     "subtract-scales": 4_400,
     "cancel-matches": 3_600,
     regroup: 3_500,
     "split-evenly": 4_600,
-    conclude: 2_000,
   };
 
   for (const round of ROUNDS) {

@@ -126,6 +126,9 @@ const WRONG_REVIEW_MS = 2200;
 const REDUCED_FEEDBACK_MS = 140;
 const REDUCED_WRONG_REVIEW_MS = 1300;
 const CAMPAIGN_PROBLEMS_PER_LEVEL = 12;
+const CONTROLLED_LESSON_ACKNOWLEDGEMENTS_KEY =
+  "spatial-gym-libra-lesson-acknowledgements-v1";
+const MAX_CONTROLLED_LESSON_ACKNOWLEDGEMENTS = 96;
 
 const CAMPAIGN_LEVELS: ReadonlyArray<{
   id: CampaignLevelId;
@@ -136,6 +139,81 @@ const CAMPAIGN_LEVELS: ReadonlyArray<{
   { id: "expert", label: "Expert" },
   { id: "wizard", label: "Wizard" },
 ];
+
+function controlledLessonAcknowledgementKey(
+  attemptId: string,
+  playId: string,
+): string {
+  return `${attemptId}:${playId}`;
+}
+
+function readControlledLessonAcknowledgements(): Record<
+  string,
+  readonly StrategyId[]
+> {
+  if (typeof window === "undefined") return {};
+  try {
+    const parsed: unknown = JSON.parse(
+      window.localStorage.getItem(
+        CONTROLLED_LESSON_ACKNOWLEDGEMENTS_KEY,
+      ) ?? "{}",
+    );
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    const valid: Record<string, readonly StrategyId[]> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (!Array.isArray(value)) continue;
+      const strategyIds = value.filter(
+        (item): item is StrategyId =>
+          typeof item === "string" &&
+          item in STRATEGY_CATALOGUE_BY_ID,
+      );
+      if (strategyIds.length > 0) valid[key] = strategyIds;
+    }
+    return valid;
+  } catch {
+    return {};
+  }
+}
+
+function persistControlledLessonAcknowledgements(
+  attemptId: string,
+  playId: string,
+  strategyIds: readonly StrategyId[],
+): void {
+  if (typeof window === "undefined" || strategyIds.length === 0) return;
+  try {
+    const key = controlledLessonAcknowledgementKey(attemptId, playId);
+    const stored = readControlledLessonAcknowledgements();
+    const existing = stored[key] ?? [];
+    const next = { ...stored };
+    delete next[key];
+    next[key] = [...new Set([...existing, ...strategyIds])];
+    const bounded = Object.fromEntries(
+      Object.entries(next).slice(
+        -MAX_CONTROLLED_LESSON_ACKNOWLEDGEMENTS,
+      ),
+    );
+    window.localStorage.setItem(
+      CONTROLLED_LESSON_ACKNOWLEDGEMENTS_KEY,
+      JSON.stringify(bounded),
+    );
+  } catch {
+    // Lesson acknowledgement improves repetition but never blocks play.
+  }
+}
+
+function controlledLessonAcknowledgements(
+  attemptId: string,
+  playId: string,
+): readonly StrategyId[] {
+  return (
+    readControlledLessonAcknowledgements()[
+      controlledLessonAcknowledgementKey(attemptId, playId)
+    ] ?? []
+  );
+}
 
 function progressionTargetHref(
   target: Readonly<{
@@ -148,10 +226,10 @@ function progressionTargetHref(
 }
 
 function teachingProofFeedback(round: Round): string {
-  const actions = buildTeachingProof(round).steps
-    .filter(({ kind }) => kind !== "inspect" && kind !== "conclude")
-    .map(({ title }) => title);
-  return `${actions.join(" → ")}.`;
+  return (
+    buildTeachingProof(round).steps[0]?.text ??
+    "The same change on both trays keeps the scale balanced."
+  );
 }
 
 function initialCampaignCursors(): CampaignCursors {
@@ -319,8 +397,12 @@ export default function LibraPage() {
   const [replayStrategyId, setReplayStrategyId] =
     useState<StrategyId | null>(null);
   const [lessonReplayKey, setLessonReplayKey] = useState(0);
+  const [lessonPlaybackState, setLessonPlaybackState] = useState<
+    "ready" | "playing" | "settled"
+  >("settled");
   const [proofReplayKey, setProofReplayKey] = useState(0);
   const [proofReplaying, setProofReplaying] = useState(false);
+  const [proofPresented, setProofPresented] = useState(false);
   const [catalogueExpanded, setCatalogueExpanded] = useState(false);
   const [campaignReviewSelection, setCampaignReviewSelection] =
     useState<CampaignReviewSelection | null>(null);
@@ -336,6 +418,8 @@ export default function LibraPage() {
   const lessonDialogRef = useRef<HTMLDialogElement>(null);
   const lessonPrimaryButtonRef = useRef<HTMLButtonElement>(null);
   const historicalReviewHeadingRef = useRef<HTMLHeadingElement>(null);
+  const liveProofReplayButtonRef = useRef<HTMLButtonElement>(null);
+  const historicalProofReplayButtonRef = useRef<HTMLButtonElement>(null);
   const campaignMarkerRefs = useRef<
     Record<string, HTMLButtonElement | null>
   >({});
@@ -344,6 +428,8 @@ export default function LibraPage() {
   >({});
   const reviewOriginIdRef = useRef<string | null>(null);
   const replayOriginIdRef = useRef<StrategyId | null>(null);
+  const proofReplayOriginRef = useRef<"live" | "historical" | null>(null);
+  const controlledLessonPrimedRef = useRef(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -354,6 +440,7 @@ export default function LibraPage() {
   const infiniteFingerprintsRef = useRef(new Set<string>());
   const infiniteAdaptiveRef = useRef(initialInfiniteAdaptiveState());
   const hydratedProgressionPlayIdRef = useRef<string | null>(null);
+  const reinforcementRoundIdsRef = useRef(new Set<string>());
 
   const controlledSession =
     progression.mode === "controlled" ? progression : null;
@@ -479,6 +566,7 @@ export default function LibraPage() {
     setSelectedIndex(null);
     setRetryReady(false);
     setProofReplaying(false);
+    setProofPresented(false);
     setPhase("idle");
   }, [clearAttemptTimers]);
 
@@ -500,6 +588,7 @@ export default function LibraPage() {
   );
 
   const closeActiveLesson = useCallback(() => {
+    proofNarrationPlayer.cancel();
     if (replayStrategyId) {
       const originId = replayOriginIdRef.current;
       setReplayStrategyId(null);
@@ -510,24 +599,95 @@ export default function LibraPage() {
     }
 
     if (!activeLesson) return;
+    if (
+      activeLesson.focusTarget === "answers" &&
+      activeSessionRound
+    ) {
+      reinforcementRoundIdsRef.current.add(activeSessionRound.id);
+    }
+    if (controlledSession?.current) {
+      persistControlledLessonAcknowledgements(
+        controlledSession.attemptId,
+        controlledSession.current.playId,
+        [activeLesson.strategyId],
+      );
+    }
     setDiscoveredStrategyIds((current) =>
       discoveredStrategyIdsAfterLesson(current, activeLesson.strategyId),
     );
+    if (pendingLessons.length > 1) {
+      proofNarrationPlayer.prime();
+      setLessonPlaybackState("playing");
+    }
     setPendingLessons((current) => current.slice(1));
-  }, [activeLesson, replayStrategyId]);
+  }, [
+    activeLesson,
+    activeSessionRound,
+    controlledSession,
+    pendingLessons.length,
+    proofNarrationPlayer,
+    replayStrategyId,
+  ]);
 
   const replayStrategyLesson = useCallback((strategyId: StrategyId) => {
     if (
       phase === "animating" ||
       phase === "wrong-review" ||
+      proofReplaying ||
       pendingLessons.length > 0
     ) {
       return;
     }
     replayOriginIdRef.current = strategyId;
+    proofNarrationPlayer.prime();
+    setLessonPlaybackState("playing");
     setLessonReplayKey((current) => current + 1);
     setReplayStrategyId(strategyId);
-  }, [pendingLessons.length, phase]);
+  }, [
+    pendingLessons.length,
+    phase,
+    proofNarrationPlayer,
+    proofReplaying,
+  ]);
+
+  const replayActiveLesson = useCallback(() => {
+    proofNarrationPlayer.cancel();
+    proofNarrationPlayer.prime();
+    setLessonPlaybackState("playing");
+    setLessonReplayKey((current) => current + 1);
+  }, [proofNarrationPlayer]);
+
+  const skipRemainingLessons = useCallback(() => {
+    if (replayStrategyId || pendingLessons.length === 0) return;
+    proofNarrationPlayer.cancel();
+    if (
+      pendingLessons.some(({ focusTarget }) => focusTarget === "answers") &&
+      activeSessionRound
+    ) {
+      reinforcementRoundIdsRef.current.add(activeSessionRound.id);
+    }
+    if (controlledSession?.current) {
+      persistControlledLessonAcknowledgements(
+        controlledSession.attemptId,
+        controlledSession.current.playId,
+        pendingLessons.map(({ strategyId }) => strategyId),
+      );
+    }
+    setDiscoveredStrategyIds((current) =>
+      pendingLessons.reduce(
+        (next, { strategyId }) =>
+          discoveredStrategyIdsAfterLesson(next, strategyId),
+        current,
+      ),
+    );
+    setPendingLessons([]);
+  }, [
+    activeSessionRound,
+    controlledSession,
+    pendingLessons,
+    proofNarrationPlayer,
+    replayStrategyId,
+  ]);
 
   const openCampaignReview = useCallback(
     (levelId: CampaignLevelId, problemIndex: number) => {
@@ -556,14 +716,19 @@ export default function LibraPage() {
 
   const closeCampaignReview = useCallback(() => {
     const originId = reviewOriginIdRef.current;
+    proofNarrationPlayer.cancel();
+    proofReplayOriginRef.current = null;
+    setProofReplaying(false);
     setCampaignReviewSelection(null);
     window.requestAnimationFrame(() => {
       if (originId) campaignMarkerRefs.current[originId]?.focus();
     });
-  }, []);
+  }, [proofNarrationPlayer]);
 
-  const replayProof = useCallback(() => {
+  const replayProof = useCallback((origin: "live" | "historical") => {
     proofNarrationPlayer.prime();
+    proofReplayOriginRef.current = origin;
+    setProofPresented(true);
     setProofReplayKey((current) => current + 1);
     setProofReplaying(true);
   }, [proofNarrationPlayer]);
@@ -641,15 +806,34 @@ export default function LibraPage() {
       inputLockedRef.current = true;
       setRetryReady(false);
       const isCorrect = optionIndex === round.correctIndex;
-      if (isCorrect) proofNarrationPlayer.prime();
+      const wasMissed =
+        isRedemption ||
+        (controlledSession?.currentAttemptCount ?? 0) > 0 ||
+        mistakes.some(
+          ({ sessionRound }) => sessionRound.id === activeSessionRound.id,
+        );
+      const shouldExplainCorrectAnswer =
+        isCorrect &&
+        (wasMissed ||
+          reinforcementRoundIdsRef.current.has(activeSessionRound.id) ||
+          orderedStrategyIdsForRound(round).some(
+            (strategyId) => !discoveredStrategyIds.includes(strategyId),
+          ));
+      if (shouldExplainCorrectAnswer) {
+        proofNarrationPlayer.prime();
+        controlledLessonPrimedRef.current = true;
+        setLessonPlaybackState("playing");
+      }
       controlledSession?.answer({
         correct: isCorrect,
         answerToken: `option-${optionIndex}`,
       });
       setSelectedIndex(optionIndex);
-      setPhase("animating");
-      const wasMissed = mistakes.some(
-        ({ sessionRound }) => sessionRound.id === activeSessionRound.id,
+      setProofPresented(isCorrect && shouldExplainCorrectAnswer);
+      setPhase(
+        isCorrect && !shouldExplainCorrectAnswer
+          ? "answered"
+          : "animating",
       );
       const reducedMotion = window.matchMedia(
         "(prefers-reduced-motion: reduce)",
@@ -710,7 +894,13 @@ export default function LibraPage() {
       const token = animationTokenRef.current + 1;
       animationTokenRef.current = token;
       clearAttemptTimers();
-      if (isCorrect) return;
+      if (isCorrect) {
+        reinforcementRoundIdsRef.current.delete(activeSessionRound.id);
+        if (!shouldExplainCorrectAnswer) {
+          queueStrategyLessons(orderedStrategyIdsForRound(round), "next");
+        }
+        return;
+      }
 
       const approachDuration = reducedMotion
         ? REDUCED_FEEDBACK_MS
@@ -744,6 +934,7 @@ export default function LibraPage() {
       clearAttemptTimers,
       complete,
       controlledSession,
+      discoveredStrategyIds,
       generationError,
       isCampaign,
       isInfinite,
@@ -752,6 +943,7 @@ export default function LibraPage() {
       phase,
       playFeedbackSound,
       proofNarrationPlayer,
+      queueStrategyLessons,
       round,
       hasStarted,
     ],
@@ -761,17 +953,47 @@ export default function LibraPage() {
     if (phase !== "animating" || !selectedCorrect || !round) return;
     animationTokenRef.current += 1;
     clearAttemptTimers();
+    if (activeSessionRound) {
+      reinforcementRoundIdsRef.current.delete(activeSessionRound.id);
+    }
     setPhase("answered");
     queueStrategyLessons(orderedStrategyIdsForRound(round), "next");
-  }, [clearAttemptTimers, phase, queueStrategyLessons, round, selectedCorrect]);
+  }, [
+    activeSessionRound,
+    clearAttemptTimers,
+    phase,
+    queueStrategyLessons,
+    round,
+    selectedCorrect,
+  ]);
 
   const finishProofReplay = useCallback(() => {
     setProofReplaying(false);
+    window.requestAnimationFrame(() => {
+      const replayButton =
+        proofReplayOriginRef.current === "historical"
+          ? historicalProofReplayButtonRef.current
+          : liveProofReplayButtonRef.current;
+      replayButton?.focus();
+      proofReplayOriginRef.current = null;
+    });
   }, []);
+
+  const skipCorrectProof = useCallback(() => {
+    proofNarrationPlayer.cancel();
+    finishCorrectProof();
+  }, [finishCorrectProof, proofNarrationPlayer]);
+
+  const skipProofReplay = useCallback(() => {
+    proofNarrationPlayer.cancel();
+    finishProofReplay();
+  }, [finishProofReplay, proofNarrationPlayer]);
 
   const startCampaign = useCallback(() => {
     resumeAudio();
+    proofNarrationPlayer.prime();
     infiniteFingerprintsRef.current.clear();
+    reinforcementRoundIdsRef.current.clear();
     const initialAdaptive = initialInfiniteAdaptiveState();
     const initialRound = buildCampaignSessionRound("starter", 0)?.round;
     infiniteAdaptiveRef.current = initialAdaptive;
@@ -800,17 +1022,20 @@ export default function LibraPage() {
         : [],
     );
     setReplayStrategyId(null);
+    setLessonPlaybackState("playing");
     setCatalogueExpanded(false);
     setCampaignReviewSelection(null);
     setStarted(true);
     setComplete(false);
     resetAttemptState();
     shouldFocusFirstOption.current = true;
-  }, [resetAttemptState, resumeAudio]);
+  }, [proofNarrationPlayer, resetAttemptState, resumeAudio]);
 
   const startInfinite = useCallback(() => {
     resumeAudio();
+    proofNarrationPlayer.prime();
     infiniteFingerprintsRef.current.clear();
+    reinforcementRoundIdsRef.current.clear();
     const initialAdaptive = initialInfiniteAdaptiveState();
     infiniteAdaptiveRef.current = initialAdaptive;
     const generated = tryBuildInfiniteSessionRound(
@@ -846,13 +1071,14 @@ export default function LibraPage() {
         : [],
     );
     setReplayStrategyId(null);
+    setLessonPlaybackState("playing");
     setCatalogueExpanded(false);
     setCampaignReviewSelection(null);
     setStarted(true);
     setComplete(false);
     resetAttemptState();
     shouldFocusFirstOption.current = Boolean(generated);
-  }, [resetAttemptState, resumeAudio]);
+  }, [proofNarrationPlayer, resetAttemptState, resumeAudio]);
 
   const selectCampaignLevel = useCallback(
     (levelId: CampaignLevelId) => {
@@ -866,6 +1092,7 @@ export default function LibraPage() {
         return;
       }
 
+      proofNarrationPlayer.prime();
       resetAttemptState();
       setActiveCampaignLevel(levelId);
       const levelIsComplete = isCampaignLevelComplete(
@@ -894,6 +1121,7 @@ export default function LibraPage() {
       campaignReviewSelection,
       isCampaign,
       phase,
+      proofNarrationPlayer,
       queueStrategyLessons,
       resetAttemptState,
     ],
@@ -929,6 +1157,9 @@ export default function LibraPage() {
       return;
     }
 
+    proofNarrationPlayer.prime();
+    controlledLessonPrimedRef.current = true;
+    setLessonPlaybackState("playing");
     if (controlledSession) {
       resetAttemptState();
       controlledSession.advance();
@@ -1026,6 +1257,7 @@ export default function LibraPage() {
     isInfinite,
     isLastRedemptionRound,
     phase,
+    proofNarrationPlayer,
     redemptionMistakeIds,
     reviewLevelId,
     queueStrategyLessons,
@@ -1034,6 +1266,7 @@ export default function LibraPage() {
   ]);
 
   const retryInfiniteGeneration = useCallback(() => {
+    proofNarrationPlayer.prime();
     const ordinal = roundQueue.length + 1;
     const generated = tryBuildInfiniteSessionRound(
       ordinal,
@@ -1060,6 +1293,7 @@ export default function LibraPage() {
     shouldFocusFirstOption.current = true;
   }, [
     discoveredStrategyIds,
+    proofNarrationPlayer,
     queueStrategyLessons,
     resetAttemptState,
     roundQueue.length,
@@ -1094,6 +1328,12 @@ export default function LibraPage() {
     writeSoundPreference(next);
     if (next) resumeAudio();
   }, [proofNarrationPlayer, resumeAudio, soundEnabled]);
+
+  const primeControlledLessonNarration = useCallback(() => {
+    proofNarrationPlayer.prime();
+    controlledLessonPrimedRef.current = true;
+    setLessonPlaybackState("playing");
+  }, [proofNarrationPlayer]);
 
   useEffect(() => {
     return () => proofNarrationPlayer.dispose();
@@ -1140,6 +1380,8 @@ export default function LibraPage() {
     const savedOptionIndex = progressionOptionIndexFromAnswerToken(
       controlledSession.lastAnswerToken,
     );
+    const currentPlayId = controlledSession.current.playId;
+    const currentRound = controlledSession.current.round;
     const reconstructedStrategies = new Set<StrategyId>();
     for (const [
       attemptRoundIndex,
@@ -1167,25 +1409,41 @@ export default function LibraPage() {
         // Stale-content recovery remains owned by the shared session.
       }
     }
+    const acknowledgedCurrentStrategies =
+      controlledLessonAcknowledgements(
+        controlledSession.attemptId,
+        currentPlayId,
+      );
+    for (const strategyId of acknowledgedCurrentStrategies) {
+      reconstructedStrategies.add(strategyId);
+    }
+    const shouldReinforceAcknowledgedIntroduction =
+      acknowledgedCurrentStrategies.some((strategyId) =>
+        preRoundStrategyIds(currentRound).includes(strategyId),
+      );
     if (
       !controlledSession.isRedemption &&
       currentAttemptRound &&
       currentAttemptRound.attemptCount > 0
     ) {
-      for (const strategyId of preRoundStrategyIds(
-        controlledSession.current.round,
-      )) {
+      for (const strategyId of preRoundStrategyIds(currentRound)) {
         reconstructedStrategies.add(strategyId);
       }
     }
     const reconstructed = [...reconstructedStrategies];
-    const currentRound = controlledSession.current.round;
     const hydrateTimer = window.setTimeout(() => {
       hydratedProgressionPlayIdRef.current = hydrationKey;
       resetAttemptState();
       setGenerationError(false);
       setCampaignReviewSelection(null);
       setReplayStrategyId(null);
+      setLessonPlaybackState(
+        controlledLessonPrimedRef.current ? "playing" : "ready",
+      );
+      controlledLessonPrimedRef.current = false;
+      if (shouldReinforceAcknowledgedIntroduction) {
+        reinforcementRoundIdsRef.current.add(currentPlayId);
+      }
       setDiscoveredStrategyIds(reconstructed);
       if (controlledSession.roundPhase === "solved") {
         setPendingLessons(
@@ -1590,11 +1848,13 @@ export default function LibraPage() {
               <ExampleVisual />
             </div>
             {controlledSession?.sectionIntro ? (
-              <ProgressionCulminationSectionIntro
-                gameTitle={libraGame.title}
-                section={controlledSession.sectionIntro}
-                onBegin={controlledSession.beginSection}
-              />
+              <div onClickCapture={primeControlledLessonNarration}>
+                <ProgressionCulminationSectionIntro
+                  gameTitle={libraGame.title}
+                  section={controlledSession.sectionIntro}
+                  onBegin={controlledSession.beginSection}
+                />
+              </div>
             ) : (
               <div
                 className={styles.modeActions}
@@ -1925,6 +2185,7 @@ export default function LibraPage() {
                                   disabled={
                                     phase === "animating" ||
                                     phase === "wrong-review" ||
+                                    proofReplaying ||
                                     pendingLessons.length > 0 ||
                                     campaignReviewSelection !== null
                                   }
@@ -2047,6 +2308,7 @@ export default function LibraPage() {
                     className={styles.modeButton}
                     type="button"
                     onClick={closeCampaignReview}
+                    disabled={proofReplaying}
                   >
                     Back to current problem
                   </button>
@@ -2070,6 +2332,9 @@ export default function LibraPage() {
                       onProofPlaybackComplete={
                         proofReplaying ? finishProofReplay : undefined
                       }
+                      onProofSkip={
+                        proofReplaying ? skipProofReplay : undefined
+                      }
                       key={`historical-proof-${proofReplayKey}`}
                     />
                   </div>
@@ -2080,11 +2345,12 @@ export default function LibraPage() {
                     <button
                       className={styles.replayButton}
                       type="button"
-                      onClick={replayProof}
+                      onClick={() => replayProof("historical")}
                       disabled={proofReplaying}
+                      ref={historicalProofReplayButtonRef}
                     >
                       <span aria-hidden="true">↻</span>
-                      Replay proof
+                      Watch explanation
                     </button>
                   </div>
                   {historicalMistake ? (
@@ -2141,7 +2407,8 @@ export default function LibraPage() {
                               disabled={
                                 !discoveredStrategyIdSet.has(strategyId) ||
                                 phase === "animating" ||
-                                phase === "wrong-review"
+                                phase === "wrong-review" ||
+                                proofReplaying
                               }
                               onClick={() =>
                                 replayStrategyLesson(strategyId)
@@ -2165,7 +2432,7 @@ export default function LibraPage() {
                       proofState={
                         selectedCorrect &&
                         (phase === "animating" ||
-                          phase === "answered")
+                          (phase === "answered" && proofPresented))
                           ? phase === "animating" || proofReplaying
                             ? "animating"
                             : "settled"
@@ -2177,6 +2444,9 @@ export default function LibraPage() {
                         proofReplaying
                           ? finishProofReplay
                           : finishCorrectProof
+                      }
+                      onProofSkip={
+                        proofReplaying ? skipProofReplay : skipCorrectProof
                       }
                       revealDifferences={phase === "wrong-review"}
                       key={`live-proof-${proofReplayKey}`}
@@ -2294,18 +2564,16 @@ export default function LibraPage() {
                         <strong className={styles.correctText}>
                           Correct · {optionFeedback(round, round.correctIndex)}
                         </strong>
-                        <span className={styles.strategyFeedback}>
-                          {teachingProofFeedback(round)}
-                        </span>
                       </span>
                       <button
                         className={styles.replayButton}
                         type="button"
-                        onClick={replayProof}
+                        onClick={() => replayProof("live")}
                         disabled={proofReplaying}
+                        ref={liveProofReplayButtonRef}
                       >
                         <span aria-hidden="true">↻</span>
-                        Replay proof
+                        Explain
                       </button>
                       <button
                         className={styles.nextButton}
@@ -2327,7 +2595,7 @@ export default function LibraPage() {
                     </>
                   ) : phase === "animating" && selectedCorrect ? (
                     <strong className={styles.correctText}>
-                      Correct · Watch the balance change step by step.
+                      Correct · Watch why the balance still works.
                     </strong>
                   ) : retryReady ? (
                     <strong className={styles.retryText}>Try again</strong>
@@ -2485,8 +2753,8 @@ export default function LibraPage() {
               <div>
                 <p className={styles.kicker}>
                   {replayStrategyId
-                    ? "Toolbox replay"
-                    : "New balance tool"}
+                    ? "Watch again"
+                    : "One useful idea"}
                 </p>
                 <h2 id="strategy-lesson-title">
                   {activeLessonStrategy.name}
@@ -2499,32 +2767,73 @@ export default function LibraPage() {
             <StrategyLessonVisual
               strategy={activeLessonStrategyId}
               replayKey={lessonReplayKey}
+              playbackRequested={lessonPlaybackState !== "ready"}
+              narrationEnabled={soundEnabled}
+              narrationPlayer={proofNarrationPlayer}
+              onPlaybackStateChange={setLessonPlaybackState}
             />
             <div className={styles.lessonActions}>
-              <button
-                className={styles.replayButton}
-                type="button"
-                onClick={() =>
-                  setLessonReplayKey((current) => current + 1)
-                }
-              >
-                <span aria-hidden="true">↻</span>
-                Replay
-              </button>
-              <button
-                className={styles.primaryButton}
-                type="button"
-                autoFocus
-                ref={lessonPrimaryButtonRef}
-                onClick={closeActiveLesson}
-              >
-                {replayStrategyId
-                  ? "Back to puzzle"
-                  : pendingLessons.length > 1
-                    ? "Next tool"
-                    : "Try it"}
-                <span aria-hidden="true">→</span>
-              </button>
+              {!replayStrategyId && pendingLessons.length > 1 ? (
+                <button
+                  className={styles.replayButton}
+                  type="button"
+                  onClick={skipRemainingLessons}
+                >
+                  Skip all introductions
+                </button>
+              ) : null}
+              {lessonPlaybackState === "ready" ? (
+                <>
+                  <button
+                    className={styles.replayButton}
+                    type="button"
+                    onClick={closeActiveLesson}
+                  >
+                    Skip introduction
+                  </button>
+                  <button
+                    className={styles.primaryButton}
+                    type="button"
+                    autoFocus
+                    ref={lessonPrimaryButtonRef}
+                    onClick={replayActiveLesson}
+                  >
+                    <span aria-hidden="true">♪</span>
+                    Watch & listen
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    className={styles.replayButton}
+                    type="button"
+                    onClick={replayActiveLesson}
+                  >
+                    <span aria-hidden="true">↻</span>
+                    Watch again
+                  </button>
+                  <button
+                    className={styles.primaryButton}
+                    type="button"
+                    autoFocus
+                    ref={lessonPrimaryButtonRef}
+                    onClick={closeActiveLesson}
+                  >
+                    {replayStrategyId
+                      ? lessonPlaybackState === "playing"
+                        ? "Skip & return"
+                        : "Back to puzzle"
+                      : pendingLessons.length > 1
+                        ? lessonPlaybackState === "playing"
+                          ? "Skip & next"
+                          : "Next idea"
+                        : lessonPlaybackState === "playing"
+                          ? "Skip & start"
+                          : "Start puzzle"}
+                    <span aria-hidden="true">→</span>
+                  </button>
+                </>
+              )}
             </div>
           </div>
         ) : null}

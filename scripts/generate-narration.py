@@ -56,7 +56,11 @@ def render_unlock_clip(sample_rate: int) -> None:
     )
 
 
-def render(manifest_path: Path, output_dir: Path) -> None:
+def render(
+    manifest_path: Path,
+    output_dir: Path,
+    selected_cue_ids: frozenset[str] | None = None,
+) -> None:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     narrator = manifest["narrator"]
     repo_id = narrator["model"]
@@ -84,7 +88,16 @@ def render(manifest_path: Path, output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="spatial-gym-narration-") as temp:
         temp_dir = Path(temp)
-        for cue_id, cue in manifest["cues"].items():
+        available_cues = manifest["cues"]
+        if selected_cue_ids:
+            missing = selected_cue_ids.difference(available_cues)
+            if missing:
+                raise KeyError(
+                    f"Unknown narration cue(s): {', '.join(sorted(missing))}"
+                )
+        for cue_id, cue in available_cues.items():
+            if selected_cue_ids and cue_id not in selected_cue_ids:
+                continue
             chunks = [
                 result.audio.detach().cpu().numpy()
                 for result in pipeline(
@@ -133,8 +146,19 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument(
+        "--cue",
+        action="append",
+        default=[],
+        help="Render only this cue ID. Repeat for multiple cues.",
+    )
     args = parser.parse_args()
-    render(args.manifest.resolve(), args.output.resolve())
+    selected_cues = frozenset(args.cue) or None
+    render(
+        args.manifest.resolve(),
+        args.output.resolve(),
+        selected_cues,
+    )
 
 
 if __name__ == "__main__":

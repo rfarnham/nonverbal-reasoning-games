@@ -29,6 +29,8 @@ import {
   proofNarrationCaption,
   proofNarrationCueId,
   proofNarrationCueIds,
+  strategyLessonNarrationCaption,
+  strategyLessonNarrationCueId,
   type LibraProofNarrationCueId,
 } from "./proof-narration.ts";
 import styles from "./libra.module.css";
@@ -572,6 +574,20 @@ type TeachingGroupedEquationValue = Extract<
 
 type ProofPhaseStyle = CSSProperties & {
   "--proof-phase-duration": string;
+};
+
+type StrategyLessonStyle = CSSProperties & {
+  "--lesson-before-duration": string;
+  "--lesson-flow-delay": string;
+  "--lesson-flow-duration": string;
+  "--lesson-operator-delay": string;
+  "--lesson-operator-duration": string;
+  "--lesson-strike-delay": string;
+  "--lesson-strike-duration": string;
+  "--lesson-after-delay": string;
+  "--lesson-after-duration": string;
+  "--lesson-group-delay": string;
+  "--lesson-group-duration": string;
 };
 
 function isGroupedEquation(
@@ -1462,7 +1478,7 @@ function TeachingProofPhase({
       data-proof-first={stepIndex === 0 ? "true" : undefined}
       data-proof-final={stepIndex === stepCount - 1 ? "true" : undefined}
       data-proof-holds-final={
-        stepIndex === stepCount - 2 ? "true" : undefined
+        nextKind === "conclude" ? "true" : undefined
       }
       style={phaseStyle}
     >
@@ -1513,6 +1529,7 @@ export function SolutionProofVisual({
   narrationEnabled = true,
   narrationPlayer,
   onPlaybackComplete,
+  onSkip,
 }: {
   round: Round;
   proofState: Exclude<ProofState, "hidden">;
@@ -1520,6 +1537,7 @@ export function SolutionProofVisual({
   narrationEnabled?: boolean;
   narrationPlayer?: GameNarrationPlayer<LibraProofNarrationCueId> | null;
   onPlaybackComplete?: () => void;
+  onSkip?: () => void;
 }) {
   const plan = useMemo(() => buildTeachingProof(round), [round]);
   const cueIds = useMemo(
@@ -1602,6 +1620,15 @@ export function SolutionProofVisual({
       role="region"
       aria-label="Step-by-step balance proof"
     >
+      {proofState === "animating" && onSkip ? (
+        <button
+          className={styles.proofSkipButton}
+          type="button"
+          onClick={onSkip}
+        >
+          Skip explanation
+        </button>
+      ) : null}
       <ol className={styles.proofAccessibleSteps}>
         {plan.steps.map((step) => (
           <li key={step.id}>{step.text}</li>
@@ -1899,24 +1926,90 @@ function lessonForStrategy(strategy: StrategyId) {
 export function StrategyLessonVisual({
   strategy,
   replayKey = 0,
+  playbackRequested = true,
+  narrationEnabled = true,
+  narrationPlayer,
+  onPlaybackStateChange,
 }: {
   strategy: StrategyId;
   replayKey?: string | number;
+  playbackRequested?: boolean;
+  narrationEnabled?: boolean;
+  narrationPlayer?: GameNarrationPlayer<LibraProofNarrationCueId> | null;
+  onPlaybackStateChange?: (state: "playing" | "settled") => void;
 }) {
+  const cueId = strategyLessonNarrationCueId(strategy);
+  const cue = LIBRA_PROOF_NARRATION.clips[cueId];
+  const narrationEnabledRef = useRef(narrationEnabled);
+  const onPlaybackStateChangeRef = useRef(onPlaybackStateChange);
+  const lessonStyle: StrategyLessonStyle = {
+    "--lesson-before-duration": `${Math.round(cue.minimumVisualMs * 0.22)}ms`,
+    "--lesson-flow-delay": `${Math.round(cue.minimumVisualMs * 0.18)}ms`,
+    "--lesson-flow-duration": `${Math.round(cue.minimumVisualMs * 0.28)}ms`,
+    "--lesson-operator-delay": `${Math.round(cue.minimumVisualMs * 0.38)}ms`,
+    "--lesson-operator-duration": `${Math.round(cue.minimumVisualMs * 0.25)}ms`,
+    "--lesson-strike-delay": `${Math.round(cue.minimumVisualMs * 0.48)}ms`,
+    "--lesson-strike-duration": `${Math.round(cue.minimumVisualMs * 0.2)}ms`,
+    "--lesson-after-delay": `${Math.round(cue.minimumVisualMs * 0.58)}ms`,
+    "--lesson-after-duration": `${Math.round(cue.minimumVisualMs * 0.3)}ms`,
+    "--lesson-group-delay": `${Math.round(cue.minimumVisualMs * 0.68)}ms`,
+    "--lesson-group-duration": `${Math.round(cue.minimumVisualMs * 0.2)}ms`,
+  };
+
+  useEffect(() => {
+    narrationEnabledRef.current = narrationEnabled;
+    narrationPlayer?.setEnabled(narrationEnabled);
+  }, [narrationEnabled, narrationPlayer]);
+
+  useEffect(() => {
+    onPlaybackStateChangeRef.current = onPlaybackStateChange;
+  }, [onPlaybackStateChange]);
+
+  useEffect(() => {
+    if (!playbackRequested) return;
+    let current = true;
+    const ownsPlayer = !narrationPlayer;
+    const player =
+      narrationPlayer ??
+      createGameNarrationPlayer(LIBRA_PROOF_NARRATION, {
+        isSoundEnabled: () => narrationEnabledRef.current,
+      });
+
+    player.setEnabled(narrationEnabledRef.current);
+    onPlaybackStateChangeRef.current?.("playing");
+    void player.play([cueId]).then((result) => {
+      if (current && result.status === "completed") {
+        onPlaybackStateChangeRef.current?.("settled");
+      }
+    });
+
+    return () => {
+      current = false;
+      player.cancel();
+      if (ownsPlayer) player.dispose();
+    };
+  }, [cueId, narrationPlayer, playbackRequested, replayKey]);
+
   return (
     <div
       className={styles.strategyLessonVisual}
       data-strategy={strategy}
-      role="img"
+      data-lesson-ready={!playbackRequested ? "true" : undefined}
+      role="group"
       aria-label={STRATEGY_LESSON_LABELS[strategy]}
     >
       <div
         className={styles.strategyLessonTimeline}
         aria-hidden="true"
         key={replayKey}
+        style={lessonStyle}
       >
         {lessonForStrategy(strategy)}
       </div>
+      <p className={styles.lessonNarrationCaption}>
+        <span aria-hidden="true">♪</span>
+        {strategyLessonNarrationCaption(strategy)}
+      </p>
     </div>
   );
 }
@@ -1931,6 +2024,7 @@ export function PuzzleVisual({
   narrationEnabled = true,
   narrationPlayer,
   onProofPlaybackComplete,
+  onProofSkip,
 }: {
   round: Round;
   candidate?: AnswerOption;
@@ -1941,6 +2035,7 @@ export function PuzzleVisual({
   narrationEnabled?: boolean;
   narrationPlayer?: GameNarrationPlayer<LibraProofNarrationCueId> | null;
   onProofPlaybackComplete?: () => void;
+  onProofSkip?: () => void;
 }) {
   const accentMap = buildRoundAccentMap(round);
   const resolvedProofState = proofState ?? (teaching ? "animating" : "hidden");
@@ -1990,6 +2085,7 @@ export function PuzzleVisual({
           narrationEnabled={narrationEnabled}
           narrationPlayer={narrationPlayer}
           onPlaybackComplete={onProofPlaybackComplete}
+          onSkip={onProofSkip}
         />
       ) : null}
       <div className={styles.goalDivider} aria-hidden="true">

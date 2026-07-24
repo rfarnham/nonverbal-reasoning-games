@@ -5,6 +5,7 @@ import {
 } from "@/lib/game-narration";
 
 import type { TeachingProofStep } from "./strategy-curriculum.ts";
+import type { StrategyId } from "./strategy-curriculum.ts";
 
 const ASSET_ROOT =
   "/audio/narration/kokoro-82m-v1-af-heart";
@@ -87,7 +88,32 @@ export function proofNarrationDurationMsForStep(
 }
 
 export function proofNarrationCaption(step: TeachingProofStep): string {
-  return LIBRA_PROOF_NARRATION.clips[proofNarrationCueId(step)].transcript;
+  return step.text;
+}
+
+const STRATEGY_LESSON_CUES = {
+  "split-evenly": "strategy-split-evenly",
+  "cancel-matches": "strategy-cancel-matches",
+  substitution: "strategy-substitution",
+  "create-combo": "strategy-create-combo",
+  "add-scales": "strategy-add-scales",
+  "subtract-scales": "strategy-subtract-scales",
+} as const satisfies Readonly<
+  Record<StrategyId, LibraProofNarrationCueId>
+>;
+
+export function strategyLessonNarrationCueId(
+  strategyId: StrategyId,
+): LibraProofNarrationCueId {
+  return STRATEGY_LESSON_CUES[strategyId];
+}
+
+export function strategyLessonNarrationCaption(
+  strategyId: StrategyId,
+): string {
+  return LIBRA_PROOF_NARRATION.clips[
+    strategyLessonNarrationCueId(strategyId)
+  ].transcript;
 }
 
 export const LIBRA_NARRATOR_PROVENANCE = narrationSource.narrator;

@@ -116,6 +116,60 @@
       "lingerMs": 1000,
       "sha256": "a55b75c9ebdcb99e9127415ee36157be395dc81aed5b2a89317fd896f015d9b1"
     },
+    "strategy-split-evenly": {
+      "caption": "Two rabbits mean two equal groups.",
+      "speechText": "There are two rabbits on the left, so make two equal groups on both trays. Keep one group. One rabbit balances two chicks.",
+      "file": "strategy-split-evenly.mp3",
+      "audioDurationMs": 8400,
+      "minVisualMs": 8400,
+      "lingerMs": 900,
+      "sha256": "a330378599aebaec386aa8085c6cdec1f33816377714b1ffa015ee683187e6b2"
+    },
+    "strategy-cancel-matches": {
+      "caption": "One fox on each tray means lift one from each.",
+      "speechText": "Like splitting, we do the same thing to both trays. A fox appears on each tray, so lift one fox from each. The cat now balances three chicks.",
+      "file": "strategy-cancel-matches.mp3",
+      "audioDurationMs": 10300,
+      "minVisualMs": 10300,
+      "lingerMs": 900,
+      "sha256": "93b5c90c93d11cf582382c96f5a1d271159d525c3f3cebc1c55dcf9dcbfde7be"
+    },
+    "strategy-substitution": {
+      "caption": "Each fox equals two chicks, so replace both foxes.",
+      "speechText": "We know one fox equals two chicks. The other scale has two foxes, so replace each fox with two chicks. The rabbit now balances four chicks.",
+      "file": "strategy-substitution.mp3",
+      "audioDurationMs": 10075,
+      "minVisualMs": 10075,
+      "lingerMs": 900,
+      "sha256": "f52eb3e38a8b5ec23536e383e71a2c0dbc5a2c29a5f3a710a9aed30d520a252e"
+    },
+    "strategy-create-combo": {
+      "caption": "Three cats and three bears make three equal combos.",
+      "speechText": "There are three cats and three bears on the left, so make three equal cat and bear groups. Divide both trays by three. One combo balances five beetles.",
+      "file": "strategy-create-combo.mp3",
+      "audioDurationMs": 10700,
+      "minVisualMs": 10700,
+      "lingerMs": 900,
+      "sha256": "71be39d483ac7cbae4ae0fc9385000d33457e1f318135829b6f8ff2698adc6e3"
+    },
+    "strategy-add-scales": {
+      "caption": "The combo is missing, so join the balanced scales.",
+      "speechText": "Neither scale has the cat and bear combo we need. Join left tray to left tray, and right tray to right tray. The new scale stays balanced and makes three equal combos.",
+      "file": "strategy-add-scales.mp3",
+      "audioDurationMs": 11825,
+      "minVisualMs": 11825,
+      "lingerMs": 900,
+      "sha256": "c4cb4c877152f1918e8fbf6cff5a5e11870615ddf71004124e9140e5995bdc5f"
+    },
+    "strategy-subtract-scales": {
+      "caption": "Take the second balance away from the first.",
+      "speechText": "You added scales to make a useful load. Subtracting works backwards. Take the second balance away from the first, left from left and right from right. What remains stays balanced.",
+      "file": "strategy-subtract-scales.mp3",
+      "audioDurationMs": 12650,
+      "minVisualMs": 12650,
+      "lingerMs": 900,
+      "sha256": "43f578994e618c939d470067b0bf840ca7fa23a101c350603bf3915d8e4c6126"
+    },
     "conclude": {
       "caption": "Balanced — we found the answer.",
       "speechText": "The scale is still balanced. We found the answer.",

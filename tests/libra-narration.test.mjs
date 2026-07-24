@@ -57,3 +57,28 @@ test("proof steps map to finite local cues and use measured timing", () => {
   assert.match(adapterSource, /count !== 2 && count !== 3 && count !== 4/);
   assert.doesNotMatch(adapterSource, /https?:\/\//);
 });
+
+test("every first-time strategy introduction has a slow local Kokoro cue", () => {
+  const strategyCueIds = [
+    "strategy-split-evenly",
+    "strategy-cancel-matches",
+    "strategy-substitution",
+    "strategy-create-combo",
+    "strategy-add-scales",
+    "strategy-subtract-scales",
+  ];
+
+  for (const cueId of strategyCueIds) {
+    const cue = manifest.cues[cueId];
+    assert.ok(cue, `${cueId} exists`);
+    assert.ok(cue.audioDurationMs >= 8_000, `${cueId} is deliberately paced`);
+    assert.ok(
+      cue.minVisualMs >= cue.audioDurationMs,
+      `${cueId} keeps the visual through the spoken cue`,
+    );
+    assert.match(cue.speechText, /\b(?:so|because|means|need|works)\b/i);
+  }
+
+  assert.match(adapterSource, /strategyLessonNarrationCueId/);
+  assert.match(adapterSource, /strategyLessonNarrationCaption/);
+});
