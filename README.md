@@ -32,6 +32,7 @@ rounds never alter Journey progress.
 | [Domino Twist](https://rfarnham.github.io/nonverbal-reasoning-games/games/domino-twist/) | Spatial composition and part-whole reasoning | Playable |
 | [Changing Strips](https://rfarnham.github.io/nonverbal-reasoning-games/games/changing-strips/) | Visual sequencing and ordered pattern replacement | Playable |
 | [Bracelet Search](https://rfarnham.github.io/nonverbal-reasoning-games/games/bracelet-search/) | Sequence search and mental reversal | Playable |
+| [Extra Piece](https://rfarnham.github.io/nonverbal-reasoning-games/games/extra-piece/) | Spatial composition, mental rotation, and chirality | Playable |
 
 ## Project shape
 
@@ -47,6 +48,7 @@ app/
     braids/           # route, catalog metadata, and shelf icon
     changing-strips/  # route, catalog metadata, and shelf icon
     domino-twist/     # route, catalog metadata, and shelf icon
+    extra-piece/      # route, catalog metadata, and shelf icon
     libra/            # route, catalog metadata, and shelf icon
     pattern-matrix/   # route, catalog metadata, and shelf icon
     rotation-match/   # route, catalog metadata, and shelf icon
