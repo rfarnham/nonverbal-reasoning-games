@@ -28,7 +28,6 @@ import {
   LIBRA_PROOF_NARRATION,
   proofNarrationCaption,
   proofNarrationCueId,
-  proofNarrationCueIds,
   strategyLessonNarrationCaption,
   strategyLessonNarrationCueId,
   type LibraProofNarrationCueId,
@@ -589,6 +588,11 @@ type StrategyLessonStyle = CSSProperties & {
   "--lesson-group-delay": string;
   "--lesson-group-duration": string;
 };
+
+type ProofCueStage = "narrating" | "mutating" | "ready";
+
+const PROOF_MUTATION_MS = 1_800;
+const STRATEGY_LESSON_MUTATION_MS = 3_200;
 
 function isGroupedEquation(
   value: BalanceEquation | TeachingGroupedEquationValue,
@@ -1457,9 +1461,8 @@ function TeachingProofPhase({
   nextKind?: TeachingProofStep["kind"];
   accentMap?: AccentMap;
 }) {
-  const clip = LIBRA_PROOF_NARRATION.clips[proofNarrationCueId(step)];
   const phaseStyle: ProofPhaseStyle = {
-    "--proof-phase-duration": `${clip.minimumVisualMs}ms`,
+    "--proof-phase-duration": `${PROOF_MUTATION_MS}ms`,
   };
 
   return (
@@ -1540,19 +1543,19 @@ export function SolutionProofVisual({
   onSkip?: () => void;
 }) {
   const plan = useMemo(() => buildTeachingProof(round), [round]);
-  const cueIds = useMemo(
-    () => proofNarrationCueIds(plan.steps),
-    [plan.steps],
-  );
   const [activeStepIndex, setActiveStepIndex] = useState(
     proofState === "settled" ? plan.steps.length - 1 : 0,
   );
-  const [playbackStarted, setPlaybackStarted] = useState(false);
+  const [cueStage, setCueStage] = useState<ProofCueStage>(
+    proofState === "settled" ? "ready" : "narrating",
+  );
   const narrationEnabledRef = useRef(narrationEnabled);
   const onPlaybackCompleteRef = useRef(onPlaybackComplete);
   const narrationPlayerRef = useRef<
     GameNarrationPlayer<LibraProofNarrationCueId> | null
   >(null);
+  const proofRegionRef = useRef<HTMLElement>(null);
+  const continueButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     narrationEnabledRef.current = narrationEnabled;
@@ -1564,11 +1567,19 @@ export function SolutionProofVisual({
   }, [onPlaybackComplete]);
 
   useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      proofRegionRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
     if (proofState === "settled") {
       return;
     }
 
     let current = true;
+    let mutationTimer: number | null = null;
     const ownsPlayer = !narrationPlayer;
     const player =
       narrationPlayer ??
@@ -1577,48 +1588,81 @@ export function SolutionProofVisual({
       });
     player.setEnabled(narrationEnabledRef.current);
     narrationPlayerRef.current = player;
+    const step = plan.steps[activeStepIndex];
+    if (!step) {
+      onPlaybackCompleteRef.current?.();
+      return;
+    }
 
-    // Let the suite's short correct earcon finish before the narrator begins.
-    const startTimer = window.setTimeout(() => {
-      if (!current) return;
-      setPlaybackStarted(true);
-      void player
-        .play(cueIds, {
-          onCueStart: (_cue, index) => {
-            if (current) setActiveStepIndex(index);
-          },
-        })
-        .then((result) => {
-          if (current && result.status === "completed") {
-            onPlaybackCompleteRef.current?.();
-          }
-        });
-    }, 360);
+    void player
+      .play([proofNarrationCueId(step)])
+      .then((result) => {
+        if (!current || result.status !== "completed") return;
+        setCueStage("mutating");
+        mutationTimer = window.setTimeout(() => {
+          if (current) setCueStage("ready");
+        }, PROOF_MUTATION_MS);
+      });
 
     return () => {
       current = false;
-      window.clearTimeout(startTimer);
+      if (mutationTimer !== null) window.clearTimeout(mutationTimer);
       player.cancel();
       if (ownsPlayer) player.dispose();
       if (narrationPlayerRef.current === player) {
         narrationPlayerRef.current = null;
       }
     };
-  }, [cueIds, narrationPlayer, plan.steps.length, proofState]);
+  }, [activeStepIndex, narrationPlayer, plan.steps, proofState]);
+
+  useEffect(() => {
+    if (cueStage !== "ready") return;
+    const frame = window.requestAnimationFrame(() => {
+      if (document.activeElement === proofRegionRef.current) {
+        continueButtonRef.current?.focus();
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [cueStage]);
 
   const displayedStepIndex =
     proofState === "settled" ? plan.steps.length - 1 : activeStepIndex;
   const activeStep = plan.steps[displayedStepIndex] ?? plan.steps[0];
+  const isLastStep = displayedStepIndex === plan.steps.length - 1;
+
+  function continueExplanation() {
+    if (cueStage !== "ready") return;
+    if (isLastStep) {
+      onPlaybackCompleteRef.current?.();
+      return;
+    }
+
+    // Continue is a fresh user gesture, so use it to keep WebKit narration
+    // unlocked before the next cue swaps onto the shared media element.
+    narrationPlayerRef.current?.prime();
+    setCueStage("narrating");
+    setActiveStepIndex((current) => current + 1);
+  }
 
   return (
     <section
       className={styles.solutionProof}
       data-proof-state={proofState}
       data-proof-playback-started={
-        proofState === "animating" && playbackStarted ? "true" : "false"
+        proofState === "animating" && cueStage !== "narrating"
+          ? "true"
+          : "false"
       }
+      data-proof-motion-started={
+        proofState === "animating" && cueStage !== "narrating"
+          ? "true"
+          : "false"
+      }
+      data-proof-step-state={cueStage}
       role="region"
       aria-label="Step-by-step balance proof"
+      ref={proofRegionRef}
+      tabIndex={-1}
     >
       {proofState === "animating" && onSkip ? (
         <button
@@ -1626,14 +1670,9 @@ export function SolutionProofVisual({
           type="button"
           onClick={onSkip}
         >
-          Skip explanation
+          Close explanation
         </button>
       ) : null}
-      <ol className={styles.proofAccessibleSteps}>
-        {plan.steps.map((step) => (
-          <li key={step.id}>{step.text}</li>
-        ))}
-      </ol>
       <div className={styles.proofSceneViewport} aria-hidden="true">
         <div
           className={styles.proofPersistentStage}
@@ -1653,11 +1692,31 @@ export function SolutionProofVisual({
               />
             ))}
           </div>
-          <p className={styles.proofNarrationCaption}>
-            <span aria-hidden="true">♪</span>
-            {proofNarrationCaption(activeStep)}
-          </p>
         </div>
+      </div>
+      <div className={styles.proofStepFooter}>
+        <p className={styles.proofStepProgress}>
+          Step {displayedStepIndex + 1} of {plan.steps.length}
+        </p>
+        <p
+          className={styles.proofNarrationCaption}
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <span aria-hidden="true">♪</span>
+          {proofNarrationCaption(activeStep)}
+        </p>
+        {cueStage === "ready" ? (
+          <button
+            className={styles.proofContinueButton}
+            type="button"
+            onClick={continueExplanation}
+            ref={continueButtonRef}
+          >
+            {isLastStep ? "Done" : "Continue"}
+            <span aria-hidden="true">→</span>
+          </button>
+        ) : null}
       </div>
       <div className={styles.proofStoryboard} aria-hidden="true">
         {plan.steps.map((step, stepIndex) => (
@@ -1731,15 +1790,15 @@ function SplitEvenlyLesson() {
   return (
     <>
       <div className={styles.lessonBefore}>
-        <span className={styles.lessonStageLabel}>Before</span>
+        <span className={styles.lessonStageLabel}>2 rabbits balance 4 chicks</span>
         <LessonEquation
           left={lessonTerms(["rabbit", 2])}
           right={lessonTerms(["chick", 4])}
         />
       </div>
-      <LessonFlow label="Split both sides evenly" symbol="÷2" />
+      <LessonFlow label="Make 2 equal groups" symbol="÷2" />
       <div className={styles.lessonAfter}>
-        <span className={styles.lessonStageLabel}>Each half</span>
+        <span className={styles.lessonStageLabel}>1 rabbit balances 2 chicks</span>
         <LessonEquation
           left={lessonTerms(["rabbit", 1])}
           right={lessonTerms(["chick", 2])}
@@ -1754,16 +1813,16 @@ function CancelMatchesLesson() {
   return (
     <>
       <div className={styles.lessonBefore}>
-        <span className={styles.lessonStageLabel}>Same fox on both sides</span>
+        <span className={styles.lessonStageLabel}>A fox is on both trays</span>
         <LessonEquation
           left={lessonTerms(["cat", 1], ["fox", 1])}
           right={lessonTerms(["fox", 1], ["chick", 3])}
           cancellation={cancellation}
         />
       </div>
-      <LessonFlow label="Remove the same load" symbol="×" />
+      <LessonFlow label="Remove 1 fox from each tray" symbol="×" />
       <div className={styles.lessonAfter}>
-        <span className={styles.lessonStageLabel}>Balance stays true</span>
+        <span className={styles.lessonStageLabel}>A cat balances 3 chicks</span>
         <LessonEquation
           left={lessonTerms(["cat", 1])}
           right={lessonTerms(["chick", 3])}
@@ -1777,7 +1836,7 @@ function SubstitutionLesson() {
   return (
     <>
       <div className={`${styles.lessonBefore} ${styles.lessonSourceStack}`}>
-        <span className={styles.lessonStageLabel}>Equal loads</span>
+        <span className={styles.lessonStageLabel}>1 fox balances 2 chicks</span>
         <LessonEquation
           left={lessonTerms(["fox", 1])}
           right={lessonTerms(["chick", 2])}
@@ -1787,9 +1846,9 @@ function SubstitutionLesson() {
           right={lessonTerms(["fox", 2])}
         />
       </div>
-      <LessonFlow label="Swap equal loads" symbol="⇄" />
+      <LessonFlow label="Replace each fox with 2 chicks" symbol="⇄" />
       <div className={styles.lessonAfter}>
-        <span className={styles.lessonStageLabel}>Foxes become chicks</span>
+        <span className={styles.lessonStageLabel}>1 rabbit balances 4 chicks</span>
         <LessonEquation
           left={lessonTerms(["rabbit", 1])}
           right={lessonTerms(["chick", 4])}
@@ -1803,7 +1862,7 @@ function AddScalesLesson() {
   return (
     <>
       <div className={`${styles.lessonBefore} ${styles.lessonSourceStack}`}>
-        <span className={styles.lessonStageLabel}>Stack both balances</span>
+        <span className={styles.lessonStageLabel}>Two balanced scales</span>
         <LessonEquation
           left={lessonTerms(["cat", 2], ["bear", 1])}
           right={lessonTerms(["beetle", 6])}
@@ -1814,9 +1873,9 @@ function AddScalesLesson() {
           right={lessonTerms(["beetle", 9])}
         />
       </div>
-      <LessonFlow label="Add left to left, right to right" symbol="+" />
+      <LessonFlow label="Move scale 2 onto scale 1" symbol="+" />
       <div className={styles.lessonAfter}>
-        <span className={styles.lessonStageLabel}>One larger balance</span>
+        <span className={styles.lessonStageLabel}>Combined scale</span>
         <LessonEquation
           left={lessonTerms(["cat", 3], ["bear", 3])}
           right={lessonTerms(["beetle", 15])}
@@ -1831,15 +1890,15 @@ function CreateComboLesson() {
   return (
     <>
       <div className={styles.lessonBefore}>
-        <span className={styles.lessonStageLabel}>Matching coefficients</span>
+        <span className={styles.lessonStageLabel}>3 cats and 3 bears</span>
         <LessonEquation
           left={lessonTerms(["cat", 3], ["bear", 3])}
           right={lessonTerms(["beetle", 15])}
         />
       </div>
-      <LessonFlow label="Circle identical combos" symbol="[ ]" />
+      <LessonFlow label="Circle 3 cat-and-bear groups" symbol="[ ]" />
       <div className={`${styles.lessonAfter} ${styles.lessonComboAfter}`}>
-        <span className={styles.lessonStageLabel}>Three copies of cat + bear</span>
+        <span className={styles.lessonStageLabel}>1 group balances 5 beetles</span>
         <span className={styles.proofEquation}>
           <span className={styles.proofComboGroups}>
             {Array.from({ length: 3 }, (_, index) => (
@@ -1868,7 +1927,7 @@ function SubtractScalesLesson() {
   return (
     <>
       <div className={`${styles.lessonBefore} ${styles.lessonSourceStack}`}>
-        <span className={styles.lessonStageLabel}>Line up both balances</span>
+        <span className={styles.lessonStageLabel}>Scale 2 fits inside scale 1</span>
         <LessonEquation
           left={lessonTerms(["cat", 3], ["bear", 4])}
           right={lessonTerms(["beetle", 7])}
@@ -1879,9 +1938,9 @@ function SubtractScalesLesson() {
           right={lessonTerms(["beetle", 3])}
         />
       </div>
-      <LessonFlow label="Subtract matching columns" symbol="−" />
+      <LessonFlow label="Remove scale 2 tray by tray" symbol="−" />
       <div className={styles.lessonAfter}>
-        <span className={styles.lessonStageLabel}>What remains</span>
+        <span className={styles.lessonStageLabel}>2 cats and 2 bears balance 4 beetles</span>
         <LessonEquation
           left={lessonTerms(["cat", 2], ["bear", 2])}
           right={lessonTerms(["beetle", 4])}
@@ -1893,17 +1952,17 @@ function SubtractScalesLesson() {
 
 const STRATEGY_LESSON_LABELS: Readonly<Record<StrategyId, string>> = {
   "split-evenly":
-    "Two rabbits balance four chicks. Divide both sides by two. One rabbit balances two chicks.",
+    "Make two equal groups on each tray. One rabbit balances two chicks.",
   "cancel-matches":
-    "A fox appears on both sides of one balance. Cross out one fox from each side. The remaining cat balances three chicks.",
+    "A fox is on both trays. Remove one fox from each tray. A cat balances three chicks.",
   substitution:
-    "One fox balances two chicks, and one rabbit balances two foxes. Replace the foxes with equal chick loads. One rabbit balances four chicks.",
+    "One fox balances two chicks. Replace each fox with two chicks. One rabbit balances four chicks.",
   "add-scales":
-    "Add two balances, left side to left side and right side to right side, to make one larger true balance.",
+    "Move the second scale onto the first, left tray to left tray and right tray to right tray.",
   "create-combo":
-    "Three cats and three bears regroup into three identical cat and bear combos. Divide both sides by three to find one combo.",
+    "Circle three cat-and-bear groups. One group balances five beetles.",
   "subtract-scales":
-    "Subtract the second balance from the first, matching each animal column. The remaining loads still balance.",
+    "Remove the second scale's loads from the first, tray by tray. The remaining loads still balance.",
 };
 
 function lessonForStrategy(strategy: StrategyId) {
@@ -1939,21 +1998,23 @@ export function StrategyLessonVisual({
   onPlaybackStateChange?: (state: "playing" | "settled") => void;
 }) {
   const cueId = strategyLessonNarrationCueId(strategy);
-  const cue = LIBRA_PROOF_NARRATION.clips[cueId];
+  const lessonRunKey = `${strategy}:${String(replayKey)}`;
+  const [motionRunKey, setMotionRunKey] = useState<string | null>(null);
+  const motionStarted = motionRunKey === lessonRunKey;
   const narrationEnabledRef = useRef(narrationEnabled);
   const onPlaybackStateChangeRef = useRef(onPlaybackStateChange);
   const lessonStyle: StrategyLessonStyle = {
-    "--lesson-before-duration": `${Math.round(cue.minimumVisualMs * 0.22)}ms`,
-    "--lesson-flow-delay": `${Math.round(cue.minimumVisualMs * 0.18)}ms`,
-    "--lesson-flow-duration": `${Math.round(cue.minimumVisualMs * 0.28)}ms`,
-    "--lesson-operator-delay": `${Math.round(cue.minimumVisualMs * 0.38)}ms`,
-    "--lesson-operator-duration": `${Math.round(cue.minimumVisualMs * 0.25)}ms`,
-    "--lesson-strike-delay": `${Math.round(cue.minimumVisualMs * 0.48)}ms`,
-    "--lesson-strike-duration": `${Math.round(cue.minimumVisualMs * 0.2)}ms`,
-    "--lesson-after-delay": `${Math.round(cue.minimumVisualMs * 0.58)}ms`,
-    "--lesson-after-duration": `${Math.round(cue.minimumVisualMs * 0.3)}ms`,
-    "--lesson-group-delay": `${Math.round(cue.minimumVisualMs * 0.68)}ms`,
-    "--lesson-group-duration": `${Math.round(cue.minimumVisualMs * 0.2)}ms`,
+    "--lesson-before-duration": "500ms",
+    "--lesson-flow-delay": "300ms",
+    "--lesson-flow-duration": "800ms",
+    "--lesson-operator-delay": "900ms",
+    "--lesson-operator-duration": "800ms",
+    "--lesson-strike-delay": "1300ms",
+    "--lesson-strike-duration": "800ms",
+    "--lesson-after-delay": "1900ms",
+    "--lesson-after-duration": "1000ms",
+    "--lesson-group-delay": "2200ms",
+    "--lesson-group-duration": "900ms",
   };
 
   useEffect(() => {
@@ -1968,6 +2029,7 @@ export function StrategyLessonVisual({
   useEffect(() => {
     if (!playbackRequested) return;
     let current = true;
+    let mutationTimer: number | null = null;
     const ownsPlayer = !narrationPlayer;
     const player =
       narrationPlayer ??
@@ -1979,22 +2041,34 @@ export function StrategyLessonVisual({
     onPlaybackStateChangeRef.current?.("playing");
     void player.play([cueId]).then((result) => {
       if (current && result.status === "completed") {
-        onPlaybackStateChangeRef.current?.("settled");
+        setMotionRunKey(lessonRunKey);
+        mutationTimer = window.setTimeout(() => {
+          if (current) {
+            onPlaybackStateChangeRef.current?.("settled");
+          }
+        }, STRATEGY_LESSON_MUTATION_MS);
       }
     });
 
     return () => {
       current = false;
+      if (mutationTimer !== null) window.clearTimeout(mutationTimer);
       player.cancel();
       if (ownsPlayer) player.dispose();
     };
-  }, [cueId, narrationPlayer, playbackRequested, replayKey]);
+  }, [
+    cueId,
+    lessonRunKey,
+    narrationPlayer,
+    playbackRequested,
+  ]);
 
   return (
     <div
       className={styles.strategyLessonVisual}
       data-strategy={strategy}
-      data-lesson-ready={!playbackRequested ? "true" : undefined}
+      data-lesson-ready={!motionStarted ? "true" : undefined}
+      data-lesson-motion-started={motionStarted ? "true" : undefined}
       role="group"
       aria-label={STRATEGY_LESSON_LABELS[strategy]}
     >

@@ -22,11 +22,15 @@ const curriculumSource = await readFile(
 function componentSource(name, nextName) {
   const startMarker = `function ${name}(`;
   const endMarker = `function ${nextName}(`;
-  const start = visualSource.indexOf(startMarker);
-  const end = visualSource.indexOf(endMarker, start + startMarker.length);
-  assert.notEqual(start, -1, `${name} exists`);
-  assert.notEqual(end, -1, `${name} has a bounded source block`);
-  return visualSource.slice(start, end);
+  return sourceBetween(visualSource, startMarker, endMarker, name);
+}
+
+function sourceBetween(source, startMarker, endMarker, label) {
+  const start = source.indexOf(startMarker);
+  const end = source.indexOf(endMarker, start + startMarker.length);
+  assert.notEqual(start, -1, `${label} exists`);
+  assert.notEqual(end, -1, `${label} has a bounded source block`);
+  return source.slice(start, end);
 }
 
 test("the teaching proof renders actual scales for every operation", () => {
@@ -112,13 +116,22 @@ test("the animated proof uses one persistent canvas instead of swapping step car
   assert.doesNotMatch(visualSource, /styles\.proofTeachingScene/);
 });
 
-test("the local narration controller advances in-place phase layers", () => {
-  assert.match(
+test("the local narration controller plays exactly one proof cue at a time", () => {
+  const proofVisual = sourceBetween(
     visualSource,
-    /"--proof-phase-duration"[\s\S]{0,180}clip\.minimumVisualMs/,
+    "export function SolutionProofVisual(",
+    "\nconst LESSON_ACCENTS",
+    "SolutionProofVisual",
   );
+
+  assert.match(
+    proofVisual,
+    /\.play\(\[proofNarrationCueId\(step\)\]\)/,
+  );
+  assert.doesNotMatch(proofVisual, /\.play\(cueIds/);
+  assert.doesNotMatch(proofVisual, /onCueStart/);
   assert.match(visualSource, /createGameNarrationPlayer\(LIBRA_PROOF_NARRATION/);
-  assert.match(visualSource, /onCueStart:[\s\S]{0,140}setActiveStepIndex\(index\)/);
+  assert.match(visualSource, /"--proof-phase-duration": `\$\{PROOF_MUTATION_MS\}ms`/);
   assert.match(visualSource, /data-proof-cue-state=/);
   assert.match(visualSource, /className=\{styles\.proofPhaseLayer\}/);
   assert.doesNotMatch(visualSource, /proofProgressTrack/);
@@ -167,50 +180,202 @@ test("routine proofs begin with the useful operation and end on its result", () 
   assert.match(visualSource, /proofState === "settled" \? plan\.steps\.length - 1/);
 });
 
-test("one calm caption replaces cycling callouts and the cursor bar", () => {
-  assert.match(visualSource, /className=\{styles\.proofNarrationCaption\}/);
-  assert.match(visualSource, /proofNarrationCaption\(activeStep\)/);
+test("one current caption stays visible and accessible below the scale", () => {
+  const proofVisual = sourceBetween(
+    visualSource,
+    "export function SolutionProofVisual(",
+    "\nconst LESSON_ACCENTS",
+    "SolutionProofVisual",
+  );
+  const hiddenViewportEnd = proofVisual.indexOf(
+    '<div className={styles.proofStepFooter}>',
+  );
+  const captionIndex = proofVisual.indexOf(
+    "className={styles.proofNarrationCaption}",
+  );
+
+  assert.notEqual(hiddenViewportEnd, -1, "the hidden visual viewport closes");
+  assert.ok(
+    captionIndex > hiddenViewportEnd,
+    "the current caption is outside the aria-hidden scale viewport",
+  );
+  assert.match(proofVisual, /proofNarrationCaption\(activeStep\)/);
+  assert.match(
+    proofVisual,
+    /className=\{styles\.proofNarrationCaption\}[\s\S]{0,120}aria-live="polite"[\s\S]{0,100}aria-atomic="true"/,
+  );
   assert.doesNotMatch(visualSource, /function ProofCallouts\(/);
   assert.doesNotMatch(visualSource, /proofProgressTrack/);
   assert.doesNotMatch(stylesSource, /proofCallout(?:First|Middle|Last)/);
   assert.doesNotMatch(stylesSource, /proofContinuousProgress/);
 });
 
-test("proof completion follows local narration instead of a page timeout", () => {
-  assert.match(visualSource, /result\.status === "completed"/);
-  assert.match(visualSource, /onPlaybackCompleteRef\.current\?\.\(\)/);
-  assert.match(pageSource, /onProofPlaybackComplete=/);
+test("each proof step narrates, mutates, then waits for the learner", () => {
+  const proofVisual = sourceBetween(
+    visualSource,
+    "export function SolutionProofVisual(",
+    "\nconst LESSON_ACCENTS",
+    "SolutionProofVisual",
+  );
+
+  assert.match(
+    proofVisual,
+    /useState<ProofCueStage>\([\s\S]*?"narrating"[\s\S]*?\.play\(\[proofNarrationCueId\(step\)\]\)[\s\S]*?result\.status !== "completed"[\s\S]*?setCueStage\("mutating"\)[\s\S]*?window\.setTimeout\([\s\S]*?setCueStage\("ready"\)[\s\S]*?PROOF_MUTATION_MS/,
+  );
+  assert.doesNotMatch(
+    proofVisual,
+    /aria-busy=/,
+    "the live caption must not sit inside a busy subtree",
+  );
+  assert.match(proofVisual, /cueStage === "ready" \? \(/);
   assert.doesNotMatch(pageSource, /teachingProofDurationMs\(round\)/);
   assert.doesNotMatch(pageSource, /proofReplayTimerRef/);
 });
 
-test("the page primes one reusable narrator from direct gestures", () => {
-  assert.match(pageSource, /proofNarrationPlayer\.prime\(\)/);
-  assert.match(
-    pageSource,
-    /if \(shouldExplainCorrectAnswer\) \{[\s\S]*?proofNarrationPlayer\.prime\(\)/,
+test("Continue alone advances a proof and Done alone completes it", () => {
+  const proofVisual = sourceBetween(
+    visualSource,
+    "export function SolutionProofVisual(",
+    "\nconst LESSON_ACCENTS",
+    "SolutionProofVisual",
   );
-  assert.match(pageSource, /narrationPlayer=\{proofNarrationPlayer\}/);
+  const continueHandler = sourceBetween(
+    proofVisual,
+    "function continueExplanation()",
+    "\n\n  return (",
+    "continueExplanation",
+  );
+
+  assert.match(continueHandler, /if \(cueStage !== "ready"\) return/);
+  assert.match(
+    continueHandler,
+    /if \(isLastStep\) \{[\s\S]*?onPlaybackCompleteRef\.current\?\.\(\);[\s\S]*?return;/,
+  );
+  assert.match(
+    continueHandler,
+    /setActiveStepIndex\(\(current\) => current \+ 1\)/,
+  );
+  assert.equal(
+    proofVisual.match(/setActiveStepIndex\(\(current\) => current \+ 1\)/g)
+      ?.length ?? 0,
+    1,
+    "no timer or narration callback advances to another step",
+  );
+  assert.match(
+    proofVisual,
+    /onClick=\{continueExplanation\}[\s\S]{0,180}\{isLastStep \? "Done" : "Continue"\}/,
+  );
 });
 
-test("proofs are optional after mastery and skippable whenever they play", () => {
-  assert.match(pageSource, /const shouldExplainCorrectAnswer =/);
-  assert.match(pageSource, /reinforcementRoundIdsRef/);
-  assert.match(pageSource, /wasMissed \|\|/);
+test("proof readiness only moves focus when the learner stayed on the proof", () => {
+  const proofVisual = sourceBetween(
+    visualSource,
+    "export function SolutionProofVisual(",
+    "\nconst LESSON_ACCENTS",
+    "SolutionProofVisual",
+  );
+
+  assert.match(
+    proofVisual,
+    /document\.activeElement === proofRegionRef\.current[\s\S]*?continueButtonRef\.current\?\.focus\(\)/,
+  );
+});
+
+test("correct answers never launch an automatic or reinforcement proof", () => {
+  const chooseOption = sourceBetween(
+    pageSource,
+    "const chooseOption = useCallback(",
+    "\n\n  const finishProofReplay",
+    "chooseOption",
+  );
+
+  assert.match(
+    chooseOption,
+    /setPhase\(isCorrect \? "answered" : "animating"\)/,
+  );
+  assert.doesNotMatch(chooseOption, /setProofReplaying\(true\)/);
+  assert.doesNotMatch(chooseOption, /replayProof\(/);
+  assert.doesNotMatch(pageSource, /shouldExplainCorrectAnswer/);
+  assert.doesNotMatch(pageSource, /reinforcementRoundIdsRef/);
+  assert.doesNotMatch(pageSource, /proofPresented/);
+  assert.doesNotMatch(pageSource, /finishCorrectProof/);
+});
+
+test("Explain problem sits beside Next problem and Next is locked during proof", () => {
+  const answeredFeedback = pageSource.match(
+    /phase === "answered" \? \([\s\S]*?\) : phase === "animating" && selectedCorrect/,
+  )?.[0] ?? "";
+  const goNext = sourceBetween(
+    pageSource,
+    "const goNext = useCallback(",
+    "\n\n  const retryInfiniteGeneration",
+    "goNext",
+  );
+
+  assert.match(
+    answeredFeedback,
+    /onClick=\{\(\) => replayProof\("live"\)\}[\s\S]*?Explain problem[\s\S]*?onClick=\{goNext\}[\s\S]*?Next problem/,
+  );
+  assert.equal(
+    answeredFeedback.match(/disabled=\{proofReplaying\}/g)?.length ?? 0,
+    2,
+    "both sibling actions are locked while the proof is open",
+  );
+  assert.match(
+    goNext,
+    /phase !== "answered" \|\|[\s\S]*?proofReplaying[\s\S]*?\) \{[\s\S]*?return;/,
+  );
+});
+
+test("Infinite cannot end while a manual explanation is active", () => {
+  const endInfinite = sourceBetween(
+    pageSource,
+    "const endInfinite = useCallback(",
+    "\n\n  const toggleSound",
+    "endInfinite",
+  );
+
+  assert.match(
+    endInfinite,
+    /activeLessonStrategyId !== null \|\|[\s\S]*?proofReplaying/,
+  );
   assert.match(
     pageSource,
-    /isCorrect && !shouldExplainCorrectAnswer[\s\S]*?"answered"/,
+    /className=\{styles\.endButton\}[\s\S]*?disabled=\{[\s\S]*?activeLessonStrategyId !== null \|\|[\s\S]*?proofReplaying/,
   );
-  assert.match(pageSource, /phase === "answered" && proofPresented/);
-  assert.match(pageSource, /setProofPresented\(isCorrect && shouldExplainCorrectAnswer\)/);
-  assert.match(visualSource, />\s*Skip explanation\s*</);
-  assert.match(pageSource, /proofNarrationPlayer\.cancel\(\);[\s\S]*?finishCorrectProof\(\)/);
-  assert.match(pageSource, />\s*Explain\s*</);
+});
+
+test("historical review keeps its proof hidden until Explain problem", () => {
+  const historicalReview = pageSource.match(
+    /historicalSessionRound && historicalProgress \? \([\s\S]*?\) : round \? \(/,
+  )?.[0] ?? "";
+
+  assert.match(
+    historicalReview,
+    /proofState=\{proofReplaying \? "animating" : "hidden"\}/,
+  );
+  assert.match(
+    historicalReview,
+    /onClick=\{\(\) => replayProof\("historical"\)\}[\s\S]*?Explain problem/,
+  );
+  assert.doesNotMatch(historicalReview, /proofState="settled"/);
+  assert.doesNotMatch(historicalReview, /proofState="animating"/);
 });
 
 test("strategy introductions use the same narrator and can be skipped immediately", () => {
+  const strategyVisual = sourceBetween(
+    visualSource,
+    "export function StrategyLessonVisual(",
+    "\nexport function PuzzleVisual(",
+    "StrategyLessonVisual",
+  );
+
   assert.match(visualSource, /strategyLessonNarrationCueId\(strategy\)/);
-  assert.match(visualSource, /player\.play\(\[cueId\]\)/);
+  assert.match(strategyVisual, /player\.play\(\[cueId\]\)/);
+  assert.match(
+    strategyVisual,
+    /result\.status === "completed"[\s\S]*?setMotionRunKey\(lessonRunKey\)[\s\S]*?window\.setTimeout\([\s\S]*?onPlaybackStateChangeRef\.current\?\.\("settled"\)[\s\S]*?STRATEGY_LESSON_MUTATION_MS/,
+  );
   assert.match(pageSource, /onPlaybackStateChange=\{setLessonPlaybackState\}/);
   assert.match(pageSource, /Skip & start/);
   assert.match(pageSource, /Skip all introductions/);
@@ -219,15 +384,22 @@ test("strategy introductions use the same narrator and can be skipped immediatel
   assert.match(pageSource, /spatial-gym-libra-lesson-acknowledgements-v1/);
   assert.match(pageSource, /persistControlledLessonAcknowledgements\(/);
   assert.match(pageSource, /controlledLessonAcknowledgements\(/);
-  assert.match(pageSource, /shouldReinforceAcknowledgedIntroduction/);
-  assert.match(
-    pageSource,
-    /shouldReinforceAcknowledgedIntroduction[\s\S]*?reinforcementRoundIdsRef\.current\.add\(currentPlayId\)/,
-  );
+  assert.doesNotMatch(pageSource, /shouldReinforceAcknowledgedIntroduction/);
   assert.match(visualSource, /if \(!playbackRequested\) return/);
   assert.match(stylesSource, /--lesson-after-delay/);
   assert.match(stylesSource, /data-lesson-ready="true"/);
   assert.doesNotMatch(stylesSource, /lessonAfterIn 700ms 1\.72s/);
+
+  const captionIndex = strategyVisual.indexOf(
+    "className={styles.lessonNarrationCaption}",
+  );
+  const hiddenTimelineIndex = strategyVisual.indexOf(
+    "className={styles.strategyLessonTimeline}",
+  );
+  assert.ok(
+    captionIndex > hiddenTimelineIndex,
+    "the strategy caption is visible outside the aria-hidden animation",
+  );
 });
 
 test("proof replay cannot race a strategy lesson and restores keyboard focus", () => {
