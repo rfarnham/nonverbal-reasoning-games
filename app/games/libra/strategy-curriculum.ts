@@ -60,7 +60,7 @@ export const STRATEGY_CATALOGUE_BY_ID: Readonly<
     shortName: "Split",
     symbol: "÷",
     description:
-      "Make the same number of equal groups on both trays, then keep one.",
+      "Split both trays into the same number of equal groups, then keep one group from each tray.",
   },
   "cancel-matches": {
     id: "cancel-matches",
@@ -69,7 +69,7 @@ export const STRATEGY_CATALOGUE_BY_ID: Readonly<
     shortName: "Cancel",
     symbol: "− = −",
     description:
-      "Like splitting, change both trays the same way: lift one matching load from each.",
+      "When the same load appears on both trays, remove that load from each tray.",
   },
   substitution: {
     id: "substitution",
@@ -78,7 +78,7 @@ export const STRATEGY_CATALOGUE_BY_ID: Readonly<
     shortName: "Substitute",
     symbol: "⇄",
     description:
-      "Use a balance you already know to replace an equal load on another scale.",
+      "When two loads balance, one can replace the other on another scale.",
   },
   "create-combo": {
     id: "create-combo",
@@ -87,7 +87,7 @@ export const STRATEGY_CATALOGUE_BY_ID: Readonly<
     shortName: "Combo",
     symbol: "k( )",
     description:
-      "Use what you know about equal groups: circle repeated copies of the bundle you need.",
+      "Circle repeated copies of the animal group the question asks for, then keep one group.",
   },
   "add-scales": {
     id: "add-scales",
@@ -96,7 +96,7 @@ export const STRATEGY_CATALOGUE_BY_ID: Readonly<
     shortName: "Add",
     symbol: "+",
     description:
-      "When neither scale makes the bundle you need, join both balanced scales.",
+      "Combine two balanced scales tray by tray to put the animals you need together.",
   },
   "subtract-scales": {
     id: "subtract-scales",
@@ -105,7 +105,7 @@ export const STRATEGY_CATALOGUE_BY_ID: Readonly<
     shortName: "Subtract",
     symbol: "−",
     description:
-      "Adding can make a useful load. Subtracting can uncover one by lifting a whole balance.",
+      "Remove one balanced scale from another: left tray from left tray, and right tray from right tray.",
   },
 };
 
@@ -524,6 +524,12 @@ function joinNatural(parts: readonly string[]): string {
   return `${parts.slice(0, -1).join(", ")}, and ${parts.at(-1)}`;
 }
 
+function sentenceCase(value: string): string {
+  return value.length > 0
+    ? `${value[0].toUpperCase()}${value.slice(1)}`
+    : value;
+}
+
 function expressionText(expression: Expression): string {
   if (expression.length === 0) return "nothing";
   return joinNatural(
@@ -754,23 +760,26 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
     const sourceToSide = sourceFromSide === "left" ? "right" : "left";
     const after = replaceLoad(before, side, from, to, copies);
     assertChanged(before, after, "substitute");
+    const sourceEquality = equationText({
+      left: canonicalExpression(from),
+      right: canonicalExpression(to),
+    });
+    const scaledFrom = canonicalExpression(scaleExpression(from, copies));
+    const scaledTo = canonicalExpression(scaleExpression(to, copies));
     steps.push({
       id: nextId("substitute"),
       kind: "substitute",
       title: "Replace an equal load",
-      text: `${expressionText(
-        scaleExpression(from, copies),
-      )} ${
-        expressionIsSingular(scaleExpression(from, copies))
-          ? "balances"
-          : "balance"
-      } ${expressionText(
-        scaleExpression(to, copies),
-      )}, so replace ${expressionText(
-        scaleExpression(from, copies),
-      )} on the ${side} tray with ${expressionText(
-        scaleExpression(to, copies),
-      )}.`,
+      text:
+        copies === 1
+          ? `The highlighted balance shows that ${sourceEquality}. Replace ${expressionText(
+              scaledFrom,
+            )} on the ${side} tray with ${expressionText(scaledTo)}.`
+          : `The highlighted balance shows that ${sourceEquality}. The ${side} tray has ${expressionText(
+              scaledFrom,
+            )}. Replace ${expressionText(
+              canonicalExpression(from),
+            )} at a time with ${expressionText(canonicalExpression(to))}.`,
       strategyId: "substitution",
       before: canonicalEquation(before),
       after,
@@ -790,13 +799,20 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
     inputs: readonly TeachingEquationSource[],
   ): BalanceEquation => {
     const after = addEquations(inputs.map(({ equation }) => equation));
+    const removable = commonExpression(after.left, after.right);
+    const motivation =
+      removable.length > 0
+        ? `Add the scales so ${expressionText(removable)} ${
+            expressionIsSingular(removable) ? "appears" : "appear"
+          } on both trays.`
+        : `Neither scale has ${expressionText(
+            round.question.target,
+          )} together. Add the scales.`;
     steps.push({
       id: nextId("add-scales"),
       kind: "add-scales",
       title: "Join the balanced scales",
-      text: `We need ${expressionText(
-        round.question.target,
-      )} together, so join both balanced scales: left to left and right to right.`,
+      text: `${motivation} Move the second balance's loads onto the matching trays of the first.`,
       strategyId: "add-scales",
       before: inputs,
       after,
@@ -812,10 +828,12 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
     steps.push({
       id: nextId("subtract-scales"),
       kind: "subtract-scales",
-      title: "Lift one balance away",
-      text: `To uncover ${expressionText(
-        round.question.target,
-      )}, lift the second scale away from the first: left from left and right from right.`,
+      title: "Remove one balance",
+      text: `The second balance's loads appear inside the first. Remove ${expressionText(
+        subtrahend.equation.left,
+      )} from the left tray and ${expressionText(
+        subtrahend.equation.right,
+      )} from the right tray. Now ${equationText(after)}.`,
       strategyId: "subtract-scales",
       before: [minuend, subtrahend],
       after,
@@ -840,12 +858,12 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
     steps.push({
       id: nextId("cancel-matches"),
       kind: "cancel-matches",
-      title: "Lift the matching loads",
-      text: `${expressionText(
+      title: "Remove the matching loads",
+      text: `${sentenceCase(expressionText(
         canonicalRemoved,
-      )} ${removedIsSingular ? "appears" : "appear"} on both trays, so lift ${
-        removedIsSingular ? "it" : "them"
-      } from both.`,
+      ))} ${removedIsSingular ? "appears" : "appear"} on both trays. Remove ${expressionText(
+        canonicalRemoved,
+      )} from each tray. Now ${equationText(after)}.`,
       strategyId: "cancel-matches",
       before: canonicalEquation(before),
       after,
@@ -878,12 +896,13 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
       id: nextId("regroup"),
       kind: "regroup",
       title: `Make ${divisor} equal groups`,
-      text: `There are ${repeatedBundleText(
+      text: `The left tray has ${expressionText(
+        before.left,
+      )}. Circle ${divisor} groups, each with ${expressionText(
         grouped.leftBundle,
-        divisor,
-      )} on the left, so make ${divisor} equal groups from ${expressionText(
+      )}. Split ${expressionText(
         before.right,
-      )} on the right.`,
+      )} on the right into ${divisor} equal groups.`,
       strategyId: "create-combo",
       before: canonicalEquation(before),
       after: grouped,
@@ -892,7 +911,9 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
       id: nextId("split-evenly"),
       kind: "split-evenly",
       title: `Keep one of the ${divisor} groups`,
-      text: `The ${divisor} groups match, so keep one group from each tray.`,
+      text: `Each tray now has ${divisor} equal groups. Keep one group from each tray: ${equationText(
+        finalEquation,
+      )}.`,
       strategyId: "split-evenly",
       before: grouped,
       after: finalEquation,
@@ -924,9 +945,11 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
       text: `There are ${repeatedBundleText(
         after.left,
         divisor,
-      )} on the left, so make ${divisor} equal groups from ${expressionText(
+      )} on the left, so split ${expressionText(
         before.right,
-      )} on the right. Keep one group from each tray.`,
+      )} on the right into ${divisor} equal groups. Keep one group from each tray: ${equationText(
+        after,
+      )}.`,
       strategyId: "split-evenly",
       before: canonicalEquation(before),
       after: canonicalEquation(after),

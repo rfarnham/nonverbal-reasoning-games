@@ -157,6 +157,11 @@ test("Turbo timing is independent from input locks and pauses for real explanati
     libra,
     /activeLessonStrategyId !== null[\s\S]{0,180}setTurboClockPaused\(true\)/,
   );
+  assert.match(
+    libra,
+    /campaignReviewSelection !== null \|\|[\s\S]{0,80}proofReplaying[\s\S]{0,180}setTurboClockPaused\(true\)/,
+    "Libra pauses Turbo while a learner-controlled proof is open",
+  );
 });
 
 test("controlled games restore persisted answer and feedback UI before retrying", async () => {

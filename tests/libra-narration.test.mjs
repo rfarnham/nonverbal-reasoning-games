@@ -22,6 +22,31 @@ const outputRoot = new URL(
   import.meta.url,
 );
 
+const activeProofCueIds = [
+  "substitute",
+  "add-scales",
+  "subtract-scales",
+  "cancel-matches",
+  "regroup-2",
+  "regroup-3",
+  "regroup-4",
+  "split-2",
+  "split-3",
+  "split-4",
+];
+
+const strategyCueIds = [
+  "strategy-split-evenly",
+  "strategy-cancel-matches",
+  "strategy-substitution",
+  "strategy-create-combo",
+  "strategy-add-scales",
+  "strategy-subtract-scales",
+];
+
+const confusingCrossReference =
+  /\b(?:like splitting|you added scales|works backwards|as before|as we saw|use what you know)\b/i;
+
 test("Libra pins the suite narrator and ships every cue locally", async () => {
   assert.deepEqual(manifest.narrator, SUITE_NARRATOR_PROVENANCE);
 
@@ -35,7 +60,9 @@ test("Libra pins the suite narrator and ships every cue locally", async () => {
     assert.match(cue.file, /^[a-z0-9-]+\.mp3$/);
     assert.ok(cue.audioDurationMs >= 3_000, `${cueId} is not rushed`);
     assert.ok(cue.lingerMs >= 900, `${cueId} leaves absorption time`);
-    assert.ok(cue.caption.length > 0 && cue.speechText.length > cue.caption.length);
+    assert.ok(
+      cue.caption.length > 0 && cue.speechText.length > cue.caption.length,
+    );
     assert.match(cue.sha256, /^[a-f\d]{64}$/);
 
     const asset = new URL(cue.file, outputRoot);
@@ -44,6 +71,16 @@ test("Libra pins the suite narrator and ships every cue locally", async () => {
       .update(await readFile(asset))
       .digest("hex");
     assert.equal(digest, cue.sha256, `${cueId} matches its manifest hash`);
+  }
+});
+
+test("every active proof and strategy cue pauses 1.5 seconds after speech", () => {
+  for (const cueId of [...activeProofCueIds, ...strategyCueIds]) {
+    assert.equal(
+      manifest.cues[cueId]?.lingerMs,
+      1_500,
+      `${cueId} has the fixed post-speech absorption pause`,
+    );
   }
 });
 
@@ -59,15 +96,6 @@ test("proof steps map to finite local cues and use measured timing", () => {
 });
 
 test("every first-time strategy introduction has a slow local Kokoro cue", () => {
-  const strategyCueIds = [
-    "strategy-split-evenly",
-    "strategy-cancel-matches",
-    "strategy-substitution",
-    "strategy-create-combo",
-    "strategy-add-scales",
-    "strategy-subtract-scales",
-  ];
-
   for (const cueId of strategyCueIds) {
     const cue = manifest.cues[cueId];
     assert.ok(cue, `${cueId} exists`);
@@ -76,9 +104,28 @@ test("every first-time strategy introduction has a slow local Kokoro cue", () =>
       cue.minVisualMs >= cue.audioDurationMs,
       `${cueId} keeps the visual through the spoken cue`,
     );
-    assert.match(cue.speechText, /\b(?:so|because|means|need|works)\b/i);
+    assert.match(
+      cue.speechText,
+      /\b(?:rabbit|chick|fox|cat|bear|beetle|scale|tray)s?\b/i,
+      `${cueId} explains its pictured loads`,
+    );
+    assert.match(
+      cue.speechText,
+      /\b(?:make|remove|replace|circle|split|move|balance)\w*\b/i,
+      `${cueId} names the useful action`,
+    );
   }
 
   assert.match(adapterSource, /strategyLessonNarrationCueId/);
   assert.match(adapterSource, /strategyLessonNarrationCaption/);
+});
+
+test("narration explains the current action without confusing callbacks", () => {
+  for (const [cueId, cue] of Object.entries(manifest.cues)) {
+    assert.doesNotMatch(
+      `${cue.caption} ${cue.speechText}`,
+      confusingCrossReference,
+      `${cueId} is self-contained`,
+    );
+  }
 });
