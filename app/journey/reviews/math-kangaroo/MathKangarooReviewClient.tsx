@@ -25,7 +25,6 @@ import {
   writeSoundPreference,
 } from "@/lib/game-audio";
 import { journeyLevelLabel } from "@/lib/progression/types";
-import { MkExplanationAnimation } from "./MkExplanationAnimation";
 import { progressionAdapter } from "./progression-adapter";
 
 import styles from "./math-kangaroo.module.css";
@@ -566,7 +565,6 @@ export function MathKangarooReviewClient() {
                       <h2 id="mk-feedback-title">
                         Check one more visual detail.
                       </h2>
-                      <p>{round.explanation.wrongAnswerHint}</p>
                     </div>
                     <button
                       className={styles.primaryButton}
@@ -588,21 +586,8 @@ export function MathKangarooReviewClient() {
                     </span>
                     <div className={styles.feedbackContent} role="status">
                       <p className={styles.reviewKicker}>Correct</p>
-                      <h2 id="mk-feedback-title">
-                        {round.explanation.headline}
-                      </h2>
+                      <h2 id="mk-feedback-title">Nice work—you found it.</h2>
                     </div>
-                    <MkExplanationAnimation
-                      illustration={round.illustration}
-                      choices={round.choices}
-                      visual={round.explanation.visualExplanation}
-                      fallbackBeats={round.explanation.animationBeats}
-                    />
-                    <ol className={styles.explanationSteps}>
-                      {round.explanation.steps.map((step, index) => (
-                        <li key={`${round.id}-step-${index}`}>{step}</li>
-                      ))}
-                    </ol>
                     <p className={styles.sourceNote}>
                       Official Cyprus competition, {round.source.year};
                       answer checked against the official key.

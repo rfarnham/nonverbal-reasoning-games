@@ -43,7 +43,7 @@ test("the generated review catalog exposes local, versioned providers", () => {
     role: "review",
     title: "Math Kangaroo Spatial Review",
     description:
-      "Carefully selected visual-spatial Math Kangaroo problems with animated explanations.",
+      "Carefully selected visual-spatial Math Kangaroo problems with answer-key-verified choices.",
     journeyContentVersion: "mk-spatial-cyprus-2026.1",
     gradeBands: ["grades-1-2", "grades-3-4"],
   });
