@@ -57,6 +57,7 @@ import {
 import { canOpenHistoricalReview } from "./campaign-review";
 import { progressionAdapter } from "./progression-adapter";
 import styles from "./braids.module.css";
+import campaignStyles from "@/components/games/campaign-progress.module.css";
 
 type DiagramSize = "tutorialDiagram" | "clueDiagram" | "optionDiagram" | "reviewDiagram" | "ghostDiagram";
 type GamePhase = "idle" | "animating" | "wrong-review" | "answered";
@@ -1638,11 +1639,11 @@ export default function BraidsPage() {
             >
               {isCampaign ? (
                 <nav
-                  className={styles.campaignNavigator}
+                  className={campaignStyles.campaignNavigator}
                   aria-label="Campaign progress"
                 >
                   <div
-                    className={styles.campaignLevels}
+                    className={campaignStyles.campaignLevels}
                     aria-label="Campaign levels"
                   >
                     {CAMPAIGN_LEVELS.map((level) => {
@@ -1664,15 +1665,15 @@ export default function BraidsPage() {
 
                       return (
                         <button
-                          className={`${styles.campaignLevel} ${
+                          className={`${campaignStyles.campaignLevel} ${
                             levelState === "correct"
-                              ? styles.campaignLevelCorrect
+                              ? campaignStyles.campaignLevelCorrect
                               : levelState === "incorrect"
-                                ? styles.campaignLevelIncorrect
-                                : styles.campaignLevelNotDone
+                                ? campaignStyles.campaignLevelIncorrect
+                                : campaignStyles.campaignLevelNotDone
                           } ${
                             activeCampaignLevel === level.id
-                              ? styles.campaignLevelActive
+                              ? campaignStyles.campaignLevelActive
                               : ""
                           }`}
                           type="button"
@@ -1693,7 +1694,7 @@ export default function BraidsPage() {
                   </div>
 
                   <ol
-                    className={styles.campaignProblems}
+                    className={campaignStyles.campaignProblems}
                     aria-label={`${campaignLevel(activeCampaignLevel).label} problems`}
                   >
                     {Array.from(
@@ -1718,19 +1719,19 @@ export default function BraidsPage() {
 
                         return (
                           <li
-                            className={styles.campaignProblemItem}
+                            className={campaignStyles.campaignProblemItem}
                             key={problemIndex}
                           >
                             <button
-                              className={`${styles.campaignProblem} ${
+                              className={`${campaignStyles.campaignProblem} ${
                                 marker === "correct"
-                                  ? styles.campaignProblemCorrect
+                                  ? campaignStyles.campaignProblemCorrect
                                   : marker === "incorrect"
-                                    ? styles.campaignProblemIncorrect
-                                    : styles.campaignProblemNotDone
+                                    ? campaignStyles.campaignProblemIncorrect
+                                    : campaignStyles.campaignProblemNotDone
                               } ${
                                 isCurrent
-                                  ? styles.campaignProblemCurrent
+                                  ? campaignStyles.campaignProblemCurrent
                                   : ""
                               }`}
                               type="button"

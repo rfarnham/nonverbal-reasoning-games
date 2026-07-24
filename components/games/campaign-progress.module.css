@@ -1,0 +1,203 @@
+.campaignNavigator {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.campaignLevels {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.campaignLevel {
+  --level-marker: #c9c5bb;
+  min-width: 0;
+  min-height: 44px;
+  position: relative;
+  padding: 5px 8px 5px 24px;
+  border: 1px solid var(--line, #cfcabd);
+  border-radius: 10px;
+  color: var(--ink, #17213d);
+  background: var(--panel, #fffdf8);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 840;
+  line-height: 1;
+}
+
+.campaignLevel::before {
+  width: 12px;
+  height: 12px;
+  position: absolute;
+  top: 50%;
+  left: 8px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--level-marker);
+  content: "";
+  font-family: Arial, sans-serif;
+  font-size: 0.54rem;
+  font-weight: 900;
+  line-height: 1;
+  transform: translateY(-50%);
+}
+
+.campaignLevelActive {
+  border-color: var(--ink, #17213d);
+  box-shadow: inset 0 -3px 0 var(--level-marker);
+}
+
+.campaignLevelCorrect {
+  --level-marker: var(--correct, #16836b);
+}
+
+.campaignLevelCorrect::before {
+  content: "✓";
+}
+
+.campaignLevelIncorrect {
+  --level-marker: var(--wrong, var(--incorrect, #bf493e));
+}
+
+.campaignLevelIncorrect::before {
+  content: "×";
+}
+
+.campaignLevelNotDone {
+  --level-marker: #c9c5bb;
+}
+
+.campaignLevel:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.campaignProblems {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: center;
+  gap: 4px;
+  list-style: none;
+}
+
+.campaignProblemItem {
+  min-width: 0;
+}
+
+.campaignProblem {
+  --problem-marker: #c9c5bb;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  background: transparent;
+  cursor: pointer;
+  font-family: Arial, sans-serif;
+  font-size: 0.56rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.campaignProblem::before {
+  width: 100%;
+  min-width: 12px;
+  height: 13px;
+  position: absolute;
+  top: 50%;
+  left: 0;
+  border-radius: 999px;
+  background: var(--problem-marker);
+  content: "";
+  transform: translateY(-50%);
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+
+.campaignProblem::after {
+  position: relative;
+  z-index: 1;
+}
+
+.campaignProblemButton {
+  width: 100%;
+}
+
+.campaignProblemCorrect {
+  --problem-marker: var(--correct, #16836b);
+}
+
+.campaignProblemCorrect::after {
+  content: "✓";
+}
+
+.campaignProblemIncorrect {
+  --problem-marker: var(--wrong, var(--incorrect, #bf493e));
+}
+
+.campaignProblemIncorrect::after {
+  content: "×";
+}
+
+.campaignProblemNotDone {
+  --problem-marker: #c9c5bb;
+}
+
+.campaignProblemCurrent::before {
+  outline: 2px solid var(--ink, #17213d);
+  outline-offset: 2px;
+  transform: translateY(-50%) scaleY(1.18);
+}
+
+.campaignProblem:disabled {
+  cursor: default;
+}
+
+.campaignLevel:focus-visible,
+.campaignProblem:focus-visible {
+  outline: 3px solid var(--focus, #1679d2);
+  outline-offset: 4px;
+}
+
+@media (hover: hover) {
+  .campaignLevel:not(:disabled):hover {
+    transform: translateY(-2px);
+  }
+
+  .campaignProblem:not(:disabled):hover::before {
+    transform: translateY(-50%) scaleY(1.35);
+  }
+}
+
+@media (max-width: 620px) {
+  .campaignNavigator {
+    grid-column: 1 / -1;
+  }
+
+  .campaignProblems {
+    grid-template-columns: repeat(6, minmax(44px, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .campaignLevel,
+  .campaignProblem::before {
+    transition-duration: 0.01ms;
+  }
+
+  .campaignLevel:not(:disabled):hover {
+    transform: none;
+  }
+}

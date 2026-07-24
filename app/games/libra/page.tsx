@@ -78,6 +78,7 @@ import {
   type LibraProofNarrationCueId,
 } from "./proof-narration";
 import styles from "./libra.module.css";
+import campaignStyles from "@/components/games/campaign-progress.module.css";
 
 type GamePhase = "idle" | "animating" | "wrong-review" | "answered";
 type SessionMode = "campaign" | "infinite" | "redemption";
@@ -1905,11 +1906,11 @@ export default function LibraPage() {
               >
               {isCampaign ? (
                 <nav
-                  className={styles.campaignNavigator}
+                  className={campaignStyles.campaignNavigator}
                   aria-label="Campaign progress"
                 >
                   <div
-                    className={styles.campaignLevels}
+                    className={campaignStyles.campaignLevels}
                     aria-label="Campaign levels"
                   >
                     {CAMPAIGN_LEVELS.map((level) => {
@@ -1931,15 +1932,15 @@ export default function LibraPage() {
 
                       return (
                         <button
-                          className={`${styles.campaignLevel} ${
+                          className={`${campaignStyles.campaignLevel} ${
                             levelState === "correct"
-                              ? styles.campaignLevelCorrect
+                              ? campaignStyles.campaignLevelCorrect
                               : levelState === "incorrect"
-                                ? styles.campaignLevelIncorrect
-                                : styles.campaignLevelNotDone
+                                ? campaignStyles.campaignLevelIncorrect
+                                : campaignStyles.campaignLevelNotDone
                           } ${
                             activeCampaignLevel === level.id
-                              ? styles.campaignLevelActive
+                              ? campaignStyles.campaignLevelActive
                               : ""
                           }`}
                           type="button"
@@ -1960,7 +1961,7 @@ export default function LibraPage() {
                     })}
                   </div>
                   <div
-                    className={styles.campaignProblems}
+                    className={campaignStyles.campaignProblems}
                     role="group"
                     aria-label={`${campaignLevel(activeCampaignLevel).label} problems`}
                   >
@@ -1990,14 +1991,14 @@ export default function LibraPage() {
 
                         return (
                           <button
-                            className={`${styles.campaignProblem} ${
+                            className={`${campaignStyles.campaignProblem} ${
                               marker === "correct"
-                                ? styles.campaignProblemCorrect
+                                ? campaignStyles.campaignProblemCorrect
                                 : marker === "incorrect"
-                                  ? styles.campaignProblemIncorrect
-                                  : styles.campaignProblemNotDone
+                                  ? campaignStyles.campaignProblemIncorrect
+                                  : campaignStyles.campaignProblemNotDone
                             } ${
-                              isCurrent ? styles.campaignProblemCurrent : ""
+                              isCurrent ? campaignStyles.campaignProblemCurrent : ""
                             }`}
                             type="button"
                             aria-label={`${campaignLevel(activeCampaignLevel).label} problem ${

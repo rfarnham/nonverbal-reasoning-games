@@ -55,6 +55,7 @@ import {
 import { dominoTwistGame } from "./game-info";
 import { progressionAdapter } from "./progression-adapter";
 import styles from "./domino-twist.module.css";
+import campaignStyles from "@/components/games/campaign-progress.module.css";
 
 type PrimaryMode = "campaign" | "infinite";
 type SessionMode = PrimaryMode | "redemption";
@@ -1654,11 +1655,11 @@ export default function DominoTwistGame() {
               >
               {isCampaign ? (
                 <nav
-                  className={styles.campaignNavigator}
+                  className={campaignStyles.campaignNavigator}
                   aria-label="Campaign progress"
                 >
                   <div
-                    className={styles.campaignLevels}
+                    className={campaignStyles.campaignLevels}
                     aria-label="Campaign levels"
                   >
                     {LEVELS.map((level) => {
@@ -1679,15 +1680,15 @@ export default function DominoTwistGame() {
                           : "not done";
                       return (
                         <button
-                          className={`${styles.campaignLevel} ${
+                          className={`${campaignStyles.campaignLevel} ${
                             levelState === "correct"
-                              ? styles.campaignLevelCorrect
+                              ? campaignStyles.campaignLevelCorrect
                               : levelState === "incorrect"
-                                ? styles.campaignLevelIncorrect
-                                : styles.campaignLevelNotDone
+                                ? campaignStyles.campaignLevelIncorrect
+                                : campaignStyles.campaignLevelNotDone
                           } ${
                             level === activeCampaignLevel
-                              ? styles.campaignLevelActive
+                              ? campaignStyles.campaignLevelActive
                               : ""
                           }`}
                           type="button"
@@ -1707,7 +1708,7 @@ export default function DominoTwistGame() {
                     })}
                   </div>
                   <div
-                    className={styles.campaignProblems}
+                    className={campaignStyles.campaignProblems}
                     role="group"
                     aria-label={`${activeCampaignLevel} problems`}
                   >
@@ -1735,14 +1736,14 @@ export default function DominoTwistGame() {
                           campaignReviewSelection.problemIndex === problemIndex;
                         return (
                           <button
-                            className={`${styles.campaignProblem} ${
+                            className={`${campaignStyles.campaignProblem} ${
                               marker === "correct"
-                                ? styles.campaignProblemCorrect
+                                ? campaignStyles.campaignProblemCorrect
                                 : marker === "incorrect"
-                                  ? styles.campaignProblemIncorrect
-                                  : styles.campaignProblemNotDone
+                                  ? campaignStyles.campaignProblemIncorrect
+                                  : campaignStyles.campaignProblemNotDone
                             } ${
-                              isCurrent ? styles.campaignProblemCurrent : ""
+                              isCurrent ? campaignStyles.campaignProblemCurrent : ""
                             }`}
                             type="button"
                             aria-label={`${activeCampaignLevel} problem ${

@@ -52,6 +52,7 @@ import {
 import { braceletSearchGame } from "./game-info";
 import { progressionAdapter } from "./progression-adapter";
 import styles from "./bracelet-search.module.css";
+import campaignStyles from "@/components/games/campaign-progress.module.css";
 import {
   braceletPresentationForRound,
   tangledLayoutForPresentation,
@@ -1597,11 +1598,11 @@ export default function BraceletSearchPage() {
             >
               {isCampaign ? (
                 <nav
-                  className={styles.campaignNavigator}
+                  className={campaignStyles.campaignNavigator}
                   aria-label="Campaign progress"
                 >
                   <div
-                    className={styles.campaignLevels}
+                    className={campaignStyles.campaignLevels}
                     aria-label="Campaign levels"
                   >
                     {CAMPAIGN_LEVELS.map((level) => {
@@ -1624,15 +1625,15 @@ export default function BraceletSearchPage() {
 
                       return (
                         <button
-                          className={`${styles.campaignLevel} ${
+                          className={`${campaignStyles.campaignLevel} ${
                             levelState === "correct"
-                              ? styles.campaignLevelCorrect
+                              ? campaignStyles.campaignLevelCorrect
                               : levelState === "incorrect"
-                                ? styles.campaignLevelIncorrect
-                                : styles.campaignLevelNotDone
+                                ? campaignStyles.campaignLevelIncorrect
+                                : campaignStyles.campaignLevelNotDone
                           } ${
                             activeCampaignLevel === level.id
-                              ? styles.campaignLevelActive
+                              ? campaignStyles.campaignLevelActive
                               : ""
                           }`}
                           type="button"
@@ -1650,7 +1651,7 @@ export default function BraceletSearchPage() {
                   </div>
 
                   <div
-                    className={styles.campaignProblems}
+                    className={campaignStyles.campaignProblems}
                     role="list"
                     aria-label={`${campaignLevel(activeCampaignLevel).label} problems`}
                   >
@@ -1670,12 +1671,12 @@ export default function BraceletSearchPage() {
                           problemIndex === campaignProblemIndex;
                         const markerClass = `${
                           marker === "correct"
-                            ? styles.campaignProblemCorrect
+                            ? campaignStyles.campaignProblemCorrect
                             : marker === "incorrect"
-                              ? styles.campaignProblemIncorrect
-                              : styles.campaignProblemNotDone
+                              ? campaignStyles.campaignProblemIncorrect
+                              : campaignStyles.campaignProblemNotDone
                         } ${
-                          isCurrent ? styles.campaignProblemCurrent : ""
+                          isCurrent ? campaignStyles.campaignProblemCurrent : ""
                         }`;
                         const markerLabel = `${campaignLevel(activeCampaignLevel).label} problem ${
                           problemIndex + 1
@@ -1683,12 +1684,12 @@ export default function BraceletSearchPage() {
 
                         return problem?.solved ? (
                           <span
-                            className={styles.campaignProblemItem}
+                            className={campaignStyles.campaignProblemItem}
                             role="listitem"
                             key={problemIndex}
                           >
                             <button
-                              className={`${styles.campaignProblem} ${styles.campaignProblemButton} ${markerClass}`}
+                              className={`${campaignStyles.campaignProblem} ${campaignStyles.campaignProblemButton} ${markerClass}`}
                               type="button"
                               aria-label={`${markerLabel}. Open review.`}
                               aria-current={isCurrent ? "step" : undefined}
@@ -1708,7 +1709,7 @@ export default function BraceletSearchPage() {
                           </span>
                         ) : (
                           <span
-                            className={`${styles.campaignProblem} ${markerClass}`}
+                            className={`${campaignStyles.campaignProblem} ${markerClass}`}
                             role="listitem"
                             aria-label={markerLabel}
                             aria-current={isCurrent ? "step" : undefined}
