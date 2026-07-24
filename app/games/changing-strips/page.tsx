@@ -36,7 +36,6 @@ import {
   optionFeedback,
   roundFingerprint,
   type Difficulty,
-  type ProcessingDirection,
   type StripRound,
   type TraceStep,
 } from "./game-engine";
@@ -184,12 +183,6 @@ function nextIncompleteCampaignLevel(
   return null;
 }
 
-function oppositeDirection(
-  direction: ProcessingDirection,
-): ProcessingDirection {
-  return direction === "ltr" ? "rtl" : "ltr";
-}
-
 function progressionTargetHref(
   target: Readonly<{
     pathname: string;
@@ -234,51 +227,52 @@ function tryBuildInfiniteSessionRound(
 }
 
 function TutorialExample() {
-  const trace = applyProgram(
-    TUTORIAL.input,
-    TUTORIAL.rules,
-    TUTORIAL.processingDirection,
-  );
-  const wrongDirection = oppositeDirection(TUTORIAL.processingDirection);
-  const nearMiss = applyProgram(
-    TUTORIAL.input,
-    TUTORIAL.rules,
-    wrongDirection,
-  ).output;
+  const trace = applyProgram(TUTORIAL.input, TUTORIAL.rules);
+  const nearMiss =
+    TUTORIAL.options.find(({ kind }) => kind === "stopped-early") ??
+    TUTORIAL.options.find(({ kind }) => kind === "one-step-only") ??
+    TUTORIAL.options.find((_, index) => index !== TUTORIAL.correctIndex) ??
+    TUTORIAL.options[0];
 
   return (
     <div className={styles.example}>
       <div className={styles.examplePrompt}>
-        <span className={styles.exampleLabel}>Start strip</span>
+        <span className={styles.exampleLabel}>Start</span>
         <StripDiagram
           cells={TUTORIAL.input}
+          rows={TUTORIAL.rows}
+          columns={TUTORIAL.columns}
           variant="example"
-          label="Example starting strip with nine solid, open, and striped tiles"
+          label="Example starting board using three black-and-white patterns"
         />
       </div>
-      <RulePipeline
-        rules={TUTORIAL.rules}
-        processingDirection={TUTORIAL.processingDirection}
-        trace={trace.steps}
-        sourceStrip={TUTORIAL.input}
-      />
+      <RulePipeline rules={TUTORIAL.rules} trace={trace.steps} />
       <div className={styles.exampleProof}>
-        <TraceStoryboard input={TUTORIAL.input} steps={trace.steps} />
+        <TraceStoryboard
+          input={TUTORIAL.input}
+          steps={trace.steps}
+          rows={TUTORIAL.rows}
+          columns={TUTORIAL.columns}
+        />
       </div>
       <div className={styles.nearMiss} aria-label="Common mistake">
         <span className={styles.nearMissMark} aria-hidden="true">
           ×
         </span>
         <div>
-          <strong>Wrong end</strong>
-          <span className={styles.miniDirection} aria-hidden="true">
-            {wrongDirection === "ltr" ? "START →" : "← START"}
-          </span>
+          <strong>Both cards</strong>
+          <span className={styles.nearMissCaption}>Don’t stop after one.</span>
         </div>
         <StripDiagram
-          cells={nearMiss}
+          cells={nearMiss.strip}
+          rows={TUTORIAL.rows}
+          columns={TUTORIAL.columns}
           variant="review"
-          label="Near-match made by starting from the wrong end"
+          differenceIndexes={stateDifferenceIndexes(
+            TUTORIAL.answer,
+            nearMiss.strip,
+          )}
+          label="Near-match made by stopping after the first pattern change"
         />
       </div>
     </div>
@@ -375,10 +369,7 @@ export default function ChangingStripsPage() {
       : (roundQueue[roundCursor] ?? null);
   const round = activeSessionRound?.round ?? null;
   const trace = useMemo(
-    () =>
-      round
-        ? applyProgram(round.input, round.rules, round.processingDirection)
-        : null,
+    () => (round ? applyProgram(round.input, round.rules) : null),
     [round],
   );
   const sessionLength = roundQueue.length;
@@ -983,11 +974,7 @@ export default function ChangingStripsPage() {
       controlledSession.lastAnswerToken,
     );
     const currentRound = controlledSession.current.round;
-    const currentTrace = applyProgram(
-      currentRound.input,
-      currentRound.rules,
-      currentRound.processingDirection,
-    );
+    const currentTrace = applyProgram(currentRound.input, currentRound.rules);
     const hydrationTimer = window.setTimeout(() => {
       hydratedProgressionPlayIdRef.current = hydrationKey;
       resetAttemptState();
@@ -1129,6 +1116,7 @@ export default function ChangingStripsPage() {
       return () => window.cancelAnimationFrame(frame);
     }
   }, [
+    activeSessionRound?.id,
     activeCampaignLevel,
     campaignProblemIndex,
     campaignReviewSelection,
@@ -1262,7 +1250,7 @@ export default function ChangingStripsPage() {
         ) : !hasStarted ? (
           <section className={styles.tutorial} aria-labelledby="tutorial-title">
             <p className={styles.kicker}>Example</p>
-            <h1 id="tutorial-title">Follow the arrows.</h1>
+            <h1 id="tutorial-title">Change every match.</h1>
             <TutorialExample />
             {controlledSession?.sectionIntro ? (
               <ProgressionCulminationSectionIntro
@@ -1647,31 +1635,29 @@ export default function ChangingStripsPage() {
                 <div className={styles.historicalPuzzle}>
                   <StripDiagram
                     cells={historicalSessionRound.round.input}
+                    rows={historicalSessionRound.round.rows}
+                    columns={historicalSessionRound.round.columns}
                     variant="clue"
-                    label="Historical puzzle starting strip"
+                    label="Historical puzzle starting board"
                   />
                   <RulePipeline
                     rules={historicalSessionRound.round.rules}
-                    processingDirection={
-                      historicalSessionRound.round.processingDirection
-                    }
                     trace={
                       applyProgram(
                         historicalSessionRound.round.input,
                         historicalSessionRound.round.rules,
-                        historicalSessionRound.round.processingDirection,
                       ).steps
                     }
-                    sourceStrip={historicalSessionRound.round.input}
                     compact
                   />
                   <TraceStoryboard
                     input={historicalSessionRound.round.input}
+                    rows={historicalSessionRound.round.rows}
+                    columns={historicalSessionRound.round.columns}
                     steps={
                       applyProgram(
                         historicalSessionRound.round.input,
                         historicalSessionRound.round.rules,
-                        historicalSessionRound.round.processingDirection,
                       ).steps
                     }
                   />
@@ -1686,6 +1672,8 @@ export default function ChangingStripsPage() {
                             historicalMistake.chosenIndex
                           ].strip
                         }
+                        rows={historicalSessionRound.round.rows}
+                        columns={historicalSessionRound.round.columns}
                         variant="review"
                         differenceIndexes={stateDifferenceIndexes(
                           historicalSessionRound.round.answer,
@@ -1716,27 +1704,23 @@ export default function ChangingStripsPage() {
                   >
                     <div className={styles.promptHeading}>
                       <p className={styles.kicker} id="puzzle-prompt">
-                        Start strip
+                        Start
                       </p>
-                      <span className={styles.directionBadge}>
-                        {round.processingDirection === "ltr" ? "→" : "←"}{" "}
-                        {round.processingDirection === "ltr"
-                          ? "Left start"
-                          : "Right start"}
+                      <span className={styles.matchBadge}>
+                        Every match
                       </span>
                     </div>
                     <StripDiagram
                       cells={round.input}
+                      rows={round.rows}
+                      columns={round.columns}
                       variant="clue"
-                      label="Starting strip for this puzzle"
+                      label="Starting pattern board for this puzzle"
                     />
                     <RulePipeline
                       rules={round.rules}
-                      processingDirection={round.processingDirection}
                       trace={trace.steps}
                       activeRuleIndex={activeTraceRuleIndex}
-                      showStepNumbers={round.difficulty !== "Wizard"}
-                      sourceStrip={round.input}
                     />
                   </section>
 
@@ -1777,8 +1761,8 @@ export default function ChangingStripsPage() {
                             onClick={() => chooseOption(optionIndex)}
                             disabled={phase !== "idle"}
                             aria-label={`Option ${optionIndex + 1}, a ${
-                              option.strip.length
-                            }-tile strip${
+                              round.rows
+                            } by ${round.columns} pattern board${
                               showCorrect
                                 ? ", correct"
                                 : showWrong
@@ -1803,6 +1787,8 @@ export default function ChangingStripsPage() {
                             </span>
                             <StripDiagram
                               cells={option.strip}
+                              rows={round.rows}
+                              columns={round.columns}
                               variant="option"
                               differenceIndexes={differences}
                               label={`Visual pattern for option ${optionIndex + 1}`}
@@ -1852,7 +1838,12 @@ export default function ChangingStripsPage() {
                           : "squares are"}{" "}
                         different. Watch the steps, then try again.
                       </p>
-                      <TraceStoryboard input={round.input} steps={trace.steps} />
+                      <TraceStoryboard
+                        input={round.input}
+                        steps={trace.steps}
+                        rows={round.rows}
+                        columns={round.columns}
+                      />
                     </>
                   ) : phase === "animating" && selectedCorrect ? (
                     <>
@@ -1865,6 +1856,8 @@ export default function ChangingStripsPage() {
                       <TraceStoryboard
                         input={round.input}
                         steps={trace.steps}
+                        rows={round.rows}
+                        columns={round.columns}
                         activeStep={traceStepIndex}
                       />
                     </>
@@ -1876,7 +1869,12 @@ export default function ChangingStripsPage() {
                         </strong>
                         <span>Every step matches.</span>
                       </div>
-                      <TraceStoryboard input={round.input} steps={trace.steps} />
+                      <TraceStoryboard
+                        input={round.input}
+                        steps={trace.steps}
+                        rows={round.rows}
+                        columns={round.columns}
+                      />
                       <div className={styles.feedbackActions}>
                         <button
                           className={styles.replayButton}
@@ -1906,7 +1904,8 @@ export default function ChangingStripsPage() {
                     </>
                   ) : (
                     <span className={styles.feedbackPlaceholder}>
-                      Choose the strip after every arrow.
+                      Do the numbered changes from top to bottom. Change every
+                      match.
                     </span>
                   )}
                 </div>
@@ -1968,6 +1967,8 @@ export default function ChangingStripsPage() {
                         </span>
                         <StripDiagram
                           cells={wrong.strip}
+                          rows={missed.round.rows}
+                          columns={missed.round.columns}
                           variant="review"
                           differenceIndexes={differences}
                           label={`First answer with ${differences.length} differences marked`}

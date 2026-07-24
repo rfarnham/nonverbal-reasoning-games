@@ -30,7 +30,7 @@ rounds never alter Journey progress.
 | [Whose Left?](https://rfarnham.github.io/nonverbal-reasoning-games/games/whose-left/) | Spatial perspective and direction tracking | Playable |
 | [Shape Fold](https://rfarnham.github.io/nonverbal-reasoning-games/games/shape-fold/) | Spatial folding and visual prediction | Playable |
 | [Domino Twist](https://rfarnham.github.io/nonverbal-reasoning-games/games/domino-twist/) | Spatial composition and part-whole reasoning | Playable |
-| [Changing Strips](https://rfarnham.github.io/nonverbal-reasoning-games/games/changing-strips/) | Visual sequencing and conditional transformation | Playable |
+| [Changing Strips](https://rfarnham.github.io/nonverbal-reasoning-games/games/changing-strips/) | Visual sequencing and ordered pattern replacement | Playable |
 | [Bracelet Search](https://rfarnham.github.io/nonverbal-reasoning-games/games/bracelet-search/) | Sequence search and mental reversal | Playable |
 
 ## Project shape

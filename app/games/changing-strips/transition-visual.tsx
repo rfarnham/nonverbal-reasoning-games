@@ -1,31 +1,23 @@
 "use client";
 
+import type { CSSProperties } from "react";
+
 import {
-  describeRule,
-  orderedRuleIndexes,
-  processingDirectionLabel,
+  PATTERN_META,
   type CellState,
-  type ProcessingDirection,
   type TraceStep,
   type TransitionRule,
 } from "./game-engine";
-import type { CSSProperties } from "react";
 import styles from "./changing-strips.module.css";
 
 type StripVariant = "example" | "clue" | "option" | "story" | "review";
-
-const CELL_LABELS: Record<CellState, string> = {
-  solid: "solid",
-  open: "open",
-  striped: "striped",
-};
 
 function cellClass(state: CellState): string {
   switch (state) {
     case "solid":
       return styles.cellSolid;
-    case "open":
-      return styles.cellOpen;
+    case "hollow":
+      return styles.cellHollow;
     case "striped":
       return styles.cellStriped;
   }
@@ -34,23 +26,23 @@ function cellClass(state: CellState): string {
 export function CellToken({
   state,
   changed = false,
+  animateChange = true,
   difference = false,
-  subject = false,
-  cue = false,
 }: Readonly<{
   state: CellState;
   changed?: boolean;
+  animateChange?: boolean;
   difference?: boolean;
-  subject?: boolean;
-  cue?: boolean;
 }>) {
   return (
     <span
       className={`${styles.cell} ${cellClass(state)} ${
-        changed ? styles.cellChanged : ""
-      } ${difference ? styles.cellDifference : ""} ${
-        subject ? styles.cellSubject : ""
-      } ${cue ? styles.cellCue : ""}`}
+        changed
+          ? animateChange
+            ? styles.cellChanged
+            : styles.cellChangedSettled
+          : ""
+      } ${difference ? styles.cellDifference : ""}`}
       aria-hidden="true"
     >
       <span className={styles.cellMark} />
@@ -60,34 +52,49 @@ export function CellToken({
 
 export function StripDiagram({
   cells,
+  rows = 1,
+  columns,
   variant = "clue",
   changedIndexes = [],
+  animateChanges = true,
   differenceIndexes = [],
   label,
 }: Readonly<{
   cells: readonly CellState[];
+  rows?: 1 | 2;
+  columns?: number;
   variant?: StripVariant;
   changedIndexes?: readonly number[];
+  animateChanges?: boolean;
   differenceIndexes?: readonly number[];
   label?: string;
 }>) {
+  const resolvedColumns = columns ?? Math.max(1, cells.length / rows);
   const changed = new Set(changedIndexes);
   const differences = new Set(differenceIndexes);
   const accessibleLabel =
     label ??
-    `${cells.length}-tile strip using solid, open, and striped tiles`;
+    `${rows} row by ${resolvedColumns} column board using solid, hollow, and striped patterns`;
+  const variantClass =
+    styles[`strip${variant[0].toUpperCase()}${variant.slice(1)}`];
 
   return (
     <span
-      className={`${styles.strip} ${styles[`strip${variant[0].toUpperCase()}${variant.slice(1)}`]}`}
+      className={`${styles.strip} ${variantClass}`}
       role="img"
       aria-label={accessibleLabel}
-      style={{ "--strip-cells": cells.length } as CSSProperties}
+      style={
+        {
+          "--strip-columns": resolvedColumns,
+          "--strip-rows": rows,
+        } as CSSProperties
+      }
     >
       {cells.map((state, index) => (
         <CellToken
           state={state}
           changed={changed.has(index)}
+          animateChange={animateChanges}
           difference={differences.has(index)}
           key={`${index}-${state}`}
         />
@@ -96,246 +103,75 @@ export function StripDiagram({
   );
 }
 
-function MiniStrip({
-  cells,
-  subjects = [],
-  cues = [],
-}: Readonly<{
-  cells: readonly CellState[];
-  subjects?: readonly number[];
-  cues?: readonly number[];
-}>) {
-  const subjectIndexes = new Set(subjects);
-  const cueIndexes = new Set(cues);
-  return (
-    <span className={styles.ruleMiniStrip} aria-hidden="true">
-      {cells.map((state, index) => (
-        <CellToken
-          state={state}
-          subject={subjectIndexes.has(index)}
-          cue={cueIndexes.has(index)}
-          key={`${index}-${state}`}
-        />
-      ))}
-    </span>
-  );
-}
-
-function NeutralCell() {
-  return (
-    <span className={`${styles.cell} ${styles.cellNeutral}`} aria-hidden="true">
-      <span className={styles.cellMark} />
-    </span>
-  );
-}
-
-function NeutralMiniStrip({ count }: Readonly<{ count: number }>) {
-  return (
-    <span className={styles.ruleMiniStrip} aria-hidden="true">
-      {Array.from({ length: count }, (_, index) => (
-        <NeutralCell key={index} />
-      ))}
-    </span>
-  );
-}
-
-function RuleDiagram({
+function RuleGlyph({
   rule,
-  traceStep,
-  clueCells,
+  compact = false,
 }: Readonly<{
   rule: TransitionRule;
-  traceStep: TraceStep;
-  clueCells?: readonly CellState[];
+  compact?: boolean;
 }>) {
-  if (rule.kind === "replace") {
-    return (
-      <span className={styles.replaceDiagram} aria-hidden="true">
-        <CellToken state={rule.from} />
-        <span className={styles.ruleDownArrow}>↓</span>
-        <CellToken state={rule.to} />
-      </span>
-    );
-  }
-
-  if (rule.kind === "swap") {
-    return (
-      <span className={styles.swapDiagram} aria-hidden="true">
-        <span className={styles.swapRow}>
-          <CellToken state={rule.first} />
-          <CellToken state={rule.second} />
-        </span>
-        <svg
-          className={styles.swapTrails}
-          viewBox="0 0 72 28"
-          focusable="false"
-        >
-          <path d="M16 3C16 17 56 11 56 25" />
-          <path d="M56 3C56 17 16 11 16 25" />
-          <path d="m51 20 5 5 5-5M11 20l5 5 5-5" />
-        </svg>
-        <span className={styles.swapRow}>
-          <CellToken state={rule.second} />
-          <CellToken state={rule.first} />
-        </span>
-      </span>
-    );
-  }
-
-  if (rule.kind === "neighbor") {
-    const before =
-      rule.neighborDirection === "left"
-        ? ([rule.neighbor, rule.from] as const)
-        : ([rule.from, rule.neighbor] as const);
-    const after =
-      rule.neighborDirection === "left"
-        ? ([rule.neighbor, rule.to] as const)
-        : ([rule.to, rule.neighbor] as const);
-    const subjectIndex = rule.neighborDirection === "left" ? 1 : 0;
-    const cueIndex = subjectIndex === 0 ? 1 : 0;
-
-    return (
-      <span className={styles.neighborDiagram} aria-hidden="true">
-        <MiniStrip
-          cells={before}
-          subjects={[subjectIndex]}
-          cues={[cueIndex]}
-        />
-        <span className={styles.ruleDownArrow}>↓</span>
-        <MiniStrip
-          cells={after}
-          subjects={[subjectIndex]}
-          cues={[cueIndex]}
-        />
-      </span>
-    );
-  }
-
-  const shiftCells = clueCells ?? traceStep.before;
-  const hideIntermediateState =
-    clueCells !== undefined && traceStep.executionIndex > 0;
-  const wrapState =
-    rule.direction === "left"
-      ? shiftCells[0]
-      : shiftCells[shiftCells.length - 1];
-
   return (
-    <span className={styles.shiftDiagram} aria-hidden="true">
-      {hideIntermediateState ? (
-        <NeutralMiniStrip count={shiftCells.length} />
-      ) : (
-        <MiniStrip cells={shiftCells} />
-      )}
-      <span className={styles.shiftArrow}>
-        <span className={styles.shiftTravelArrow}>
-          {rule.direction === "left" ? "←" : "→"}
-        </span>
-        {wrapState || hideIntermediateState ? (
-          <span className={styles.shiftWrap}>
-            {hideIntermediateState ? (
-              <NeutralCell />
-            ) : wrapState ? (
-              <CellToken state={wrapState} />
-            ) : null}
-            <span className={styles.shiftWrapPath}>
-              {rule.direction === "left" ? "↪ ───→" : "←─── ↩"}
-            </span>
-            {hideIntermediateState ? (
-              <NeutralCell />
-            ) : wrapState ? (
-              <CellToken state={wrapState} />
-            ) : null}
-          </span>
-        ) : null}
-      </span>
+    <span
+      className={`${styles.replaceDiagram} ${
+        compact ? styles.replaceDiagramCompact : ""
+      }`}
+      aria-hidden="true"
+    >
+      <CellToken state={rule.from} />
+      <span className={styles.ruleDownArrow}>↓</span>
+      <CellToken state={rule.to} />
     </span>
   );
 }
 
 export function RulePipeline({
   rules,
-  processingDirection,
-  trace,
   activeRuleIndex = null,
   compact = false,
-  showStepNumbers = true,
-  sourceStrip,
 }: Readonly<{
   rules: readonly TransitionRule[];
-  processingDirection: ProcessingDirection;
-  trace: readonly TraceStep[];
+  trace?: readonly TraceStep[];
   activeRuleIndex?: number | null;
   compact?: boolean;
-  showStepNumbers?: boolean;
-  sourceStrip?: readonly CellState[];
 }>) {
-  const executionOrder = orderedRuleIndexes(
-    rules.length,
-    processingDirection,
-  );
-
   return (
     <div
       className={`${styles.rulePipeline} ${
-        processingDirection === "rtl"
-          ? styles.pipelineRtl
-          : ""
-      } ${compact ? styles.pipelineCompact : ""} ${
-        showStepNumbers ? "" : styles.ruleNumbersHidden
+        compact ? styles.pipelineCompact : ""
       }`}
-      aria-label={`${processingDirectionLabel(processingDirection)}. ${executionOrder
-        .map((ruleIndex, executionIndex) => {
-          return `Step ${executionIndex + 1}: ${describeRule(
-            rules[ruleIndex],
-          )}`;
-        })
+      role="img"
+      aria-label={`${rules.length} numbered pattern changes, applied from top to bottom. Each change affects every matching square. ${rules
+        .map(
+          (rule, index) =>
+            `Step ${index + 1}: ${PATTERN_META[rule.from].label} to ${PATTERN_META[rule.to].label}.`,
+        )
         .join(" ")}`}
-      style={{ "--rule-count": rules.length } as CSSProperties}
     >
-      <div className={styles.orderRail} aria-hidden="true">
-        {processingDirection === "ltr" ? (
-          <>
-            <span className={styles.startLabel}>START</span>
-            <span className={styles.startDot} />
-            <span className={styles.railLine} />
-            <span className={styles.railArrow}>→</span>
-          </>
-        ) : (
-          <>
-            <span className={styles.railArrow}>←</span>
-            <span className={styles.railLine} />
-            <span className={styles.startDot} />
-            <span className={styles.startLabel}>START</span>
-          </>
-        )}
+      <div className={styles.recipeHeading} aria-hidden="true">
+        <span>TOP</span>
+        <span>Every match</span>
       </div>
-      <div className={styles.ruleCards}>
-        {rules.map((rule, ruleIndex) => {
-          const executionIndex = executionOrder.indexOf(ruleIndex);
-          const traceStep = trace.find(
-            (step) => step.ruleIndex === ruleIndex,
-          );
-          if (!traceStep) return null;
-          return (
-            <div
+      <ol
+        className={styles.ruleCards}
+        style={{ "--rule-count": rules.length } as CSSProperties}
+        aria-hidden="true"
+      >
+        {rules.map((rule, index) => (
+          <li className={styles.ruleCardWrap} key={`${index}-${rule.from}-${rule.to}`}>
+            <span
               className={`${styles.ruleCard} ${
-                activeRuleIndex === ruleIndex ? styles.ruleCardActive : ""
+                activeRuleIndex === index ? styles.ruleCardActive : ""
               }`}
-              aria-label={`Step ${executionIndex + 1}: ${describeRule(rule)}`}
-              key={`${ruleIndex}-${rule.kind}`}
             >
-              <span className={styles.ruleNumber} aria-hidden="true">
-                {executionIndex + 1}
-              </span>
-              <RuleDiagram
-                rule={rule}
-                traceStep={traceStep}
-                clueCells={sourceStrip}
-              />
-            </div>
-          );
-        })}
-      </div>
+              <span className={styles.ruleNumber}>{index + 1}</span>
+              <RuleGlyph rule={rule} compact={compact} />
+            </span>
+            {index < rules.length - 1 ? (
+              <span className={styles.ruleConnector}>↓</span>
+            ) : null}
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
@@ -343,78 +179,68 @@ export function RulePipeline({
 export function TraceStoryboard({
   input,
   steps,
+  rows = 1,
+  columns,
   activeStep = null,
-  finalLabel = "Answer",
 }: Readonly<{
   input: readonly CellState[];
   steps: readonly TraceStep[];
+  rows?: 1 | 2;
+  columns?: number;
   activeStep?: number | null;
-  finalLabel?: string;
 }>) {
-  const animationRunning = activeStep !== null;
+  const settled = activeStep === null;
+  const resolvedColumns = columns ?? Math.max(1, input.length / rows);
 
   return (
     <ol
       className={`${styles.storyboard} ${
-        animationRunning ? styles.storyboardPlaying : styles.storyboardSettled
+        settled ? styles.storyboardSettled : ""
       }`}
-      aria-label={`Step-by-step proof from start to ${finalLabel.toLowerCase()}`}
+      aria-label="Step-by-step visual proof"
+      aria-live="off"
     >
-      <li className={styles.storyStep}>
+      <li className={styles.storyStart}>
         <span className={styles.storyLabel}>Start</span>
         <StripDiagram
           cells={input}
+          rows={rows}
+          columns={resolvedColumns}
           variant="story"
-          label="Starting strip"
+          label="Starting board in the visual proof"
         />
       </li>
       {steps.map((step, index) => {
         const isActive = activeStep === index;
         const isFuture = activeStep !== null && index > activeStep;
-        const isLast = index === steps.length - 1;
         return (
           <li
             className={`${styles.storyStep} ${
               isActive ? styles.storyStepActive : ""
             } ${isFuture ? styles.storyStepFuture : ""}`}
             aria-current={isActive ? "step" : undefined}
-            key={`${step.executionIndex}-${step.ruleIndex}`}
+            key={`${step.executionIndex}-${step.rule.from}-${step.rule.to}`}
           >
             <span className={styles.storyConnector} aria-hidden="true">
               ↓
             </span>
-            <span className={styles.storyLabel}>
-              {isLast ? finalLabel : `Step ${index + 1}`}
-            </span>
+            <div className={styles.storyOperation} aria-hidden="true">
+              <span className={styles.storyRuleBadge}>{index + 1}</span>
+              <RuleGlyph rule={step.rule} compact />
+            </div>
             <StripDiagram
               cells={step.after}
+              rows={rows}
+              columns={resolvedColumns}
               variant="story"
-              changedIndexes={isActive ? step.changedIndexes : []}
-              label={
-                isLast
-                  ? `Final strip after ${steps.length} ${
-                      steps.length === 1 ? "step" : "steps"
-                    }`
-                  : `Strip after step ${index + 1}`
+              changedIndexes={
+                activeStep === null || index <= activeStep
+                  ? step.changedIndexes
+                  : []
               }
+              animateChanges={isActive}
+              label={`Board after visual change ${index + 1}`}
             />
-            <span
-              className={`${styles.storyOperation} ${
-                styles[
-                  `storyOperation${step.rule.kind[0].toUpperCase()}${step.rule.kind.slice(1)}`
-                ]
-              } ${
-                step.rule.kind === "shift"
-                  ? step.rule.direction === "left"
-                    ? styles.storyShiftLeft
-                    : styles.storyShiftRight
-                  : ""
-              }`}
-              aria-hidden="true"
-            >
-              <span className={styles.storyRuleBadge}>{index + 1}</span>
-              <RuleDiagram rule={step.rule} traceStep={step} />
-            </span>
           </li>
         );
       })}
@@ -424,14 +250,12 @@ export function TraceStoryboard({
 
 export function stateDifferenceIndexes(
   expected: readonly CellState[],
-  actual: readonly CellState[],
+  attempted: readonly CellState[],
 ): readonly number[] {
-  const count = Math.max(expected.length, actual.length);
-  return Array.from({ length: count }, (_, index) => index).filter(
-    (index) => expected[index] !== actual[index],
-  );
-}
-
-export function stateSequenceLabel(states: readonly CellState[]): string {
-  return states.map((state) => CELL_LABELS[state]).join(", ");
+  const differences: number[] = [];
+  const length = Math.max(expected.length, attempted.length);
+  for (let index = 0; index < length; index += 1) {
+    if (expected[index] !== attempted[index]) differences.push(index);
+  }
+  return differences;
 }

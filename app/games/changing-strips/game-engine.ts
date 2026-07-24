@@ -8,72 +8,31 @@ export const DIFFICULTIES = [
 export type Difficulty = (typeof DIFFICULTIES)[number];
 
 /**
- * The names describe the redundant visual encodings used by the renderer:
- * a filled cell with a dot, an outlined cell with a ring, and a striped cell.
- * A player never has to distinguish the states by color alone.
+ * The three monochrome patterns are redundantly encoded by fill and mark, so
+ * recognizing a pattern never depends on color.
  */
-export type CellState = "solid" | "open" | "striped";
-export type Strip = readonly CellState[];
-export type ProcessingDirection = "ltr" | "rtl";
-export type NeighborDirection = "left" | "right";
+export type Pattern = "solid" | "hollow" | "striped";
+export type CellState = Pattern;
+export type Strip = readonly Pattern[];
 
 export type ReplaceRule = Readonly<{
   kind: "replace";
-  from: CellState;
-  to: CellState;
+  from: Pattern;
+  to: Pattern;
 }>;
 
-export type SwapRule = Readonly<{
-  kind: "swap";
-  first: CellState;
-  second: CellState;
-}>;
-
-export type NeighborRule = Readonly<{
-  kind: "neighbor";
-  neighborDirection: NeighborDirection;
-  neighbor: CellState;
-  from: CellState;
-  to: CellState;
-}>;
-
-export type ShiftRule = Readonly<{
-  kind: "shift";
-  direction: "left" | "right";
-}>;
-
-/** The complete, finite player-visible rule grammar. */
-export type TransitionRule =
-  | ReplaceRule
-  | SwapRule
-  | NeighborRule
-  | ShiftRule;
-
-export type TraceMovement = Readonly<{
-  fromIndex: number;
-  toIndex: number;
-  state: CellState;
-}>;
-
-export type ConditionWitness = Readonly<{
-  cellIndex: number;
-  neighborIndex: number;
-}>;
+/** The complete finite rule grammar: one global simultaneous replacement. */
+export type TransitionRule = ReplaceRule;
 
 export type TraceStep = Readonly<{
-  /** Position in the actual execution sequence, starting at zero. */
+  /** Recipe position, starting at zero. Recipes always run top-to-bottom. */
   executionIndex: number;
-  /** Position of the physical card in the displayed row. */
+  /** Kept explicit so the renderer can associate a proof frame with its card. */
   ruleIndex: number;
   rule: TransitionRule;
   before: Strip;
   after: Strip;
-  /** Target positions whose visible state changed. */
   changedIndexes: readonly number[];
-  /** Whole-strip shifts expose the exact source-to-target travel. */
-  movements: readonly TraceMovement[];
-  /** Exact adjacent pairs that made a neighbor condition true. */
-  conditionWitnesses: readonly ConditionWitness[];
 }>;
 
 export type ProgramResult = Readonly<{
@@ -82,22 +41,20 @@ export type ProgramResult = Readonly<{
 }>;
 
 export type MisconceptionKind =
-  | "reverse-order"
+  | "wrong-order"
   | "stopped-early"
-  | "one-card-only"
-  | "skipped-card"
+  | "one-step-only"
+  | "skipped-step"
   | "missed-all"
   | "reversed-arrow"
+  | "wrong-source"
   | "wrong-target"
-  | "opposite-neighbor"
-  | "opposite-shift"
-  | "wrong-swap-pair"
-  | "changed-one-match"
-  | "local-near-miss";
+  | "changed-some-matches";
 
 export type OptionKind = "correct" | MisconceptionKind;
 
 export type StripOption = Readonly<{
+  /** Row-major cells using the owning round's rows and columns. */
   strip: Strip;
   kind: OptionKind;
 }>;
@@ -105,9 +62,12 @@ export type StripOption = Readonly<{
 export type StripRound = Readonly<{
   id: string;
   difficulty: Difficulty;
+  rows: 1 | 2;
+  columns: number;
+  /** Row-major board cells. Rules never depend on a cell's position. */
   input: Strip;
+  /** Cards execute in this array order, visibly top-to-bottom. */
   rules: readonly TransitionRule[];
-  processingDirection: ProcessingDirection;
   options: readonly [
     StripOption,
     StripOption,
@@ -116,15 +76,13 @@ export type StripRound = Readonly<{
   ];
   correctIndex: 0 | 1 | 2 | 3;
   answer: Strip;
-  /** The solved opening example may use more cards than a Starter round. */
   isExample?: true;
 }>;
 
 export type AuthoredChangingStripsRoundSpec = Readonly<{
   /**
-   * Selects a deterministic curriculum variant from the canonical authored
-   * sequence. Standalone Campaign owns variants 0–11; Journey-only banks use
-   * later variants without copying rule or distractor construction.
+   * Selects a deterministic curriculum variant. Standalone Campaign uses
+   * 0–11; Journey-only banks use later variants without duplicating content.
    */
   authoredIndex: number;
   correctIndex: 0 | 1 | 2 | 3;
@@ -143,15 +101,18 @@ export type OptionFeedback = Readonly<{
 
 export type RandomSource = () => number;
 
-export const CELL_STATES = [
+export const PATTERNS = [
   "solid",
-  "open",
+  "hollow",
   "striped",
-] as const satisfies readonly CellState[];
+] as const satisfies readonly Pattern[];
 
-export const CELL_STATE_META: Readonly<
+/** Compatibility name for shared visual helpers that render individual cells. */
+export const CELL_STATES = PATTERNS;
+
+export const PATTERN_META: Readonly<
   Record<
-    CellState,
+    Pattern,
     Readonly<{
       label: string;
       symbol: string;
@@ -163,80 +124,75 @@ export const CELL_STATE_META: Readonly<
   solid: {
     label: "Solid",
     symbol: "●",
-    color: "#f06f5f",
-    accessibleDescription: "solid coral cell with a center dot",
+    color: "#17213d",
+    accessibleDescription: "solid black square",
   },
-  open: {
-    label: "Open",
+  hollow: {
+    label: "Hollow",
     symbol: "○",
     color: "#fffdf8",
-    accessibleDescription: "open paper cell with a dark ring",
+    accessibleDescription: "hollow white square with a black ring",
   },
   striped: {
     label: "Striped",
     symbol: "◍",
-    color: "#35a999",
-    accessibleDescription: "teal cell with diagonal stripes",
+    color: "#17213d",
+    accessibleDescription: "black-and-white diagonally striped square",
   },
 };
+
+/** Compatibility name for the renderer; values use the simplified patterns. */
+export const CELL_STATE_META = PATTERN_META;
 
 export const DIFFICULTY_RULES: Readonly<
   Record<
     Difficulty,
     Readonly<{
-      programLength: 1 | 3;
-      executionKindSequences: readonly (
-        readonly TransitionRule["kind"][]
-      )[];
+      minSteps: 2 | 3 | 4;
+      maxSteps: 2 | 3 | 4 | 6;
+      rows: 1 | 2;
+      columns: number;
     }>
   >
 > = {
   Starter: {
-    programLength: 1,
-    executionKindSequences: [["replace"]],
+    minSteps: 2,
+    maxSteps: 2,
+    rows: 1,
+    columns: 6,
   },
   Junior: {
-    programLength: 1,
-    executionKindSequences: [["swap"], ["shift"], ["neighbor"]],
+    minSteps: 2,
+    maxSteps: 3,
+    rows: 1,
+    columns: 6,
   },
   Expert: {
-    programLength: 3,
-    executionKindSequences: [["replace", "shift", "swap"]],
+    minSteps: 3,
+    maxSteps: 4,
+    rows: 2,
+    columns: 5,
   },
   Wizard: {
-    programLength: 3,
-    executionKindSequences: [["shift", "neighbor", "swap"]],
+    minSteps: 4,
+    maxSteps: 6,
+    rows: 2,
+    columns: 5,
   },
 };
 
 export const GENERATOR_MAX_ATTEMPTS = 256;
 
-const GENERATED_STRIP_LENGTH = 7;
-
-const STATE_CODE: Readonly<Record<CellState, string>> = {
+const PATTERN_CODE: Readonly<Record<Pattern, string>> = {
   solid: "S",
-  open: "O",
+  hollow: "H",
   striped: "T",
 };
 
-const CODE_STATE: Readonly<Record<string, CellState>> = {
+const CODE_PATTERN: Readonly<Record<string, Pattern>> = {
   S: "solid",
-  O: "open",
+  H: "hollow",
   T: "striped",
-};
-
-const OPPOSITE_PROCESSING_DIRECTION: Readonly<
-  Record<ProcessingDirection, ProcessingDirection>
-> = {
-  ltr: "rtl",
-  rtl: "ltr",
-};
-
-const OPPOSITE_NEIGHBOR_DIRECTION: Readonly<
-  Record<NeighborDirection, NeighborDirection>
-> = {
-  left: "right",
-  right: "left",
 };
 
 const CAMPAIGN_CORRECT_INDEXES = {
@@ -244,34 +200,38 @@ const CAMPAIGN_CORRECT_INDEXES = {
   Junior: [1, 0, 1, 2, 3, 1, 3, 2, 0, 2, 0, 3],
   Expert: [2, 1, 2, 3, 0, 1, 0, 2, 3, 0, 3, 1],
   Wizard: [3, 0, 3, 2, 1, 3, 1, 2, 0, 1, 0, 2],
-} as const satisfies Readonly<Record<Difficulty, readonly number[]>>;
+} as const satisfies Readonly<
+  Record<Difficulty, readonly (0 | 1 | 2 | 3)[]>
+>;
 
-const STATE_PERMUTATIONS = [
-  ["solid", "open", "striped"],
-  ["solid", "striped", "open"],
-  ["open", "solid", "striped"],
-  ["open", "striped", "solid"],
-  ["striped", "solid", "open"],
-  ["striped", "open", "solid"],
-] as const satisfies readonly (readonly [
-  CellState,
-  CellState,
-  CellState,
-])[];
+const PATTERN_PERMUTATIONS = [
+  ["solid", "hollow", "striped"],
+  ["solid", "striped", "hollow"],
+  ["hollow", "solid", "striped"],
+  ["hollow", "striped", "solid"],
+  ["striped", "solid", "hollow"],
+  ["striped", "hollow", "solid"],
+] as const satisfies readonly (readonly [Pattern, Pattern, Pattern])[];
 
-function cloneStrip(strip: Strip): CellState[] {
+function cloneStrip(strip: Strip): Pattern[] {
   return [...strip];
 }
 
-function sameStrip(left: Strip, right: Strip): boolean {
+function cloneRule(rule: TransitionRule): TransitionRule {
+  return { ...rule };
+}
+
+function sameStrip(firstStrip: Strip, secondStrip: Strip): boolean {
   return (
-    left.length === right.length &&
-    left.every((state, index) => state === right[index])
+    firstStrip.length === secondStrip.length &&
+    firstStrip.every(
+      (pattern, index) => pattern === secondStrip[index],
+    )
   );
 }
 
-function isCellState(value: unknown): value is CellState {
-  return CELL_STATES.includes(value as CellState);
+function isPattern(value: unknown): value is Pattern {
+  return PATTERNS.includes(value as Pattern);
 }
 
 function isDifficulty(value: unknown): value is Difficulty {
@@ -279,216 +239,112 @@ function isDifficulty(value: unknown): value is Difficulty {
 }
 
 export function encodeStrip(strip: Strip): string {
-  return strip.map((state) => STATE_CODE[state]).join("");
+  return strip.map((pattern) => PATTERN_CODE[pattern]).join("");
 }
 
 export function decodeStrip(encoded: string): Strip {
-  const states = [...encoded].map((code) => CODE_STATE[code]);
-  if (states.some((state) => state === undefined)) {
-    throw new Error(`Invalid strip encoding: ${encoded}`);
+  const patterns = [...encoded].map((code) => CODE_PATTERN[code]);
+  if (patterns.some((pattern) => pattern === undefined)) {
+    throw new Error(`Invalid board encoding: ${encoded}`);
   }
-  return states;
+  return patterns;
 }
 
-export function stripDistance(left: Strip, right: Strip): number {
-  const sharedLength = Math.min(left.length, right.length);
-  let distance = Math.abs(left.length - right.length);
+export function stripDistance(
+  firstStrip: Strip,
+  secondStrip: Strip,
+): number {
+  const sharedLength = Math.min(
+    firstStrip.length,
+    secondStrip.length,
+  );
+  let distance = Math.abs(firstStrip.length - secondStrip.length);
   for (let index = 0; index < sharedLength; index += 1) {
-    if (left[index] !== right[index]) distance += 1;
+    if (firstStrip[index] !== secondStrip[index]) distance += 1;
   }
   return distance;
 }
 
 export function differingStripIndexes(
-  left: Strip,
-  right: Strip,
+  firstStrip: Strip,
+  secondStrip: Strip,
 ): readonly number[] {
   const indexes: number[] = [];
-  const length = Math.max(left.length, right.length);
+  const length = Math.max(firstStrip.length, secondStrip.length);
   for (let index = 0; index < length; index += 1) {
-    if (left[index] !== right[index]) indexes.push(index);
+    if (firstStrip[index] !== secondStrip[index]) indexes.push(index);
   }
   return indexes;
 }
 
-export function orderedRuleIndexes(
-  ruleCount: number,
-  processingDirection: ProcessingDirection,
-): readonly number[] {
-  const indexes = Array.from({ length: ruleCount }, (_, index) => index);
-  return processingDirection === "ltr" ? indexes : indexes.reverse();
-}
-
-export function processingDirectionLabel(
-  processingDirection: ProcessingDirection,
-): string {
-  return processingDirection === "ltr" ? "left to right" : "right to left";
-}
-
-export function processingDirectionSymbol(
-  processingDirection: ProcessingDirection,
-): "→" | "←" {
-  return processingDirection === "ltr" ? "→" : "←";
-}
-
 export function describeRule(rule: TransitionRule): string {
-  if (rule.kind === "replace") {
-    return `Change every ${rule.from} cell to ${rule.to}.`;
-  }
-  if (rule.kind === "swap") {
-    return `Swap every ${rule.first} cell with every ${rule.second} cell at the same time.`;
-  }
-  if (rule.kind === "neighbor") {
-    return `Change each ${rule.from} cell to ${rule.to} when the cell on its ${rule.neighborDirection} is ${rule.neighbor}.`;
-  }
-  return `Shift the whole strip one place ${rule.direction}, wrapping the end cell around.`;
-}
-
-function applyRuleWithEvidence(
-  input: Strip,
-  rule: TransitionRule,
-  ruleIndex: number,
-  executionIndex: number,
-): Readonly<{ output: Strip; step: TraceStep }> {
-  const before = cloneStrip(input);
-  let after = cloneStrip(input);
-  const movements: TraceMovement[] = [];
-  const conditionWitnesses: ConditionWitness[] = [];
-
-  if (rule.kind === "replace") {
-    after = before.map((state) => (state === rule.from ? rule.to : state));
-  } else if (rule.kind === "swap") {
-    after = before.map((state) => {
-      if (state === rule.first) return rule.second;
-      if (state === rule.second) return rule.first;
-      return state;
-    });
-  } else if (rule.kind === "neighbor") {
-    const offset = rule.neighborDirection === "left" ? -1 : 1;
-    after = before.map((state, cellIndex) => {
-      const neighborIndex = cellIndex + offset;
-      if (
-        state === rule.from &&
-        neighborIndex >= 0 &&
-        neighborIndex < before.length &&
-        before[neighborIndex] === rule.neighbor
-      ) {
-        conditionWitnesses.push({ cellIndex, neighborIndex });
-        return rule.to;
-      }
-      return state;
-    });
-  } else if (before.length > 0) {
-    const offset = rule.direction === "left" ? -1 : 1;
-    after = Array<CellState>(before.length);
-    for (let fromIndex = 0; fromIndex < before.length; fromIndex += 1) {
-      const toIndex =
-        (fromIndex + offset + before.length * 2) % before.length;
-      after[toIndex] = before[fromIndex];
-      movements.push({
-        fromIndex,
-        toIndex,
-        state: before[fromIndex],
-      });
-    }
-  }
-
-  const changedIndexes = differingStripIndexes(before, after);
-  return {
-    output: after,
-    step: {
-      executionIndex,
-      ruleIndex,
-      rule: cloneRule(rule),
-      before,
-      after: cloneStrip(after),
-      changedIndexes,
-      movements,
-      conditionWitnesses,
-    },
-  };
+  return `Change every ${rule.from} square to ${rule.to}.`;
 }
 
 /**
- * Applies one card. All matches read from one immutable snapshot, so a swap or
- * replacement cannot cascade through the strip during a single card.
+ * One card reads one immutable snapshot and changes every match together.
  */
 export function applyRule(
   input: Strip,
   rule: TransitionRule,
 ): Strip {
-  return applyRuleWithEvidence(input, rule, 0, 0).output;
+  return input.map((pattern) =>
+    pattern === rule.from ? rule.to : pattern,
+  );
 }
 
 /**
- * Applies physically ordered cards in the direction of the large arrow.
- * Trace steps retain both the physical card index and execution index.
+ * Recipe cards execute in their visible array order, top-to-bottom.
  */
 export function applyProgram(
   input: Strip,
   rules: readonly TransitionRule[],
-  processingDirection: ProcessingDirection,
 ): ProgramResult {
   let current = cloneStrip(input);
   const steps: TraceStep[] = [];
-  for (const [executionIndex, ruleIndex] of orderedRuleIndexes(
-    rules.length,
-    processingDirection,
-  ).entries()) {
-    const result = applyRuleWithEvidence(
-      current,
-      rules[ruleIndex],
-      ruleIndex,
+
+  rules.forEach((rule, executionIndex) => {
+    const before = cloneStrip(current);
+    const after = applyRule(before, rule);
+    steps.push({
       executionIndex,
+      ruleIndex: executionIndex,
+      rule: cloneRule(rule),
+      before,
+      after: cloneStrip(after),
+      changedIndexes: differingStripIndexes(before, after),
+    });
+    current = cloneStrip(after);
+  });
+
+  return {
+    output: current,
+    steps,
+  };
+}
+
+function semanticProgramKey(
+  rules: readonly TransitionRule[],
+): string {
+  return PATTERNS.map((pattern) => {
+    const result = rules.reduce<Strip>(
+      (current, rule) => applyRule(current, rule),
+      [pattern],
     );
-    current = cloneStrip(result.output);
-    steps.push(result.step);
-  }
-  return { output: current, steps };
-}
-
-function cloneRule(rule: TransitionRule): TransitionRule {
-  return { ...rule };
-}
-
-function ruleKey(rule: TransitionRule): string {
-  if (rule.kind === "replace") {
-    return `R:${STATE_CODE[rule.from]}>${STATE_CODE[rule.to]}`;
-  }
-  if (rule.kind === "swap") {
-    const pair = [STATE_CODE[rule.first], STATE_CODE[rule.second]].sort();
-    return `W:${pair.join("<>")}`;
-  }
-  if (rule.kind === "neighbor") {
-    return `N:${rule.neighborDirection[0]}:${STATE_CODE[rule.neighbor]}:${STATE_CODE[rule.from]}>${STATE_CODE[rule.to]}`;
-  }
-  return `H:${rule.direction[0]}`;
+    return `${PATTERN_CODE[pattern]}>${PATTERN_CODE[result[0]]}`;
+  }).join(",");
 }
 
 /**
- * Fingerprints execution semantics rather than option placement. Reversing
- * both the physical card order and the processing arrow yields the same key.
+ * Fingerprints board geometry, row-major input, and normalized replacement
+ * semantics. Option placement and execution-equivalent recipe spellings do
+ * not create false novelty.
  */
 export function roundFingerprint(round: Pick<
   StripRound,
-  "input" | "rules" | "processingDirection"
+  "rows" | "columns" | "input" | "rules"
 >): string {
-  const executionRules = orderedRuleIndexes(
-    round.rules.length,
-    round.processingDirection,
-  ).map((index) => round.rules[index]);
-  const executionKey = executionRules.every(
-    (rule) => rule.kind === "replace",
-  )
-    ? `M:${CELL_STATES.map((state) => {
-        const output = executionRules.reduce<Strip>(
-          (current, rule) => applyRule(current, rule),
-          [state],
-        );
-        return `${STATE_CODE[state]}>${STATE_CODE[output[0]]}`;
-      }).join(",")}`
-    : executionRules.map(ruleKey).join(",");
-  return `${encodeStrip(round.input)}|${executionKey}`;
+  return `${round.rows}x${round.columns}|${encodeStrip(round.input)}|${semanticProgramKey(round.rules)}`;
 }
 
 type Candidate = Readonly<{
@@ -496,146 +352,48 @@ type Candidate = Readonly<{
   kind: MisconceptionKind;
 }>;
 
-function oppositeNeighborRules(
+function withChangedRule(
   rules: readonly TransitionRule[],
+  index: number,
+  replacement: TransitionRule,
 ): readonly TransitionRule[] {
-  return rules.map((rule) =>
-    rule.kind === "neighbor"
-      ? {
-          ...rule,
-          neighborDirection:
-            OPPOSITE_NEIGHBOR_DIRECTION[rule.neighborDirection],
-        }
-      : cloneRule(rule),
+  return rules.map((rule, ruleIndex) =>
+    ruleIndex === index ? cloneRule(replacement) : cloneRule(rule),
   );
 }
 
-function oppositeShiftRules(
-  rules: readonly TransitionRule[],
-): readonly TransitionRule[] {
-  return rules.map((rule) =>
-    rule.kind === "shift"
-      ? {
-          ...rule,
-          direction: rule.direction === "left" ? "right" : "left",
-        }
-      : cloneRule(rule),
-  );
-}
-
-function reverseFirstArrow(
-  rules: readonly TransitionRule[],
-): readonly TransitionRule[] | null {
-  const index = rules.findIndex(
-    (rule) => rule.kind === "replace" || rule.kind === "neighbor",
-  );
-  if (index < 0) return null;
-  const changed = rules.map(cloneRule);
-  const rule = changed[index];
-  changed[index] =
-    rule.kind === "replace"
-      ? { ...rule, from: rule.to, to: rule.from }
-      : rule.kind === "neighbor"
-        ? { ...rule, from: rule.to, to: rule.from }
-        : rule;
-  return changed;
-}
-
-function buildWrongTargetRules(
-  rules: readonly TransitionRule[],
-): readonly TransitionRule[] | null {
-  const index = rules.findIndex(
-    (rule) => rule.kind === "replace" || rule.kind === "neighbor",
-  );
-  if (index < 0) return null;
-  const changed = rules.map(cloneRule);
-  const rule = changed[index];
-  if (rule.kind !== "replace" && rule.kind !== "neighbor") return null;
-  const alternate = CELL_STATES.find(
-    (state) => state !== rule.from && state !== rule.to,
-  );
-  if (!alternate) return null;
-  changed[index] = { ...rule, to: alternate };
-  return changed;
-}
-
-function buildWrongSwapPairRules(
-  rules: readonly TransitionRule[],
-): readonly TransitionRule[] | null {
-  const index = rules.findIndex((rule) => rule.kind === "swap");
-  if (index < 0) return null;
-  const changed = rules.map(cloneRule);
-  const rule = changed[index];
-  if (rule.kind !== "swap") return null;
-  const alternate = CELL_STATES.find(
-    (state) => state !== rule.first && state !== rule.second,
-  );
-  if (!alternate) return null;
-  changed[index] = {
-    kind: "swap",
-    first: rule.first,
-    second: alternate,
-  };
-  return changed;
-}
-
-function applyProgramWithOneMatch(
+function applyWithPartialStep(
   input: Strip,
   rules: readonly TransitionRule[],
-  processingDirection: ProcessingDirection,
+  partialIndex: number,
 ): Strip | null {
   let current = cloneStrip(input);
   let limited = false;
-  for (const ruleIndex of orderedRuleIndexes(
-    rules.length,
-    processingDirection,
-  )) {
-    const full = applyRule(current, rules[ruleIndex]);
-    const changedIndexes = differingStripIndexes(current, full);
-    if (!limited && rules[ruleIndex].kind !== "shift" && changedIndexes.length > 1) {
+
+  rules.forEach((rule, ruleIndex) => {
+    const full = applyRule(current, rule);
+    const changes = differingStripIndexes(current, full);
+    if (ruleIndex === partialIndex && changes.length > 1) {
       const next = cloneStrip(current);
-      const changedIndex = changedIndexes[0];
-      next[changedIndex] = full[changedIndex];
+      const appliedCount = changes.length - 1;
+      changes.slice(0, appliedCount).forEach((index) => {
+        next[index] = full[index];
+      });
       current = next;
       limited = true;
     } else {
       current = cloneStrip(full);
     }
-  }
-  return limited ? current : null;
-}
+  });
 
-function enumerateLocalNearMisses(answer: Strip): readonly Candidate[] {
-  const candidates: Candidate[] = [];
-  for (let firstIndex = 0; firstIndex < answer.length; firstIndex += 1) {
-    for (const firstState of CELL_STATES) {
-      if (firstState === answer[firstIndex]) continue;
-      const oneAway = cloneStrip(answer);
-      oneAway[firstIndex] = firstState;
-      candidates.push({ strip: oneAway, kind: "local-near-miss" });
-      for (
-        let secondIndex = firstIndex + 1;
-        secondIndex < answer.length;
-        secondIndex += 1
-      ) {
-        for (const secondState of CELL_STATES) {
-          if (secondState === answer[secondIndex]) continue;
-          const twoAway = cloneStrip(oneAway);
-          twoAway[secondIndex] = secondState;
-          candidates.push({ strip: twoAway, kind: "local-near-miss" });
-        }
-      }
-    }
-  }
-  return candidates;
+  return limited ? current : null;
 }
 
 function misconceptionCandidates(
   input: Strip,
   rules: readonly TransitionRule[],
-  processingDirection: ProcessingDirection,
 ): readonly Candidate[] {
-  const result = applyProgram(input, rules, processingDirection);
+  const result = applyProgram(input, rules);
   const answerKey = encodeStrip(result.output);
   const byStrip = new Map<string, Candidate>();
 
@@ -643,84 +401,85 @@ function misconceptionCandidates(
     if (!strip) return;
     const key = encodeStrip(strip);
     if (key === answerKey || byStrip.has(key)) return;
-    byStrip.set(key, { strip: cloneStrip(strip), kind });
+    byStrip.set(key, {
+      strip: cloneStrip(strip),
+      kind,
+    });
   };
 
   if (rules.length > 1) {
     add(
+      applyProgram(input, [...rules].reverse()).output,
+      "wrong-order",
+    );
+  }
+
+  result.steps.slice(0, -1).forEach((step) => {
+    add(step.after, "stopped-early");
+  });
+
+  rules.forEach((rule) => {
+    add(applyRule(input, rule), "one-step-only");
+  });
+
+  rules.forEach((_, skippedIndex) => {
+    add(
       applyProgram(
         input,
-        rules,
-        OPPOSITE_PROCESSING_DIRECTION[processingDirection],
+        rules.filter((__, ruleIndex) => ruleIndex !== skippedIndex),
       ).output,
-      "reverse-order",
+      "skipped-step",
     );
-  }
+  });
 
-  for (const step of result.steps.slice(0, -1)) {
-    add(step.after, "stopped-early");
-  }
-
-  for (const ruleIndex of orderedRuleIndexes(
-    rules.length,
-    processingDirection,
-  )) {
-    add(applyRule(input, rules[ruleIndex]), "one-card-only");
-  }
-
-  for (let skippedIndex = 0; skippedIndex < rules.length; skippedIndex += 1) {
-    const shortened = rules.filter((_, index) => index !== skippedIndex);
+  rules.forEach((rule, ruleIndex) => {
     add(
-      applyProgram(input, shortened, processingDirection).output,
-      "skipped-card",
-    );
-  }
-
-  add(
-    applyProgramWithOneMatch(input, rules, processingDirection),
-    "changed-one-match",
-  );
-  add(
-    applyProgram(
-      input,
-      oppositeNeighborRules(rules),
-      processingDirection,
-    ).output,
-    "opposite-neighbor",
-  );
-  add(
-    applyProgram(input, oppositeShiftRules(rules), processingDirection).output,
-    "opposite-shift",
-  );
-
-  const reversedArrow = reverseFirstArrow(rules);
-  if (reversedArrow) {
-    add(
-      applyProgram(input, reversedArrow, processingDirection).output,
+      applyProgram(
+        input,
+        withChangedRule(rules, ruleIndex, {
+          kind: "replace",
+          from: rule.to,
+          to: rule.from,
+        }),
+      ).output,
       "reversed-arrow",
     );
-  }
 
-  const wrongTarget = buildWrongTargetRules(rules);
-  if (wrongTarget) {
-    add(
-      applyProgram(input, wrongTarget, processingDirection).output,
-      "wrong-target",
+    const alternate = PATTERNS.find(
+      (pattern) => pattern !== rule.from && pattern !== rule.to,
     );
-  }
+    if (alternate) {
+      add(
+        applyProgram(
+          input,
+          withChangedRule(rules, ruleIndex, {
+            kind: "replace",
+            from: rule.from,
+            to: alternate,
+          }),
+        ).output,
+        "wrong-target",
+      );
+      add(
+        applyProgram(
+          input,
+          withChangedRule(rules, ruleIndex, {
+            kind: "replace",
+            from: alternate,
+            to: rule.to,
+          }),
+        ).output,
+        "wrong-source",
+      );
+    }
 
-  const wrongSwapPair = buildWrongSwapPairRules(rules);
-  if (wrongSwapPair) {
     add(
-      applyProgram(input, wrongSwapPair, processingDirection).output,
-      "wrong-swap-pair",
+      applyWithPartialStep(input, rules, ruleIndex),
+      "changed-some-matches",
     );
-  }
+  });
 
   add(input, "missed-all");
-  for (const candidate of enumerateLocalNearMisses(result.output)) {
-    add(candidate.strip, candidate.kind);
-  }
   return [...byStrip.values()];
 }
 
@@ -730,22 +489,30 @@ function selectDistractors(
   candidates: readonly Candidate[],
 ): readonly [Candidate, Candidate, Candidate] {
   const selected: Candidate[] = [];
+  const ordered = [...candidates].sort(
+    (firstCandidate, secondCandidate) => {
+      const distanceDifference =
+        stripDistance(firstCandidate.strip, answer) -
+        stripDistance(secondCandidate.strip, answer);
+      if (distanceDifference !== 0) return distanceDifference;
+      return firstCandidate.kind.localeCompare(secondCandidate.kind);
+    },
+  );
   const isEarly = difficulty === "Starter" || difficulty === "Junior";
-  const eligible = isEarly
-    ? candidates
-    : candidates.filter(({ kind }) => kind !== "local-near-miss");
-  const ordered =
-    isEarly
-      ? eligible
-      : [...eligible].sort((left, right) => {
-          const distanceDifference =
-            stripDistance(left.strip, answer) -
-            stripDistance(right.strip, answer);
-          if (distanceDifference !== 0) return distanceDifference;
-          return left.kind.localeCompare(right.kind);
-        });
+
+  if (!isEarly) {
+    const closePartial = ordered.find(
+      (candidate) =>
+        candidate.kind === "changed-some-matches" &&
+        stripDistance(candidate.strip, answer) === 1,
+    );
+    if (closePartial) selected.push(closePartial);
+  }
 
   for (const candidate of ordered) {
+    if (selected.some((other) => sameStrip(other.strip, candidate.strip))) {
+      continue;
+    }
     const minimumDistance = isEarly ? 2 : 1;
     if (stripDistance(candidate.strip, answer) < minimumDistance) continue;
     if (
@@ -762,15 +529,7 @@ function selectDistractors(
 
   if (selected.length !== 3) {
     throw new Error(
-      `Could not construct three distinct ${difficulty} distractors.`,
-    );
-  }
-  if (
-    !isEarly &&
-    !selected.some(({ strip }) => stripDistance(strip, answer) <= 2)
-  ) {
-    throw new Error(
-      `Could not construct a close named ${difficulty} misconception.`,
+      "Could not construct three distinct named replacement mistakes.",
     );
   }
   return selected as [Candidate, Candidate, Candidate];
@@ -783,9 +542,13 @@ function placeOptions(
 ): readonly [StripOption, StripOption, StripOption, StripOption] {
   const options: StripOption[] = [];
   let distractorIndex = 0;
+
   for (let optionIndex = 0; optionIndex < 4; optionIndex += 1) {
     if (optionIndex === correctIndex) {
-      options.push({ strip: cloneStrip(answer), kind: "correct" });
+      options.push({
+        strip: cloneStrip(answer),
+        kind: "correct",
+      });
     } else {
       const distractor = distractors[distractorIndex];
       options.push({
@@ -795,30 +558,39 @@ function placeOptions(
       distractorIndex += 1;
     }
   }
-  return options as [StripOption, StripOption, StripOption, StripOption];
+
+  return options as [
+    StripOption,
+    StripOption,
+    StripOption,
+    StripOption,
+  ];
 }
 
 function makeRound(
   id: string,
   difficulty: Difficulty,
+  rows: 1 | 2,
+  columns: number,
   input: Strip,
   rules: readonly TransitionRule[],
-  processingDirection: ProcessingDirection,
   correctIndex: 0 | 1 | 2 | 3,
   isExample = false,
 ): StripRound {
-  const answer = applyProgram(input, rules, processingDirection).output;
+  const answer = applyProgram(input, rules).output;
   const distractors = selectDistractors(
     difficulty,
     answer,
-    misconceptionCandidates(input, rules, processingDirection),
+    misconceptionCandidates(input, rules),
   );
+
   return {
     id,
     difficulty,
+    rows,
+    columns,
     input: cloneStrip(input),
     rules: rules.map(cloneRule),
-    processingDirection,
     options: placeOptions(answer, distractors, correctIndex),
     correctIndex,
     answer: cloneStrip(answer),
@@ -826,143 +598,119 @@ function makeRound(
   };
 }
 
-function rotateStrip(strip: Strip, amount: number): Strip {
-  if (strip.length === 0) return [];
-  const normalized = ((amount % strip.length) + strip.length) % strip.length;
-  return [...strip.slice(normalized), ...strip.slice(0, normalized)];
-}
-
-function inverseShift(strip: Strip, direction: "left" | "right"): Strip {
-  return applyRule(strip, {
-    kind: "shift",
-    direction: direction === "left" ? "right" : "left",
-  });
-}
-
-function physicalRulesForDirection(
-  executionRules: readonly TransitionRule[],
-  processingDirection: ProcessingDirection,
+function recipeFor(
+  patterns: readonly [Pattern, Pattern, Pattern],
+  stepCount: number,
 ): readonly TransitionRule[] {
-  return processingDirection === "ltr"
-    ? executionRules.map(cloneRule)
-    : [...executionRules].reverse().map(cloneRule);
+  const [first, second, third] = patterns;
+  const completeRecipe = [
+    { kind: "replace", from: first, to: second },
+    { kind: "replace", from: third, to: first },
+    { kind: "replace", from: second, to: third },
+    { kind: "replace", from: first, to: second },
+    { kind: "replace", from: third, to: first },
+    { kind: "replace", from: second, to: third },
+  ] as const satisfies readonly TransitionRule[];
+
+  return completeRecipe.slice(0, stepCount).map(cloneRule);
+}
+
+function authoredStepCount(
+  difficulty: Difficulty,
+  authoredIndex: number,
+): number {
+  const curriculumIndex = authoredIndex % 12;
+  if (difficulty === "Starter") return 2;
+  if (difficulty === "Junior") return curriculumIndex < 4 ? 2 : 3;
+  if (difficulty === "Expert") return curriculumIndex < 6 ? 3 : 4;
+  if (curriculumIndex < 4) return 4;
+  if (curriculumIndex < 8) return 5;
+  return 6;
+}
+
+function factorial(value: number): number {
+  let result = 1;
+  for (let factor = 2; factor <= value; factor += 1) {
+    result *= factor;
+  }
+  return result;
+}
+
+function multisetPermutationCount(counts: readonly number[]): number {
+  const total = counts.reduce((sum, count) => sum + count, 0);
+  return (
+    factorial(total) /
+    counts.reduce(
+      (denominator, count) => denominator * factorial(count),
+      1,
+    )
+  );
+}
+
+function authoredBoardByRank(
+  length: number,
+  requestedRank: number,
+): Strip {
+  const baseCount = Math.floor(length / PATTERNS.length);
+  const remainder = length % PATTERNS.length;
+  const counts = PATTERNS.map(
+    (_, index) => baseCount + (index < remainder ? 1 : 0),
+  );
+  let rank =
+    requestedRank % multisetPermutationCount(counts);
+  const board: Pattern[] = [];
+
+  while (board.length < length) {
+    for (let patternIndex = 0; patternIndex < PATTERNS.length; patternIndex += 1) {
+      if (counts[patternIndex] === 0) continue;
+      counts[patternIndex] -= 1;
+      const branchSize = multisetPermutationCount(counts);
+      if (rank < branchSize) {
+        board.push(PATTERNS[patternIndex]);
+        break;
+      }
+      rank -= branchSize;
+      counts[patternIndex] += 1;
+    }
+  }
+
+  return board;
 }
 
 function authoredSpec(
   difficulty: Difficulty,
-  index: number,
+  authoredIndex: number,
 ): Readonly<{
+  rows: 1 | 2;
+  columns: number;
   input: Strip;
   rules: readonly TransitionRule[];
-  processingDirection: ProcessingDirection;
 }> {
-  const [first, second, third] =
-    STATE_PERMUTATIONS[index % STATE_PERMUTATIONS.length];
-  const processingDirection: ProcessingDirection =
-    index % 2 === 0 ? "ltr" : "rtl";
-  const rotation = (index * 2 + Math.floor(index / 6)) % GENERATED_STRIP_LENGTH;
-  const baseInput = rotateStrip(
-    [first, second, third, first, second, third, CELL_STATES[index % 3]],
-    rotation,
-  );
-
-  if (difficulty === "Starter") {
-    return {
-      input: baseInput,
-      rules: [{ kind: "replace", from: first, to: second }],
-      processingDirection,
-    };
-  }
-
-  if (difficulty === "Junior") {
-    const curriculumBlock = Math.floor(index / 4) % 3;
-    if (curriculumBlock === 0) {
-      return {
-        input: baseInput,
-        rules: [{ kind: "swap", first, second }],
-        processingDirection,
-      };
-    }
-    if (curriculumBlock === 1) {
-      const direction: "left" | "right" =
-        index % 2 === 0 ? "left" : "right";
-      return {
-        input: baseInput,
-        rules: [{ kind: "shift", direction }],
-        processingDirection,
-      };
-    }
-    const neighborDirection: NeighborDirection =
-      index % 2 === 0 ? "right" : "left";
-    const input = rotateStrip(
-      neighborDirection === "right"
-        ? [first, second, third, first, second, third, first]
-        : [second, first, third, second, first, third, first],
-      rotation,
-    );
-    return {
-      input,
-      rules: [
-        {
-          kind: "neighbor",
-          neighborDirection,
-          neighbor: second,
-          from: first,
-          to: third,
-        },
-      ],
-      processingDirection,
-    };
-  }
-
-  const shiftDirection: "left" | "right" =
-    Math.floor(index / 2) % 2 === 0 ? "right" : "left";
-  const shiftRule: ShiftRule = {
-    kind: "shift",
-    direction: shiftDirection,
-  };
-  const swapRule: SwapRule = {
-    kind: "swap",
-    first: second,
-    second: third,
-  };
-
-  if (difficulty === "Expert") {
-    const executionRules: readonly TransitionRule[] = [
-      { kind: "replace", from: first, to: second },
-      shiftRule,
-      swapRule,
-    ];
-    return {
-      input: baseInput,
-      rules: physicalRulesForDirection(executionRules, processingDirection),
-      processingDirection,
-    };
-  }
-
-  const neighborDirection: NeighborDirection =
-    Math.floor(index / 2) % 2 === 0 ? "right" : "left";
-  const neighborPattern =
-    neighborDirection === "right"
-      ? [first, second, third, first, second, third, first]
-      : [second, first, third, second, first, third, first];
-  const afterOptionalShift = rotateStrip(neighborPattern, rotation);
-  const neighborRule: NeighborRule = {
-    kind: "neighbor",
-    neighborDirection,
-    neighbor: second,
-    from: first,
-    to: third,
-  };
-  const executionRules: readonly TransitionRule[] = [
-    shiftRule,
-    neighborRule,
-    swapRule,
+  const difficultyRule = DIFFICULTY_RULES[difficulty];
+  const difficultyIndex = DIFFICULTIES.indexOf(difficulty);
+  const patterns =
+    PATTERN_PERMUTATIONS[
+      (authoredIndex + difficultyIndex * 2) %
+        PATTERN_PERMUTATIONS.length
   ];
+  const length = difficultyRule.rows * difficultyRule.columns;
+  const boardRank =
+    (difficulty === "Starter"
+      ? 0
+      : difficulty === "Junior"
+        ? 12
+        : difficulty === "Expert"
+          ? 0
+          : 24) + authoredIndex;
+
   return {
-    input: inverseShift(afterOptionalShift, shiftDirection),
-    rules: physicalRulesForDirection(executionRules, processingDirection),
-    processingDirection,
+    rows: difficultyRule.rows,
+    columns: difficultyRule.columns,
+    input: authoredBoardByRank(length, boardRank),
+    rules: recipeFor(
+      patterns,
+      authoredStepCount(difficulty, authoredIndex),
+    ),
   };
 }
 
@@ -971,6 +719,9 @@ export function buildAuthoredChangingStripsRounds(
   specs: readonly AuthoredChangingStripsRoundSpec[],
   idPrefix: string,
 ): readonly StripRound[] {
+  if (!isDifficulty(difficulty)) {
+    throw new RangeError(`Unknown difficulty: ${String(difficulty)}`);
+  }
   const normalizedPrefix = idPrefix.trim();
   if (!normalizedPrefix) {
     throw new Error("Changing Strips authored round IDs need a prefix.");
@@ -1000,16 +751,15 @@ export function buildAuthoredChangingStripsRounds(
     const round = makeRound(
       `${normalizedPrefix}-${String(index + 1).padStart(2, "0")}`,
       difficulty,
+      authored.rows,
+      authored.columns,
       authored.input,
       authored.rules,
-      authored.processingDirection,
       spec.correctIndex,
     );
     const issues = validateRound(round);
     if (issues.length > 0) {
-      throw new Error(
-        `${round.id} is invalid: ${issues.join("; ")}`,
-      );
+      throw new Error(`${round.id} is invalid: ${issues.join("; ")}`);
     }
     const fingerprint = roundFingerprint(round);
     if (fingerprints.has(fingerprint)) {
@@ -1031,7 +781,8 @@ export function buildCampaignRounds(): Readonly<
     Expert: [],
     Wizard: [],
   };
-  for (const difficulty of DIFFICULTIES) {
+
+  DIFFICULTIES.forEach((difficulty) => {
     byDifficulty[difficulty] = buildAuthoredChangingStripsRounds(
       difficulty,
       CAMPAIGN_CORRECT_INDEXES[difficulty].map(
@@ -1042,7 +793,8 @@ export function buildCampaignRounds(): Readonly<
       ),
       `changing-strips-${difficulty.toLowerCase()}`,
     );
-  }
+  });
+
   return byDifficulty;
 }
 
@@ -1053,108 +805,44 @@ export const ROUNDS: readonly StripRound[] = DIFFICULTIES.flatMap(
 
 const TUTORIAL_INPUT = [
   "solid",
-  "open",
+  "hollow",
   "striped",
-  "open",
+  "hollow",
   "striped",
   "solid",
-  "open",
-  "solid",
-  "striped",
 ] as const satisfies Strip;
 
 const TUTORIAL_RULES = [
-  { kind: "replace", from: "solid", to: "open" },
+  { kind: "replace", from: "solid", to: "hollow" },
   { kind: "replace", from: "striped", to: "solid" },
-  { kind: "replace", from: "open", to: "striped" },
 ] as const satisfies readonly TransitionRule[];
 
-/**
- * The photographed nine-cell problem, solved by the same engine as live play.
- * The answer is intentionally calculated rather than maintained as a literal.
- */
+/** A gentle two-card example derived from the photographed exercise. */
 export const TUTORIAL: StripRound = makeRound(
   "changing-strips-example",
   "Starter",
+  1,
+  6,
   TUTORIAL_INPUT,
   TUTORIAL_RULES,
-  "ltr",
   0,
   true,
 );
 
-function validateRule(rule: TransitionRule, index: number): readonly string[] {
+function validateRule(
+  rule: TransitionRule,
+  index: number,
+): readonly string[] {
   const issues: string[] = [];
-  if (rule.kind === "replace") {
-    if (!isCellState(rule.from) || !isCellState(rule.to)) {
-      issues.push(`Rule ${index + 1} uses an unknown cell state.`);
-    }
-    if (rule.from === rule.to) {
-      issues.push(`Rule ${index + 1} is a no-op replacement.`);
-    }
-  } else if (rule.kind === "swap") {
-    if (!isCellState(rule.first) || !isCellState(rule.second)) {
-      issues.push(`Rule ${index + 1} uses an unknown cell state.`);
-    }
-    if (rule.first === rule.second) {
-      issues.push(`Rule ${index + 1} swaps a state with itself.`);
-    }
-  } else if (rule.kind === "neighbor") {
-    if (
-      !isCellState(rule.neighbor) ||
-      !isCellState(rule.from) ||
-      !isCellState(rule.to)
-    ) {
-      issues.push(`Rule ${index + 1} uses an unknown cell state.`);
-    }
-    if (
-      rule.neighborDirection !== "left" &&
-      rule.neighborDirection !== "right"
-    ) {
-      issues.push(`Rule ${index + 1} has an unknown neighbor direction.`);
-    }
-    if (rule.from === rule.to) {
-      issues.push(`Rule ${index + 1} has a no-op conditional change.`);
-    }
-  } else if (
-    rule.kind !== "shift" ||
-    (rule.direction !== "left" && rule.direction !== "right")
-  ) {
-    issues.push(`Rule ${index + 1} is outside the finite rule grammar.`);
+  if (rule.kind !== "replace") {
+    issues.push(`Rule ${index + 1} is outside the replacement grammar.`);
+    return issues;
   }
-  return issues;
-}
-
-function difficultyFamilyIssues(round: StripRound): readonly string[] {
-  if (round.isExample) return [];
-  const expected = DIFFICULTY_RULES[round.difficulty];
-  const executionRules = orderedRuleIndexes(
-    round.rules.length,
-    round.processingDirection,
-  ).map((index) => round.rules[index]);
-  const issues: string[] = [];
-  if (executionRules.length !== expected.programLength) {
-    issues.push(
-      `${round.difficulty} must use ${expected.programLength} rule cards.`,
-    );
+  if (!isPattern(rule.from) || !isPattern(rule.to)) {
+    issues.push(`Rule ${index + 1} uses an unknown pattern.`);
   }
-  const executionKindKey = executionRules
-    .map((rule) => rule.kind)
-    .join(",");
-  if (
-    !expected.executionKindSequences.some(
-      (sequence) => sequence.join(",") === executionKindKey,
-    )
-  ) {
-    issues.push(
-      `${round.difficulty} uses a rule sequence outside its curriculum.`,
-    );
-  }
-  if (
-    round.difficulty === "Junior" &&
-    new Set(round.answer).size < 2
-  ) {
-    issues.push("Junior answers must remain non-uniform and input-dependent.");
+  if (rule.from === rule.to) {
+    issues.push(`Rule ${index + 1} is a no-op replacement.`);
   }
   return issues;
 }
@@ -1164,18 +852,7 @@ function isKnownMisconception(
   option: StripOption,
 ): boolean {
   if (option.kind === "correct") return false;
-  if (option.kind === "local-near-miss") {
-    if (round.difficulty === "Expert" || round.difficulty === "Wizard") {
-      return false;
-    }
-    const distance = stripDistance(option.strip, round.answer);
-    return distance === 2;
-  }
-  return misconceptionCandidates(
-    round.input,
-    round.rules,
-    round.processingDirection,
-  ).some(
+  return misconceptionCandidates(round.input, round.rules).some(
     (candidate) =>
       candidate.kind === option.kind &&
       sameStrip(candidate.strip, option.strip),
@@ -1186,56 +863,63 @@ export function validateRound(round: StripRound): readonly string[] {
   const issues: string[] = [];
   if (!round.id) issues.push("Round ID is required.");
   if (!isDifficulty(round.difficulty)) issues.push("Unknown difficulty.");
-  if (
-    round.processingDirection !== "ltr" &&
-    round.processingDirection !== "rtl"
-  ) {
-    issues.push("Unknown processing direction.");
+  if (round.rows !== 1 && round.rows !== 2) {
+    issues.push("Rows must be one or two.");
+  }
+  if (!Number.isInteger(round.columns) || round.columns < 2) {
+    issues.push("Columns must be an integer of at least two.");
   }
   if (
-    round.input.length < 4 ||
-    round.input.length > 12 ||
-    !round.input.every(isCellState)
+    round.input.length !== round.rows * round.columns ||
+    !round.input.every(isPattern)
   ) {
-    issues.push("Input must contain 4–12 known cell states.");
+    issues.push(
+      "Input must match the declared board dimensions and pattern grammar.",
+    );
   }
-  round.rules.forEach((rule, index) =>
-    issues.push(...validateRule(rule, index)),
-  );
-  issues.push(...difficultyFamilyIssues(round));
+
+  round.rules.forEach((rule, index) => {
+    issues.push(...validateRule(rule, index));
+  });
+
+  if (!round.isExample && isDifficulty(round.difficulty)) {
+    const expected = DIFFICULTY_RULES[round.difficulty];
+    if (round.rows !== expected.rows || round.columns !== expected.columns) {
+      issues.push(
+        `${round.difficulty} must use a ${expected.rows}×${expected.columns} board.`,
+      );
+    }
+    if (
+      round.rules.length < expected.minSteps ||
+      round.rules.length > expected.maxSteps
+    ) {
+      issues.push(
+        `${round.difficulty} recipes must contain ${expected.minSteps}–${expected.maxSteps} steps.`,
+      );
+    }
+  }
 
   let result: ProgramResult | null = null;
   try {
-    result = applyProgram(
-      round.input,
-      round.rules,
-      round.processingDirection,
-    );
+    result = applyProgram(round.input, round.rules);
   } catch {
-    issues.push("Program could not be executed.");
+    issues.push("Recipe could not be executed.");
   }
 
   if (result) {
     if (!sameStrip(result.output, round.answer)) {
       issues.push("Stored answer does not match the calculated output.");
     }
-    for (const step of result.steps) {
-      if (sameStrip(step.before, step.after)) {
-        issues.push(`Rule card ${step.ruleIndex + 1} is a no-op in this round.`);
+    result.steps.forEach((step) => {
+      if (step.changedIndexes.length === 0) {
+        issues.push(`Recipe step ${step.executionIndex + 1} is a no-op.`);
       }
+    });
+    if (stripDistance(round.input, result.output) < 2) {
+      issues.push("The complete recipe must visibly change at least two cells.");
     }
-    if (
-      result.steps.length > 1 &&
-      sameStrip(
-        result.output,
-        applyProgram(
-          round.input,
-          round.rules,
-          OPPOSITE_PROCESSING_DIRECTION[round.processingDirection],
-        ).output,
-      )
-    ) {
-      issues.push("Processing order does not affect this multi-card round.");
+    if (new Set(result.output).size < 2) {
+      issues.push("The final answer must retain at least two patterns.");
     }
   }
 
@@ -1254,13 +938,17 @@ export function validateRound(round: StripRound): readonly string[] {
     round.options.some(
       (option) =>
         option.strip.length !== round.input.length ||
-        !option.strip.every(isCellState),
+        !option.strip.every(isPattern),
     )
   ) {
-    issues.push("Every option must match the input length and state grammar.");
+    issues.push(
+      "Every option must match the board dimensions and pattern grammar.",
+    );
   }
 
-  const optionKeys = round.options.map((option) => encodeStrip(option.strip));
+  const optionKeys = round.options.map((option) =>
+    encodeStrip(option.strip),
+  );
   if (new Set(optionKeys).size !== 4) {
     issues.push("Options must be mutually distinct.");
   }
@@ -1273,6 +961,7 @@ export function validateRound(round: StripRound): readonly string[] {
   ) {
     issues.push("Exactly the indexed option must equal the calculated answer.");
   }
+
   round.options.forEach((option, index) => {
     if (index === round.correctIndex) {
       if (option.kind !== "correct") {
@@ -1282,13 +971,35 @@ export function validateRound(round: StripRound): readonly string[] {
       option.kind === "correct" ||
       !isKnownMisconception(round, option)
     ) {
-      issues.push(`Option ${index + 1} is not a supported misconception.`);
+      issues.push(`Option ${index + 1} is not a named recipe mistake.`);
     }
   });
 
-  if (round.difficulty === "Starter" || round.difficulty === "Junior") {
+  if (
+    (round.difficulty === "Expert" ||
+      round.difficulty === "Wizard") &&
+    !round.options.some(
+      (option, index) =>
+        index !== round.correctIndex &&
+        option.kind === "changed-some-matches" &&
+        stripDistance(option.strip, round.answer) === 1,
+    )
+  ) {
+    issues.push(
+      "Expert and Wizard require a named one-cell partial-change trap.",
+    );
+  }
+
+  if (
+    round.difficulty === "Starter" ||
+    round.difficulty === "Junior"
+  ) {
     for (let first = 0; first < round.options.length; first += 1) {
-      for (let second = first + 1; second < round.options.length; second += 1) {
+      for (
+        let second = first + 1;
+        second < round.options.length;
+        second += 1
+      ) {
         if (
           stripDistance(
             round.options[first].strip,
@@ -1296,32 +1007,37 @@ export function validateRound(round: StripRound): readonly string[] {
           ) < 2
         ) {
           issues.push(
-            `Options ${first + 1} and ${second + 1} must differ in at least two positions.`,
+            `Options ${first + 1} and ${second + 1} must differ in at least two cells.`,
           );
         }
       }
     }
   }
+
   return issues;
 }
 
 const MISCONCEPTION_MESSAGES: Readonly<
   Record<MisconceptionKind, string>
 > = {
-  "reverse-order": "That strip follows the cards in the opposite order.",
-  "stopped-early": "That strip stops before every card has had its turn.",
-  "one-card-only": "That strip uses just one of the shown cards.",
-  "skipped-card": "That strip skips one card in the arrow path.",
-  "missed-all": "That is the starting strip before the cards change it.",
-  "reversed-arrow": "That strip turns one small change arrow around.",
-  "wrong-target": "That strip changes a matching cell into the other state.",
-  "opposite-neighbor": "That strip checks the neighbor on the other side.",
-  "opposite-shift": "That strip moves the whole row in the other direction.",
-  "wrong-swap-pair": "That strip swaps the wrong pair of cell states.",
-  "changed-one-match":
-    "That strip changes only one match; a card changes every match together.",
-  "local-near-miss":
-    "That strip is close, but one or two cells do not match the final frame.",
+  "wrong-order":
+    "That board runs the recipe from the bottom card upward.",
+  "stopped-early":
+    "That board stops before every recipe card has had its turn.",
+  "one-step-only":
+    "That board uses just one of the shown recipe cards.",
+  "skipped-step":
+    "That board skips one card in the top-to-bottom recipe.",
+  "missed-all":
+    "That is the starting board before the recipe changes it.",
+  "reversed-arrow":
+    "That board turns one replacement arrow around.",
+  "wrong-source":
+    "That board starts one card from the wrong pattern.",
+  "wrong-target":
+    "That board changes matches into the other pattern.",
+  "changed-some-matches":
+    "That board changes only some matches; a card changes every match together.",
 };
 
 export function optionFeedback(
@@ -1335,9 +1051,14 @@ export function optionFeedback(
   ) {
     throw new RangeError(`Option index ${optionIndex} is outside 0–3.`);
   }
+
   const option = round.options[optionIndex];
-  const differingIndexes = differingStripIndexes(option.strip, round.answer);
+  const differingIndexes = differingStripIndexes(
+    option.strip,
+    round.answer,
+  );
   const correct = optionIndex === round.correctIndex;
+
   return {
     correct,
     kind: option.kind,
@@ -1346,20 +1067,18 @@ export function optionFeedback(
     attempted: cloneStrip(option.strip),
     expected: cloneStrip(round.answer),
     message: correct
-      ? `Correct. The cards run ${processingDirectionLabel(round.processingDirection)}.`
+      ? "Correct. Every card ran once, from top to bottom."
       : `${MISCONCEPTION_MESSAGES[option.kind as MisconceptionKind]} ${differingIndexes.length} ${differingIndexes.length === 1 ? "cell is" : "cells are"} different.`,
-    trace: applyProgram(
-      round.input,
-      round.rules,
-      round.processingDirection,
-    ).steps,
+    trace: applyProgram(round.input, round.rules).steps,
   };
 }
 
 function sampleUnit(random: RandomSource): number {
   const value = random();
   if (!Number.isFinite(value) || value < 0 || value >= 1) {
-    throw new RangeError("Random source must return a finite value in [0, 1).");
+    throw new RangeError(
+      "Random source must return a finite value in [0, 1).",
+    );
   }
   return value;
 }
@@ -1368,7 +1087,10 @@ function randomIndex(random: RandomSource, length: number): number {
   return Math.floor(sampleUnit(random) * length);
 }
 
-function shuffled<T>(items: readonly T[], random: RandomSource): T[] {
+function shuffled<T>(
+  items: readonly T[],
+  random: RandomSource,
+): T[] {
   const result = [...items];
   for (let index = result.length - 1; index > 0; index -= 1) {
     const target = randomIndex(random, index + 1);
@@ -1377,148 +1099,50 @@ function shuffled<T>(items: readonly T[], random: RandomSource): T[] {
   return result;
 }
 
-function randomStripWithCounts(
-  states: readonly [CellState, CellState, CellState],
+function randomPatternBoard(
+  length: number,
+  patterns: readonly [Pattern, Pattern, Pattern],
   random: RandomSource,
 ): Strip {
-  const [first, second, third] = states;
-  const extra = states[randomIndex(random, states.length)];
-  return shuffled(
-    [first, first, second, second, third, third, extra],
-    random,
-  );
-}
-
-function randomNeighborStrip(
-  states: readonly [CellState, CellState, CellState],
-  neighborDirection: NeighborDirection,
-  random: RandomSource,
-): Strip {
-  const [from, neighbor] = states;
-  const strip = Array.from(
-    { length: GENERATED_STRIP_LENGTH },
-    () => states[randomIndex(random, states.length)],
-  );
-  const fromIndex =
-    neighborDirection === "right"
-      ? randomIndex(random, GENERATED_STRIP_LENGTH - 1)
-      : 1 + randomIndex(random, GENERATED_STRIP_LENGTH - 1);
-  const neighborIndex =
-    fromIndex + (neighborDirection === "right" ? 1 : -1);
-  strip[fromIndex] = from;
-  strip[neighborIndex] = neighbor;
-  return strip;
+  const base: Pattern[] = [
+    patterns[0],
+    patterns[0],
+    patterns[1],
+    patterns[1],
+    patterns[2],
+    patterns[2],
+  ];
+  while (base.length < length) {
+    base.push(patterns[randomIndex(random, patterns.length)]);
+  }
+  return shuffled(base, random);
 }
 
 function generatedSpec(
   difficulty: Difficulty,
   random: RandomSource,
 ): Readonly<{
+  rows: 1 | 2;
+  columns: number;
   input: Strip;
   rules: readonly TransitionRule[];
-  processingDirection: ProcessingDirection;
   correctIndex: 0 | 1 | 2 | 3;
 }> {
-  const states = STATE_PERMUTATIONS[
-    randomIndex(random, STATE_PERMUTATIONS.length)
-  ] as readonly [CellState, CellState, CellState];
-  const [first, second, third] = states;
-  const processingDirection: ProcessingDirection =
-    randomIndex(random, 2) === 0 ? "ltr" : "rtl";
+  const expected = DIFFICULTY_RULES[difficulty];
+  const patterns = PATTERN_PERMUTATIONS[
+    randomIndex(random, PATTERN_PERMUTATIONS.length)
+  ] as readonly [Pattern, Pattern, Pattern];
+  const stepCount =
+    expected.minSteps +
+    randomIndex(random, expected.maxSteps - expected.minSteps + 1);
   const correctIndex = randomIndex(random, 4) as 0 | 1 | 2 | 3;
+  const length = expected.rows * expected.columns;
 
-  if (difficulty === "Starter") {
-    return {
-      input: randomStripWithCounts(states, random),
-      rules: [{ kind: "replace", from: first, to: second }],
-      processingDirection,
-      correctIndex,
-    };
-  }
-
-  if (difficulty === "Junior") {
-    const family = randomIndex(random, 3);
-    if (family === 0) {
-      return {
-        input: randomStripWithCounts(states, random),
-        rules: [{ kind: "swap", first, second }],
-        processingDirection,
-        correctIndex,
-      };
-    }
-    if (family === 1) {
-      const direction: "left" | "right" =
-        randomIndex(random, 2) === 0 ? "left" : "right";
-      return {
-        input: randomStripWithCounts(states, random),
-        rules: [{ kind: "shift", direction }],
-        processingDirection,
-        correctIndex,
-      };
-    }
-    const neighborDirection: NeighborDirection =
-      randomIndex(random, 2) === 0 ? "left" : "right";
-    return {
-      input: randomNeighborStrip(states, neighborDirection, random),
-      rules: [
-        {
-          kind: "neighbor",
-          neighborDirection,
-          neighbor: second,
-          from: first,
-          to: third,
-        },
-      ],
-      processingDirection,
-      correctIndex,
-    };
-  }
-
-  const shiftDirection: "left" | "right" =
-    randomIndex(random, 2) === 0 ? "left" : "right";
-  const swapRule: SwapRule = {
-    kind: "swap",
-    first: second,
-    second: third,
-  };
-
-  if (difficulty === "Expert") {
-    const executionRules: readonly TransitionRule[] = [
-      { kind: "replace", from: first, to: second },
-      { kind: "shift", direction: shiftDirection },
-      swapRule,
-    ];
-    return {
-      input: randomStripWithCounts(states, random),
-      rules: physicalRulesForDirection(executionRules, processingDirection),
-      processingDirection,
-      correctIndex,
-    };
-  }
-
-  const neighborDirection: NeighborDirection =
-    randomIndex(random, 2) === 0 ? "left" : "right";
-  const neighborRule: NeighborRule = {
-    kind: "neighbor",
-    neighborDirection,
-    neighbor: second,
-    from: first,
-    to: third,
-  };
-  const afterShift = randomNeighborStrip(
-    states,
-    neighborDirection,
-    random,
-  );
-  const executionRules: readonly TransitionRule[] = [
-    { kind: "shift", direction: shiftDirection },
-    neighborRule,
-    swapRule,
-  ];
   return {
-    input: inverseShift(afterShift, shiftDirection),
-    rules: physicalRulesForDirection(executionRules, processingDirection),
-    processingDirection,
+    rows: expected.rows,
+    columns: expected.columns,
+    input: randomPatternBoard(length, patterns, random),
+    rules: recipeFor(patterns, stepCount),
     correctIndex,
   };
 }
@@ -1540,15 +1164,21 @@ export function generateInfiniteRound(
   if (!isDifficulty(difficulty)) {
     throw new RangeError(`Unknown difficulty: ${String(difficulty)}`);
   }
-  for (let attempt = 0; attempt < GENERATOR_MAX_ATTEMPTS; attempt += 1) {
+
+  for (
+    let attempt = 0;
+    attempt < GENERATOR_MAX_ATTEMPTS;
+    attempt += 1
+  ) {
     try {
       const spec = generatedSpec(difficulty, random);
       const provisional = makeRound(
         "generated",
         difficulty,
+        spec.rows,
+        spec.columns,
         spec.input,
         spec.rules,
-        spec.processingDirection,
         spec.correctIndex,
       );
       const fingerprint = roundFingerprint(provisional);
@@ -1559,25 +1189,29 @@ export function generateInfiniteRound(
         id: `changing-strips-${difficulty.toLowerCase()}-${hashString(fingerprint)}`,
       };
     } catch {
-      // Candidate rejection is expected. The public boundary fails only after
-      // the fixed attempt budget, never by returning an invalid round.
+      // Candidate rejection is expected. Only the fixed public boundary fails.
     }
   }
+
   throw new Error(
     `Unable to generate a valid ${difficulty} Changing Strips round after ${GENERATOR_MAX_ATTEMPTS} attempts.`,
   );
 }
 
-/** Mulberry32: compact, deterministic, and suitable for reproducible puzzles. */
+/** Mulberry32: compact deterministic randomness for reproducible puzzles. */
 export function makeSeededRandom(seed: number | string): RandomSource {
   let state =
     typeof seed === "number"
       ? seed >>> 0
       : [...seed].reduce(
           (hash, character) =>
-            Math.imul(hash ^ character.charCodeAt(0), 0x45d9f3b) >>> 0,
+            Math.imul(
+              hash ^ character.charCodeAt(0),
+              0x45d9f3b,
+            ) >>> 0,
           0x9e3779b9,
         );
+
   return () => {
     state = (state + 0x6d2b79f5) >>> 0;
     let value = state;

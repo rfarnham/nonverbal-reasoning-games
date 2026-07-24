@@ -7,15 +7,29 @@ import { progressionMetadata } from "./progression-metadata";
 export const gameInfo = {
   title: "Changing Strips",
   description:
-    "Follow visual replacement, swap, and neighbor rules in the right order to predict each strip.",
-  skills: ["Visual sequencing", "Conditional reasoning"],
+    "Apply every black-and-white pattern change in numbered order.",
+  skills: ["Visual sequencing", "Multi-step reasoning"],
   estimatedMinutes: 10,
   progression: progressionMetadata,
   shelfOrder: 45,
 } satisfies GameInfo;
 
-const SOURCE = ["solid", "open", "striped", "open", "solid", "striped"] as const;
-const RESULT = ["striped", "striped", "open", "striped", "striped", "open"] as const;
+const SOURCE = [
+  "solid",
+  "hollow",
+  "striped",
+  "hollow",
+  "solid",
+  "striped",
+] as const;
+const RESULT = [
+  "hollow",
+  "hollow",
+  "solid",
+  "hollow",
+  "hollow",
+  "solid",
+] as const;
 
 function ShelfTile({
   state,
@@ -28,7 +42,7 @@ function ShelfTile({
 }>) {
   const fill =
     state === "solid"
-      ? "#f06f5f"
+      ? "#111827"
       : state === "striped"
         ? "url(#changing-strips-shelf-stripes)"
         : "#fffdf8";
@@ -45,25 +59,16 @@ function ShelfTile({
         stroke="#17213d"
         strokeWidth="2.5"
       />
-      {state === "solid" ? (
-        <circle cx={x + 15} cy={y + 15} r="3.5" fill="#742f36" />
-      ) : state === "open" ? (
+      {state === "hollow" ? (
         <circle
           cx={x + 15}
           cy={y + 15}
-          r="5"
+          r="6"
           fill="none"
-          stroke="#7767d7"
+          stroke="#17213d"
           strokeWidth="2.5"
         />
-      ) : (
-        <path
-          d={`M${x + 10} ${y + 20}l10-10`}
-          stroke="#195e5a"
-          strokeLinecap="round"
-          strokeWidth="3"
-        />
-      )}
+      ) : null}
     </g>
   );
 }
@@ -83,8 +88,8 @@ export function ShelfIcon({ style, ...props }: ShelfIconProps) {
           patternUnits="userSpaceOnUse"
           patternTransform="rotate(-45)"
         >
-          <rect width="8" height="8" fill="#dff4ef" />
-          <rect width="4" height="8" fill="#35a999" />
+          <rect width="8" height="8" fill="#fffdf8" />
+          <rect width="4" height="8" fill="#111827" />
         </pattern>
       </defs>
       <rect width="320" height="186" rx="13" fill="#f3eadc" />
@@ -100,69 +105,39 @@ export function ShelfIcon({ style, ...props }: ShelfIconProps) {
         ))}
       </g>
 
-      <g aria-hidden="true">
-        <circle cx="76" cy="81" r="5" fill="#17213d" />
-        <path
-          d="M84 81h151"
-          fill="none"
-          stroke="#17213d"
-          strokeLinecap="round"
-          strokeWidth="4"
-        />
-        <path d="m235 73 14 8-14 8Z" fill="#17213d" />
-      </g>
-
-      <g transform="translate(104 67)">
+      <g transform="translate(138 57)">
         <rect
-          width="46"
-          height="55"
-          rx="9"
+          width="44"
+          height="32"
+          rx="7"
           fill="#fffdf8"
           stroke="#cfcabd"
           strokeWidth="2"
         />
-        <circle cx="23" cy="14" r="9" fill="#f06f5f" stroke="#17213d" strokeWidth="2" />
-        <circle cx="23" cy="14" r="2.5" fill="#742f36" />
-        <path d="M23 25v9" stroke="#1679d2" strokeWidth="3" />
-        <path d="m18 31 5 6 5-6" fill="none" stroke="#1679d2" strokeWidth="3" />
-        <circle cx="23" cy="44" r="9" fill="#fffdf8" stroke="#17213d" strokeWidth="2" />
-        <circle cx="23" cy="44" r="3.5" fill="none" stroke="#7767d7" strokeWidth="2" />
+        <circle cx="7" cy="7" r="6" fill="#17213d" />
+        <text x="7" y="10" textAnchor="middle" fill="#fff" fontSize="7" fontWeight="800">1</text>
+        <rect x="16" y="4" width="11" height="11" rx="2" fill="#111827" stroke="#17213d" strokeWidth="1.5" />
+        <path d="M33 7v12m-3-3 3 4 3-4" fill="none" stroke="#1679d2" strokeWidth="2" />
+        <rect x="16" y="18" width="11" height="11" rx="2" fill="#fffdf8" stroke="#17213d" strokeWidth="1.5" />
+        <circle cx="21.5" cy="23.5" r="2.5" fill="none" stroke="#17213d" strokeWidth="1.4" />
       </g>
 
-      <g transform="translate(169 67)">
+      <path d="M160 90v4m-3-2 3 4 3-4" fill="none" stroke="#1679d2" strokeWidth="2" />
+
+      <g transform="translate(138 97)">
         <rect
-          width="46"
-          height="55"
-          rx="9"
+          width="44"
+          height="32"
+          rx="7"
           fill="#fffdf8"
           stroke="#cfcabd"
           strokeWidth="2"
         />
-        <rect
-          x="7"
-          y="8"
-          width="13"
-          height="13"
-          rx="3"
-          fill="url(#changing-strips-shelf-stripes)"
-          stroke="#17213d"
-          strokeWidth="1.8"
-        />
-        <rect
-          x="26"
-          y="34"
-          width="13"
-          height="13"
-          rx="3"
-          fill="url(#changing-strips-shelf-stripes)"
-          stroke="#17213d"
-          strokeWidth="1.8"
-        />
-        <circle cx="32.5" cy="14.5" r="6.5" fill="#fffdf8" stroke="#17213d" strokeWidth="1.8" />
-        <circle cx="32.5" cy="14.5" r="2.4" fill="none" stroke="#7767d7" strokeWidth="1.8" />
-        <circle cx="13.5" cy="40.5" r="6.5" fill="#fffdf8" stroke="#17213d" strokeWidth="1.8" />
-        <circle cx="13.5" cy="40.5" r="2.4" fill="none" stroke="#7767d7" strokeWidth="1.8" />
-        <path d="M16 23c4 9 10 9 14 0M30 31c-4-9-10-9-14 0" fill="none" stroke="#1679d2" strokeWidth="2.3" />
+        <circle cx="7" cy="7" r="6" fill="#17213d" />
+        <text x="7" y="10" textAnchor="middle" fill="#fff" fontSize="7" fontWeight="800">2</text>
+        <rect x="16" y="4" width="11" height="11" rx="2" fill="url(#changing-strips-shelf-stripes)" stroke="#17213d" strokeWidth="1.5" />
+        <path d="M33 7v12m-3-3 3 4 3-4" fill="none" stroke="#1679d2" strokeWidth="2" />
+        <rect x="16" y="18" width="11" height="11" rx="2" fill="#111827" stroke="#17213d" strokeWidth="1.5" />
       </g>
 
       <g transform="translate(61 133)">

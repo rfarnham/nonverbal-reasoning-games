@@ -14,9 +14,9 @@ export type ChangingStripsJourneyExtraLevel =
   | "wizard-2";
 
 const ANSWER_SCHEDULES = {
-  "junior-2": [1, 3, 0, 2, 1, 0, 3, 2, 0, 2, 1, 3],
-  "expert-2": [2, 0, 3, 1, 2, 1, 0, 3, 1, 3, 2, 0],
-  "wizard-2": [0, 2, 3, 1, 3, 0, 1, 2, 1, 3, 0, 2],
+  "junior-2": [1, 3, 1, 0, 2, 1, 2, 0, 3, 2, 3, 0],
+  "expert-2": [3, 2, 3, 0, 1, 3, 1, 0, 2, 0, 2, 1],
+  "wizard-2": [3, 2, 3, 0, 1, 2, 1, 3, 0, 1, 0, 2],
 } as const satisfies Readonly<
   Record<
     ChangingStripsJourneyExtraLevel,
@@ -61,10 +61,18 @@ function assertAnswerSchedule(
     throw new Error(`${level} cannot repeat adjacent answer positions.`);
   }
   const blocks = [0, 4, 8].map((start) =>
-    positions.slice(start, start + 4).join(","),
+    positions.slice(start, start + 4),
   );
-  if (new Set(blocks).size !== blocks.length) {
+  if (
+    new Set(blocks.map((block) => block.join(","))).size !==
+    blocks.length
+  ) {
     throw new Error(`${level} cannot repeat a four-position cycle.`);
+  }
+  if (blocks.some((block) => new Set(block).size === 4)) {
+    throw new Error(
+      `${level} cannot reveal one answer in every position per four-question block.`,
+    );
   }
 }
 

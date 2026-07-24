@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Changing Strips",
   description:
-    "Practice following visual replacement, swap, and neighbor rules in the right order.",
+    "Practice applying clear black-and-white pattern changes in numbered order.",
 };
 
 export default function ChangingStripsLayout({

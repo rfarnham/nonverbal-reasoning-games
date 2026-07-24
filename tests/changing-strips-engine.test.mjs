@@ -7,6 +7,7 @@ import {
   DIFFICULTIES,
   DIFFICULTY_RULES,
   GENERATOR_MAX_ATTEMPTS,
+  PATTERNS,
   ROUNDS,
   TUTORIAL,
   applyProgram,
@@ -17,7 +18,6 @@ import {
   generateInfiniteRound,
   makeSeededRandom,
   optionFeedback,
-  orderedRuleIndexes,
   roundFingerprint,
   stripDistance,
   validateRound,
@@ -30,569 +30,357 @@ import { progressionAdapter } from "../app/games/changing-strips/progression-ada
 
 const GENERATED_COUNT_PER_DIFFICULTY = 400;
 
-function executionKinds(round) {
-  return orderedRuleIndexes(
-    round.rules.length,
-    round.processingDirection,
-  ).map((index) => round.rules[index].kind);
-}
-
-function curriculumAllows(round) {
-  const kindKey = executionKinds(round).join(",");
-  return DIFFICULTY_RULES[round.difficulty].executionKindSequences.some(
-    (sequence) => sequence.join(",") === kindKey,
-  );
-}
+const NAMED_MISTAKES = new Set([
+  "wrong-order",
+  "stopped-early",
+  "one-step-only",
+  "skipped-step",
+  "missed-all",
+  "reversed-arrow",
+  "wrong-source",
+  "wrong-target",
+  "changed-some-matches",
+]);
 
 function assertTraceTruth(round, label) {
-  const result = applyProgram(
-    round.input,
-    round.rules,
-    round.processingDirection,
+  const result = applyProgram(round.input, round.rules);
+  assert.deepEqual(result.output, round.answer, `${label}: calculated answer`);
+  assert.equal(
+    result.steps.length,
+    round.rules.length,
+    `${label}: trace length`,
   );
-  assert.deepEqual(result.output, round.answer, `${label} calculated answer`);
-  assert.equal(result.steps.length, round.rules.length, `${label} trace length`);
 
   let current = [...round.input];
-  const expectedRuleIndexes = orderedRuleIndexes(
-    round.rules.length,
-    round.processingDirection,
-  );
   result.steps.forEach((step, executionIndex) => {
-    assert.equal(step.executionIndex, executionIndex, `${label} execution index`);
+    assert.equal(
+      step.executionIndex,
+      executionIndex,
+      `${label}: execution index`,
+    );
     assert.equal(
       step.ruleIndex,
-      expectedRuleIndexes[executionIndex],
-      `${label} physical card index`,
+      executionIndex,
+      `${label}: card index follows top-to-bottom order`,
     );
-    assert.deepEqual(step.before, current, `${label} step snapshot`);
+    assert.equal(step.rule.kind, "replace", `${label}: finite grammar`);
+    assert.deepEqual(step.before, current, `${label}: before snapshot`);
     assert.deepEqual(
       step.after,
       applyRule(step.before, step.rule),
-      `${label} independently applied step`,
+      `${label}: independently applied card`,
     );
     assert.deepEqual(
       step.changedIndexes,
       differingStripIndexes(step.before, step.after),
-      `${label} exact changed indexes`,
+      `${label}: exact changed cells`,
     );
-    assert.ok(step.changedIndexes.length > 0, `${label} has no no-op stage`);
-
-    if (step.rule.kind === "neighbor") {
-      for (const witness of step.conditionWitnesses) {
-        const offset = step.rule.neighborDirection === "left" ? -1 : 1;
-        assert.equal(
-          witness.neighborIndex,
-          witness.cellIndex + offset,
-          `${label} adjacent witness side`,
-        );
-        assert.equal(
-          step.before[witness.cellIndex],
-          step.rule.from,
-          `${label} witness source state`,
-        );
-        assert.equal(
-          step.before[witness.neighborIndex],
-          step.rule.neighbor,
-          `${label} witness neighbor state`,
-        );
-        assert.equal(
-          step.after[witness.cellIndex],
-          step.rule.to,
-          `${label} witness result state`,
-        );
-      }
-      assert.equal(
-        step.conditionWitnesses.length,
-        step.changedIndexes.length,
-        `${label} every conditional change has one witness`,
-      );
-    } else {
-      assert.deepEqual(
-        step.conditionWitnesses,
-        [],
-        `${label} non-conditional has no witness`,
-      );
-    }
-
-    if (step.rule.kind === "shift") {
-      assert.equal(
-        step.movements.length,
-        step.before.length,
-        `${label} shift maps every cell`,
-      );
-      assert.equal(
-        new Set(step.movements.map(({ fromIndex }) => fromIndex)).size,
-        step.before.length,
-        `${label} shift uses each source once`,
-      );
-      assert.equal(
-        new Set(step.movements.map(({ toIndex }) => toIndex)).size,
-        step.before.length,
-        `${label} shift fills each target once`,
-      );
-      const reconstructed = Array(step.before.length);
-      for (const movement of step.movements) {
-        assert.equal(
-          movement.state,
-          step.before[movement.fromIndex],
-          `${label} movement retains state`,
-        );
-        reconstructed[movement.toIndex] = movement.state;
-      }
-      assert.deepEqual(
-        reconstructed,
-        step.after,
-        `${label} movements reconstruct shift`,
-      );
-    } else {
-      assert.deepEqual(
-        step.movements,
-        [],
-        `${label} stationary rule has no travel map`,
-      );
-    }
+    assert.ok(
+      step.changedIndexes.length > 0,
+      `${label}: every shown card changes at least one cell`,
+    );
     current = [...step.after];
   });
 }
 
 function assertRoundContract(round, label) {
-  assert.deepEqual(validateRound(round), [], `${label} validator`);
-  assert.equal(round.options.length, 4, `${label} four options`);
+  assert.deepEqual(validateRound(round), [], `${label}: validator`);
+  assert.equal(
+    round.input.length,
+    round.rows * round.columns,
+    `${label}: row-major dimensions`,
+  );
+  assert.equal(round.options.length, 4, `${label}: four options`);
   assert.equal(
     new Set(round.options.map(({ strip }) => encodeStrip(strip))).size,
     4,
-    `${label} distinct options`,
+    `${label}: distinct options`,
   );
   assert.deepEqual(
     round.options.flatMap((option, index) =>
       encodeStrip(option.strip) === encodeStrip(round.answer) ? [index] : [],
     ),
     [round.correctIndex],
-    `${label} unique exact answer`,
+    `${label}: one exact answer`,
   );
   assert.equal(
     round.options[round.correctIndex].kind,
     "correct",
-    `${label} answer label`,
+    `${label}: indexed answer label`,
   );
-  for (const [index, option] of round.options.entries()) {
-    const feedback = optionFeedback(round, index);
-    assert.equal(feedback.correct, index === round.correctIndex);
-    assert.equal(feedback.kind, option.kind);
+  assert.ok(
+    stripDistance(round.input, round.answer) >= 2,
+    `${label}: complete recipe visibly changes the board`,
+  );
+  assert.ok(
+    new Set(round.answer).size >= 2,
+    `${label}: answer is not a uniform shortcut`,
+  );
+
+  round.options.forEach((option, optionIndex) => {
+    const feedback = optionFeedback(round, optionIndex);
+    assert.equal(
+      feedback.correct,
+      optionIndex === round.correctIndex,
+      `${label}: feedback correctness`,
+    );
+    assert.equal(feedback.kind, option.kind, `${label}: feedback kind`);
     assert.equal(
       feedback.mismatchCount,
       stripDistance(option.strip, round.answer),
+      `${label}: mismatch count`,
     );
     assert.deepEqual(
       feedback.differingIndexes,
       differingStripIndexes(option.strip, round.answer),
+      `${label}: exact mismatch cells`,
     );
-    assert.equal(feedback.trace.length, round.rules.length);
-    if (index !== round.correctIndex) {
-      assert.notEqual(option.kind, "correct", `${label} misconception kind`);
-      assert.ok(feedback.message.length > 20, `${label} teaching feedback`);
+    assert.equal(
+      feedback.trace.length,
+      round.rules.length,
+      `${label}: feedback proof`,
+    );
+    if (optionIndex !== round.correctIndex) {
+      assert.ok(
+        NAMED_MISTAKES.has(option.kind),
+        `${label}: distractor is a named recipe mistake`,
+      );
+      assert.ok(
+        feedback.message.length > 20,
+        `${label}: explanatory feedback`,
+      );
     }
-  }
+  });
 
   if (round.difficulty === "Starter" || round.difficulty === "Junior") {
-    for (let first = 0; first < 4; first += 1) {
-      for (let second = first + 1; second < 4; second += 1) {
+    for (let first = 0; first < round.options.length; first += 1) {
+      for (
+        let second = first + 1;
+        second < round.options.length;
+        second += 1
+      ) {
         assert.ok(
           stripDistance(
             round.options[first].strip,
             round.options[second].strip,
           ) >= 2,
-          `${label} options ${first + 1}/${second + 1} differ twice`,
+          `${label}: options ${first + 1}/${second + 1} differ twice`,
         );
       }
     }
-    if (round.difficulty === "Junior") {
-      assert.ok(
-        new Set(round.answer).size > 1,
-        `${label} keeps an input-dependent non-uniform answer`,
-      );
-    }
   } else {
     assert.ok(
-      round.options.every(
-        (option, index) =>
-          index === round.correctIndex || option.kind !== "local-near-miss",
-      ),
-      `${label} uses named execution mistakes, not arbitrary mutations`,
-    );
-    assert.ok(
       round.options.some(
-        (option, index) =>
-          index !== round.correctIndex &&
-          stripDistance(option.strip, round.answer) <= 2,
+        (option, optionIndex) =>
+          optionIndex !== round.correctIndex &&
+          option.kind === "changed-some-matches" &&
+          stripDistance(option.strip, round.answer) === 1,
       ),
-      `${label} includes a close local trap`,
+      `${label}: advanced board has a named one-cell partial-change trap`,
     );
   }
+
   assertTraceTruth(round, label);
 }
 
-test("single-card rules are simultaneous and neighbor checks use one snapshot", () => {
+test("one replacement card changes every matching pattern simultaneously", () => {
+  const input = [
+    "solid",
+    "hollow",
+    "solid",
+    "striped",
+    "solid",
+  ];
   assert.deepEqual(
-    applyRule(["solid", "open", "solid", "striped"], {
+    applyRule(input, {
       kind: "replace",
       from: "solid",
-      to: "open",
+      to: "hollow",
     }),
-    ["open", "open", "open", "striped"],
+    ["hollow", "hollow", "hollow", "striped", "hollow"],
   );
-
-  assert.deepEqual(
-    applyRule(["solid", "open", "striped", "solid"], {
-      kind: "swap",
-      first: "solid",
-      second: "open",
-    }),
-    ["open", "solid", "striped", "open"],
-    "both sides of a global swap read the original strip",
-  );
-
-  assert.deepEqual(
-    applyRule(["solid", "solid", "solid"], {
-      kind: "neighbor",
-      neighborDirection: "left",
-      neighbor: "solid",
-      from: "solid",
-      to: "open",
-    }),
-    ["solid", "open", "open"],
-    "the second change does not erase evidence for the third cell",
-  );
+  assert.deepEqual(input, [
+    "solid",
+    "hollow",
+    "solid",
+    "striped",
+    "solid",
+  ]);
 });
 
-test("processing direction selects physical card order and changes the answer", () => {
+test("recipes execute exactly once per card in visible top-to-bottom order", () => {
+  const input = ["solid", "hollow", "striped", "solid"];
   const rules = [
-    { kind: "replace", from: "solid", to: "open" },
-    { kind: "replace", from: "open", to: "striped" },
+    { kind: "replace", from: "solid", to: "hollow" },
+    { kind: "replace", from: "hollow", to: "solid" },
   ];
-  const input = ["solid", "open", "striped", "solid"];
-  const ltr = applyProgram(input, rules, "ltr");
-  const rtl = applyProgram(input, rules, "rtl");
+  const result = applyProgram(input, rules);
+  const bottomFirst = applyProgram(input, [...rules].reverse());
 
-  assert.deepEqual(ltr.steps.map(({ ruleIndex }) => ruleIndex), [0, 1]);
-  assert.deepEqual(rtl.steps.map(({ ruleIndex }) => ruleIndex), [1, 0]);
-  assert.deepEqual(ltr.output, ["striped", "striped", "striped", "striped"]);
-  assert.deepEqual(rtl.output, ["open", "striped", "striped", "open"]);
-  assert.notDeepEqual(ltr.output, rtl.output);
-});
-
-test("whole-strip shifts wrap and expose truthful source-to-target motion", () => {
-  const input = ["solid", "open", "striped", "open"];
-  const left = applyProgram(
-    input,
-    [{ kind: "shift", direction: "left" }],
-    "ltr",
-  );
-  const right = applyProgram(
-    input,
-    [{ kind: "shift", direction: "right" }],
-    "ltr",
-  );
-  assert.deepEqual(left.output, ["open", "striped", "open", "solid"]);
-  assert.deepEqual(right.output, ["open", "solid", "open", "striped"]);
   assert.deepEqual(
-    left.steps[0].movements.map(({ fromIndex, toIndex }) => [
-      fromIndex,
-      toIndex,
+    result.steps.map(({ executionIndex, ruleIndex }) => [
+      executionIndex,
+      ruleIndex,
     ]),
     [
-      [0, 3],
-      [1, 0],
-      [2, 1],
-      [3, 2],
+      [0, 0],
+      [1, 1],
     ],
   );
+  assert.deepEqual(result.output, [
+    "solid",
+    "solid",
+    "striped",
+    "solid",
+  ]);
+  assert.deepEqual(bottomFirst.output, [
+    "hollow",
+    "hollow",
+    "striped",
+    "hollow",
+  ]);
+  assert.notDeepEqual(result.output, bottomFirst.output);
 });
 
-test("the photographed solved example uses the exact nine cells and an honest trace", () => {
+test("the example uses a gentle two-card recipe and an honest trace", () => {
+  assert.equal(TUTORIAL.isExample, true);
+  assert.equal(TUTORIAL.rows, 1);
+  assert.equal(TUTORIAL.columns, 6);
   assert.deepEqual(TUTORIAL.input, [
     "solid",
-    "open",
+    "hollow",
     "striped",
-    "open",
+    "hollow",
     "striped",
     "solid",
-    "open",
-    "solid",
-    "striped",
   ]);
-  assert.equal(TUTORIAL.isExample, true);
   assert.deepEqual(TUTORIAL.rules, [
-    { kind: "replace", from: "solid", to: "open" },
+    { kind: "replace", from: "solid", to: "hollow" },
     { kind: "replace", from: "striped", to: "solid" },
-    { kind: "replace", from: "open", to: "striped" },
   ]);
-  assert.deepEqual(
-    TUTORIAL.answer,
-    applyProgram(
-      TUTORIAL.input,
-      TUTORIAL.rules,
-      TUTORIAL.processingDirection,
-    ).output,
-  );
   assertRoundContract(TUTORIAL, "tutorial");
 });
 
-test("Campaign has 48 validated rounds with balanced, non-patterned answer positions", () => {
+test("Campaign has 48 deterministic rounds with balanced non-patterned answer positions", () => {
   assert.equal(ROUNDS.length, 48);
-  const rebuiltCampaign = buildCampaignRounds();
+  assert.deepEqual(buildCampaignRounds(), CAMPAIGN_ROUNDS_BY_DIFFICULTY);
   assert.deepEqual(
-    rebuiltCampaign,
-    CAMPAIGN_ROUNDS_BY_DIFFICULTY,
-    "the canonical authored builder reproduces standalone Campaign",
-  );
-  assert.deepEqual(
-    DIFFICULTIES.flatMap((difficulty) => rebuiltCampaign[difficulty]),
+    DIFFICULTIES.flatMap(
+      (difficulty) => CAMPAIGN_ROUNDS_BY_DIFFICULTY[difficulty],
+    ),
     ROUNDS,
-    "Journey extensions do not alter the standalone 48-round sequence",
   );
 
+  const expectedStepCoverage = {
+    Starter: [2],
+    Junior: [2, 3],
+    Expert: [3, 4],
+    Wizard: [4, 5, 6],
+  };
   const allFingerprints = new Set();
-  for (const difficulty of DIFFICULTIES) {
-    const rounds = ROUNDS.filter((round) => round.difficulty === difficulty);
-    assert.equal(rounds.length, 12, `${difficulty} authored count`);
-    assert.deepEqual(
-      rounds,
-      CAMPAIGN_ROUNDS_BY_DIFFICULTY[difficulty],
-      `${difficulty} grouped export`,
-    );
 
-    const indexes = rounds.map(({ correctIndex }) => correctIndex);
+  DIFFICULTIES.forEach((difficulty) => {
+    const rounds = CAMPAIGN_ROUNDS_BY_DIFFICULTY[difficulty];
+    const expected = DIFFICULTY_RULES[difficulty];
+    const answerIndexes = rounds.map(({ correctIndex }) => correctIndex);
+    const stepCounts = new Set();
+
+    assert.equal(rounds.length, 12, `${difficulty}: authored count`);
     assert.deepEqual(
       [0, 1, 2, 3].map(
         (answerIndex) =>
-          indexes.filter((index) => index === answerIndex).length,
+          answerIndexes.filter((value) => value === answerIndex).length,
       ),
       [3, 3, 3, 3],
-      `${difficulty} 3/3/3/3 balance`,
+      `${difficulty}: 3/3/3/3 answer balance`,
     );
     assert.ok(
-      indexes.every((index, position) =>
-        position === 0 ? true : index !== indexes[position - 1],
+      answerIndexes.every(
+        (value, index) =>
+          index === 0 || answerIndexes[index - 1] !== value,
       ),
-      `${difficulty} no adjacent answer repeats`,
+      `${difficulty}: no adjacent repeat`,
     );
-    assert.equal(
-      indexes.slice(0, 4).join(",") === indexes.slice(4, 8).join(",") &&
-        indexes.slice(0, 4).join(",") === indexes.slice(8, 12).join(","),
-      false,
-      `${difficulty} is not one four-position cycle repeated`,
-    );
-    for (let blockStart = 0; blockStart < indexes.length; blockStart += 4) {
+    for (let blockStart = 0; blockStart < 12; blockStart += 4) {
       assert.ok(
-        new Set(indexes.slice(blockStart, blockStart + 4)).size < 4,
-        `${difficulty} block ${blockStart / 4 + 1} is not a predictable four-answer permutation`,
+        new Set(answerIndexes.slice(blockStart, blockStart + 4)).size < 4,
+        `${difficulty}: aligned block is not a predictable permutation`,
       );
     }
 
-    const processingDirections = new Set();
-    const neighborDirections = new Set();
-    const shiftDirections = new Set();
-    for (const [index, round] of rounds.entries()) {
+    rounds.forEach((round, index) => {
       assertRoundContract(round, `${difficulty} Campaign ${index + 1}`);
-      assert.ok(
-        curriculumAllows(round),
-        `${difficulty} family ${executionKinds(round).join(" then ")}`,
+      assert.equal(round.rows, expected.rows, `${difficulty}: rows`);
+      assert.equal(
+        round.columns,
+        expected.columns,
+        `${difficulty}: columns`,
       );
+      assert.ok(
+        round.rules.every(({ kind }) => kind === "replace"),
+        `${difficulty}: replacement-only grammar`,
+      );
+      assert.ok(
+        round.rules.length >= expected.minSteps &&
+          round.rules.length <= expected.maxSteps,
+        `${difficulty}: recipe length`,
+      );
+      stepCounts.add(round.rules.length);
+
       const fingerprint = roundFingerprint(round);
       assert.equal(
         allFingerprints.has(fingerprint),
         false,
-        `${difficulty} unique fingerprint`,
+        `${difficulty}: unique fingerprint ${index + 1}`,
       );
       allFingerprints.add(fingerprint);
-      processingDirections.add(round.processingDirection);
-      for (const rule of round.rules) {
-        if (rule.kind === "neighbor") {
-          neighborDirections.add(rule.neighborDirection);
-        }
-        if (rule.kind === "shift") shiftDirections.add(rule.direction);
-      }
-      if (round.rules.length > 1) {
-        const opposite = round.processingDirection === "ltr" ? "rtl" : "ltr";
-        assert.notDeepEqual(
-          round.answer,
-          applyProgram(round.input, round.rules, opposite).output,
-          `${difficulty} ${index + 1} order matters`,
-        );
-      }
-    }
+    });
+
     assert.deepEqual(
-      [...processingDirections].sort(),
-      ["ltr", "rtl"],
-      `${difficulty} mixes processing arrows`,
+      [...stepCounts].sort(
+        (firstCount, secondCount) => firstCount - secondCount,
+      ),
+      expectedStepCoverage[difficulty],
+      `${difficulty}: authored recipe-length coverage`,
     );
-    if (difficulty === "Junior" || difficulty === "Wizard") {
-      assert.deepEqual(
-        [...neighborDirections].sort(),
-        ["left", "right"],
-        `${difficulty} checks both relative sides`,
-      );
-    }
-    if (
-      difficulty === "Junior" ||
-      difficulty === "Expert" ||
-      difficulty === "Wizard"
-    ) {
-      assert.deepEqual(
-        [...shiftDirections].sort(),
-        ["left", "right"],
-        `${difficulty} shifts both ways`,
-      );
-    }
-  }
+  });
+
   assert.equal(allFingerprints.size, 48);
-  assert.deepEqual(
-    CAMPAIGN_ROUNDS_BY_DIFFICULTY.Junior.map(
-      (round) => executionKinds(round)[0],
+  assert.ok(
+    CAMPAIGN_ROUNDS_BY_DIFFICULTY.Starter.every(
+      ({ rules }) => rules.length === 2,
     ),
-    [
-      "swap",
-      "swap",
-      "swap",
-      "swap",
-      "shift",
-      "shift",
-      "shift",
-      "shift",
-      "neighbor",
-      "neighbor",
-      "neighbor",
-      "neighbor",
-    ],
-    "Junior teaches each atomic family in a coherent four-round block",
+    "Starter uses two-card recipes from puzzle 1",
+  );
+  assert.ok(
+    CAMPAIGN_ROUNDS_BY_DIFFICULTY.Expert.every(
+      ({ rows }) => rows === 2,
+    ),
+    "Expert uses two-row boards",
+  );
+  assert.ok(
+    CAMPAIGN_ROUNDS_BY_DIFFICULTY.Wizard.every(
+      ({ rows }) => rows === 2,
+    ),
+    "Wizard uses two-row boards",
+  );
+  assert.equal(DIFFICULTY_RULES.Junior.columns, 6);
+  assert.equal(DIFFICULTY_RULES.Expert.columns, 5);
+  assert.equal(DIFFICULTY_RULES.Wizard.columns, 5);
+  assert.ok(
+    DIFFICULTY_RULES.Expert.rows * DIFFICULTY_RULES.Expert.columns >
+      DIFFICULTY_RULES.Junior.rows * DIFFICULTY_RULES.Junior.columns,
+    "two-row levels increase total cells without shrinking phone options",
   );
 });
 
-test("Journey-only banks add 36 deterministic, validated, disjoint rounds", () => {
-  const expectations = {
-    "junior-2": {
-      difficulty: "Junior",
-      positions: [1, 3, 0, 2, 1, 0, 3, 2, 0, 2, 1, 3],
-    },
-    "expert-2": {
-      difficulty: "Expert",
-      positions: [2, 0, 3, 1, 2, 1, 0, 3, 1, 3, 2, 0],
-    },
-    "wizard-2": {
-      difficulty: "Wizard",
-      positions: [0, 2, 3, 1, 3, 0, 1, 2, 1, 3, 0, 2],
-    },
-  };
-  const standaloneFingerprints = new Set(ROUNDS.map(roundFingerprint));
-  const journeyFingerprints = new Set();
-
-  assert.deepEqual(
-    Object.keys(JOURNEY_EXTRA_CAMPAIGN_ROUNDS),
-    Object.keys(expectations),
-  );
-  assert.equal(Object.isFrozen(JOURNEY_EXTRA_CAMPAIGN_ROUNDS), true);
-  assert.deepEqual(
-    buildChangingStripsJourneyExtraCampaignRounds(),
-    JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
-    "Journey authored construction is deterministic",
-  );
-
-  for (const [level, expectation] of Object.entries(expectations)) {
-    const rounds = JOURNEY_EXTRA_CAMPAIGN_ROUNDS[level];
-    const positions = rounds.map(({ correctIndex }) => correctIndex);
-
-    assert.equal(rounds.length, 12, `${level}: round count`);
-    assert.equal(Object.isFrozen(rounds), true, `${level}: frozen bank`);
-    assert.ok(
-      rounds.every(
-        ({ difficulty }) => difficulty === expectation.difficulty,
-      ),
-      `${level}: mapped difficulty`,
-    );
-    assert.deepEqual(
-      positions,
-      expectation.positions,
-      `${level}: frozen answer schedule`,
-    );
-    assert.deepEqual(
-      [0, 1, 2, 3].map(
-        (position) =>
-          positions.filter((value) => value === position).length,
-      ),
-      [3, 3, 3, 3],
-      `${level}: answer balance`,
-    );
-    assert.ok(
-      positions.every(
-        (position, index) =>
-          index === 0 || positions[index - 1] !== position,
-      ),
-      `${level}: no adjacent answer-position repeat`,
-    );
-    assert.equal(
-      new Set(
-        [0, 4, 8].map((start) =>
-          positions.slice(start, start + 4).join(","),
-        ),
-      ).size,
-      3,
-      `${level}: no repeated four-position cycle`,
-    );
-
-    for (const [index, round] of rounds.entries()) {
-      assert.equal(
-        round.id,
-        `changing-strips-journey-${level}-${String(index + 1).padStart(2, "0")}`,
-      );
-      assertRoundContract(round, `${level} Journey ${index + 1}`);
-      assert.ok(
-        curriculumAllows(round),
-        `${level} family ${executionKinds(round).join(" then ")}`,
-      );
-
-      const fingerprint = roundFingerprint(round);
-      assert.equal(
-        standaloneFingerprints.has(fingerprint),
-        false,
-        `${level} round ${index + 1}: standalone disjointness`,
-      );
-      assert.equal(
-        journeyFingerprints.has(fingerprint),
-        false,
-        `${level} round ${index + 1}: Journey disjointness`,
-      );
-      journeyFingerprints.add(fingerprint);
-    }
-  }
-  assert.equal(journeyFingerprints.size, 36);
-  assert.deepEqual(
-    JOURNEY_EXTRA_CAMPAIGN_ROUNDS["junior-2"].map(
-      (round) => executionKinds(round)[0],
-    ),
-    [
-      "swap",
-      "swap",
-      "swap",
-      "swap",
-      "shift",
-      "shift",
-      "shift",
-      "shift",
-      "neighbor",
-      "neighbor",
-      "neighbor",
-      "neighbor",
-    ],
-    "Junior II repeats the taught atomic-family progression",
-  );
-
+test("authored construction never consults randomness", () => {
   const originalRandom = Math.random;
   Math.random = () => {
-    throw new Error("Authored Journey construction cannot use randomness.");
+    throw new Error("Authored construction cannot use randomness.");
   };
   try {
+    assert.deepEqual(buildCampaignRounds(), CAMPAIGN_ROUNDS_BY_DIFFICULTY);
     assert.deepEqual(
       buildChangingStripsJourneyExtraCampaignRounds(),
       JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
@@ -602,7 +390,76 @@ test("Journey-only banks add 36 deterministic, validated, disjoint rounds", () =
   }
 });
 
-test("the adapter exposes seven explicit Journey banks and keeps Campaign separate", () => {
+test("Journey-only banks add 36 deterministic valid rounds disjoint from standalone Campaign", () => {
+  const expectations = {
+    "junior-2": {
+      difficulty: "Junior",
+      positions: [1, 3, 1, 0, 2, 1, 2, 0, 3, 2, 3, 0],
+    },
+    "expert-2": {
+      difficulty: "Expert",
+      positions: [3, 2, 3, 0, 1, 3, 1, 0, 2, 0, 2, 1],
+    },
+    "wizard-2": {
+      difficulty: "Wizard",
+      positions: [3, 2, 3, 0, 1, 2, 1, 3, 0, 1, 0, 2],
+    },
+  };
+  const usedFingerprints = new Set(ROUNDS.map(roundFingerprint));
+
+  assert.deepEqual(
+    Object.keys(JOURNEY_EXTRA_CAMPAIGN_ROUNDS),
+    Object.keys(expectations),
+  );
+  assert.equal(Object.isFrozen(JOURNEY_EXTRA_CAMPAIGN_ROUNDS), true);
+  assert.deepEqual(
+    buildChangingStripsJourneyExtraCampaignRounds(),
+    JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+  );
+
+  Object.entries(expectations).forEach(([level, expectation]) => {
+    const rounds = JOURNEY_EXTRA_CAMPAIGN_ROUNDS[level];
+    assert.equal(rounds.length, 12, `${level}: count`);
+    assert.equal(Object.isFrozen(rounds), true, `${level}: frozen`);
+    assert.deepEqual(
+      rounds.map(({ correctIndex }) => correctIndex),
+      expectation.positions,
+      `${level}: answer schedule`,
+    );
+    for (let blockStart = 0; blockStart < 12; blockStart += 4) {
+      assert.ok(
+        new Set(
+          expectation.positions.slice(blockStart, blockStart + 4),
+        ).size < 4,
+        `${level}: aligned block is not a predictable permutation`,
+      );
+    }
+
+    rounds.forEach((round, index) => {
+      assert.equal(
+        round.difficulty,
+        expectation.difficulty,
+        `${level}: difficulty`,
+      );
+      assert.equal(
+        round.id,
+        `changing-strips-journey-${level}-${String(index + 1).padStart(2, "0")}`,
+      );
+      assertRoundContract(round, `${level} Journey ${index + 1}`);
+      const fingerprint = roundFingerprint(round);
+      assert.equal(
+        usedFingerprints.has(fingerprint),
+        false,
+        `${level}: disjoint fingerprint ${index + 1}`,
+      );
+      usedFingerprints.add(fingerprint);
+    });
+  });
+
+  assert.equal(usedFingerprints.size, 84);
+});
+
+test("the adapter exposes version-2 authored and generated content through seven Journey banks", () => {
   const expectedBanks = {
     starter: CAMPAIGN_ROUNDS_BY_DIFFICULTY.Starter,
     "junior-1": CAMPAIGN_ROUNDS_BY_DIFFICULTY.Junior,
@@ -612,112 +469,91 @@ test("the adapter exposes seven explicit Journey banks and keeps Campaign separa
     "wizard-1": CAMPAIGN_ROUNDS_BY_DIFFICULTY.Wizard,
     "wizard-2": JOURNEY_EXTRA_CAMPAIGN_ROUNDS["wizard-2"],
   };
-  const journeyFingerprints = new Set();
+  const fingerprints = new Set();
 
-  assert.equal(progressionAdapter.journeyContentVersion, "1");
-  assert.equal(progressionAdapter.campaignRounds.length, 48);
+  assert.equal(progressionAdapter.contentVersion, "2");
+  assert.equal(progressionAdapter.generatorVersion, "2");
+  assert.equal(progressionAdapter.journeyContentVersion, "2");
   assert.deepEqual(progressionAdapter.campaignRounds, ROUNDS);
   assert.deepEqual(
     Object.keys(progressionAdapter.journeyCampaignRounds),
     Object.keys(expectedBanks),
   );
 
-  for (const [level, expectedRounds] of Object.entries(expectedBanks)) {
+  Object.entries(expectedBanks).forEach(([level, expectedRounds]) => {
     const rounds = progressionAdapter.journeyCampaignRounds[level];
-    assert.equal(rounds.length, 12, `${level}: adapter round count`);
     assert.deepEqual(rounds, expectedRounds, `${level}: explicit bank`);
-    for (const round of rounds) {
+    rounds.forEach((round) => {
       const fingerprint = roundFingerprint(round);
       assert.equal(
-        journeyFingerprints.has(fingerprint),
+        fingerprints.has(fingerprint),
         false,
-        `${level}: Journey fingerprint uniqueness`,
+        `${level}: unique Journey fingerprint`,
       );
-      journeyFingerprints.add(fingerprint);
-    }
-  }
-  assert.equal(journeyFingerprints.size, 84);
+      fingerprints.add(fingerprint);
+    });
+  });
+
+  assert.equal(fingerprints.size, 84);
 });
 
-test("fingerprints ignore answer placement and normalize equivalent card presentation", () => {
-  const round = ROUNDS.find(
-    ({ difficulty }) => difficulty === "Wizard",
-  );
-  assert.ok(round);
+test("fingerprints ignore answer placement and normalize equivalent replacement recipes", () => {
+  const round = CAMPAIGN_ROUNDS_BY_DIFFICULTY.Wizard[0];
   const reorderedOptions = {
     ...round,
     options: [...round.options].reverse(),
     correctIndex: 3 - round.correctIndex,
   };
   assert.equal(roundFingerprint(reorderedOptions), roundFingerprint(round));
-  assert.equal(
-    roundFingerprint({
-      input: round.input,
-      rules: [...round.rules].reverse(),
-      processingDirection:
-        round.processingDirection === "ltr" ? "rtl" : "ltr",
-    }),
-    roundFingerprint(round),
-    "reversing both cards and arrow preserves execution semantics",
-  );
 
-  const swapForward = {
-    input: ["solid", "open", "striped"],
-    rules: [{ kind: "swap", first: "solid", second: "open" }],
-    processingDirection: "ltr",
-  };
-  const swapBackward = {
-    ...swapForward,
-    rules: [{ kind: "swap", first: "open", second: "solid" }],
-  };
-  assert.equal(
-    roundFingerprint(swapForward),
-    roundFingerprint(swapBackward),
-    "swap operand order is normalized",
-  );
-
-  const collapseSolidThenOpen = {
-    input: ["solid", "open", "striped", "solid"],
-    rules: [
-      { kind: "replace", from: "solid", to: "open" },
-      { kind: "replace", from: "open", to: "striped" },
+  const expanded = {
+    rows: 1,
+    columns: 6,
+    input: [
+      "solid",
+      "hollow",
+      "striped",
+      "solid",
+      "hollow",
+      "striped",
     ],
-    processingDirection: "ltr",
-  };
-  const collapseOpenThenSolid = {
-    ...collapseSolidThenOpen,
     rules: [
-      { kind: "replace", from: "open", to: "solid" },
-      { kind: "replace", from: "solid", to: "striped" },
+      { kind: "replace", from: "solid", to: "hollow" },
+      { kind: "replace", from: "hollow", to: "solid" },
+    ],
+  };
+  const normalized = {
+    ...expanded,
+    rules: [
+      { kind: "replace", from: "hollow", to: "solid" },
     ],
   };
   assert.deepEqual(
-    applyProgram(
-      collapseSolidThenOpen.input,
-      collapseSolidThenOpen.rules,
-      collapseSolidThenOpen.processingDirection,
-    ).output,
-    applyProgram(
-      collapseOpenThenSolid.input,
-      collapseOpenThenSolid.rules,
-      collapseOpenThenSolid.processingDirection,
-    ).output,
+    applyProgram(expanded.input, expanded.rules).output,
+    applyProgram(normalized.input, normalized.rules).output,
   );
   assert.equal(
-    roundFingerprint(collapseSolidThenOpen),
-    roundFingerprint(collapseOpenThenSolid),
-    "execution-equivalent replacement chains share one semantic fingerprint",
+    roundFingerprint(expanded),
+    roundFingerprint(normalized),
+    "execution-equivalent recipes share one semantic fingerprint",
+  );
+  assert.notEqual(
+    roundFingerprint(expanded),
+    roundFingerprint({
+      ...expanded,
+      rows: 2,
+      columns: 3,
+    }),
+    "board geometry remains part of puzzle identity",
   );
 });
 
 test("1,600 seeded Infinite rounds are reproducible, unique, valid, and in tier", () => {
-  for (const [difficultyIndex, difficulty] of DIFFICULTIES.entries()) {
+  DIFFICULTIES.forEach((difficulty, difficultyIndex) => {
     const fingerprints = new Set();
     const answerIndexes = new Set();
-    const processingDirections = new Set();
-    const neighborDirections = new Set();
-    const shiftDirections = new Set();
-    const generatedKindSequences = new Set();
+    const stepCounts = new Set();
+    const expected = DIFFICULTY_RULES[difficulty];
 
     for (
       let seedIndex = 0;
@@ -737,62 +573,55 @@ test("1,600 seeded Infinite rounds are reproducible, unique, valid, and in tier"
         makeSeededRandom(seed),
         exclusionsBefore,
       );
+
       assert.deepEqual(
         reproduced,
         round,
-        `${difficulty} seed ${seedIndex} reproducibility`,
+        `${difficulty} seed ${seedIndex}: reproducible`,
       );
       assertRoundContract(
         round,
         `${difficulty} generated seed ${seedIndex}`,
       );
+      assert.equal(round.rows, expected.rows, `${difficulty}: rows`);
+      assert.equal(round.columns, expected.columns, `${difficulty}: columns`);
       assert.ok(
-        curriculumAllows(round),
-        `${difficulty} generated curriculum family`,
+        round.rules.every(({ kind }) => kind === "replace"),
+        `${difficulty}: replacement-only generator`,
       );
-      generatedKindSequences.add(executionKinds(round).join(","));
+
       const fingerprint = roundFingerprint(round);
       assert.equal(
         fingerprints.has(fingerprint),
         false,
-        `${difficulty} seed ${seedIndex} session uniqueness`,
+        `${difficulty} seed ${seedIndex}: session uniqueness`,
       );
       fingerprints.add(fingerprint);
       answerIndexes.add(round.correctIndex);
-      processingDirections.add(round.processingDirection);
-      for (const rule of round.rules) {
-        if (rule.kind === "neighbor") {
-          neighborDirections.add(rule.neighborDirection);
-        }
-        if (rule.kind === "shift") shiftDirections.add(rule.direction);
-      }
+      stepCounts.add(round.rules.length);
     }
 
     assert.equal(
       fingerprints.size,
       GENERATED_COUNT_PER_DIFFICULTY,
-      `${difficulty} generated corpus size`,
+      `${difficulty}: generated corpus size`,
     );
-    assert.deepEqual([...answerIndexes].sort(), [0, 1, 2, 3]);
-    assert.deepEqual([...processingDirections].sort(), ["ltr", "rtl"]);
-    if (difficulty === "Junior" || difficulty === "Wizard") {
-      assert.deepEqual([...neighborDirections].sort(), ["left", "right"]);
-    }
-    if (
-      difficulty === "Junior" ||
-      difficulty === "Expert" ||
-      difficulty === "Wizard"
-    ) {
-      assert.deepEqual([...shiftDirections].sort(), ["left", "right"]);
-    }
     assert.deepEqual(
-      [...generatedKindSequences].sort(),
-      DIFFICULTY_RULES[difficulty].executionKindSequences
-        .map((sequence) => sequence.join(","))
-        .sort(),
-      `${difficulty} generated pool covers every curriculum family`,
+      [...answerIndexes].sort(),
+      [0, 1, 2, 3],
+      `${difficulty}: answer-position coverage`,
     );
-  }
+    assert.deepEqual(
+      [...stepCounts].sort(
+        (firstCount, secondCount) => firstCount - secondCount,
+      ),
+      Array.from(
+        { length: expected.maxSteps - expected.minSteps + 1 },
+        (_, index) => expected.minSteps + index,
+      ),
+      `${difficulty}: recipe-length coverage`,
+    );
+  });
 });
 
 test("excluded fingerprints are honored and hostile randomness fails at the bound", () => {
@@ -832,18 +661,32 @@ test("excluded fingerprints are honored and hostile randomness fails at the boun
   );
 });
 
-test("validator rejects no-op stages, duplicate answers, and irrelevant order", () => {
-  const starter = structuredClone(
-    ROUNDS.find(({ difficulty }) => difficulty === "Starter"),
-  );
-  starter.input = Array(starter.input.length).fill("striped");
+test("validator rejects no-op cards, bad dimensions, duplicate answers, and unnamed mistakes", () => {
+  const noOp = structuredClone(CAMPAIGN_ROUNDS_BY_DIFFICULTY.Starter[0]);
+  noOp.rules[0] = {
+    kind: "replace",
+    from: "solid",
+    to: "solid",
+  };
   assert.ok(
-    validateRound(starter).some((issue) => issue.includes("no-op")),
-    "runtime no-op is rejected",
+    validateRound(noOp).some((issue) => issue.includes("no-op")),
+    "static or executed no-op is rejected",
+  );
+
+  const badDimensions = structuredClone(
+    CAMPAIGN_ROUNDS_BY_DIFFICULTY.Expert[0],
+  );
+  badDimensions.columns += 1;
+  assert.ok(
+    validateRound(badDimensions).some(
+      (issue) =>
+        issue.includes("dimensions") || issue.includes("must use"),
+    ),
+    "declared dimensions are enforced",
   );
 
   const duplicate = structuredClone(
-    ROUNDS.find(({ difficulty }) => difficulty === "Junior"),
+    CAMPAIGN_ROUNDS_BY_DIFFICULTY.Junior[0],
   );
   duplicate.options[0].strip = [...duplicate.answer];
   duplicate.options[1].strip = [...duplicate.answer];
@@ -856,23 +699,39 @@ test("validator rejects no-op stages, duplicate answers, and irrelevant order", 
     "duplicate answer options are rejected",
   );
 
-  const orderFree = structuredClone(
-    ROUNDS.find(({ difficulty }) => difficulty === "Expert"),
+  const unnamed = structuredClone(
+    CAMPAIGN_ROUNDS_BY_DIFFICULTY.Wizard[0],
   );
-  orderFree.rules = [
-    { kind: "shift", direction: "left" },
-    { kind: "shift", direction: "right" },
-    { kind: "shift", direction: "left" },
-  ];
+  const wrongIndex = unnamed.correctIndex === 0 ? 1 : 0;
+  unnamed.options[wrongIndex].kind = "mystery-error";
   assert.ok(
-    validateRound(orderFree).some(
-      (issue) => issue.includes("Processing order does not affect"),
+    validateRound(unnamed).some((issue) =>
+      issue.includes("named recipe mistake"),
     ),
-    "a multi-card puzzle cannot pretend order matters when it does not",
+    "generic distractor labels are rejected",
+  );
+
+  const missingCloseTrap = structuredClone(
+    CAMPAIGN_ROUNDS_BY_DIFFICULTY.Expert[0],
+  );
+  missingCloseTrap.options.forEach((option, index) => {
+    if (
+      index !== missingCloseTrap.correctIndex &&
+      option.kind === "changed-some-matches"
+    ) {
+      option.kind = "wrong-order";
+    }
+  });
+  assert.ok(
+    validateRound(missingCloseTrap).some((issue) =>
+      issue.includes("one-cell partial-change trap"),
+    ),
+    "advanced rounds require the named close trap",
   );
 });
 
-test("the state catalogue is finite and uses the photographed semantics", () => {
-  assert.deepEqual(CELL_STATES, ["solid", "open", "striped"]);
-  assert.equal(new Set(CELL_STATES).size, 3);
+test("the finite pattern catalogue is solid, hollow, and striped", () => {
+  assert.deepEqual(PATTERNS, ["solid", "hollow", "striped"]);
+  assert.deepEqual(CELL_STATES, PATTERNS);
+  assert.equal(new Set(PATTERNS).size, 3);
 });
