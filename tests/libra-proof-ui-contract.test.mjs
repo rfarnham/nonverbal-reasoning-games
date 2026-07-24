@@ -111,9 +111,64 @@ test("the animated proof uses one persistent canvas instead of swapping step car
   );
   assert.match(visualSource, /className=\{styles\.proofPersistentStage\}/);
   assert.match(visualSource, /data-proof-phase=\{step\.kind\}/);
+  assert.match(visualSource, /function ProofScaleRackScene\(/);
+  assert.match(visualSource, /displayedProofScaleIndexes\(round\)\.map/);
+  assert.match(visualSource, /proofScaleStatesBeforeStep\(/);
   assert.doesNotMatch(visualSource, /function TeachingProofSceneCard\(/);
   assert.doesNotMatch(visualSource, /<article\b/);
   assert.doesNotMatch(visualSource, /styles\.proofTeachingScene/);
+});
+
+test("proofs name the strategy and keep every numbered scale in view", () => {
+  const proofVisual = sourceBetween(
+    visualSource,
+    "export function SolutionProofVisual(",
+    "\nconst LESSON_ACCENTS",
+    "SolutionProofVisual",
+  );
+  const rack = componentSource("ProofScaleRackScene", "TeachingProofPhase");
+
+  assert.match(
+    proofVisual,
+    /`Using strategy \$\{PROOF_STRATEGY_NAMES\[activeStep\.strategyId\]\}`/,
+  );
+  assert.match(
+    proofVisual,
+    /<h3 className=\{styles\.proofStrategyHeading\}>/,
+  );
+  assert.match(
+    curriculumSource,
+    /"cancel-matches":\s*"Cancel"/,
+  );
+  assert.match(curriculumSource, /substitution:\s*"Substitution"/);
+  assert.match(curriculumSource, /"create-combo":\s*"Combo"/);
+  assert.match(curriculumSource, /"add-scales":\s*"Add scales"/);
+  assert.match(curriculumSource, /"subtract-scales":\s*"Subtract scales"/);
+
+  assert.match(rack, /displayedProofScaleIndexes\(round\)\.map/);
+  assert.match(rack, /data-proof-scale-number=\{displayNumber\}/);
+  assert.match(rack, /\(\{displayNumber\}\)/);
+  assert.match(rack, /data-proof-scale-state=\{state\}/);
+  assert.match(visualSource, /label="Working"/);
+  assert.match(
+    visualSource,
+    /source\.copies > 1 \? `Use \$\{source\.copies\} copies` : "Use"/,
+  );
+  assert.match(stylesSource, /\.proofScaleLane\[data-proof-scale-state="working"\]/);
+  assert.match(stylesSource, /\.proofScaleLane\[data-proof-scale-state="source"\]/);
+  assert.match(
+    proofVisual,
+    /proofScaleStatesBeforeStep\(round, plan\.steps, displayedStepIndex\)/,
+  );
+  assert.match(
+    proofVisual,
+    /accessibleScaleStates\[workingScaleIndex\] = activeAfter/,
+  );
+  assert.doesNotMatch(
+    proofVisual,
+    /key=\{activeStep\.id\}/,
+    "changing steps must not remount the persistent proof canvas",
+  );
 });
 
 test("the local narration controller plays exactly one proof cue at a time", () => {
@@ -142,9 +197,9 @@ test("the local narration controller plays exactly one proof cue at a time", () 
   );
   assert.match(
     stylesSource,
-    /\.proofPhaseLayer\s*\{[^}]*position:\s*absolute;[^}]*inset:\s*0;/s,
+    /\.proofPhaseLayer\s*\{[^}]*position:\s*relative;/s,
   );
-  assert.match(stylesSource, /\.proofPhaseLayer\s*\{[^}]*transition:\s*opacity/s);
+  assert.match(stylesSource, /\.proofPhaseLayer\s*\{[^}]*transition:\s*none;/s);
 });
 
 test("phase changes do not slide or zoom the persistent proof canvas", () => {
@@ -153,7 +208,8 @@ test("phase changes do not slide or zoom the persistent proof canvas", () => {
   assert.doesNotMatch(stylesSource, /\.proofTeachingScene/);
 
   const phaseLayer = stylesSource.match(/\.proofPhaseLayer\s*\{[^}]*\}/s)?.[0] ?? "";
-  assert.match(phaseLayer, /transition:\s*opacity/);
+  assert.match(phaseLayer, /position:\s*relative/);
+  assert.match(phaseLayer, /transition:\s*none/);
   assert.doesNotMatch(phaseLayer, /\btranslate(?:X|Y)?\(/);
   assert.doesNotMatch(phaseLayer, /\bscale\(/);
   assert.doesNotMatch(stylesSource, /@keyframes proofPhaseCaption/);

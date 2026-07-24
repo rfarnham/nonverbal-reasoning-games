@@ -22,8 +22,14 @@ import type {
   Expression,
   Round,
 } from "./game-engine";
+import { describeExpression } from "./game-engine";
 import type { StrategyId, TeachingProofStep } from "./strategy-curriculum";
-import { buildTeachingProof } from "./strategy-curriculum";
+import {
+  PROOF_STRATEGY_NAMES,
+  buildTeachingProof,
+  displayedProofScaleIndexes,
+  displayedProofScaleNumber,
+} from "./strategy-curriculum";
 import {
   LIBRA_PROOF_NARRATION,
   proofNarrationCaption,
@@ -690,9 +696,9 @@ function proofGroupsAroundTarget(
 }
 
 function sourceLabel(source: TeachingSource): string {
-  return source.sourceIndex === null
-    ? "What we just found"
-    : `Scale ${source.sourceIndex + 1}`;
+  return source.copies > 1
+    ? `${source.copies} copies of scale (${source.sourceIndex + 1})`
+    : `Scale (${source.sourceIndex + 1})`;
 }
 
 function ProofScaleLoadGroup({
@@ -814,6 +820,7 @@ function ProofBalanceScale({
   travelers = [],
   className = "",
   accentMap,
+  children,
 }: {
   equation: BalanceEquation;
   label: string;
@@ -823,6 +830,7 @@ function ProofBalanceScale({
   travelers?: readonly ProofScaleTraveler[];
   className?: string;
   accentMap?: AccentMap;
+  children?: ReactNode;
 }) {
   const resolvedLeftGroups = leftGroups ?? [
     { expression: equation.left, tone: "plain" },
@@ -860,6 +868,7 @@ function ProofBalanceScale({
           </span>
         )),
       )}
+      {children}
     </ProofScaleFrame>
   );
 }
@@ -1444,7 +1453,581 @@ function TeachingProofSceneVisual({
   }
 }
 
+function proofStepAfterEquation(
+  step: TeachingProofStep,
+): BalanceEquation | null {
+  switch (step.kind) {
+    case "substitute":
+    case "add-scales":
+    case "subtract-scales":
+    case "cancel-matches":
+    case "split-evenly":
+      return step.after;
+    case "regroup":
+      return step.before;
+    case "conclude":
+      return step.equation;
+    case "inspect":
+      return null;
+  }
+}
+
+function proofScaleStatesBeforeStep(
+  round: Round,
+  steps: readonly TeachingProofStep[],
+  activeStepIndex: number,
+): readonly BalanceEquation[] {
+  const states = round.equations.map((equation) => equation);
+  for (const step of steps.slice(0, activeStepIndex)) {
+    const after = proofStepAfterEquation(step);
+    const workingScaleIndex = step.scaleFocus?.workingScaleIndex;
+    if (after && workingScaleIndex !== undefined) {
+      states[workingScaleIndex] = after;
+    }
+  }
+  return states;
+}
+
+function proofSourceForScale(
+  step: TeachingProofStep,
+  sourceIndex: number,
+): TeachingSource | null {
+  if (step.kind === "substitute") {
+    return step.source.sourceIndex === sourceIndex ? step.source : null;
+  }
+  if (step.kind === "add-scales" || step.kind === "subtract-scales") {
+    return (
+      step.before.find((source) => source.sourceIndex === sourceIndex) ?? null
+    );
+  }
+  return null;
+}
+
+function proofSourceEquation(source: TeachingSource): BalanceEquation {
+  if (source.copies === 1) return source.equation;
+  return {
+    left: source.equation.left.map(({ creature, count }) => ({
+      creature,
+      count: count * source.copies,
+    })),
+    right: source.equation.right.map(({ creature, count }) => ({
+      creature,
+      count: count * source.copies,
+    })),
+  };
+}
+
+function ProofWorkingScaleForStep({
+  step,
+  accentMap,
+}: {
+  step: TeachingProofStep;
+  accentMap?: AccentMap;
+}) {
+  switch (step.kind) {
+    case "substitute": {
+      const { replacement } = step;
+      const beforeLeftGroups =
+        replacement.side === "left"
+          ? proofGroupsAroundTarget(
+              step.before.left,
+              replacement.from,
+              replacement.copies,
+              "match",
+              "rack-substitution-before-left",
+            )
+          : undefined;
+      const beforeRightGroups =
+        replacement.side === "right"
+          ? proofGroupsAroundTarget(
+              step.before.right,
+              replacement.from,
+              replacement.copies,
+              "match",
+              "rack-substitution-before-right",
+            )
+          : undefined;
+      const afterLeftGroups =
+        replacement.side === "left"
+          ? proofGroupsAroundTarget(
+              step.after.left,
+              replacement.to,
+              replacement.copies,
+              "replacement",
+              "rack-substitution-after-left",
+            )
+          : undefined;
+      const afterRightGroups =
+        replacement.side === "right"
+          ? proofGroupsAroundTarget(
+              step.after.right,
+              replacement.to,
+              replacement.copies,
+              "replacement",
+              "rack-substitution-after-right",
+            )
+          : undefined;
+      return (
+        <ProofMorphingBalanceScale
+          before={step.before}
+          after={step.after}
+          label="Working"
+          beforeLabel="Before substitution"
+          afterLabel="After substitution"
+          beforeRole="substitution-before"
+          afterRole="substitution-after"
+          beforeLeftGroups={beforeLeftGroups}
+          beforeRightGroups={beforeRightGroups}
+          afterLeftGroups={afterLeftGroups}
+          afterRightGroups={afterRightGroups}
+          className={styles.proofRackScale}
+          accentMap={accentMap}
+        />
+      );
+    }
+    case "add-scales": {
+      const receiving = step.before[0];
+      return (
+        <ProofMorphingBalanceScale
+          before={proofSourceEquation(receiving)}
+          after={step.after}
+          label="Working"
+          beforeLabel="Before adding"
+          afterLabel="After adding"
+          beforeRole="add-receiver"
+          afterRole="add-result"
+          className={styles.proofRackScale}
+          accentMap={accentMap}
+        >
+          <span className={styles.proofSameChangeBadge} aria-hidden="true">
+            + left &nbsp;&nbsp; + right
+          </span>
+        </ProofMorphingBalanceScale>
+      );
+    }
+    case "subtract-scales": {
+      const guide = step.before[1];
+      const beforeLeftGroups: readonly ProofLoadGroup[] = [
+        ...(step.after.left.length > 0
+          ? [
+              {
+                expression: step.after.left,
+                tone: "plain" as const,
+                key: "rack-left-rest",
+              },
+            ]
+          : []),
+        {
+          expression: guide.equation.left,
+          tone: "remove",
+          key: "rack-left-remove",
+        },
+      ];
+      const beforeRightGroups: readonly ProofLoadGroup[] = [
+        ...(step.after.right.length > 0
+          ? [
+              {
+                expression: step.after.right,
+                tone: "plain" as const,
+                key: "rack-right-rest",
+              },
+            ]
+          : []),
+        {
+          expression: guide.equation.right,
+          tone: "remove",
+          key: "rack-right-remove",
+        },
+      ];
+      return (
+        <ProofMorphingBalanceScale
+          before={step.before[0].equation}
+          after={step.after}
+          label="Working"
+          beforeLabel="Before subtracting"
+          afterLabel="After subtracting"
+          beforeRole="subtract-working"
+          afterRole="subtract-result"
+          beforeLeftGroups={beforeLeftGroups}
+          beforeRightGroups={beforeRightGroups}
+          className={styles.proofRackScale}
+          accentMap={accentMap}
+        />
+      );
+    }
+    case "cancel-matches": {
+      const beforeLeftGroups: readonly ProofLoadGroup[] = [
+        ...(step.after.left.length > 0
+          ? [
+              {
+                expression: step.after.left,
+                tone: "plain" as const,
+                key: "rack-cancel-left-rest",
+              },
+            ]
+          : []),
+        {
+          expression: step.removed,
+          tone: "remove",
+          key: "rack-cancel-left-remove",
+        },
+      ];
+      const beforeRightGroups: readonly ProofLoadGroup[] = [
+        ...(step.after.right.length > 0
+          ? [
+              {
+                expression: step.after.right,
+                tone: "plain" as const,
+                key: "rack-cancel-right-rest",
+              },
+            ]
+          : []),
+        {
+          expression: step.removed,
+          tone: "remove",
+          key: "rack-cancel-right-remove",
+        },
+      ];
+      return (
+        <ProofMorphingBalanceScale
+          before={step.before}
+          after={step.after}
+          label="Working"
+          beforeLabel="Before cancellation"
+          afterLabel="After cancellation"
+          beforeRole="cancel-before"
+          afterRole="cancel-after"
+          beforeLeftGroups={beforeLeftGroups}
+          beforeRightGroups={beforeRightGroups}
+          className={styles.proofRackScale}
+          accentMap={accentMap}
+        />
+      );
+    }
+    case "regroup":
+      return (
+        <ProofMorphingBalanceScale
+          before={step.before}
+          after={step.before}
+          label="Working"
+          beforeLabel="Before grouping"
+          afterLabel={`${step.after.groupCount} equal combos`}
+          beforeRole="regroup-before"
+          afterRole="regroup-after"
+          afterLeftGroups={groupedProofLoads(
+            step.after.leftBundle,
+            step.after.groupCount,
+            "bundle",
+            "left",
+          )}
+          afterRightGroups={groupedProofLoads(
+            step.after.rightBundle,
+            step.after.groupCount,
+            "bundle",
+            "right",
+          )}
+          className={styles.proofRackScale}
+          accentMap={accentMap}
+        />
+      );
+    case "split-evenly": {
+      let grouped: TeachingGroupedEquationValue;
+      let expandedEquation: BalanceEquation;
+      if (isGroupedEquation(step.before)) {
+        grouped = step.before;
+        expandedEquation = {
+          left: grouped.leftBundle.map(({ creature, count }) => ({
+            creature,
+            count: count * grouped.groupCount,
+          })),
+          right: grouped.rightBundle.map(({ creature, count }) => ({
+            creature,
+            count: count * grouped.groupCount,
+          })),
+        };
+      } else {
+        grouped = {
+          groupCount: step.divisor,
+          leftBundle: expressionPerCopy(step.before.left, step.divisor),
+          rightBundle: expressionPerCopy(step.before.right, step.divisor),
+        };
+        expandedEquation = step.before;
+      }
+      return (
+        <ProofMorphingBalanceScale
+          before={expandedEquation}
+          after={step.after}
+          label="Working"
+          beforeLabel={`${step.divisor} equal groups`}
+          afterLabel="One group"
+          beforeRole="split-grouped"
+          afterRole="split-result"
+          beforeLeftGroups={groupedProofLoads(
+            grouped.leftBundle,
+            grouped.groupCount,
+            "split",
+            "left",
+          )}
+          beforeRightGroups={groupedProofLoads(
+            grouped.rightBundle,
+            grouped.groupCount,
+            "split",
+            "right",
+          )}
+          className={`${styles.proofRackScale} ${styles.proofSplitMorph}`}
+          accentMap={accentMap}
+        >
+          <span
+            className={styles.proofScaleDivideBadge}
+            data-proof-motion="divide-sign"
+          >
+            ÷ {step.divisor}
+          </span>
+        </ProofMorphingBalanceScale>
+      );
+    }
+    case "inspect":
+      return (
+        <ProofBalanceScale
+          equation={step.sources[0]?.equation ?? { left: [], right: [] }}
+          label="Working"
+          role="source"
+          className={styles.proofRackScale}
+          accentMap={accentMap}
+        />
+      );
+    case "conclude":
+      return (
+        <ProofBalanceScale
+          equation={step.equation}
+          label="Answer"
+          role="conclusion"
+          className={styles.proofRackScale}
+          accentMap={accentMap}
+        />
+      );
+  }
+}
+
+function ProofRackTransferGhost({
+  round,
+  step,
+  source,
+  accentMap,
+}: {
+  round: Round;
+  step: Extract<TeachingProofStep, { kind: "substitute" | "add-scales" }>;
+  source: TeachingSource;
+  accentMap?: AccentMap;
+}) {
+  const focus = step.scaleFocus;
+  if (!focus) return null;
+  const sourceNumber = displayedProofScaleNumber(round, source.sourceIndex);
+  const targetNumber = displayedProofScaleNumber(
+    round,
+    focus.workingScaleIndex,
+  );
+  const laneDelta = targetNumber - sourceNumber;
+  const laneStep = "var(--proof-scale-lane-step)";
+  const transferDistance =
+    laneDelta === 0
+      ? "0px"
+      : laneDelta > 0
+        ? `calc(${Array.from({ length: laneDelta }, () => laneStep).join(
+            " + ",
+          )})`
+        : `calc(0px - ${Array.from(
+            { length: Math.abs(laneDelta) },
+            () => laneStep,
+          ).join(" - ")})`;
+  const transferStyle = {
+    "--proof-rack-transfer-y": transferDistance,
+  } as CSSProperties;
+
+  if (step.kind === "substitute") {
+    const replacement = step.replacement;
+    return (
+      <span
+        className={styles.proofRackTransferGhost}
+        data-proof-transfer="substitution"
+        data-source-side={replacement.sourceToSide}
+        data-target-side={replacement.side}
+        style={transferStyle}
+      >
+        <ProofScalePan
+          side={replacement.sourceToSide}
+          groups={proofGroupsForCopies(
+            replacement.to,
+            replacement.copies,
+            "replacement",
+            "rack-substitution-transfer",
+          )}
+          accentMap={accentMap}
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={styles.proofRackTransferGhost}
+      data-proof-transfer="add-scales"
+      style={transferStyle}
+    >
+      <ProofScaleCargoLayer
+        role="add-transfer"
+        leftGroups={proofGroupsForCopies(
+          source.equation.left,
+          source.copies,
+          "move",
+          "rack-add-left-transfer",
+        )}
+        rightGroups={proofGroupsForCopies(
+          source.equation.right,
+          source.copies,
+          "move",
+          "rack-add-right-transfer",
+        )}
+        accentMap={accentMap}
+      />
+    </span>
+  );
+}
+
+function ProofReferenceScale({
+  round,
+  step,
+  source,
+  accentMap,
+}: {
+  round: Round;
+  step: TeachingProofStep;
+  source: TeachingSource;
+  accentMap?: AccentMap;
+}) {
+  let leftGroups: readonly ProofLoadGroup[] | undefined;
+  let rightGroups: readonly ProofLoadGroup[] | undefined;
+  if (step.kind === "substitute") {
+    leftGroups = [
+      {
+        expression: source.equation.left,
+        tone:
+          step.replacement.sourceFromSide === "left"
+            ? "match"
+            : "replacement",
+      },
+    ];
+    rightGroups = [
+      {
+        expression: source.equation.right,
+        tone:
+          step.replacement.sourceFromSide === "right"
+            ? "match"
+            : "replacement",
+      },
+    ];
+  } else if (step.kind === "subtract-scales") {
+    leftGroups = [{ expression: source.equation.left, tone: "guide" }];
+    rightGroups = [{ expression: source.equation.right, tone: "guide" }];
+  }
+
+  const label = source.copies > 1 ? `Use ${source.copies} copies` : "Use";
+  return (
+    <ProofBalanceScale
+      equation={source.equation}
+      label={label}
+      role={
+        step.kind === "subtract-scales"
+          ? "subtract-guide"
+          : step.kind === "add-scales"
+            ? "add-donor"
+            : "substitution-source"
+      }
+      leftGroups={leftGroups}
+      rightGroups={rightGroups}
+      className={styles.proofRackScale}
+      accentMap={accentMap}
+    >
+      {step.kind === "substitute" || step.kind === "add-scales" ? (
+        <ProofRackTransferGhost
+          round={round}
+          step={step}
+          source={source}
+          accentMap={accentMap}
+        />
+      ) : null}
+    </ProofBalanceScale>
+  );
+}
+
+function ProofScaleRackScene({
+  round,
+  steps,
+  step,
+  stepIndex,
+  accentMap,
+}: {
+  round: Round;
+  steps: readonly TeachingProofStep[];
+  step: TeachingProofStep;
+  stepIndex: number;
+  accentMap?: AccentMap;
+}) {
+  const states = proofScaleStatesBeforeStep(round, steps, stepIndex);
+  const focus = step.scaleFocus;
+  return (
+    <div
+      className={styles.proofScaleRack}
+      data-proof-phase={step.kind}
+      data-proof-scale-count={round.equations.length}
+    >
+      {displayedProofScaleIndexes(round).map((sourceIndex) => {
+        const isWorking = focus?.workingScaleIndex === sourceIndex;
+        const isSource =
+          focus?.sourceScaleIndexes.includes(sourceIndex) ?? false;
+        const source = proofSourceForScale(step, sourceIndex);
+        const displayNumber = displayedProofScaleNumber(round, sourceIndex);
+        const state = isWorking ? "working" : isSource ? "source" : "idle";
+        return (
+          <div
+            className={styles.proofScaleLane}
+            data-proof-scale-state={state}
+            data-proof-scale-number={displayNumber}
+            key={`proof-scale-${sourceIndex}`}
+          >
+            <span className={styles.proofScaleNumber} aria-hidden="true">
+              ({displayNumber})
+            </span>
+            <span className={styles.proofScaleLaneBody}>
+              {isWorking ? (
+                <ProofWorkingScaleForStep step={step} accentMap={accentMap} />
+              ) : source ? (
+                <ProofReferenceScale
+                  round={round}
+                  step={step}
+                  source={source}
+                  accentMap={accentMap}
+                />
+              ) : (
+                <ProofBalanceScale
+                  equation={states[sourceIndex]}
+                  label="Balanced"
+                  role="persistent-scale"
+                  className={styles.proofRackScale}
+                  accentMap={accentMap}
+                />
+              )}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function TeachingProofPhase({
+  round,
+  steps,
   step,
   stepIndex,
   stepCount,
@@ -1453,6 +2036,8 @@ function TeachingProofPhase({
   nextKind,
   accentMap,
 }: {
+  round: Round;
+  steps: readonly TeachingProofStep[];
   step: TeachingProofStep;
   stepIndex: number;
   stepCount: number;
@@ -1485,11 +2070,13 @@ function TeachingProofPhase({
       }
       style={phaseStyle}
     >
-      <div className={styles.proofPhaseEnter}>
-        <div className={styles.proofPhaseExit}>
-          <TeachingProofSceneVisual step={step} accentMap={accentMap} />
-        </div>
-      </div>
+      <ProofScaleRackScene
+        round={round}
+        steps={steps}
+        step={step}
+        stepIndex={stepIndex}
+        accentMap={accentMap}
+      />
     </div>
   );
 }
@@ -1640,8 +2227,26 @@ export function SolutionProofVisual({
     // Continue is a fresh user gesture, so use it to keep WebKit narration
     // unlocked before the next cue swaps onto the shared media element.
     narrationPlayerRef.current?.prime();
+    proofRegionRef.current?.focus();
     setCueStage("narrating");
     setActiveStepIndex((current) => current + 1);
+  }
+
+  const strategyHeading =
+    activeStep.strategyId === null
+      ? activeStep.kind === "conclude"
+        ? "Answer"
+        : "Look closely"
+      : `Using strategy ${PROOF_STRATEGY_NAMES[activeStep.strategyId]}`;
+  const accessibleScaleStates = [
+    ...proofScaleStatesBeforeStep(round, plan.steps, displayedStepIndex),
+  ];
+  if (cueStage === "ready" || proofState === "settled") {
+    const activeAfter = proofStepAfterEquation(activeStep);
+    const workingScaleIndex = activeStep.scaleFocus?.workingScaleIndex;
+    if (activeAfter && workingScaleIndex !== undefined) {
+      accessibleScaleStates[workingScaleIndex] = activeAfter;
+    }
   }
 
   return (
@@ -1673,27 +2278,41 @@ export function SolutionProofVisual({
           Close explanation
         </button>
       ) : null}
+      <h3 className={styles.proofStrategyHeading}>
+        {strategyHeading}
+      </h3>
       <div className={styles.proofSceneViewport} aria-hidden="true">
         <div
           className={styles.proofPersistentStage}
           data-proof-stage="persistent"
         >
           <div className={styles.proofPersistentCanvas}>
-            {plan.steps.map((step, stepIndex) => (
-              <TeachingProofPhase
-                step={step}
-                stepIndex={stepIndex}
-                stepCount={plan.steps.length}
-                activeStepIndex={displayedStepIndex}
-                previousKind={plan.steps[stepIndex - 1]?.kind}
-                nextKind={plan.steps[stepIndex + 1]?.kind}
-                accentMap={accentMap}
-                key={step.id}
-              />
-            ))}
+            <TeachingProofPhase
+              round={round}
+              steps={plan.steps}
+              step={activeStep}
+              stepIndex={displayedStepIndex}
+              stepCount={plan.steps.length}
+              activeStepIndex={displayedStepIndex}
+              previousKind={plan.steps[displayedStepIndex - 1]?.kind}
+              nextKind={plan.steps[displayedStepIndex + 1]?.kind}
+              accentMap={accentMap}
+            />
           </div>
         </div>
       </div>
+      <ol className={styles.proofSrOnly} aria-label="Numbered scales">
+        {displayedProofScaleIndexes(round).map((sourceIndex) => {
+          const equation = accessibleScaleStates[sourceIndex];
+          return (
+            <li key={`proof-scale-summary-${sourceIndex}`}>
+              Scale {displayedProofScaleNumber(round, sourceIndex)}:{" "}
+              {describeExpression(equation.left)} balances{" "}
+              {describeExpression(equation.right)}.
+            </li>
+          );
+        })}
+      </ol>
       <div className={styles.proofStepFooter}>
         <p className={styles.proofStepProgress}>
           Step {displayedStepIndex + 1} of {plan.steps.length}
@@ -1704,6 +2323,7 @@ export function SolutionProofVisual({
           aria-atomic="true"
         >
           <span aria-hidden="true">♪</span>
+          <span className={styles.proofSrOnly}>{strategyHeading}. </span>
           {proofNarrationCaption(activeStep)}
         </p>
         {cueStage === "ready" ? (
