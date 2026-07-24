@@ -126,6 +126,7 @@
 .soundButton:focus-visible,
 .primaryButton:focus-visible,
 .secondaryButton:focus-visible,
+.levelUpAction:focus-visible,
 .avatarOption:focus-visible,
 .nodeButton:focus-visible,
 .profileChoice:focus-visible,
@@ -133,6 +134,221 @@
 .dangerButton:focus-visible {
   outline: 3px solid var(--journey-focus);
   outline-offset: 4px;
+}
+
+.levelUpScrim {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  overflow: hidden;
+  background: rgb(23 33 61 / 72%);
+  backdrop-filter: blur(5px);
+}
+
+.levelUpSplash {
+  position: relative;
+  isolation: isolate;
+  width: min(580px, 100%);
+  overflow: hidden;
+  padding: clamp(28px, 7vw, 54px);
+  border: 2px solid var(--journey-ink);
+  border-radius: 30px;
+  background: #f3bd4e;
+  color: var(--journey-ink);
+  text-align: center;
+  box-shadow: 10px 12px 0 var(--journey-ink);
+  animation: level-up-arrive 520ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.levelUpBurst {
+  position: absolute;
+  z-index: -2;
+  inset: -45%;
+  background: repeating-conic-gradient(
+    from -8deg,
+    rgb(255 253 248 / 82%) 0deg 9deg,
+    transparent 9deg 21deg
+  );
+  animation: level-up-burst 900ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.levelUpSplash::after {
+  position: absolute;
+  z-index: -1;
+  inset: 16px;
+  border: 2px solid rgb(23 33 61 / 18%);
+  border-radius: 20px;
+  content: "";
+  pointer-events: none;
+}
+
+.levelUpKicker {
+  margin: 0 0 18px;
+  color: #3b318b;
+  font-size: clamp(2.8rem, 12vw, 5.8rem);
+  font-weight: 900;
+  letter-spacing: -0.08em;
+  line-height: 0.8;
+  text-transform: uppercase;
+  text-shadow: 3px 3px 0 var(--journey-panel);
+}
+
+.levelUpMedallion {
+  width: clamp(148px, 38vw, 190px);
+  aspect-ratio: 1;
+  display: grid;
+  place-content: center;
+  gap: 0;
+  margin: 0 auto 18px;
+  border: 7px solid var(--journey-panel);
+  border-radius: 50%;
+  background: var(--journey-ink);
+  color: var(--journey-panel);
+  box-shadow:
+    0 0 0 3px var(--journey-ink),
+    0 12px 0 rgb(23 33 61 / 20%);
+  animation: level-up-medallion 660ms 120ms
+    cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.levelUpMedallion span {
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.levelUpMedallion strong {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: clamp(4rem, 15vw, 6rem);
+  letter-spacing: -0.1em;
+  line-height: 0.88;
+}
+
+.levelUpSplash h2 {
+  margin: 0;
+  font-size: clamp(1.5rem, 5vw, 2.15rem);
+  letter-spacing: -0.05em;
+}
+
+.levelUpSplash p:not(.levelUpKicker) {
+  margin: 8px 0 24px;
+  font-weight: 700;
+}
+
+.levelUpAction {
+  min-height: 48px;
+  padding: 0 24px;
+  border: 1px solid var(--journey-ink);
+  border-radius: 999px;
+  background: var(--journey-ink);
+  color: var(--journey-panel);
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.levelUpAction:hover {
+  transform: translateY(-2px);
+}
+
+.levelUpSparkles span {
+  position: absolute;
+  color: #7767d7;
+  font-size: clamp(1.3rem, 5vw, 2.2rem);
+  animation: level-up-sparkle 700ms 280ms both;
+}
+
+.levelUpSparkles span:nth-child(1) {
+  top: 18%;
+  left: 10%;
+}
+
+.levelUpSparkles span:nth-child(2) {
+  top: 35%;
+  right: 9%;
+  color: #16836b;
+  animation-delay: 360ms;
+}
+
+.levelUpSparkles span:nth-child(3) {
+  bottom: 22%;
+  left: 12%;
+  color: #bf493e;
+  animation-delay: 440ms;
+}
+
+.levelUpSparkles span:nth-child(4) {
+  right: 14%;
+  bottom: 16%;
+  color: #1679d2;
+  animation-delay: 520ms;
+}
+
+.levelUpSparkles span:nth-child(5) {
+  top: 51%;
+  left: 20%;
+  font-size: 1rem;
+  animation-delay: 600ms;
+}
+
+.levelUpSparkles span:nth-child(6) {
+  top: 13%;
+  right: 22%;
+  color: #f06f5f;
+  font-size: 1.1rem;
+  animation-delay: 680ms;
+}
+
+@keyframes level-up-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.9) rotate(-1deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0);
+  }
+}
+
+@keyframes level-up-burst {
+  from {
+    opacity: 0;
+    transform: scale(0.55) rotate(-8deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+@keyframes level-up-medallion {
+  from {
+    opacity: 0;
+    transform: scale(0.35) rotate(-10deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+@keyframes level-up-sparkle {
+  from {
+    opacity: 0;
+    transform: scale(0) rotate(-30deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
 }
 
 .loading {
@@ -962,6 +1178,12 @@
   .summaryStat {
     min-height: 78px;
   }
+
+  .levelUpSplash {
+    padding-inline: 20px;
+    border-radius: 23px;
+    box-shadow: 6px 7px 0 var(--journey-ink);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -974,6 +1196,13 @@
   }
 
   .walkerArriving {
+    animation: none;
+  }
+
+  .levelUpSplash,
+  .levelUpBurst,
+  .levelUpMedallion,
+  .levelUpSparkles span {
     animation: none;
   }
 }

@@ -59,8 +59,10 @@ import {
 import {
   createJourneyAttempt,
   consumeJourneyArrival,
+  consumeJourneyLevelUp,
   journeyCatalogSnapshot,
   navigateToProgressionAttempt,
+  type JourneyLevelUpArrival,
 } from "./journey-launch";
 
 import styles from "@/app/journey/journey.module.css";
@@ -233,6 +235,73 @@ function JourneyTopbar({
         ) : null}
       </div>
     </header>
+  );
+}
+
+function LevelUpSplash({
+  celebration,
+  onClose,
+}: {
+  celebration: JourneyLevelUpArrival;
+  onClose: () => void;
+}) {
+  const actionRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    actionRef.current?.focus();
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      } else if (event.key === "Tab") {
+        event.preventDefault();
+        actionRef.current?.focus();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className={styles.levelUpScrim}>
+      <section
+        className={styles.levelUpSplash}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="level-up-title"
+        aria-describedby="level-up-message"
+      >
+        <div className={styles.levelUpBurst} aria-hidden="true" />
+        <div className={styles.levelUpSparkles} aria-hidden="true">
+          <span>✦</span>
+          <span>✦</span>
+          <span>✦</span>
+          <span>✦</span>
+          <span>✦</span>
+          <span>✦</span>
+        </div>
+        <p className={styles.levelUpKicker}>Level up!</p>
+        <div
+          className={styles.levelUpMedallion}
+          aria-label={`Level ${celebration.level}`}
+        >
+          <span>Level</span>
+          <strong>{celebration.level}</strong>
+        </div>
+        <h2 id="level-up-title">Your practice is adding up.</h2>
+        <p id="level-up-message">
+          You reached {celebration.totalXp.toLocaleString()} total XP.
+        </p>
+        <button
+          className={styles.levelUpAction}
+          type="button"
+          onClick={onClose}
+          ref={actionRef}
+        >
+          Keep exploring <span aria-hidden="true">→</span>
+        </button>
+      </section>
+    </div>
   );
 }
 
@@ -771,8 +840,11 @@ export function JourneyClient() {
   const [viewedLevel, setViewedLevel] =
     useState<JourneyLevel>("starter");
   const [arrivalNodeId, setArrivalNodeId] = useState<string | null>(null);
+  const [levelUpArrival, setLevelUpArrival] =
+    useState<JourneyLevelUpArrival | null>(null);
 
   const profile = state ? activePlayerProfile(state) : undefined;
+  const activeProfileId = profile?.id;
   const journey = useMemo(
     () =>
       profile
@@ -884,6 +956,19 @@ export function JourneyClient() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [journey, profile]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () =>
+        setLevelUpArrival(
+          activeProfileId
+            ? consumeJourneyLevelUp(activeProfileId)
+            : null,
+        ),
+      0,
+    );
+    return () => window.clearTimeout(timer);
+  }, [activeProfileId]);
 
   useEffect(() => {
     if (!arrivalNodeId) return;
@@ -1205,6 +1290,19 @@ export function JourneyClient() {
         onLaunch={launch}
         onRestartActive={restartActiveStop}
       />
+      {levelUpArrival ? (
+        <LevelUpSplash
+          celebration={levelUpArrival}
+          onClose={() => {
+            setLevelUpArrival(null);
+            window.requestAnimationFrame(() => {
+              document
+                .querySelector<HTMLElement>('[aria-current="step"]')
+                ?.focus();
+            });
+          }}
+        />
+      ) : null}
       {profilePanelOpen ? (
         <ProfilePanel
           key={profile.id}

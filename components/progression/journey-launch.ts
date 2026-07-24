@@ -18,6 +18,13 @@ import {
 
 const basePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
 const JOURNEY_ARRIVAL_KEY = "spatial-gym:journey-arrival";
+const JOURNEY_LEVEL_UP_KEY = "spatial-gym:journey-level-up";
+
+export type JourneyLevelUpArrival = Readonly<{
+  profileId: string;
+  level: number;
+  totalXp: number;
+}>;
 
 function nextAttemptId(stopId: string) {
   try {
@@ -239,6 +246,43 @@ export function consumeJourneyArrival(profileId: string): string | null {
     };
     return value.profileId === profileId && typeof value.nodeId === "string"
       ? value.nodeId
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export function markJourneyLevelUp(
+  profileId: string,
+  level: number,
+  totalXp: number,
+) {
+  try {
+    window.sessionStorage.setItem(
+      JOURNEY_LEVEL_UP_KEY,
+      JSON.stringify({ profileId, level, totalXp }),
+    );
+  } catch {
+    // Level celebrations are optional when session storage is unavailable.
+  }
+}
+
+export function consumeJourneyLevelUp(
+  profileId: string,
+): JourneyLevelUpArrival | null {
+  try {
+    const serialized = window.sessionStorage.getItem(JOURNEY_LEVEL_UP_KEY);
+    window.sessionStorage.removeItem(JOURNEY_LEVEL_UP_KEY);
+    if (!serialized) return null;
+    const value = JSON.parse(serialized) as Partial<JourneyLevelUpArrival>;
+    return value.profileId === profileId &&
+      Number.isInteger(value.level) &&
+      Number.isFinite(value.totalXp)
+      ? {
+          profileId,
+          level: value.level!,
+          totalXp: value.totalXp!,
+        }
       : null;
   } catch {
     return null;

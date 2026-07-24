@@ -17,6 +17,7 @@ import {
   activePlayerProfile,
   buildJourneyPlanForVersion,
   closeAttemptSummary,
+  cosmeticJourneyLevelCrossed,
   findJourneyNode,
   isJourneyTestProfile,
   journeyLevelLabel,
@@ -36,6 +37,7 @@ import {
 import {
   createJourneyAttempt,
   markJourneyArrival,
+  markJourneyLevelUp,
   navigateToJourney,
   navigateToProgressionAttempt,
 } from "./journey-launch";
@@ -301,6 +303,9 @@ export function JourneySummaryClient() {
         latest.profile,
         latest.attempt,
       );
+      const xpBefore = profileXpTotal(latest.profile);
+      const xpAfter = profileXpTotal(result.profile);
+      const cosmeticLevel = cosmeticJourneyLevelCrossed(xpBefore, xpAfter);
       const resultTestingMode = isJourneyTestProfile(result.profile);
       const nextProfile =
         result.settlement.passed || resultTestingMode
@@ -315,6 +320,13 @@ export function JourneySummaryClient() {
 
       if (result.settlement.passed || resultTestingMode) {
         if (!resultTestingMode) {
+          if (cosmeticLevel) {
+            markJourneyLevelUp(
+              result.profile.id,
+              cosmeticLevel.level,
+              xpAfter,
+            );
+          }
           const nextNode = nextIncompleteJourneyNode(nextProfile);
           if (nextNode) markJourneyArrival(nextProfile.id, nextNode.id);
         } else {
