@@ -13,6 +13,7 @@ import {
   calculateAnswer,
   canonicalEquationKey,
   createSeededRandom,
+  describeExpression,
   expressionItemCount,
   expressionKey,
   generateInfiniteRound,
@@ -1368,4 +1369,18 @@ test("tutorial and feedback copy preserve the hidden Wizard inference", () => {
   ).at(-2);
   assert.match(solutionStrategyFeedback(juniorAdd), /Add the balances/);
   assert.match(solutionStrategyFeedback(juniorAdd), /3 matching target groups/);
+});
+
+test("visible and accessible balance descriptions use natural plurals", () => {
+  assert.equal(
+    describeExpression([
+      { creature: "goose", count: 2 },
+      { creature: "fox", count: 3 },
+    ]),
+    "2 geese and 3 foxes",
+  );
+  assert.equal(
+    describeExpression([{ creature: MYSTERY_TOKEN, count: 2 }]),
+    "2 sealed loads",
+  );
 });

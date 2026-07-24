@@ -112,6 +112,15 @@ export const STRATEGY_CATALOGUE_BY_ID: Readonly<
 export const STRATEGY_CATALOGUE: readonly StrategyCatalogueEntry[] =
   STRATEGY_IDS.map((id) => STRATEGY_CATALOGUE_BY_ID[id]);
 
+export const PROOF_STRATEGY_NAMES: Readonly<Record<StrategyId, string>> = {
+  "split-evenly": "Split",
+  "cancel-matches": "Cancel",
+  substitution: "Substitution",
+  "create-combo": "Combo",
+  "add-scales": "Add scales",
+  "subtract-scales": "Subtract scales",
+};
+
 type StrategyRound = Round;
 
 /**
@@ -280,7 +289,8 @@ export type SolutionProof = {
 };
 
 export type TeachingEquationSource = {
-  sourceIndex: number | null;
+  sourceIndex: number;
+  copies: number;
   equation: BalanceEquation;
 };
 
@@ -304,6 +314,10 @@ type TeachingProofStepBase = {
   title: string;
   text: string;
   strategyId: StrategyId | null;
+  scaleFocus: {
+    workingScaleIndex: number;
+    sourceScaleIndexes: readonly number[];
+  } | null;
 };
 
 export type TeachingInspectStep = TeachingProofStepBase & {
@@ -630,10 +644,12 @@ function equationsMatch(
 
 function teachingSource(
   equation: BalanceEquation,
-  sourceIndex: number | null,
+  sourceIndex: number,
+  copies = 1,
 ): TeachingEquationSource {
   return {
     sourceIndex,
+    copies,
     equation: canonicalEquation(equation),
   };
 }
@@ -704,6 +720,26 @@ function assertChanged(
   }
 }
 
+export function displayedProofScaleIndexes(
+  round: Pick<Round, "equations" | "scaffold">,
+): readonly number[] {
+  return (
+    round.scaffold?.equationOrder ??
+    round.equations.map((_, equationIndex) => equationIndex)
+  );
+}
+
+export function displayedProofScaleNumber(
+  round: Pick<Round, "equations" | "scaffold">,
+  sourceIndex: number,
+): number {
+  const displayedIndex = displayedProofScaleIndexes(round).indexOf(sourceIndex);
+  if (displayedIndex < 0) {
+    throw new Error("A proof step referenced a scale that is not displayed.");
+  }
+  return displayedIndex + 1;
+}
+
 /**
  * Builds the shortest curriculum-approved visual path for a round. Unlike the
  * signed certificate, this plan models the order a learner should actually
@@ -723,12 +759,37 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
 
   const nextId = (kind: TeachingProofStep["kind"]): string =>
     `${++stepNumber}-${kind}`;
+  const scaleLabel = (sourceIndex: number): string =>
+    `scale (${displayedProofScaleNumber(round, sourceIndex)})`;
   const source = (
     equation: BalanceEquation,
-    sourceIndex: number | null,
-  ): TeachingEquationSource => teachingSource(equation, sourceIndex);
+    sourceIndex: number,
+    copies = 1,
+  ): TeachingEquationSource => teachingSource(equation, sourceIndex, copies);
+  const sourceLabel = (equationSource: TeachingEquationSource): string =>
+    equationSource.copies === 1
+      ? scaleLabel(equationSource.sourceIndex)
+      : `${equationSource.copies} copies of ${scaleLabel(
+          equationSource.sourceIndex,
+        )}`;
+  const expandedSourceEquation = (
+    equationSource: TeachingEquationSource,
+  ): BalanceEquation =>
+    equationSource.copies === 1
+      ? equationSource.equation
+      : canonicalEquation({
+          left: scaleExpression(
+            equationSource.equation.left,
+            equationSource.copies,
+          ),
+          right: scaleExpression(
+            equationSource.equation.right,
+            equationSource.copies,
+          ),
+        });
   const substitute = ({
     before,
+    beforeScaleIndex,
     sourceEquation,
     sourceIndex,
     side,
@@ -737,8 +798,9 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
     copies = 1,
   }: {
     before: BalanceEquation;
+    beforeScaleIndex: number;
     sourceEquation: BalanceEquation;
-    sourceIndex: number | null;
+    sourceIndex: number;
     side: "left" | "right";
     from: Expression;
     to: Expression;
@@ -772,15 +834,27 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
       title: "Replace an equal load",
       text:
         copies === 1
-          ? `The highlighted balance shows that ${sourceEquality}. Replace ${expressionText(
+          ? `${sentenceCase(scaleLabel(
+              sourceIndex,
+            ))} shows that ${sourceEquality}. On ${scaleLabel(
+              beforeScaleIndex,
+            )}, replace ${expressionText(
               scaledFrom,
             )} on the ${side} tray with ${expressionText(scaledTo)}.`
-          : `The highlighted balance shows that ${sourceEquality}. The ${side} tray has ${expressionText(
+          : `${sentenceCase(scaleLabel(
+              sourceIndex,
+            ))} shows that ${sourceEquality}. The ${side} tray of ${scaleLabel(
+              beforeScaleIndex,
+            )} has ${expressionText(
               scaledFrom,
             )}. Replace ${expressionText(
               canonicalExpression(from),
             )} at a time with ${expressionText(canonicalExpression(to))}.`,
       strategyId: "substitution",
+      scaleFocus: {
+        workingScaleIndex: beforeScaleIndex,
+        sourceScaleIndexes: [sourceIndex],
+      },
       before: canonicalEquation(before),
       after,
       source: source(sourceEquation, sourceIndex),
@@ -798,7 +872,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
   const addScales = (
     inputs: readonly TeachingEquationSource[],
   ): BalanceEquation => {
-    const after = addEquations(inputs.map(({ equation }) => equation));
+    const after = addEquations(inputs.map(expandedSourceEquation));
     const removable = commonExpression(after.left, after.right);
     const motivation =
       removable.length > 0
@@ -812,8 +886,14 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
       id: nextId("add-scales"),
       kind: "add-scales",
       title: "Join the balanced scales",
-      text: `${motivation} Move the second balance's loads onto the matching trays of the first.`,
+      text: `${motivation} Add ${sourceLabel(inputs[1])} to ${sourceLabel(
+        inputs[0],
+      )}: left tray to left tray and right tray to right tray.`,
       strategyId: "add-scales",
+      scaleFocus: {
+        workingScaleIndex: inputs[0].sourceIndex,
+        sourceScaleIndexes: inputs.slice(1).map(({ sourceIndex }) => sourceIndex),
+      },
       before: inputs,
       after,
     });
@@ -829,12 +909,20 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
       id: nextId("subtract-scales"),
       kind: "subtract-scales",
       title: "Remove one balance",
-      text: `The second balance's loads appear inside the first. Remove ${expressionText(
+      text: `Subtract ${sourceLabel(subtrahend)} from ${sourceLabel(
+        minuend,
+      )}. Remove ${expressionText(
         subtrahend.equation.left,
       )} from the left tray and ${expressionText(
         subtrahend.equation.right,
-      )} from the right tray. Now ${equationText(after)}.`,
+      )} from the right tray of ${scaleLabel(
+        minuend.sourceIndex,
+      )}. Now ${equationText(after)}.`,
       strategyId: "subtract-scales",
+      scaleFocus: {
+        workingScaleIndex: minuend.sourceIndex,
+        sourceScaleIndexes: [subtrahend.sourceIndex],
+      },
       before: [minuend, subtrahend],
       after,
     });
@@ -842,6 +930,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
   };
   const cancelMatches = (
     before: BalanceEquation,
+    scaleIndex: number,
     removed: Expression = commonExpression(before.left, before.right),
   ): BalanceEquation => {
     const canonicalRemoved = canonicalExpression(removed);
@@ -859,12 +948,16 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
       id: nextId("cancel-matches"),
       kind: "cancel-matches",
       title: "Remove the matching loads",
-      text: `${sentenceCase(expressionText(
+      text: `On ${scaleLabel(scaleIndex)}, ${expressionText(
         canonicalRemoved,
-      ))} ${removedIsSingular ? "appears" : "appear"} on both trays. Remove ${expressionText(
+      )} ${removedIsSingular ? "appears" : "appear"} on both trays. Remove ${expressionText(
         canonicalRemoved,
       )} from each tray. Now ${equationText(after)}.`,
       strategyId: "cancel-matches",
+      scaleFocus: {
+        workingScaleIndex: scaleIndex,
+        sourceScaleIndexes: [],
+      },
       before: canonicalEquation(before),
       after,
       removed: canonicalRemoved,
@@ -874,6 +967,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
   const regroupAndSplit = (
     before: BalanceEquation,
     divisor: number,
+    scaleIndex: number,
   ): BalanceEquation => {
     if (!Number.isSafeInteger(divisor) || divisor <= 1) {
       throw new Error("Regrouping needs at least two matching bundles.");
@@ -896,7 +990,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
       id: nextId("regroup"),
       kind: "regroup",
       title: `Make ${divisor} equal groups`,
-      text: `The left tray has ${expressionText(
+      text: `On ${scaleLabel(scaleIndex)}, the left tray has ${expressionText(
         before.left,
       )}. Circle ${divisor} groups, each with ${expressionText(
         grouped.leftBundle,
@@ -904,6 +998,10 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
         before.right,
       )} on the right into ${divisor} equal groups.`,
       strategyId: "create-combo",
+      scaleFocus: {
+        workingScaleIndex: scaleIndex,
+        sourceScaleIndexes: [],
+      },
       before: canonicalEquation(before),
       after: grouped,
     });
@@ -911,10 +1009,16 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
       id: nextId("split-evenly"),
       kind: "split-evenly",
       title: `Keep one of the ${divisor} groups`,
-      text: `Each tray now has ${divisor} equal groups. Keep one group from each tray: ${equationText(
+      text: `On ${scaleLabel(
+        scaleIndex,
+      )}, each tray now has ${divisor} equal groups. Keep one group from each tray: ${equationText(
         finalEquation,
       )}.`,
       strategyId: "split-evenly",
+      scaleFocus: {
+        workingScaleIndex: scaleIndex,
+        sourceScaleIndexes: [],
+      },
       before: grouped,
       after: finalEquation,
       divisor,
@@ -924,6 +1028,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
   const splitDirectly = (
     before: BalanceEquation,
     divisor: number,
+    scaleIndex: number,
     after: BalanceEquation = finalEquation,
   ): BalanceEquation => {
     if (!Number.isSafeInteger(divisor) || divisor <= 1) {
@@ -942,7 +1047,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
       id: nextId("split-evenly"),
       kind: "split-evenly",
       title: `Split into ${divisor} equal groups`,
-      text: `There are ${repeatedBundleText(
+      text: `On ${scaleLabel(scaleIndex)}, there are ${repeatedBundleText(
         after.left,
         divisor,
       )} on the left, so split ${expressionText(
@@ -951,6 +1056,10 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
         after,
       )}.`,
       strategyId: "split-evenly",
+      scaleFocus: {
+        workingScaleIndex: scaleIndex,
+        sourceScaleIndexes: [],
+      },
       before: canonicalEquation(before),
       after: canonicalEquation(after),
       divisor,
@@ -961,20 +1070,25 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
   const finishBySplitting = (
     before: BalanceEquation,
     divisor: number,
+    scaleIndex: number,
   ): BalanceEquation =>
     targetIsCombo
-      ? regroupAndSplit(before, divisor)
-      : splitDirectly(before, divisor);
+      ? regroupAndSplit(before, divisor, scaleIndex)
+      : splitDirectly(before, divisor, scaleIndex);
 
   let current: BalanceEquation;
 
   switch (round.family) {
     case "direct": {
-      current = splitDirectly(equations[0], round.solutionDerivation.normalizeBy);
+      current = splitDirectly(
+        equations[0],
+        round.solutionDerivation.normalizeBy,
+        0,
+      );
       break;
     }
     case "cancellation": {
-      current = cancelMatches(equations[0]);
+      current = cancelMatches(equations[0], 0);
       break;
     }
     case "chain":
@@ -986,6 +1100,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
       ];
       current = substitute({
         before: equations[1],
+        beforeScaleIndex: 1,
         sourceEquation: equations[0],
         sourceIndex: 0,
         side: "right",
@@ -994,7 +1109,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
         copies: bridgeCopies,
       });
       if (round.family === "offset-chain") {
-        current = cancelMatches(current);
+        current = cancelMatches(current, 1);
       }
       break;
     }
@@ -1002,6 +1117,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
       current = finishBySplitting(
         equations[0],
         round.solutionDerivation.normalizeBy,
+        0,
       );
       break;
     }
@@ -1013,6 +1129,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
       current = finishBySplitting(
         current,
         round.solutionDerivation.normalizeBy,
+        0,
       );
       break;
     }
@@ -1024,6 +1141,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
       current = finishBySplitting(
         current,
         round.solutionDerivation.normalizeBy,
+        0,
       );
       break;
     }
@@ -1035,6 +1153,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
       ];
       let secondSolved = substitute({
         before: equations[1],
+        beforeScaleIndex: 1,
         sourceEquation: equations[0],
         sourceIndex: 0,
         side: "right",
@@ -1042,12 +1161,13 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
         to: firstReplacement,
         copies: firstCopies,
       });
-      secondSolved = cancelMatches(secondSolved);
+      secondSolved = cancelMatches(secondSolved, 1);
 
       current = equations[2];
       if (!targetIsCombo) {
         current = substitute({
           before: current,
+          beforeScaleIndex: 2,
           sourceEquation: equations[0],
           sourceIndex: 0,
           side: "left",
@@ -1057,35 +1177,38 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
       }
       current = substitute({
         before: current,
+        beforeScaleIndex: 2,
         sourceEquation: secondSolved,
-        sourceIndex: null,
+        sourceIndex: 1,
         side: "right",
         from: secondSolved.left,
         to: secondSolved.right,
       });
-      if (!targetIsCombo) current = cancelMatches(current);
+      if (!targetIsCombo) current = cancelMatches(current, 2);
       break;
     }
     case "cross": {
-      const firstSolved = cancelMatches(equations[0]);
+      const firstSolved = cancelMatches(equations[0], 0);
       const firstLink = firstSolved.left;
       let secondSolved = substitute({
         before: equations[1],
+        beforeScaleIndex: 1,
         sourceEquation: firstSolved,
-        sourceIndex: null,
+        sourceIndex: 0,
         side: "right",
         from: firstLink,
         to: firstSolved.right,
         copies: expressionCounts(equations[1].right)[firstLink[0].creature],
       });
-      secondSolved = cancelMatches(secondSolved);
+      secondSolved = cancelMatches(secondSolved, 1);
 
       current = equations[2];
       if (!targetIsCombo) {
         current = substitute({
           before: current,
+          beforeScaleIndex: 2,
           sourceEquation: firstSolved,
-          sourceIndex: null,
+          sourceIndex: 0,
           side: "left",
           from: firstSolved.left,
           to: firstSolved.right,
@@ -1093,13 +1216,14 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
       }
       current = substitute({
         before: current,
+        beforeScaleIndex: 2,
         sourceEquation: secondSolved,
-        sourceIndex: null,
+        sourceIndex: 1,
         side: "right",
         from: secondSolved.left,
         to: secondSolved.right,
       });
-      if (!targetIsCombo) current = cancelMatches(current);
+      if (!targetIsCombo) current = cancelMatches(current, 2);
       break;
     }
     case "parallel": {
@@ -1108,6 +1232,7 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
       }
       current = substitute({
         before: equations[2],
+        beforeScaleIndex: 2,
         sourceEquation: equations[0],
         sourceIndex: 0,
         side: "left",
@@ -1116,18 +1241,20 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
       });
       current = substitute({
         before: current,
+        beforeScaleIndex: 2,
         sourceEquation: equations[1],
         sourceIndex: 1,
         side: "right",
         from: equations[1].left,
         to: equations[1].right,
       });
-      current = cancelMatches(current);
+      current = cancelMatches(current, 2);
       break;
     }
     case "sum-combo": {
       current = substitute({
         before: equations[0],
+        beforeScaleIndex: 0,
         sourceEquation: equations[2],
         sourceIndex: 2,
         side: "right",
@@ -1135,18 +1262,20 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
         to: equations[2].right,
       });
       current = addScales([
-        source(current, null),
+        source(current, 0),
         source(equations[1], 1),
       ]);
       current = finishBySplitting(
         current,
         round.solutionDerivation.normalizeBy,
+        0,
       );
       break;
     }
     case "difference": {
       current = substitute({
         before: equations[0],
+        beforeScaleIndex: 0,
         sourceEquation: equations[2],
         sourceIndex: 2,
         side: "right",
@@ -1154,13 +1283,14 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
         to: equations[2].right,
       });
       current = subtractScales(
-        source(current, null),
+        source(current, 0),
         source(equations[1], 1),
       );
       if (round.solutionDerivation.normalizeBy > 1) {
         current = finishBySplitting(
           current,
           round.solutionDerivation.normalizeBy,
+          0,
         );
       }
       break;
@@ -1177,12 +1307,14 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
       const solvedBridge = splitDirectly(
         current,
         round.solutionDerivation.normalizeBy,
+        1,
         bridgeGoal,
       );
       current = substitute({
         before: equations[0],
+        beforeScaleIndex: 0,
         sourceEquation: solvedBridge,
-        sourceIndex: null,
+        sourceIndex: 1,
         side: "right",
         from: solvedBridge.left,
         to: solvedBridge.right,
@@ -1192,43 +1324,42 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
     case "sealed-cancellation": {
       current = substitute({
         before: equations[1],
+        beforeScaleIndex: 1,
         sourceEquation: equations[0],
         sourceIndex: 0,
         side: "left",
         from: equations[0].right,
         to: equations[0].left,
       });
-      current = cancelMatches(current, [
+      current = cancelMatches(current, 1, [
         { creature: "mystery", count: 1 },
       ]);
 
       const divisor = round.solutionDerivation.normalizeBy;
       if (targetIsCombo) {
-        const repeatedBridge = canonicalEquation({
-          left: scaleExpression(equations[2].left, divisor - 1),
-          right: scaleExpression(equations[2].right, divisor - 1),
-        });
         current = addScales([
-          source(current, null),
-          source(repeatedBridge, 2),
+          source(current, 1),
+          source(equations[2], 2, divisor - 1),
         ]);
       } else {
         current = substitute({
           before: current,
+          beforeScaleIndex: 1,
           sourceEquation: equations[2],
           sourceIndex: 2,
           side: "left",
           from: equations[2].left,
           to: equations[2].right,
         });
-        current = cancelMatches(current);
+        current = cancelMatches(current, 1);
       }
-      current = finishBySplitting(current, divisor);
+      current = finishBySplitting(current, divisor, 1);
       break;
     }
     case "sealed-sum": {
       current = substitute({
         before: equations[0],
+        beforeScaleIndex: 0,
         sourceEquation: equations[2],
         sourceIndex: 2,
         side: "right",
@@ -1236,19 +1367,21 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
         to: equations[2].right,
       });
       current = addScales([
-        source(current, null),
+        source(current, 0),
         source(equations[1], 1),
       ]);
-      current = cancelMatches(current);
+      current = cancelMatches(current, 0);
       current = finishBySplitting(
         current,
         round.solutionDerivation.normalizeBy,
+        0,
       );
       break;
     }
     case "sealed-difference": {
       current = substitute({
         before: equations[0],
+        beforeScaleIndex: 0,
         sourceEquation: equations[2],
         sourceIndex: 2,
         side: "right",
@@ -1256,13 +1389,14 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
         to: equations[2].right,
       });
       current = subtractScales(
-        source(current, null),
+        source(current, 0),
         source(equations[1], 1),
       );
       if (round.solutionDerivation.normalizeBy > 1) {
         current = finishBySplitting(
           current,
           round.solutionDerivation.normalizeBy,
+          0,
         );
       }
       break;

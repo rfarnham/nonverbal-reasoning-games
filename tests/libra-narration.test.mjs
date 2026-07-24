@@ -129,3 +129,17 @@ test("narration explains the current action without confusing callbacks", () => 
     );
   }
 });
+
+test("multi-scale proof narration follows the persistent Use and Working labels", () => {
+  for (const cueId of ["add-scales", "subtract-scales"]) {
+    const cue = manifest.cues[cueId];
+    assert.match(cue.speechText, /\bWorking scale\b/i);
+    assert.doesNotMatch(
+      `${cue.caption} ${cue.speechText}`,
+      /\b(?:first|second) balance\b/i,
+      `${cueId} cannot assume a scale's displayed number`,
+    );
+  }
+  assert.match(manifest.cues["add-scales"].speechText, /\bscale marked Use\b/i);
+  assert.match(manifest.cues["subtract-scales"].speechText, /\bgold scale\b/i);
+});

@@ -36,22 +36,22 @@
       "sha256": "6f13f10ac9b60bcfc04b3ed5b7e68aa2ce902c78f2c97ff7d78f9308ab235a2b"
     },
     "add-scales": {
-      "caption": "Move the second balance onto the first.",
-      "speechText": "Move the second balance onto the first: left tray to left tray and right tray to right tray. The combined scale will stay balanced.",
+      "caption": "Move the Use scale onto the Working scale.",
+      "speechText": "Move the loads from the scale marked Use onto the matching trays of the scale marked Working. Left joins left, and right joins right. The Working scale stays balanced.",
       "file": "add-scales.mp3",
-      "audioDurationMs": 9025,
-      "minVisualMs": 9025,
+      "audioDurationMs": 11400,
+      "minVisualMs": 11400,
       "lingerMs": 1500,
-      "sha256": "fbad7bfb73900e38cff2411b13d1b6bff9d19a5b39c9e54de9e04c31c19c4bb0"
+      "sha256": "0b26f766f374e63ef54577efdf4958fe0497cedbccf429455011c6a944ee8b46"
     },
     "subtract-scales": {
-      "caption": "Remove the second balance tray by tray.",
-      "speechText": "Remove the loads shown on the second balance from the matching trays of the first balance. The remaining loads will still balance.",
+      "caption": "Use one scale to remove matching loads from the Working scale.",
+      "speechText": "Use the gold scale as a guide. On the purple Working scale, remove the matching left-tray loads and the matching right-tray loads. The Working scale stays balanced.",
       "file": "subtract-scales.mp3",
-      "audioDurationMs": 8300,
-      "minVisualMs": 8300,
+      "audioDurationMs": 10975,
+      "minVisualMs": 10975,
       "lingerMs": 1500,
-      "sha256": "b1d50403bec3aedd3608ba9574bdbdad395d5844b63d16212be45da4b948e81e"
+      "sha256": "3f72cfbde8b44bd41546ad27fa61421bff7cb8fbed9c116a1930c048c0db8310"
     },
     "cancel-matches": {
       "caption": "Remove the highlighted load from each tray.",

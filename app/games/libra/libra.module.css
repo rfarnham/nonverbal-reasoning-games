@@ -1545,7 +1545,7 @@
 /* Real-scale proof player */
 
 .solutionProof {
-  width: min(100%, 720px);
+  width: min(100%, 760px);
   min-height: 0;
   padding: 12px;
   background: #f2eee5;
@@ -1577,12 +1577,39 @@
   outline-offset: 4px;
 }
 
+.proofStrategyHeading {
+  min-height: 44px;
+  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border: 1px solid rgb(119 103 215 / 38%);
+  border-radius: 14px;
+  background: rgb(119 103 215 / 9%);
+  color: var(--ink);
+  font-size: clamp(0.9rem, 2vw, 1.08rem);
+  font-weight: 900;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.proofSrOnly {
+  width: 1px;
+  height: 1px;
+  position: absolute;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .proofSceneViewport {
-  min-height: 468px;
+  min-height: 0;
 }
 
 .proofPersistentStage {
-  min-height: 468px;
+  min-height: 0;
   position: relative;
   display: block;
   overflow: hidden;
@@ -1592,7 +1619,7 @@
 }
 
 .proofPersistentCanvas {
-  min-height: 468px;
+  min-height: 0;
   position: relative;
 }
 
@@ -1676,19 +1703,188 @@
 
 .proofPhaseLayer {
   min-width: 0;
-  position: absolute;
-  inset: 0;
-  display: grid;
+  position: relative;
+  display: block;
   padding: 10px 13px 12px;
-  opacity: 0;
+  opacity: 1;
   pointer-events: none;
-  transition: opacity 520ms linear;
+  transition: none;
 }
 
 .solutionProof[data-proof-state="animating"]
   .proofPhaseLayer[data-proof-cue-state="active"] {
   opacity: 1;
   z-index: 2;
+}
+
+.proofScaleRack {
+  --proof-scale-lane-step: calc(100% + 42px);
+  width: 100%;
+  display: grid;
+  gap: 7px;
+}
+
+.proofScaleLane {
+  min-width: 0;
+  min-height: 124px;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 350px);
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 3px solid transparent;
+  border-radius: 16px;
+  background: rgb(251 248 240 / 48%);
+}
+
+.proofScaleLane[data-proof-scale-state="working"] {
+  border-color: var(--violet);
+  background: rgb(119 103 215 / 8%);
+  box-shadow: inset 0 0 0 2px rgb(119 103 215 / 9%);
+}
+
+.proofScaleLane[data-proof-scale-state="source"] {
+  border-color: #d99b25;
+  background: rgb(243 189 78 / 9%);
+}
+
+.proofScaleNumber {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.proofScaleLane[data-proof-scale-state="working"] .proofScaleNumber {
+  border-color: var(--violet);
+  background: var(--violet);
+  color: white;
+}
+
+.proofScaleLane[data-proof-scale-state="source"] .proofScaleNumber {
+  border-color: #bb7910;
+  color: #855200;
+}
+
+.proofScaleLaneBody {
+  min-width: 0;
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.proofRackScale,
+.proofScaleRack .proofScaleFigure {
+  width: min(100%, 350px);
+}
+
+.proofScaleRack .proofScaleFigure > figcaption {
+  min-height: 18px;
+  font-size: 0.6rem;
+}
+
+.proofScaleRack[data-proof-scale-count="3"] .proofScaleLane {
+  min-height: 108px;
+  grid-template-columns: 40px minmax(0, 280px);
+  padding-block: 3px;
+}
+
+.proofScaleRack[data-proof-scale-count="3"] .proofRackScale,
+.proofScaleRack[data-proof-scale-count="3"] .proofScaleFigure {
+  width: min(100%, 280px);
+}
+
+.proofScaleRack .proofMorphScale,
+.proofScaleRack
+  .proofScaleFigure[data-proof-scale-role="substitution-source"] {
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofScaleRack
+  .proofMorphScale,
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofScaleRack
+  .proofScaleFigure[data-proof-scale-role="substitution-source"] {
+  animation: none !important;
+}
+
+.proofRackTransferGhost {
+  --proof-rack-transfer-x: 0cqw;
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.proofRackTransferGhost[data-source-side="left"][data-target-side="right"] {
+  --proof-rack-transfer-x: 46cqw;
+}
+
+.proofRackTransferGhost[data-source-side="right"][data-target-side="left"] {
+  --proof-rack-transfer-x: -46cqw;
+}
+
+.proofRackTransferGhost .proofScaleLoadGroup {
+  background: rgb(255 253 248 / 96%);
+  box-shadow: 0 7px 18px rgb(23 33 61 / 18%);
+}
+
+.proofRackTransferGhost[data-proof-transfer="add-scales"]
+  .proofScaleLoadGroup[data-proof-load-state="move"] {
+  opacity: 1;
+  transform: none;
+  animation: none !important;
+}
+
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"]
+  .proofRackTransferGhost {
+  animation: proofRackTransferTravel var(--proof-phase-duration)
+    cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+@keyframes proofRackTransferTravel {
+  0%,
+  30% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.94);
+  }
+
+  40%,
+  52% {
+    opacity: 0.9;
+    transform: translate(0, 0) scale(1.03);
+  }
+
+  72%,
+  82% {
+    opacity: 0.82;
+    transform: translate(
+        var(--proof-rack-transfer-x),
+        var(--proof-rack-transfer-y)
+      )
+      scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(
+        var(--proof-rack-transfer-x),
+        var(--proof-rack-transfer-y)
+      )
+      scale(0.97);
+  }
 }
 
 .proofPhaseEnter,
@@ -4825,19 +5021,41 @@
 
 @media (max-width: 620px) {
   .solutionProof {
-    min-height: 570px;
+    min-height: 0;
   }
 
   .proofSceneViewport {
-    min-height: 548px;
+    min-height: 0;
   }
 
   .proofPersistentStage {
-    min-height: 548px;
+    min-height: 0;
   }
 
   .proofPersistentCanvas {
-    min-height: 482px;
+    min-height: 0;
+  }
+
+  .proofScaleRack {
+    --proof-scale-lane-step: calc(100% + 42px);
+  }
+
+  .proofScaleLane {
+    min-height: 113px;
+    grid-template-columns: 40px minmax(0, 310px);
+    gap: 6px;
+    padding-inline: 5px;
+  }
+
+  .proofRackScale,
+  .proofScaleRack .proofScaleFigure {
+    width: min(100%, 310px);
+  }
+
+  .proofScaleNumber {
+    width: 36px;
+    height: 36px;
+    font-size: 0.78rem;
   }
 
   .proofFinalCallout,
@@ -4856,12 +5074,12 @@
 @media (max-width: 480px) {
   .solutionProof,
   .solutionProof[data-proof-state="animating"] {
-    min-height: 590px;
+    min-height: 0;
   }
 
   .solutionProof[data-proof-state="animating"] .proofSceneViewport,
   .proofSceneViewport {
-    min-height: 568px;
+    min-height: 0;
   }
 
   .proofPhaseLayer {
@@ -4869,11 +5087,40 @@
   }
 
   .proofPersistentStage {
-    min-height: 568px;
+    min-height: 0;
   }
 
   .proofPersistentCanvas {
-    min-height: 504px;
+    min-height: 0;
+  }
+
+  .proofStrategyHeading {
+    margin-bottom: 8px;
+    font-size: 0.84rem;
+  }
+
+  .proofScaleRack {
+    --proof-scale-lane-step: calc(100% + 37px);
+    gap: 5px;
+  }
+
+  .proofScaleLane {
+    min-height: 100px;
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 4px;
+    padding: 4px 3px;
+    border-radius: 13px;
+  }
+
+  .proofRackScale,
+  .proofScaleRack .proofScaleFigure {
+    width: min(100%, 270px);
+  }
+
+  .proofScaleNumber {
+    width: 32px;
+    height: 32px;
+    font-size: 0.72rem;
   }
 
   .proofFinalCallout {
@@ -4935,16 +5182,36 @@
 @media (max-width: 390px) {
   .solutionProof,
   .solutionProof[data-proof-state="animating"] {
-    min-height: 580px;
+    min-height: 0;
   }
 
   .solutionProof[data-proof-state="animating"] .proofSceneViewport,
   .proofSceneViewport {
-    min-height: 562px;
+    min-height: 0;
   }
 
   .proofPersistentCanvas {
-    min-height: 498px;
+    min-height: 0;
+  }
+
+  .proofScaleRack {
+    --proof-scale-lane-step: calc(100% + 37px);
+  }
+
+  .proofScaleLane {
+    min-height: 94px;
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+
+  .proofRackScale,
+  .proofScaleRack .proofScaleFigure {
+    width: min(100%, 250px);
+  }
+
+  .proofScaleNumber {
+    width: 30px;
+    height: 30px;
+    font-size: 0.68rem;
   }
 
   .proofSubstitutionScales > .proofScaleFigure,

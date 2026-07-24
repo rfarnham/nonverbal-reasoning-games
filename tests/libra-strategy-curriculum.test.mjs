@@ -8,6 +8,7 @@ import {
   generateInfiniteRoundFromSeed,
 } from "../app/games/libra/game-engine.ts";
 import {
+  PROOF_STRATEGY_NAMES,
   STRATEGY_CATALOGUE,
   STRATEGY_CATALOGUE_BY_ID,
   STRATEGY_IDS,
@@ -17,6 +18,8 @@ import {
   canOpenHistoricalReview,
   canIntroduceStrategiesBeforeRound,
   discoveredStrategyIdsAfterLesson,
+  displayedProofScaleIndexes,
+  displayedProofScaleNumber,
   isInfiniteCurriculumCandidate,
   orderedStrategyIdsForRound,
   preRoundStrategyIds,
@@ -317,12 +320,13 @@ function equationChanged(before, after, label) {
   );
 }
 
-function addedExpressionCounts(...expressions) {
+function addedSourceCounts(sources, side) {
   return Object.fromEntries(
     BALANCE_TOKENS.map((token) => [
       token,
-      expressions.reduce(
-        (total, expression) => total + counts(expression)[token],
+      sources.reduce(
+        (total, source) =>
+          total + counts(source.equation[side])[token] * source.copies,
         0,
       ),
     ]),
@@ -418,11 +422,11 @@ function assertTeachingPlan(round, label) {
       assert.equal(step.before.length, 2, `${label}: add shows two scales`);
       assert.deepEqual(
         counts(step.after.left),
-        addedExpressionCounts(...step.before.map(({ equation }) => equation.left)),
+        addedSourceCounts(step.before, "left"),
       );
       assert.deepEqual(
         counts(step.after.right),
-        addedExpressionCounts(...step.before.map(({ equation }) => equation.right)),
+        addedSourceCounts(step.before, "right"),
       );
     }
     if (step.kind === "subtract-scales") {
@@ -571,12 +575,12 @@ test("proof copy explains why each operation helps using the pictured loads", ()
   const substitutionText = buildTeachingProof(substitution).steps[0].text;
   assert.match(
     substitutionText,
-    /the highlighted balance shows that .+ balances? .+\.(?: the .+ tray has .+\.)? replace/i,
+    /scale \(\d+\) shows that .+ balances? .+\.(?: the .+ tray (?:of scale \(\d+\) )?has .+\.)? (?:on scale \(\d+\), )?replace/i,
   );
 
   const combo = ROUNDS.find(({ family }) => family === "combo-primer");
   const comboText = buildTeachingProof(combo).steps[0].text;
-  assert.match(comboText, /the left tray has .+/i);
+  assert.match(comboText, /on scale \(\d+\), the left tray has .+/i);
   assert.match(comboText, /circle \d+ groups, each with .+/i);
   assert.match(comboText, /split .+ on the right into \d+ equal groups/i);
 
@@ -597,19 +601,28 @@ test("proof copy explains why each operation helps using the pictured loads", ()
           text,
           /(?:neither scale has .+ together\. add the scales|add the scales so .+ on both trays)\./i,
         );
-        assert.match(text, /move the second balance's loads/i);
+        assert.match(
+          text,
+          /add (?:\d+ copies of )?scale \(\d+\) to (?:\d+ copies of )?scale \(\d+\): left tray to left tray and right tray to right tray/i,
+        );
       } else if (kind === "subtract-scales") {
-        assert.match(text, /the second balance's loads appear inside the first/i);
+        assert.match(
+          text,
+          /subtract (?:\d+ copies of )?scale \(\d+\) from (?:\d+ copies of )?scale \(\d+\)/i,
+        );
         assert.match(text, /remove .+ from the left tray and .+ from the right tray/i);
+        assert.match(text, /of scale \(\d+\)/i);
         assert.match(text, /\bnow .+ balances? .+\.$/i);
       } else if (kind === "cancel-matches") {
+        assert.match(text, /^on scale \(\d+\),/i);
         assert.match(text, /appear(?:s)? on both trays/i);
         assert.match(text, /remove .+ from each tray/i);
         assert.match(text, /\bnow .+ balances? .+\.$/i);
       } else if (kind === "regroup") {
-        assert.match(text, /the left tray has .+/i);
+        assert.match(text, /^on scale \(\d+\), the left tray has .+/i);
         assert.match(text, /circle \d+ groups, each with .+/i);
       } else if (kind === "split-evenly") {
+        assert.match(text, /^on scale \(\d+\),/i);
         assert.match(text, /keep one group from each tray/i);
       }
     }
@@ -622,6 +635,93 @@ test("proof copy explains why each operation helps using the pictured loads", ()
       `${strategy.id} explains itself directly`,
     );
   }
+});
+
+test("every proof uses stable visible scale numbers and a named strategy", () => {
+  assert.deepEqual(PROOF_STRATEGY_NAMES, {
+    "split-evenly": "Split",
+    "cancel-matches": "Cancel",
+    substitution: "Substitution",
+    "create-combo": "Combo",
+    "add-scales": "Add scales",
+    "subtract-scales": "Subtract scales",
+  });
+
+  for (const [roundIndex, round] of ROUNDS.entries()) {
+    const displayedIndexes = displayedProofScaleIndexes(round);
+    assert.equal(displayedIndexes.length, round.equations.length);
+    assert.equal(new Set(displayedIndexes).size, round.equations.length);
+
+    for (const [displayedIndex, sourceIndex] of displayedIndexes.entries()) {
+      assert.equal(
+        displayedProofScaleNumber(round, sourceIndex),
+        displayedIndex + 1,
+      );
+    }
+
+    for (const step of buildTeachingProof(round).steps) {
+      assert.ok(step.strategyId, `round ${roundIndex + 1}: strategy is named`);
+      assert.ok(step.scaleFocus, `round ${roundIndex + 1}: a scale is focused`);
+      const { workingScaleIndex, sourceScaleIndexes } = step.scaleFocus;
+      assert.ok(
+        workingScaleIndex >= 0 &&
+          workingScaleIndex < round.equations.length,
+        `round ${roundIndex + 1}: working scale exists`,
+      );
+      assert.match(
+        step.text,
+        new RegExp(
+          `scale \\(${displayedProofScaleNumber(
+            round,
+            workingScaleIndex,
+          )}\\)`,
+          "i",
+        ),
+        `round ${roundIndex + 1}: copy names the working scale`,
+      );
+      for (const sourceIndex of sourceScaleIndexes) {
+        assert.ok(
+          sourceIndex >= 0 && sourceIndex < round.equations.length,
+          `round ${roundIndex + 1}: reference scale exists`,
+        );
+        assert.match(
+          step.text,
+          new RegExp(
+            `scale \\(${displayedProofScaleNumber(round, sourceIndex)}\\)`,
+            "i",
+          ),
+          `round ${roundIndex + 1}: copy names each reference scale`,
+        );
+      }
+
+      const sources =
+        step.kind === "substitute"
+          ? [step.source]
+          : step.kind === "add-scales" || step.kind === "subtract-scales"
+            ? step.before
+            : [];
+      for (const source of sources) {
+        assert.ok(
+          Number.isSafeInteger(source.copies) && source.copies >= 1,
+          `round ${roundIndex + 1}: scale copies are explicit`,
+        );
+      }
+    }
+  }
+
+  const threeScaleRound = ROUNDS.find(({ equations }) => equations.length === 3);
+  assert.ok(threeScaleRound, "the campaign includes a three-scale proof");
+  const reordered = {
+    equations: threeScaleRound.equations,
+    scaffold: {
+      ...threeScaleRound.scaffold,
+      equationOrder: [2, 0, 1],
+    },
+  };
+  assert.deepEqual(displayedProofScaleIndexes(reordered), [2, 0, 1]);
+  assert.equal(displayedProofScaleNumber(reordered, 2), 1);
+  assert.equal(displayedProofScaleNumber(reordered, 0), 2);
+  assert.equal(displayedProofScaleNumber(reordered, 1), 3);
 });
 
 test("plain one-animal targets divide directly instead of pretending to form a combo", () => {

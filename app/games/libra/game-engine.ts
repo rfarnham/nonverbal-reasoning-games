@@ -2806,7 +2806,13 @@ export function generateInfiniteRoundFromSeed(
 export function describeExpression(expression: Expression): string {
   const parts = expression.map(({ creature, count }) => {
     const name = BALANCE_TOKEN_NAMES[creature];
-    return `${count} ${name}${count === 1 ? "" : "s"}`;
+    const plural =
+      creature === "goose"
+        ? "geese"
+        : creature === "fox"
+          ? "foxes"
+          : `${name}s`;
+    return `${count} ${count === 1 ? name : plural}`;
   });
   if (parts.length <= 1) return parts[0] ?? "nothing";
   return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
