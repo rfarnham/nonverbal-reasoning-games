@@ -18,7 +18,10 @@ import {
   PROGRESSION_STORAGE_KEY,
   saveProgressionState,
 } from "./persistence.ts";
-import { buildJourneyPlan, findJourneyNode } from "./journey.ts";
+import {
+  buildJourneyPlanForVersion,
+  findJourneyNode,
+} from "./journey.ts";
 import {
   activePlayerProfile,
   replacePlayerProfile,
@@ -48,11 +51,13 @@ import {
   recordAdaptiveFirstAttempt,
   type AdaptiveState,
 } from "../adaptive-progression.ts";
+import { journeyReviews } from "../journey-reviews.ts";
 
 export type ProgressionRouteTarget = Readonly<{
   pathname:
     | "/journey/"
     | "/journey/summary/"
+    | `/journey/reviews/${string}/`
     | `/games/${string}/`;
   query?: Readonly<Record<string, string>>;
 }>;
@@ -118,8 +123,9 @@ function gameTarget(
   gameSlug: string,
   attemptId: string,
 ): ProgressionRouteTarget {
+  const review = journeyReviews.find(({ slug }) => slug === gameSlug);
   return {
-    pathname: `/games/${gameSlug}/`,
+    pathname: review?.href ?? `/games/${gameSlug}/`,
     query: { progression: attemptId },
   };
 }
@@ -224,7 +230,11 @@ function sameLogicalQuestion(
   }
   return left.source === "campaign" && right.source === "campaign"
     ? left.questionIndex === right.questionIndex
-    : left.source === "generated" &&
+    : left.source === "journey" && right.source === "journey"
+      ? left.journeyLevel === right.journeyLevel &&
+        left.collectionId === right.collectionId &&
+        left.questionIndex === right.questionIndex
+      : left.source === "generated" &&
         right.source === "generated" &&
         left.seed === right.seed;
 }
@@ -235,9 +245,18 @@ function logicalQuestionSlotKey(question: QuestionReference): string {
     question.level,
     question.source,
   ];
-  return question.source === "campaign"
-    ? [...prefix, question.questionIndex].join(":")
-    : [...prefix, encodeURIComponent(question.seed)].join(":");
+  if (question.source === "campaign") {
+    return [...prefix, question.questionIndex].join(":");
+  }
+  if (question.source === "journey") {
+    return [
+      ...prefix,
+      question.journeyLevel,
+      encodeURIComponent(question.collectionId),
+      question.questionIndex,
+    ].join(":");
+  }
+  return [...prefix, encodeURIComponent(question.seed)].join(":");
 }
 
 function isPristineAttemptRound(round: AttemptRound): boolean {
@@ -336,14 +355,22 @@ function questionGameMatchesJourney(
   gameSlug: string,
 ): boolean {
   const node = findJourneyNode(
-    buildJourneyPlan(profile.gameSnapshot),
+    buildJourneyPlanForVersion(
+      profile.gameSnapshot,
+      profile.journeyPlanVersion,
+    ),
     attempt.stopId,
   );
-  if (!node || node.kind !== attempt.kind || node.level !== attempt.level) {
+  if (
+    !node ||
+    node.kind !== attempt.kind ||
+    node.journeyLevel !== attempt.journeyLevel ||
+    node.level !== attempt.level
+  ) {
     return false;
   }
   return node.kind === "culmination"
-    ? node.gameSlugs.includes(gameSlug)
+    ? node.sections.some((section) => section.gameSlug === gameSlug)
     : node.gameSlug === gameSlug;
 }
 
@@ -809,7 +836,10 @@ export function addActiveTimeBrowserSession<
   elapsedMs: number,
   nowMs?: number,
   options: Omit<BrowserSessionOptions, "attemptId" | "search"> = {},
-  timing: { countTowardTurbo?: boolean } = {},
+  timing: {
+    countTowardTurbo?: boolean;
+    countTowardFirstAnswer?: boolean;
+  } = {},
 ): BrowserProgressionSession<Round> {
   return mutateBrowserAttempt(adapter, attemptId, options, (attempt) => {
     if (attempt.phase !== "playing" && attempt.phase !== "redemption") {
@@ -819,6 +849,9 @@ export function addActiveTimeBrowserSession<
       countTowardTurbo:
         attempt.phase === "playing" &&
         timing.countTowardTurbo !== false,
+      countTowardFirstAnswer:
+        attempt.phase === "playing" &&
+        timing.countTowardFirstAnswer !== false,
     });
   });
 }

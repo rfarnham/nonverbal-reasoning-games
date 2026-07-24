@@ -1,12 +1,15 @@
 import { games } from "@/lib/games";
+import { journeyReviews } from "@/lib/journey-reviews";
 import {
   createCulminationProgressionAttempt,
   createNormalProgressionAttempt,
+  createReviewProgressionAttempt,
   createTurboProgressionAttempt,
   currentAttemptSection,
   currentRedemptionQuestion,
   JOURNEY_GAMES_PER_BOARD,
   type CampaignQuestionReference,
+  type JourneyQuestionReference,
   type JourneyNode,
   type PlayerProfile,
   type ProgressionAttempt,
@@ -27,12 +30,27 @@ function nextAttemptId(stopId: string) {
 }
 
 export function journeyCatalogSnapshot() {
-  return games.slice(0, JOURNEY_GAMES_PER_BOARD).map(({ slug, title, progression }) => ({
-    slug,
-    title,
-    contentVersion: progression.contentVersion,
-    generatorVersion: progression.generatorVersion,
-  }));
+  return [
+    ...games
+      .slice(0, JOURNEY_GAMES_PER_BOARD)
+      .map(({ slug, title, progression }) => ({
+        slug,
+        title,
+        role: "game" as const,
+        contentVersion: progression.contentVersion,
+        generatorVersion: progression.generatorVersion,
+        journeyContentVersion:
+          progression.journeyContentVersion ?? progression.contentVersion,
+      })),
+    ...journeyReviews.map(
+      ({ slug, title, journeyContentVersion }) => ({
+        slug,
+        title,
+        role: "review" as const,
+        journeyContentVersion,
+      }),
+    ),
+  ];
 }
 
 export function journeyCampaignQuestions(
@@ -59,10 +77,61 @@ function currentGameVersions(profile: PlayerProfile, gameSlug: string) {
     currentGame?.progression.contentVersion ?? savedGame.contentVersion;
   const generatorVersion =
     currentGame?.progression.generatorVersion ?? savedGame.generatorVersion;
+  const journeyContentVersion =
+    currentGame?.progression.journeyContentVersion ??
+    savedGame.journeyContentVersion ??
+    contentVersion;
   if (!contentVersion?.trim() || !generatorVersion?.trim()) {
     throw new Error(`${gameSlug} is missing current progression versions.`);
   }
-  return { contentVersion, generatorVersion };
+  return { contentVersion, generatorVersion, journeyContentVersion };
+}
+
+function currentJourneyContentVersion(
+  profile: PlayerProfile,
+  gameSlug: string,
+): string {
+  const savedGame = profile.gameSnapshot.find(({ slug }) => slug === gameSlug);
+  if (!savedGame) {
+    throw new Error(`${gameSlug} is not part of this profile's saved Journey.`);
+  }
+  const currentGame = games.find(({ slug }) => slug === gameSlug);
+  const currentReview = journeyReviews.find(({ slug }) => slug === gameSlug);
+  const version =
+    currentGame?.progression.journeyContentVersion ??
+    currentReview?.journeyContentVersion ??
+    savedGame.journeyContentVersion ??
+    savedGame.contentVersion;
+  if (!version?.trim()) {
+    throw new Error(`${gameSlug} is missing its Journey content version.`);
+  }
+  return version;
+}
+
+function journeyQuestionsForRange(
+  profile: PlayerProfile,
+  node: {
+    gameSlug: string;
+    journeyLevel: JourneyQuestionReference["journeyLevel"];
+    level: JourneyQuestionReference["level"];
+    collectionId: string;
+    questionOffset: number;
+    questionCount: number;
+  },
+): readonly JourneyQuestionReference[] {
+  const contentVersion = currentJourneyContentVersion(
+    profile,
+    node.gameSlug,
+  );
+  return Array.from({ length: node.questionCount }, (_, index) => ({
+    source: "journey" as const,
+    gameSlug: node.gameSlug,
+    journeyLevel: node.journeyLevel,
+    level: node.level,
+    collectionId: node.collectionId,
+    questionIndex: node.questionOffset + index,
+    contentVersion,
+  }));
 }
 
 export function createJourneyAttempt(
@@ -72,6 +141,13 @@ export function createJourneyAttempt(
   const id = nextAttemptId(node.id);
   if (node.kind === "normal") {
     const versions = currentGameVersions(profile, node.gameSlug);
+    if (profile.journeyPlanVersion !== 1) {
+      return createNormalProgressionAttempt({
+        id,
+        node,
+        journeyQuestions: journeyQuestionsForRange(profile, node),
+      });
+    }
     return createNormalProgressionAttempt({
       id,
       node,
@@ -88,6 +164,13 @@ export function createJourneyAttempt(
       id,
       node,
       generatorVersion: versions.generatorVersion,
+    });
+  }
+  if (node.kind === "review") {
+    return createReviewProgressionAttempt({
+      id,
+      node,
+      journeyQuestions: journeyQuestionsForRange(profile, node),
     });
   }
   return createCulminationProgressionAttempt({
@@ -110,9 +193,27 @@ export function createJourneyAttempt(
         )[0],
         campaignQuestions: questions,
         currentContentVersion: versions.contentVersion,
+        currentJourneyContentVersion: versions.journeyContentVersion,
         currentGeneratorVersion: versions.generatorVersion,
       };
     }),
+    fixedSections: node.sections.flatMap((section) =>
+      section.selection === "fixed"
+        ? [
+            {
+              gameSlug: section.gameSlug,
+              questions: journeyQuestionsForRange(profile, {
+                gameSlug: section.gameSlug,
+                journeyLevel: node.journeyLevel,
+                level: node.level,
+                collectionId: section.collectionId,
+                questionOffset: section.questionOffset,
+                questionCount: section.questionCount,
+              }),
+            },
+          ]
+        : [],
+    ),
   });
 }
 
@@ -171,6 +272,13 @@ export function navigateToProgressionAttempt(attempt: ProgressionAttempt) {
   const gameSlug = progressionAttemptGameSlug(attempt);
   if (!gameSlug) {
     window.location.assign(`${basePath}/journey/`);
+    return;
+  }
+  const review = journeyReviews.find(({ slug }) => slug === gameSlug);
+  if (review) {
+    window.location.assign(
+      `${basePath}${review.href}?progression=${encodeURIComponent(attempt.id)}`,
+    );
     return;
   }
   window.location.assign(

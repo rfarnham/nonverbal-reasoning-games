@@ -39,12 +39,13 @@ app/games/<slug>/progression-adapter.ts
 
 ### Version metadata is the single source of truth
 
-`progression-metadata.ts` owns the two content versions:
+`progression-metadata.ts` owns the three content versions:
 
 ```ts
 export const progressionMetadata = {
   contentVersion: "1",
   generatorVersion: "1",
+  journeyContentVersion: "1",
 } as const;
 ```
 
@@ -68,6 +69,7 @@ export const progressionAdapter = defineProgressionGameAdapter({
   // canonical engine fields
   contentVersion: progressionMetadata.contentVersion,
   generatorVersion: progressionMetadata.generatorVersion,
+  journeyContentVersion: progressionMetadata.journeyContentVersion,
 });
 ```
 
@@ -79,8 +81,10 @@ materialized or migrated. Keeping both imports pointed at
 
 Increment `contentVersion` when the identity or ordering of Campaign content
 changes. Increment `generatorVersion` when the same generated seed may produce
-different content. Increment both when both contracts change. Fingerprints
-still verify individual rounds; versions do not replace fingerprints.
+different content. Increment `journeyContentVersion` when a Journey-only bank
+changes. Increment every affected version when contracts change together.
+Fingerprints still verify individual rounds; versions do not replace
+fingerprints.
 
 ## Persisted question references
 
@@ -106,29 +110,42 @@ export type GeneratedQuestionReference = QuestionReferenceBase & {
   generatorVersion: string;
 };
 
+export type JourneyQuestionReference = QuestionReferenceBase & {
+  source: "journey";
+  journeyLevel: JourneyLevel;
+  collectionId: string;
+  questionIndex: number;
+  contentVersion: string;
+};
+
 export type QuestionReference =
   | CampaignQuestionReference
-  | GeneratedQuestionReference;
+  | GeneratedQuestionReference
+  | JourneyQuestionReference;
 ```
 
 Important details:
 
 - `level` is one of `starter`, `junior`, `expert`, or `wizard`.
-- `questionIndex` is the zero-based position in the 12-round Campaign level.
-  It is not parsed from a page's presentation ID.
+- `journeyLevel` is one of Starter, Junior I–II, Expert I–II, or Wizard I–II.
+- `questionIndex` is the zero-based position in a named Campaign or Journey
+  collection. It is not parsed from a page's presentation ID.
+- `collectionId` distinguishes the seven game-owned banks and fixed review
+  collections without shared slug-specific logic.
 - `seed` is a non-empty string, not a number. String seeds can safely include
   attempt, stop, sequence, and candidate identity without integer truncation.
 - `fingerprint` may be absent when an attempt is first built. Resolution fills
   it from the canonical engine and persists the normalized reference.
-- Campaign refs carry `contentVersion`; generated refs carry
-  `generatorVersion`.
+- Campaign and Journey refs carry their respective content version; generated
+  refs carry `generatorVersion`.
 
 `questionReferenceKey()` includes the slug, level, source, matching version,
 source identity (`questionIndex` or `seed`), and fingerprint. This key is the
 persisted uniqueness key and becomes the resolved question's `playId`.
 Migration separately recognizes a logical Campaign question by
-slug/level/index and a logical generated question by slug/level/seed, allowing
-the stored ref to be replaced when its version or fingerprint changes.
+slug/level/index, a Journey question by slug/collection/index, and a generated
+question by slug/level/seed, allowing the stored ref to be replaced when its
+version or fingerprint changes.
 
 ## Per-game adapter API
 
@@ -142,7 +159,11 @@ export type ProgressionGameAdapter<
   gameSlug: string;
   contentVersion: string;
   generatorVersion: string;
+  journeyContentVersion: string;
   campaignRounds: readonly Round[];
+  journeyCampaignRounds: Readonly<
+    Record<JourneyLevel, readonly Round[]>
+  >;
   difficultyByLevel: Readonly<
     Record<ProgressionLevel, EngineDifficulty>
   >;
@@ -177,7 +198,9 @@ export const progressionAdapter = defineProgressionGameAdapter<
   gameSlug: "bracelet-search",
   contentVersion: progressionMetadata.contentVersion,
   generatorVersion: progressionMetadata.generatorVersion,
+  journeyContentVersion: progressionMetadata.journeyContentVersion,
   campaignRounds: ROUNDS,
+  journeyCampaignRounds: JOURNEY_CAMPAIGN_ROUNDS,
   difficultyByLevel: {
     starter: "Easy",
     junior: "Medium",
@@ -197,11 +220,12 @@ discovered directory. A Starter/Junior/Expert engine changes only
 
 `defineProgressionGameAdapter()` validates at module initialization that:
 
-- the slug and both versions are non-empty and valid;
+- the slug and all three versions are non-empty and valid;
 - every Journey level maps to a non-empty engine difficulty;
-- filtering the canonical array by each mapped difficulty returns exactly 12
-  rounds; and
-- all 48 Campaign fingerprints are non-empty and globally unique.
+- every explicit Journey bank contains exactly 12 rounds at its mapped
+  difficulty; and
+- all 48 Campaign and all 84 Journey fingerprints are non-empty and globally
+  unique within their respective corpora.
 
 The adapter intentionally has no renderer or answer checker. The page still
 compares the selected option with its canonical `round.correctIndex` (or the
@@ -499,9 +523,19 @@ route wrapper.
 
 ### Normal
 
-- The attempt starts with 12 Campaign refs for one game and board level.
-- The refs use indices 0 through 11 and the current catalog content version.
+- The attempt starts with 12 Journey refs for one game and board level.
+- The refs use indices 0 through 11, a board collection ID, and the current
+  Journey content version.
 - First resolution attaches current fingerprints and persists them.
+
+### Math Kangaroo review
+
+- Starter has no review stop. Every later board has two fixed 12-question
+  review stops, at offsets 0 and 12 of that board's review collection.
+- Prompts are semantic HTML. Selected diagrams and options are bundled locally;
+  the source prompt prose is not embedded in the illustration.
+- Review attempts use the same first-attempt, retry, redemption, persistence,
+  and summary state machine as normal stops.
 
 ### Turbo
 
@@ -518,13 +552,16 @@ route wrapper.
 
 ### Culmination
 
-- The attempt has one ordered section per snapshotted game.
-- Each section contains one Starter Campaign question plus two current,
+- The attempt has one ordered section per snapshotted canonical game, followed
+  from Junior I onward by one fixed review-provider section.
+- Each canonical section contains one Starter Campaign question plus two current,
   distinct prior misses at or below the board level when eligible. Remaining
   positions are filled deterministically from the current board-level Campaign
   refs.
-- A section change redirects to the next canonical game route with the same
-  attempt ID. Shared code never imports that game's engine.
+- The fixed review section contains four questions at offsets 24–27, disjoint
+  from both review stops on that board.
+- A section change redirects to the next provider route with the same attempt
+  ID. Shared code never imports that provider's engine.
 - Accuracy and redemption are aggregate across every section.
 
 ### Redemption and summary
@@ -538,8 +575,8 @@ route wrapper.
 
 ## Timing and persistence
 
-The persisted timer fields are `activeTimeMs` and, for Turbo,
-`turboRemainingMs`.
+The persisted timer fields are `activeTimeMs`, each round's
+`firstAnswerActiveTimeMs`, and, for Turbo, `turboRemainingMs`.
 
 - `activeTimeMs` accumulates while a controlled attempt is visible and in
   `playing` or `redemption`. It supplies the summary time.
@@ -549,6 +586,9 @@ The persisted timer fields are `activeTimeMs` and, for Turbo,
 - Ordinary wrong/correct feedback, teaching animations, solved states, and
   puzzle transitions consume the Turbo limit. Explicit explanation modals,
   hidden documents, recovery, and redemption do not.
+- `firstAnswerActiveTimeMs` captures visible answering time only and freezes at
+  the first submission. A first-attempt miss stores that value with its attempt,
+  stop, board, and timestamp for later curriculum analysis.
 
 The hook flushes elapsed time before actions and interaction-state changes, on
 visibility/page lifecycle changes, and on a one-second heartbeat. It starts a
@@ -566,7 +606,7 @@ to recovery instead of uncaught errors or volatile XP awards.
 - a route-local `progression-adapter.ts` exists and imports no other game;
 - the literal adapter slug matches the route;
 - adapter versions come from `progressionMetadata`;
-- all 48 Campaign refs resolve to canonical fingerprints; and
+- all 48 Campaign and 84 Journey refs resolve to canonical fingerprints; and
 - generated rounds replay from string seeds and stale generator versions fall
   back to current Campaign content.
 

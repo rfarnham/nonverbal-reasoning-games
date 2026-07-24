@@ -8,7 +8,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "generate:games": "node scripts/generate-game-registry.mjs",
+    "generate:games": "node scripts/generate-game-registry.mjs && node scripts/generate-math-kangaroo-runtime-manifest.mjs && node scripts/generate-journey-review-registry.mjs",
     "dev": "npm run generate:games && next dev",
     "build": "npm run generate:games && next build",
     "build:pages": "npm run generate:games && NEXT_PUBLIC_BASE_PATH=/nonverbal-reasoning-games next build --webpack",

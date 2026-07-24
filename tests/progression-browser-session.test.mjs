@@ -118,6 +118,15 @@ const games = Array.from({ length: 8 }, (_, index) => ({
   title: `Game ${index + 1}`,
   contentVersion: "1",
 }));
+const journeyGames = [
+  ...games,
+  {
+    slug: "spatial-review",
+    title: "Spatial Review",
+    role: "review",
+    journeyContentVersion: "review-1",
+  },
+];
 
 test("progression answer tokens restore both legacy and explicit option indexes", () => {
   assert.equal(progressionOptionIndexFromAnswerToken("2"), 2);
@@ -129,14 +138,14 @@ test("progression answer tokens restore both legacy and explicit option indexes"
 });
 
 function storeAttempt(storage, attempt) {
-  const journey = buildJourneyPlan(games);
+  const journey = buildJourneyPlan(journeyGames);
   const previousStopIds = previousJourneyNodeIds(journey, attempt.stopId);
   const profile = {
     ...createPlayerProfile({
     id: "profile",
     name: "Ada",
     avatarId: "hedgehog",
-    gameSnapshot: games,
+    gameSnapshot: journeyGames,
     nowMs: 1,
     }),
     clearedStopIds: previousStopIds,
@@ -213,7 +222,7 @@ test("browser sessions recover without writes when storage is unavailable", () =
 
 test("browser session preserves first attempts through retry and redemption", () => {
   const gameAdapter = adapter();
-  const node = buildJourneyPlan(games).boards[0].nodes[0];
+  const node = buildJourneyPlan(journeyGames).boards[0].nodes[0];
   const attempt = createNormalProgressionAttempt({
     id: "normal-attempt",
     node,
@@ -310,7 +319,7 @@ test("browser session preserves first attempts through retry and redemption", ()
 
 test("Turbo charges feedback and solved transitions but not explanation pauses", () => {
   const gameAdapter = adapter();
-  const node = buildJourneyPlan(games).boards[0].nodes[2];
+  const node = buildJourneyPlan(journeyGames).boards[0].nodes[2];
   const attempt = createTurboProgressionAttempt({
     id: "turbo-attempt",
     node,
@@ -406,7 +415,9 @@ test("Turbo charges feedback and solved transitions but not explanation pauses",
 
 test("Turbo starts at Starter, adapts upward, and never exceeds its board cap", () => {
   const gameAdapter = adapter();
-  const node = buildJourneyPlan(games).boards[2].nodes[2];
+  const node = buildJourneyPlan(journeyGames).boards.find(
+    ({ journeyLevel }) => journeyLevel === "expert-1",
+  ).nodes[2];
   const attempt = createTurboProgressionAttempt({
     id: "turbo-cap",
     node,
@@ -471,7 +482,7 @@ test("Turbo finishes cleanly when every unique generated and Campaign question i
       correctIndex: 0,
     }),
   });
-  const node = buildJourneyPlan(games).boards[0].nodes[2];
+  const node = buildJourneyPlan(journeyGames).boards[0].nodes[2];
   const attempt = createTurboProgressionAttempt({
     id: "turbo-exhaustion",
     node,
@@ -510,7 +521,7 @@ test("Turbo finishes cleanly when every unique generated and Campaign question i
 
 test("a controlled URL redirects to the canonical game for the current section", () => {
   const firstAdapter = adapter("game-1");
-  const node = buildJourneyPlan(games).boards[0].nodes[0];
+  const node = buildJourneyPlan(journeyGames).boards[0].nodes[0];
   const attempt = createNormalProgressionAttempt({
     id: "wrong-route",
     node,
@@ -550,7 +561,7 @@ test("refresh migrates current Campaign content and persists the canonical ref",
     contentVersion: "2",
     campaignVersion: "2",
   });
-  const node = buildJourneyPlan(games).boards[0].nodes[0];
+  const node = buildJourneyPlan(journeyGames).boards[0].nodes[0];
   const attempt = createNormalProgressionAttempt({
     id: "campaign-migration",
     node,
@@ -586,7 +597,7 @@ test("refresh replaces stale generated content with a current Campaign fallback"
     campaignVersion: "2",
     contentVersion: "2",
   });
-  const node = buildJourneyPlan(games).boards[0].nodes[2];
+  const node = buildJourneyPlan(journeyGames).boards[0].nodes[2];
   const attempt = createTurboProgressionAttempt({
     id: "generated-migration",
     node,
@@ -616,7 +627,7 @@ test("refresh replaces stale generated content with a current Campaign fallback"
 
 test("culmination advances and redemption route by the current question slug", () => {
   const firstAdapter = adapter("game-1");
-  const node = buildJourneyPlan(games).boards[0].nodes.at(-1);
+  const node = buildJourneyPlan(journeyGames).boards[0].nodes.at(-1);
   const attempt = createCulminationProgressionAttempt({
     id: "culmination-routing",
     node,
@@ -784,7 +795,7 @@ test("culmination advances and redemption route by the current question slug", (
 });
 
 test("legacy culmination duplicate references repair before a cross-game handoff", () => {
-  const node = buildJourneyPlan(games).boards[0].nodes.at(-1);
+  const node = buildJourneyPlan(journeyGames).boards[0].nodes.at(-1);
   const attempt = createCulminationProgressionAttempt({
     id: "culmination-legacy-duplicate",
     node,
@@ -918,7 +929,7 @@ test("legacy culmination duplicate references repair before a cross-game handoff
 
 test("redemption practice time never consumes a Turbo countdown", () => {
   const gameAdapter = adapter();
-  const node = buildJourneyPlan(games).boards[0].nodes[2];
+  const node = buildJourneyPlan(journeyGames).boards[0].nodes[2];
   const initial = createTurboProgressionAttempt({
     id: "turbo-redemption-clock",
     node,

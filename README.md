@@ -11,11 +11,13 @@ There is no account, download, backend, or analytics.
 
 **[Play the games](https://rfarnham.github.io/nonverbal-reasoning-games/)**
 
-The prominent **Journey** path connects every canonical game across Starter,
-Junior, Expert, and Wizard boards, with local player profiles, animal avatars,
-saved stop progress, Turbo Time, redemption, level challenges, and collectible
-XP. The game shelf remains available for standalone Campaign and Infinite play;
-shelf rounds never alter Journey progress.
+The prominent **Journey** path connects a stable, snapshotted set of up to
+eight canonical games across seven boards: Starter, Junior I–II, Expert I–II,
+and Wizard I–II. It includes local player profiles, animal avatars, saved stop
+progress, Turbo Time, redemption, level challenges, collectible XP, and two
+Math Kangaroo spatial-review stops on every board from Junior I onward. The
+game shelf remains available for standalone Campaign and Infinite play; shelf
+rounds never alter Journey progress.
 
 ## Games
 
@@ -50,7 +52,7 @@ app/
     rotation-match/   # route, catalog metadata, and shelf icon
     shape-fold/       # route, catalog metadata, and shelf icon
     whose-left/       # route, catalog metadata, and shelf icon
-  journey/            # local profiles, progression board, and summaries
+  journey/            # local profiles, progression boards, reviews, and summaries
   page.tsx            # auto-discovered game catalog
 components/
   progression/        # shared Journey bridge and avatar presentation
@@ -101,9 +103,10 @@ registry. A committed route with `page.tsx` and `catalog.tsx` therefore appears
 on the home shelf without editing a shared list.
 
 Every released game also exposes a thin `progression-adapter.ts`. It delegates
-to that game’s canonical Campaign rounds, fingerprint, and Infinite generator;
-Journey never copies puzzle data or branches on a game slug. Fixes and balance
-changes therefore reach standalone and Journey play through the same engine.
+to that game’s canonical Campaign rounds, Journey-only authored banks,
+fingerprint, and Infinite generator; Journey never copies puzzle data or
+branches on a game slug. Fixes and balance changes therefore reach standalone
+and Journey play through the same engine.
 
 See [Adding a game](docs/ADDING_A_GAME.md) for the full contract.
 
@@ -127,4 +130,6 @@ before starting a larger game or architectural change.
 
 ## License
 
-[MIT](LICENSE)
+Source code and original project assets are [MIT licensed](LICENSE). Selected
+Math Kangaroo question illustrations are included with authorization and are
+not granted under the repository’s MIT license.

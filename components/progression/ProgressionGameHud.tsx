@@ -3,7 +3,7 @@ import Link from "next/link";
 import styles from "./progression-game-hud.module.css";
 
 type ProgressionGameHudProps = {
-  mode: "normal" | "turbo" | "culmination";
+  mode: "normal" | "review" | "turbo" | "culmination";
   levelLabel: string;
   current: number;
   total: number | null;
@@ -25,6 +25,9 @@ function modeLabel(
 ) {
   if (mode === "turbo") {
     return redemption ? "Turbo Time · Redemption" : "Turbo Time";
+  }
+  if (mode === "review") {
+    return redemption ? "Spatial review · Redemption" : "Spatial review";
   }
   if (mode === "culmination") return "Level challenge";
   return "Journey stop";

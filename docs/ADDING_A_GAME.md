@@ -81,6 +81,9 @@ Use
 `defineProgressionGameAdapter` to expose only:
 
 - the canonical Campaign array;
+- one explicit 12-round bank for every Journey board, reusing canonical
+  Starter, Junior I, Expert I, and Wizard I rounds and keeping the additional
+  Junior II, Expert II, and Wizard II content beside the game engine;
 - the mapping from Starter, Junior, Expert, and Wizard to the engine’s
   difficulty names;
 - the canonical difficulty and fingerprint readers; and
@@ -93,9 +96,9 @@ behavior in the game. Do not create a Journey-specific puzzle copy, persist a
 rendered round, or add a slug case to shared progression code.
 
 The discovery-driven adapter test is a release requirement. It verifies all 48
-Campaign refs, seeded generation, current-content migration, and the absence of
-cross-game imports. See `docs/progression-game-bridge.md` for the mechanical
-page integration.
+standalone Campaign refs, all 84 Journey refs, seeded generation,
+current-content migration, and the absence of cross-game imports. See
+`docs/progression-game-bridge.md` for the mechanical page integration.
 
 ## 6. Accessibility and input
 

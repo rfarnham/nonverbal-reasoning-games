@@ -8,10 +8,17 @@ import {
   campaignQuestionReferences,
   campaignRoundsForLevel,
   createFreshGeneratedQuestion,
+  defineProgressionGameAdapter,
+  journeyCampaignRoundsForLevel,
+  journeyQuestionReferences,
   resolveProgressionQuestion,
 } from "../lib/progression/game-adapter.ts";
 import { questionReferenceKey } from "../lib/progression/questions.ts";
-import { PROGRESSION_LEVELS } from "../lib/progression/types.ts";
+import {
+  JOURNEY_LEVELS,
+  PROGRESSION_LEVELS,
+  journeyLevelDifficulty,
+} from "../lib/progression/types.ts";
 import {
   defaultGamesDirectory,
   discoverGamePackages,
@@ -81,6 +88,16 @@ test("every discovered game exposes only a local, canonical adapter bridge", asy
       source,
       /\bgeneratorVersion:\s*progressionMetadata\.generatorVersion/,
     );
+    assert.match(
+      source,
+      /\bjourneyContentVersion:\s*progressionMetadata\.journeyContentVersion/,
+      `${slug} must version its Journey-only authored content`,
+    );
+    assert.match(
+      source,
+      /\bjourneyCampaignRounds:\s*\{/,
+      `${slug} must provide all seven Journey banks explicitly`,
+    );
   }
 });
 
@@ -118,6 +135,105 @@ test("all discovered Campaign adapters resolve the canonical 48 rounds", async (
     assert.equal(questionKeys.size, 48, `${slug} Campaign ref uniqueness`);
     assert.equal(fingerprints.size, 48, `${slug} Campaign fingerprint uniqueness`);
   }
+});
+
+test("Journey banks add seven authored collections without changing standalone Campaign", () => {
+  const campaignRounds = PROGRESSION_LEVELS.flatMap((level) =>
+    Array.from({ length: 12 }, (_, index) => ({
+      id: `campaign:${level}:${index}`,
+      difficulty: level,
+    })),
+  );
+  const journeyCampaignRounds = Object.fromEntries(
+    JOURNEY_LEVELS.map((journeyLevel) => [
+      journeyLevel,
+      Array.from({ length: 12 }, (_, index) => ({
+        id: `journey:${journeyLevel}:${index}`,
+        difficulty: journeyLevelDifficulty(journeyLevel),
+      })),
+    ]),
+  );
+  const reviewRounds = Array.from({ length: 28 }, (_, index) => ({
+    id: `review:junior-1:${index}`,
+    difficulty: "junior",
+  }));
+  const adapter = defineProgressionGameAdapter({
+    gameSlug: "authored-test",
+    contentVersion: "campaign-v1",
+    generatorVersion: "generator-v1",
+    journeyContentVersion: "journey-v1",
+    campaignRounds,
+    journeyCampaignRounds,
+    journeyCollections: [
+      {
+        id: "review:junior-1",
+        journeyLevel: "junior-1",
+        rounds: reviewRounds,
+      },
+    ],
+    difficultyByLevel: {
+      starter: "starter",
+      junior: "junior",
+      expert: "expert",
+      wizard: "wizard",
+    },
+    difficultyOf: (round) => round.difficulty,
+    fingerprint: (round) => round.id,
+    generate: (difficulty) => ({
+      id: `generated:${difficulty}`,
+      difficulty,
+    }),
+  });
+
+  assert.equal(adapter.campaignRounds.length, 48);
+  const journeyKeys = new Set();
+  const journeyFingerprints = new Set();
+  for (const journeyLevel of JOURNEY_LEVELS) {
+    const rounds = journeyCampaignRoundsForLevel(adapter, journeyLevel);
+    const refs = journeyQuestionReferences(adapter, journeyLevel);
+    assert.equal(rounds.length, 12);
+    assert.equal(refs.length, 12);
+    for (const [index, ref] of refs.entries()) {
+      const resolved = resolveProgressionQuestion(adapter, ref);
+      assert.equal(ref.source, "journey");
+      assert.equal(ref.journeyLevel, journeyLevel);
+      assert.equal(ref.level, journeyLevelDifficulty(journeyLevel));
+      assert.equal(ref.questionIndex, index);
+      assert.equal(resolved.resolution, "current");
+      assert.equal(resolved.fingerprint, rounds[index].id);
+      journeyKeys.add(questionReferenceKey(ref));
+      journeyFingerprints.add(resolved.fingerprint);
+    }
+  }
+  assert.equal(journeyKeys.size, 84);
+  assert.equal(journeyFingerprints.size, 84);
+
+  const freshCulminationRefs = journeyQuestionReferences(
+    adapter,
+    "junior-1",
+    {
+      collectionId: "review:junior-1",
+      questionOffset: 24,
+      questionCount: 4,
+    },
+  );
+  assert.deepEqual(
+    freshCulminationRefs.map(({ questionIndex }) => questionIndex),
+    [24, 25, 26, 27],
+  );
+  assert.ok(
+    freshCulminationRefs.every(
+      (ref) => resolveProgressionQuestion(adapter, ref).resolution === "current",
+    ),
+  );
+
+  const stale = resolveProgressionQuestion(adapter, {
+    ...freshCulminationRefs[0],
+    contentVersion: "stale",
+  });
+  assert.equal(stale.resolution, "journey-updated");
+  assert.equal(stale.ref.contentVersion, "journey-v1");
+  assert.equal(stale.migrated, true);
 });
 
 test("every adapter deterministically replays generated rounds and migrates stale refs", async () => {

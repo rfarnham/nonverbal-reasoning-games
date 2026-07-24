@@ -1,0 +1,1067 @@
+{
+  "schemaVersion": 1,
+  "rounds": {
+    "mk-cyprus-2014-12-q09": {
+      "sourceMasks": [
+        {
+          "page": 4,
+          "x": 55,
+          "y": 118,
+          "width": 510,
+          "height": 445,
+          "reason": "The semantic prompt contains the target route. Remove the worked example and its duplicated Greek translation, keeping the shared board and five animal choices."
+        }
+      ],
+      "preserveCanvasAfterFinalMasks": true,
+      "finalMasks": [
+        {
+          "x": 0.077,
+          "y": 0.665,
+          "width": 0.018,
+          "height": 0.04,
+          "reason": "Remove the worked-example arrowhead as it leaves the home cell without covering the home illustration."
+        }
+      ],
+      "finalGridRepairs": [
+        {
+          "x": 0.0303,
+          "y": 0.0345,
+          "width": 0.4929,
+          "height": 0.9329,
+          "rows": 8,
+          "columns": 8,
+          "lineColor": "#252525",
+          "lineWidth": 2,
+          "cells": [
+            {"row": 5, "column": 1, "fill": "#c0c0c0"},
+            {"row": 5, "column": 2, "fill": "#ffffff"},
+            {"row": 5, "column": 3, "fill": "#c0c0c0"},
+            {"row": 4, "column": 3, "fill": "#ffffff"},
+            {"row": 3, "column": 3, "fill": "#c0c0c0"},
+            {"row": 2, "column": 3, "fill": "#ffffff"},
+            {"row": 2, "column": 4, "fill": "#c0c0c0"},
+            {"row": 2, "column": 5, "fill": "#ffffff"},
+            {"row": 2, "column": 6, "fill": "#c0c0c0"}
+          ]
+        }
+      ]
+    },
+    "mk-cyprus-2013-12-q07": {
+      "finalCrop": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 0.86,
+        "reason": "Remove the partial artwork from the following question below the complete five-choice row."
+      }
+    },
+    "mk-cyprus-2023-12-q09": {
+      "sourceMasks": [
+        {
+          "page": 3,
+          "x": 441,
+          "y": 136,
+          "width": 16,
+          "height": 14,
+          "reason": "Remove the duplicate Greek suffix from the diagram's Point A label."
+        },
+        {
+          "page": 3,
+          "x": 488,
+          "y": 130,
+          "width": 15,
+          "height": 15,
+          "reason": "Remove the duplicate Greek suffix from the diagram's Point B label."
+        },
+        {
+          "page": 3,
+          "x": 519,
+          "y": 130,
+          "width": 17,
+          "height": 15,
+          "reason": "Remove the duplicate Greek suffix from the diagram's Point C label."
+        },
+        {
+          "page": 3,
+          "x": 537,
+          "y": 162,
+          "width": 16,
+          "height": 15,
+          "reason": "Remove the duplicate Greek suffix from the diagram's Point D label."
+        },
+        {
+          "page": 3,
+          "x": 469,
+          "y": 208,
+          "width": 18,
+          "height": 15,
+          "reason": "Remove the duplicate Greek suffix from the diagram's Point E label."
+        }
+      ]
+    },
+    "mk-cyprus-2023-34-q16": {
+      "sourceMasks": [
+        {
+          "page": 5,
+          "x": 55,
+          "y": 568,
+          "width": 235,
+          "height": 82,
+          "reason": "Remove the Greek prompt beside the English two-storey maze diagrams."
+        },
+        {
+          "page": 5,
+          "x": 290,
+          "y": 647,
+          "width": 275,
+          "height": 88,
+          "reason": "Remove the duplicated Greek-labelled floor diagrams while preserving the English ground-floor and first-floor pair above."
+        }
+      ],
+      "finalChoiceMarkers": [
+        {
+          "choiceIndex": 0,
+          "x": 0,
+          "y": 0.73,
+          "width": 0.055,
+          "height": 0.25
+        },
+        {
+          "choiceIndex": 1,
+          "x": 0.21,
+          "y": 0.73,
+          "width": 0.055,
+          "height": 0.25
+        },
+        {
+          "choiceIndex": 2,
+          "x": 0.385,
+          "y": 0.73,
+          "width": 0.06,
+          "height": 0.25
+        },
+        {
+          "choiceIndex": 3,
+          "x": 0.605,
+          "y": 0.73,
+          "width": 0.06,
+          "height": 0.25
+        },
+        {
+          "choiceIndex": 4,
+          "x": 0.81,
+          "y": 0.73,
+          "width": 0.055,
+          "height": 0.25
+        }
+      ]
+    },
+    "mk-cyprus-2020-12-a-q05": {
+      "sourceMasks": [
+        {
+          "page": 4,
+          "x": 202,
+          "y": 268,
+          "width": 23,
+          "height": 18,
+          "reason": "Remove the isolated prompt word left after OCR; the semantic prompt already states that Plate A is placed on top of Plate B."
+        }
+      ],
+      "finalCrop": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 0.8,
+        "reason": "Remove the partial cube illustration from the following question below the complete five-choice row."
+      }
+    },
+    "mk-cyprus-2026-12-q06": {
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0, "y": 0.61, "width": 0.07, "height": 0.11},
+        {"choiceIndex": 1, "x": 0.37, "y": 0.61, "width": 0.07, "height": 0.11},
+        {"choiceIndex": 2, "x": 0.735, "y": 0.61, "width": 0.07, "height": 0.11},
+        {"choiceIndex": 3, "x": 0, "y": 0.88, "width": 0.07, "height": 0.115},
+        {"choiceIndex": 4, "x": 0.37, "y": 0.88, "width": 0.07, "height": 0.115}
+      ]
+    },
+    "mk-cyprus-2026-12-q09": {
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0, "y": 0.56, "width": 0.055, "height": 0.15},
+        {"choiceIndex": 1, "x": 0.37, "y": 0.56, "width": 0.055, "height": 0.15},
+        {"choiceIndex": 2, "x": 0.735, "y": 0.56, "width": 0.055, "height": 0.15},
+        {"choiceIndex": 3, "x": 0, "y": 0.79, "width": 0.055, "height": 0.18},
+        {"choiceIndex": 4, "x": 0.37, "y": 0.79, "width": 0.055, "height": 0.18}
+      ]
+    },
+    "mk-cyprus-2026-12-q13": {
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0, "y": 0.84, "width": 0.06, "height": 0.15},
+        {"choiceIndex": 1, "x": 0.21, "y": 0.84, "width": 0.06, "height": 0.15},
+        {"choiceIndex": 2, "x": 0.42, "y": 0.84, "width": 0.06, "height": 0.15},
+        {"choiceIndex": 3, "x": 0.63, "y": 0.84, "width": 0.06, "height": 0.15},
+        {"choiceIndex": 4, "x": 0.84, "y": 0.84, "width": 0.06, "height": 0.15}
+      ]
+    },
+    "mk-cyprus-2025-12-q08": {
+      "finalMasks": [
+        {"x": 0.02, "y": 0.87, "width": 0.05, "height": 0.12, "reason": "Remove source marker A left of choice 1 without touching the button outline."},
+        {"x": 0.215, "y": 0.87, "width": 0.05, "height": 0.12, "reason": "Remove source marker B left of choice 2 without touching the button outline."},
+        {"x": 0.41, "y": 0.87, "width": 0.05, "height": 0.12, "reason": "Remove source marker C left of choice 3 without touching the button outline."},
+        {"x": 0.605, "y": 0.87, "width": 0.05, "height": 0.12, "reason": "Remove source marker D left of choice 4 without touching the button outline."},
+        {"x": 0.805, "y": 0.87, "width": 0.05, "height": 0.12, "reason": "Remove source marker E left of choice 5 without touching the button outline."}
+      ],
+      "preserveCanvasAfterFinalMasks": true,
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0.027, "y": 0.88, "width": 0.04, "height": 0.1},
+        {"choiceIndex": 1, "x": 0.222, "y": 0.88, "width": 0.04, "height": 0.1},
+        {"choiceIndex": 2, "x": 0.418, "y": 0.88, "width": 0.04, "height": 0.1},
+        {"choiceIndex": 3, "x": 0.614, "y": 0.88, "width": 0.04, "height": 0.1},
+        {"choiceIndex": 4, "x": 0.81, "y": 0.88, "width": 0.04, "height": 0.1}
+      ]
+    },
+    "mk-cyprus-2026-34-q10": {
+      "finalMasks": [
+        {
+          "x": 0.055,
+          "y": 0.045,
+          "width": 0.09,
+          "height": 0.09,
+          "reason": "Remove the detached prompt word; the semantic prompt already explains the target heart."
+        }
+      ],
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0, "y": 0.56, "width": 0.055, "height": 0.11},
+        {"choiceIndex": 1, "x": 0.37, "y": 0.56, "width": 0.055, "height": 0.11},
+        {"choiceIndex": 2, "x": 0, "y": 0.69, "width": 0.055, "height": 0.11},
+        {"choiceIndex": 3, "x": 0.37, "y": 0.69, "width": 0.055, "height": 0.11},
+        {"choiceIndex": 4, "x": 0, "y": 0.88, "width": 0.055, "height": 0.115}
+      ]
+    },
+    "mk-cyprus-2017-34-q09": {
+      "finalCrop": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 0.965,
+        "reason": "Remove the thin residue below the five complete rear-view choices."
+      }
+    },
+    "mk-cyprus-2015-34-q08": {
+      "finalCrop": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 0.82,
+        "reason": "Remove the empty footer box and lower-page residue below the five numbered umbrellas."
+      }
+    },
+    "mk-cyprus-2018-34-q08": {
+      "finalMasks": [
+        {
+          "x": 0.68,
+          "y": 0,
+          "width": 0.16,
+          "height": 0.13,
+          "reason": "Remove the detached direction word; the table arrangement itself is the complete evidence."
+        }
+      ]
+    },
+    "mk-cyprus-2024-34-q07": {
+      "finalCrop": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 0.96,
+        "reason": "Remove the thin footer strip below the complete five-choice construction."
+      },
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0, "y": 0.57, "width": 0.055, "height": 0.11},
+        {"choiceIndex": 1, "x": 0.30, "y": 0.57, "width": 0.06, "height": 0.11},
+        {"choiceIndex": 2, "x": 0.61, "y": 0.57, "width": 0.06, "height": 0.11},
+        {"choiceIndex": 3, "x": 0, "y": 0.835, "width": 0.07, "height": 0.165},
+        {"choiceIndex": 4, "x": 0.29, "y": 0.835, "width": 0.075, "height": 0.165}
+      ]
+    },
+    "mk-cyprus-2025-34-q08": {
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0, "y": 0.51, "width": 0.09, "height": 0.14},
+        {"choiceIndex": 1, "x": 0.34, "y": 0.51, "width": 0.12, "height": 0.14},
+        {"choiceIndex": 2, "x": 0.70, "y": 0.51, "width": 0.12, "height": 0.14},
+        {"choiceIndex": 3, "x": 0, "y": 0.86, "width": 0.09, "height": 0.14},
+        {"choiceIndex": 4, "x": 0.34, "y": 0.86, "width": 0.12, "height": 0.14}
+      ]
+    },
+    "mk-cyprus-2026-34-q15": {
+      "finalMasks": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 0.13,
+          "height": 0.18,
+          "reason": "Remove the detached orientation word; the arrow grid retains the complete evidence."
+        }
+      ]
+    },
+    "mk-cyprus-2014-34-q13": {
+      "finalMasks": [
+        {
+          "x": 0.42,
+          "y": 0,
+          "width": 0.2,
+          "height": 0.19,
+          "reason": "Remove the detached prompt word above the numbered stick stack."
+        }
+      ]
+    },
+    "mk-cyprus-2017-34-q08": {
+      "finalMasks": [
+        {
+          "x": 0.27,
+          "y": 0,
+          "width": 0.2,
+          "height": 0.12,
+          "reason": "Remove the detached direction word above the necklace evidence."
+        }
+      ]
+    },
+    "mk-cyprus-2026-34-q12": {
+      "finalMasks": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 0.14,
+          "height": 0.5,
+          "reason": "Remove the detached prompt word and trim the blank lead-in before the complete arrow grid."
+        }
+      ]
+    },
+    "mk-cyprus-2022-34-q08": {
+      "finalMasks": [
+        {
+          "x": 0,
+          "y": 0.86,
+          "width": 0.18,
+          "height": 0.14,
+          "reason": "Remove the detached point-value footer beneath the complete five top-view choices."
+        }
+      ]
+    },
+    "mk-cyprus-2018-34-q10": {
+      "sourceTopMarginPoints": 145,
+      "sourceMasks": [
+        {
+          "page": 4,
+          "x": 60,
+          "y": 235,
+          "width": 90,
+          "height": 165,
+          "reason": "Remove the redundant vertical inventory and its OCR punctuation while retaining the complete five-by-five Latin-square grid and the five answer figures."
+        }
+      ]
+    },
+    "mk-cyprus-2015-34-q14": {
+      "finalMasks": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 0.62,
+          "height": 0.23,
+          "reason": "Remove detached direction words while retaining the labelled route, start arrow, and gates."
+        }
+      ]
+    },
+    "mk-cyprus-2018-34-q11": {
+      "finalCrop": {
+        "x": 0,
+        "y": 0,
+        "width": 0.49,
+        "height": 1,
+        "reason": "Remove the empty glossary box while retaining the labelled square, trapezium, and boat."
+      }
+    },
+    "mk-cyprus-2025-34-q04": {
+      "preserveCanvasAfterFinalMasks": true,
+      "finalMasks": [
+        {"x": 0, "y": 0.82, "width": 0.075, "height": 0.18, "reason": "Remove source marker A below the first pinwheel."},
+        {"x": 0.14, "y": 0.82, "width": 0.1, "height": 0.18, "reason": "Remove source marker B below the second pinwheel."},
+        {"x": 0.30, "y": 0.82, "width": 0.1, "height": 0.18, "reason": "Remove source marker C below the third pinwheel."},
+        {"x": 0.46, "y": 0.82, "width": 0.1, "height": 0.18, "reason": "Remove source marker D below the fourth pinwheel."},
+        {"x": 0.62, "y": 0.82, "width": 0.1, "height": 0.18, "reason": "Remove source marker E below the fifth pinwheel."}
+      ],
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0, "y": 0.83, "width": 0.065, "height": 0.17, "eraseSource": false},
+        {"choiceIndex": 1, "x": 0.16, "y": 0.83, "width": 0.065, "height": 0.17, "eraseSource": false},
+        {"choiceIndex": 2, "x": 0.32, "y": 0.83, "width": 0.065, "height": 0.17, "eraseSource": false},
+        {"choiceIndex": 3, "x": 0.48, "y": 0.83, "width": 0.065, "height": 0.17, "eraseSource": false},
+        {"choiceIndex": 4, "x": 0.64, "y": 0.83, "width": 0.065, "height": 0.17, "eraseSource": false}
+      ]
+    },
+    "mk-cyprus-2015-34-q18": {
+      "finalMasks": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 1,
+          "height": 0.24,
+          "reason": "Remove the detached prompt word and top-edge residue above the three complete transparency grids."
+        }
+      ]
+    },
+    "mk-cyprus-2025-34-q16": {
+      "preserveCanvasAfterFinalMasks": true,
+      "finalMasks": [
+        {"x": 0, "y": 0.52, "width": 0.043, "height": 0.16, "reason": "Remove source marker A without covering the first candidate."},
+        {"x": 0.28, "y": 0.52, "width": 0.043, "height": 0.16, "reason": "Remove source marker B without covering the second candidate."},
+        {"x": 0.56, "y": 0.52, "width": 0.043, "height": 0.16, "reason": "Remove source marker C without covering the third candidate."},
+        {"x": 0, "y": 0.82, "width": 0.043, "height": 0.18, "reason": "Remove source marker D without covering the fourth candidate."},
+        {"x": 0.28, "y": 0.82, "width": 0.043, "height": 0.18, "reason": "Remove source marker E without covering the fifth candidate."},
+        {"x": 0.56, "y": 0.65, "width": 0.06, "height": 0.05, "reason": "Remove the final marker-C residue below the third candidate without touching its grid."},
+        {"x": 0.585, "y": 0.6, "width": 0.015, "height": 0.12, "reason": "Remove the narrow marker-C antialiasing immediately left of the third candidate."}
+      ],
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0, "y": 0.52, "width": 0.043, "height": 0.13, "eraseSource": false},
+        {"choiceIndex": 1, "x": 0.28, "y": 0.52, "width": 0.043, "height": 0.13, "eraseSource": false},
+        {"choiceIndex": 2, "x": 0.56, "y": 0.52, "width": 0.043, "height": 0.13, "eraseSource": false},
+        {"choiceIndex": 3, "x": 0, "y": 0.82, "width": 0.043, "height": 0.17, "eraseSource": false},
+        {"choiceIndex": 4, "x": 0.28, "y": 0.82, "width": 0.043, "height": 0.17, "eraseSource": false}
+      ]
+    },
+    "mk-cyprus-2023-34-q22": {
+      "finalMasks": [
+        {
+          "x": 0.58,
+          "y": 0,
+          "width": 0.42,
+          "height": 0.39,
+          "reason": "Remove detached suit-symbol residue above the two worked machine examples."
+        }
+      ]
+    },
+    "mk-cyprus-2015-34-q17": {
+      "finalMasks": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 1,
+          "height": 0.35,
+          "reason": "Remove top-edge OCR residue while retaining the complete numbered cube net."
+        }
+      ]
+    },
+    "mk-cyprus-2026-34-q19": {
+      "finalMasks": [
+        {
+          "x": 0,
+          "y": 0.12,
+          "width": 0.25,
+          "height": 0.42,
+          "reason": "Remove detached direction words beside the circular arrangement."
+        },
+        {
+          "x": 0.67,
+          "y": 0,
+          "width": 0.3,
+          "height": 0.22,
+          "reason": "Remove the bilingual raster name label; the semantic prompt identifies Maria."
+        }
+      ]
+    },
+    "mk-cyprus-2015-34-q16": {
+      "finalCrop": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 0.84,
+        "reason": "Remove the empty footer box beneath the complete five-choice grid-piece puzzle."
+      }
+    },
+    "mk-cyprus-2016-34-q17": {
+      "finalMasks": [
+        {
+          "x": 0.48,
+          "y": 0,
+          "width": 0.2,
+          "height": 0.12,
+          "reason": "Remove the detached direction word; the two shown turnovers remain complete."
+        }
+      ]
+    },
+    "mk-cyprus-2023-34-q08": {
+      "finalMasks": [
+        {
+          "x": 0.28,
+          "y": 0,
+          "width": 0.34,
+          "height": 0.13,
+          "reason": "Remove the duplicate upper copy of the semicircle and quarter-circle plus its detached prompt word."
+        },
+        {
+          "x": 0.84,
+          "y": 0,
+          "width": 0.16,
+          "height": 0.21,
+          "reason": "Remove the duplicate upper black target circle while preserving the complete lower evidence set."
+        }
+      ]
+    },
+    "mk-cyprus-2026-34-q11": {
+      "preserveCanvasAfterFinalMasks": true,
+      "finalMasks": [
+        {"x": 0.008, "y": 0.59, "width": 0.035, "height": 0.09, "reason": "Remove source marker A in the margin left of choice 1."},
+        {"x": 0.203, "y": 0.59, "width": 0.035, "height": 0.09, "reason": "Remove source marker B in the margin left of choice 2."},
+        {"x": 0.398, "y": 0.59, "width": 0.035, "height": 0.09, "reason": "Remove source marker C in the margin left of choice 3."},
+        {"x": 0.008, "y": 0.91, "width": 0.035, "height": 0.08, "reason": "Remove source marker D in the margin left of choice 4."},
+        {"x": 0.203, "y": 0.91, "width": 0.035, "height": 0.08, "reason": "Remove source marker E in the margin left of choice 5."}
+      ],
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0.012, "y": 0.615, "width": 0.03, "height": 0.06, "eraseSource": false},
+        {"choiceIndex": 1, "x": 0.207, "y": 0.615, "width": 0.03, "height": 0.06, "eraseSource": false},
+        {"choiceIndex": 2, "x": 0.402, "y": 0.615, "width": 0.03, "height": 0.06, "eraseSource": false},
+        {"choiceIndex": 3, "x": 0.012, "y": 0.932, "width": 0.03, "height": 0.06, "eraseSource": false},
+        {"choiceIndex": 4, "x": 0.207, "y": 0.932, "width": 0.03, "height": 0.06, "eraseSource": false}
+      ]
+    },
+    "mk-cyprus-2014-34-q23": {
+      "finalMasks": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 0.25,
+          "height": 0.19,
+          "reason": "Remove the first detached shaded 2-by-2 prompt icon above the diamond grid."
+        },
+        {
+          "x": 0.64,
+          "y": 0.18,
+          "width": 0.36,
+          "height": 0.3,
+          "reason": "Remove the second detached shaded 2-by-2 prompt icon above the diamond grid."
+        }
+      ]
+    },
+    "mk-cyprus-2025-34-q19": {
+      "preserveCanvasAfterFinalMasks": true,
+      "finalMasks": [
+        {"x": 0.008, "y": 0.62, "width": 0.038, "height": 0.09, "reason": "Remove source marker A in the margin left of choice 1."},
+        {"x": 0.228, "y": 0.62, "width": 0.038, "height": 0.09, "reason": "Remove source marker B in the margin left of choice 2."},
+        {"x": 0.008, "y": 0.9, "width": 0.038, "height": 0.09, "reason": "Remove source marker C in the margin left of choice 3."},
+        {"x": 0.228, "y": 0.9, "width": 0.038, "height": 0.09, "reason": "Remove source marker D in the margin left of choice 4."},
+        {"x": 0.446, "y": 0.9, "width": 0.038, "height": 0.09, "reason": "Remove source marker E in the margin left of choice 5."}
+      ],
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0.012, "y": 0.64, "width": 0.03, "height": 0.055, "eraseSource": false},
+        {"choiceIndex": 1, "x": 0.232, "y": 0.64, "width": 0.03, "height": 0.055, "eraseSource": false},
+        {"choiceIndex": 2, "x": 0.012, "y": 0.915, "width": 0.03, "height": 0.055, "eraseSource": false},
+        {"choiceIndex": 3, "x": 0.232, "y": 0.915, "width": 0.03, "height": 0.055, "eraseSource": false},
+        {"choiceIndex": 4, "x": 0.45, "y": 0.915, "width": 0.03, "height": 0.055, "eraseSource": false}
+      ]
+    },
+    "mk-cyprus-2023-34-q18": {
+      "preserveCanvasAfterFinalMasks": true,
+      "finalMasks": [
+        {"x": 0.035, "y": 0.84, "width": 0.04, "height": 0.14, "reason": "Remove source marker A in the margin left of choice 1."},
+        {"x": 0.233, "y": 0.84, "width": 0.035, "height": 0.14, "reason": "Remove source marker B in the margin left of choice 2."},
+        {"x": 0.43, "y": 0.84, "width": 0.04, "height": 0.14, "reason": "Remove source marker gamma in the margin left of choice 3."},
+        {"x": 0.623, "y": 0.84, "width": 0.039, "height": 0.14, "reason": "Remove source marker delta in the margin left of choice 4."},
+        {"x": 0.81, "y": 0.84, "width": 0.05, "height": 0.14, "reason": "Remove source marker E in the margin left of choice 5."}
+      ],
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0.038, "y": 0.87, "width": 0.03, "height": 0.11, "eraseSource": false},
+        {"choiceIndex": 1, "x": 0.236, "y": 0.87, "width": 0.03, "height": 0.11, "eraseSource": false},
+        {"choiceIndex": 2, "x": 0.432, "y": 0.87, "width": 0.022, "height": 0.11, "eraseSource": false},
+        {"choiceIndex": 3, "x": 0.625, "y": 0.87, "width": 0.022, "height": 0.11, "eraseSource": false},
+        {"choiceIndex": 4, "x": 0.812, "y": 0.87, "width": 0.022, "height": 0.11, "eraseSource": false}
+      ]
+    },
+    "mk-cyprus-2025-34-q24": {
+      "finalMasks": [
+        {
+          "x": 0.33,
+          "y": 0.2,
+          "width": 0.09,
+          "height": 0.18,
+          "reason": "Remove the first floating red-square prompt icon above the scales."
+        },
+        {
+          "x": 0.89,
+          "y": 0,
+          "width": 0.11,
+          "height": 0.16,
+          "reason": "Remove the second floating red-square prompt icon above the scales."
+        }
+      ]
+    },
+    "mk-cyprus-2012-34-q09": {
+      "finalCrop": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 0.64,
+        "reason": "Keep the L-tile exemplar and four target shapes while removing the raster prompt and duplicate lower tile."
+      }
+    },
+    "mk-cyprus-2015-34-q21": {
+      "finalMasks": [
+        {"x": 0, "y": 0, "width": 1, "height": 0.06, "reason": "Remove isolated top-edge scan residue."}
+      ]
+    },
+    "mk-cyprus-2019-34-q22": {
+      "finalMasks": [
+        {"x": 0, "y": 0, "width": 1, "height": 0.06, "reason": "Remove isolated top-edge scan residue."}
+      ]
+    },
+    "mk-cyprus-2016-34-q21": {
+      "finalMasks": [
+        {"x": 0, "y": 0, "width": 1, "height": 0.06, "reason": "Remove isolated top-edge scan residue."}
+      ]
+    },
+    "mk-cyprus-2021-34-q16": {
+      "finalMasks": [
+        {
+          "x": 0.055,
+          "y": 0,
+          "width": 0.14,
+          "height": 0.08,
+          "reason": "Remove the redundant direction word while preserving the directional arrow and cup sequence."
+        }
+      ]
+    },
+    "mk-cyprus-2017-12-q19": {
+      "sourceTopMarginPoints": 55,
+      "preserveCanvasAfterFinalMasks": true,
+      "finalMasks": [
+        {"x": 0, "y": 0.34, "width": 0.2, "height": 0.14, "reason": "Remove the OCR remnant from the English prompt while keeping the exemplar and choices."},
+        {"x": 0.975, "y": 0.24, "width": 0.025, "height": 0.11, "reason": "Remove the sentence-ending prompt punctuation beside the exemplar."}
+      ],
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0.025, "y": 0.86, "width": 0.045, "height": 0.13, "eraseSource": false},
+        {"choiceIndex": 1, "x": 0.195, "y": 0.86, "width": 0.045, "height": 0.13, "eraseSource": false},
+        {"choiceIndex": 2, "x": 0.365, "y": 0.86, "width": 0.045, "height": 0.13, "eraseSource": false},
+        {"choiceIndex": 3, "x": 0.595, "y": 0.86, "width": 0.045, "height": 0.13, "eraseSource": false},
+        {"choiceIndex": 4, "x": 0.835, "y": 0.86, "width": 0.045, "height": 0.13, "eraseSource": false}
+      ]
+    },
+    "mk-cyprus-2013-12-q23": {
+      "sourceTopMarginPoints": 70,
+      "finalMasks": [
+        {"x": 0.58, "y": 0.52, "width": 0.09, "height": 0.13, "reason": "Remove the OCR direction-word remnant between the altered cube and stamp shapes."}
+      ]
+    },
+    "mk-cyprus-2013-12-q16": {
+      "sourceTopMarginPoints": 55,
+      "finalMasks": [
+        {"x": 0, "y": 0.88, "width": 0.79, "height": 0.12, "reason": "Remove the empty five-point section footer below the choices."}
+      ]
+    },
+    "mk-cyprus-2013-12-q21": {
+      "sourceTopMarginPoints": 35
+    },
+    "mk-cyprus-2012-34-q15": {
+      "finalMasks": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 1,
+          "height": 0.04,
+          "reason": "Remove two punctuation remnants above the complete coloured cuboid and all five white candidate pieces."
+        }
+      ]
+    },
+    "mk-cyprus-2018-34-q06": {
+      "finalMasks": [
+        {
+          "x": 0.64,
+          "y": 0,
+          "width": 0.16,
+          "height": 0.13,
+          "reason": "Remove the clipped English duplicate of the fold-and-cut diagram; retain the complete identical Greek-row copy and all outcomes."
+        }
+      ],
+      "finalGridRepairs": [
+        {
+          "x": 0.72,
+          "y": 0.035,
+          "width": 0.073,
+          "height": 0.21,
+          "rows": 1,
+          "columns": 2,
+          "lineWidth": 2,
+          "lineColor": "#252525",
+          "reason": "Add a code-native full-sheet outline and centre crease before the official cut-on-fold diagram."
+        }
+      ],
+      "finalTextLabels": [
+        {
+          "text": "←",
+          "x": 0.735,
+          "y": 0.075,
+          "width": 0.05,
+          "height": 0.09,
+          "fontScale": 0.82
+        },
+        {
+          "text": "fold left",
+          "x": 0.695,
+          "y": 0.245,
+          "width": 0.12,
+          "height": 0.07,
+          "fontScale": 0.52
+        },
+        {
+          "text": "→",
+          "x": 0.82,
+          "y": 0.08,
+          "width": 0.06,
+          "height": 0.11,
+          "fontScale": 0.8
+        },
+        {
+          "text": "cut",
+          "x": 0.91,
+          "y": 0.245,
+          "width": 0.08,
+          "height": 0.07,
+          "fontScale": 0.52
+        }
+      ]
+    },
+    "mk-cyprus-2017-12-q05": {
+      "sourceMasks": [
+        {
+          "page": 3,
+          "x": 132,
+          "y": 338,
+          "width": 160,
+          "height": 55,
+          "reason": "Remove the duplicate Greek-language sticker inventory while retaining one complete inventory, the blank butterfly, and all five outcomes."
+        }
+      ]
+    },
+    "mk-cyprus-2014-12-q02": {
+      "sourceMasks": [
+        {
+          "page": 1,
+          "x": 60,
+          "y": 672,
+          "width": 490,
+          "height": 92,
+          "reason": "Remove the complete English and Greek semantic answer rows."
+        }
+      ]
+    },
+    "mk-cyprus-2022-34-q04": {
+      "finalMasks": [
+        {
+          "x": 0.91,
+          "y": 0,
+          "width": 0.09,
+          "height": 0.08,
+          "reason": "Remove the OCR prompt word above the box diagram."
+        }
+      ],
+      "finalTextLabels": [
+        {
+          "text": "music sheets",
+          "x": 0.308,
+          "y": 0.266,
+          "width": 0.148,
+          "height": 0.084,
+          "fontScale": 0.48
+        },
+        {
+          "text": "board games",
+          "x": 0.684,
+          "y": 0.219,
+          "width": 0.184,
+          "height": 0.058,
+          "fontScale": 0.5
+        },
+        {
+          "text": "bedding",
+          "x": 0.489,
+          "y": 0.545,
+          "width": 0.165,
+          "height": 0.084,
+          "fontScale": 0.56
+        },
+        {
+          "text": "BOOKS",
+          "x": 0.806,
+          "y": 0.82,
+          "width": 0.132,
+          "height": 0.13,
+          "fontScale": 0.24,
+          "background": "#a0a0a0"
+        }
+      ]
+    },
+    "mk-cyprus-2019-12-q18": {
+      "finalMasks": [
+        {"x": 0, "y": 0, "width": 0.035, "height": 0.13, "reason": "Remove the isolated upper-left raster speck."}
+      ]
+    },
+    "mk-cyprus-2017-12-q24": {
+      "finalMasks": [
+        {"x": 0.455, "y": 0, "width": 0.085, "height": 0.12, "reason": "Remove the stray OCR word above the threaded-card diagram."}
+      ]
+    },
+    "mk-cyprus-2020-12-a-q15": {
+      "finalMasks": [
+        {"x": 0.19, "y": 0.16, "width": 0.08, "height": 0.1, "reason": "Remove the first redundant direction word."},
+        {"x": 0.45, "y": 0.16, "width": 0.08, "height": 0.1, "reason": "Remove the second redundant direction word."}
+      ]
+    },
+    "mk-cyprus-2025-12-q16": {
+      "preserveCanvasAfterFinalMasks": true,
+      "finalMasks": [
+        {"x": 0.245, "y": 0, "width": 0.2, "height": 0.11, "reason": "Remove duplicate prompt-derived front/back text above the labelled views."},
+        {"x": 0.43, "y": 0, "width": 0.08, "height": 0.1, "reason": "Remove the remaining duplicate back-label fragment."},
+        {"x": 0, "y": 0.88, "width": 0.035, "height": 0.12, "reason": "Remove the source marker-A parenthesis left of choice 1."},
+        {"x": 0.84, "y": 0.88, "width": 0.035, "height": 0.12, "reason": "Remove the source marker-E punctuation right of choice 5."}
+      ],
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0.02, "y": 0.9, "width": 0.055, "height": 0.1},
+        {"choiceIndex": 1, "x": 0.2, "y": 0.9, "width": 0.055, "height": 0.1},
+        {"choiceIndex": 2, "x": 0.4, "y": 0.9, "width": 0.055, "height": 0.1},
+        {"choiceIndex": 3, "x": 0.6, "y": 0.9, "width": 0.055, "height": 0.1},
+        {"choiceIndex": 4, "x": 0.8, "y": 0.9, "width": 0.055, "height": 0.1}
+      ]
+    },
+    "mk-cyprus-2026-12-q19": {
+      "finalMasks": [
+        {"x": 0, "y": 0.04, "width": 0.09, "height": 0.11, "reason": "Remove the redundant top-view word."},
+        {"x": 0.67, "y": 0, "width": 0.1, "height": 0.11, "reason": "Remove the redundant left-view word."}
+      ],
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0.01, "y": 0.84, "width": 0.055, "height": 0.15},
+        {"choiceIndex": 1, "x": 0.23, "y": 0.84, "width": 0.055, "height": 0.15},
+        {"choiceIndex": 2, "x": 0.45, "y": 0.84, "width": 0.055, "height": 0.15},
+        {"choiceIndex": 3, "x": 0.67, "y": 0.84, "width": 0.055, "height": 0.15},
+        {"choiceIndex": 4, "x": 0.89, "y": 0.84, "width": 0.055, "height": 0.15}
+      ]
+    },
+    "mk-cyprus-2026-12-q20": {
+      "finalMasks": [
+        {"x": 0.16, "y": 0, "width": 0.24, "height": 0.57, "reason": "Remove the raster instruction words already supplied as semantic text."}
+      ],
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0.01, "y": 0.76, "width": 0.055, "height": 0.2},
+        {"choiceIndex": 1, "x": 0.195, "y": 0.76, "width": 0.055, "height": 0.2},
+        {"choiceIndex": 2, "x": 0.385, "y": 0.76, "width": 0.055, "height": 0.2},
+        {"choiceIndex": 3, "x": 0.57, "y": 0.76, "width": 0.055, "height": 0.2},
+        {"choiceIndex": 4, "x": 0.755, "y": 0.76, "width": 0.055, "height": 0.2}
+      ]
+    },
+    "mk-cyprus-2016-12-q17": {
+      "finalMasks": [
+        {"x": 0.77, "y": 0, "width": 0.12, "height": 0.14, "reason": "Remove the clipped duplicate T-piece fragment at the top edge."}
+      ]
+    },
+    "mk-cyprus-2019-12-q13": {
+      "finalMasks": [
+        {"x": 0, "y": 0, "width": 0.09, "height": 0.14, "reason": "Remove the stray back-view word."}
+      ]
+    },
+    "mk-cyprus-2026-12-q16": {
+      "finalMasks": [
+        {"x": 0.19, "y": 0, "width": 0.14, "height": 0.15, "reason": "Remove the redundant left-view word."},
+        {"x": 0.01, "y": 0.7, "width": 0.05, "height": 0.08, "reason": "Remove source marker A left of choice 1."},
+        {"x": 0.39, "y": 0.7, "width": 0.05, "height": 0.08, "reason": "Remove source marker B left of choice 2."},
+        {"x": 0.77, "y": 0.7, "width": 0.05, "height": 0.08, "reason": "Remove source marker C left of choice 3."},
+        {"x": 0.01, "y": 0.91, "width": 0.05, "height": 0.08, "reason": "Remove source marker D left of choice 4."},
+        {"x": 0.39, "y": 0.91, "width": 0.05, "height": 0.08, "reason": "Remove source marker E left of choice 5."}
+      ],
+      "preserveCanvasAfterFinalMasks": true,
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0.015, "y": 0.705, "width": 0.04, "height": 0.075},
+        {"choiceIndex": 1, "x": 0.395, "y": 0.705, "width": 0.04, "height": 0.075},
+        {"choiceIndex": 2, "x": 0.78, "y": 0.705, "width": 0.04, "height": 0.075},
+        {"choiceIndex": 3, "x": 0.015, "y": 0.915, "width": 0.04, "height": 0.075},
+        {"choiceIndex": 4, "x": 0.395, "y": 0.915, "width": 0.04, "height": 0.075}
+      ]
+    },
+    "mk-cyprus-2018-12-q14": {
+      "finalMasks": [
+        {"x": 0, "y": 0, "width": 0.13, "height": 0.12, "reason": "Remove the stray right-direction word."}
+      ]
+    },
+    "mk-cyprus-2025-34-q06": {
+      "finalMasks": [
+        {"x": 0.285, "y": 0.32, "width": 0.045, "height": 0.13, "reason": "Remove source marker B left of choice 2."},
+        {"x": 0.285, "y": 0.58, "width": 0.045, "height": 0.13, "reason": "Remove source marker D left of choice 4."}
+      ],
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0.01, "y": 0.37, "width": 0.055, "height": 0.1},
+        {"choiceIndex": 1, "x": 0.23, "y": 0.37, "width": 0.055, "height": 0.1},
+        {"choiceIndex": 2, "x": 0.01, "y": 0.64, "width": 0.055, "height": 0.1},
+        {"choiceIndex": 3, "x": 0.23, "y": 0.64, "width": 0.055, "height": 0.1},
+        {"choiceIndex": 4, "x": 0.01, "y": 0.89, "width": 0.055, "height": 0.11}
+      ]
+    },
+    "mk-cyprus-2017-34-q03": {
+      "finalMasks": [
+        {"x": 0.19, "y": 0, "width": 0.1, "height": 0.12, "reason": "Remove the stray top-view word."}
+      ]
+    },
+    "mk-cyprus-2023-34-q03": {
+      "finalMasks": [
+        {"x": 0.89, "y": 0, "width": 0.11, "height": 0.13, "reason": "Remove the stray top-view word."}
+      ]
+    },
+    "mk-cyprus-2025-34-q07": {
+      "finalMasks": [
+        {"x": 0.2, "y": 0.74, "width": 0.035, "height": 0.05, "reason": "Remove the isolated raster speck."},
+        {"x": 0.44, "y": 0.9, "width": 0.04, "height": 0.1, "reason": "Remove source marker C left of choice 3."},
+        {"x": 0.64, "y": 0.9, "width": 0.04, "height": 0.1, "reason": "Remove source marker D left of choice 4."},
+        {"x": 0.84, "y": 0.9, "width": 0.04, "height": 0.1, "reason": "Remove source marker E left of choice 5."}
+      ],
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0.015, "y": 0.93, "width": 0.05, "height": 0.07},
+        {"choiceIndex": 1, "x": 0.205, "y": 0.93, "width": 0.05, "height": 0.07},
+        {"choiceIndex": 2, "x": 0.395, "y": 0.93, "width": 0.05, "height": 0.07},
+        {"choiceIndex": 3, "x": 0.595, "y": 0.93, "width": 0.05, "height": 0.07},
+        {"choiceIndex": 4, "x": 0.795, "y": 0.93, "width": 0.05, "height": 0.07}
+      ]
+    },
+    "mk-cyprus-2018-34-q05": {
+      "finalMasks": [
+        {"x": 0.53, "y": 0, "width": 0.12, "height": 0.1, "reason": "Remove the unrelated clipped top fragment."},
+        {"x": 0.86, "y": 0.89, "width": 0.13, "height": 0.11, "reason": "Remove the unrelated clipped bottom fragment."}
+      ]
+    },
+    "mk-cyprus-2026-34-q06": {
+      "finalMasks": [
+        {"x": 0.03, "y": 0.73, "width": 0.05, "height": 0.07, "reason": "Remove source marker A left of choice 1."},
+        {"x": 0.395, "y": 0.73, "width": 0.05, "height": 0.07, "reason": "Remove source marker B left of choice 2."},
+        {"x": 0.76, "y": 0.73, "width": 0.05, "height": 0.07, "reason": "Remove source marker C left of choice 3."},
+        {"x": 0.03, "y": 0.94, "width": 0.05, "height": 0.06, "reason": "Remove source marker D left of choice 4."},
+        {"x": 0.395, "y": 0.94, "width": 0.05, "height": 0.06, "reason": "Remove source marker E left of choice 5."}
+      ],
+      "preserveCanvasAfterFinalMasks": true,
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0.035, "y": 0.74, "width": 0.04, "height": 0.045},
+        {"choiceIndex": 1, "x": 0.4, "y": 0.74, "width": 0.04, "height": 0.045},
+        {"choiceIndex": 2, "x": 0.765, "y": 0.74, "width": 0.04, "height": 0.045},
+        {"choiceIndex": 3, "x": 0.035, "y": 0.947, "width": 0.04, "height": 0.045},
+        {"choiceIndex": 4, "x": 0.4, "y": 0.947, "width": 0.04, "height": 0.045}
+      ]
+    },
+    "mk-cyprus-2025-34-q01": {
+      "finalMasks": [
+        {"x": 0.005, "y": 0.78, "width": 0.05, "height": 0.2, "reason": "Remove source marker A left of choice 1."},
+        {"x": 0.21, "y": 0.78, "width": 0.05, "height": 0.2, "reason": "Remove source marker B left of choice 2."},
+        {"x": 0.41, "y": 0.78, "width": 0.05, "height": 0.2, "reason": "Remove source marker C left of choice 3."},
+        {"x": 0.61, "y": 0.78, "width": 0.05, "height": 0.2, "reason": "Remove source marker D left of choice 4."},
+        {"x": 0.81, "y": 0.78, "width": 0.06, "height": 0.2, "reason": "Remove source marker E left of choice 5."}
+      ],
+      "preserveCanvasAfterFinalMasks": true,
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0.012, "y": 0.8, "width": 0.04, "height": 0.16},
+        {"choiceIndex": 1, "x": 0.215, "y": 0.8, "width": 0.04, "height": 0.16},
+        {"choiceIndex": 2, "x": 0.417, "y": 0.8, "width": 0.04, "height": 0.16},
+        {"choiceIndex": 3, "x": 0.619, "y": 0.8, "width": 0.04, "height": 0.16},
+        {"choiceIndex": 4, "x": 0.82, "y": 0.8, "width": 0.04, "height": 0.16}
+      ]
+    },
+    "mk-cyprus-2026-34-q07": {
+      "finalMasks": [
+        {"x": 0.005, "y": 0.61, "width": 0.045, "height": 0.1, "reason": "Remove source marker A left of choice 1."},
+        {"x": 0.26, "y": 0.61, "width": 0.045, "height": 0.1, "reason": "Remove source marker B left of choice 2."},
+        {"x": 0.515, "y": 0.61, "width": 0.045, "height": 0.1, "reason": "Remove source marker C left of choice 3."},
+        {"x": 0.005, "y": 0.9, "width": 0.045, "height": 0.09, "reason": "Remove source marker D left of choice 4."},
+        {"x": 0.26, "y": 0.9, "width": 0.045, "height": 0.09, "reason": "Remove source marker E left of choice 5."}
+      ],
+      "preserveCanvasAfterFinalMasks": true,
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0.012, "y": 0.63, "width": 0.035, "height": 0.065},
+        {"choiceIndex": 1, "x": 0.265, "y": 0.63, "width": 0.035, "height": 0.065},
+        {"choiceIndex": 2, "x": 0.519, "y": 0.63, "width": 0.035, "height": 0.065},
+        {"choiceIndex": 3, "x": 0.012, "y": 0.92, "width": 0.035, "height": 0.065},
+        {"choiceIndex": 4, "x": 0.265, "y": 0.92, "width": 0.035, "height": 0.065}
+      ]
+    },
+    "mk-cyprus-2020-34-a-q08": {
+      "finalMasks": [
+        {"x": 0.36, "y": 0.91, "width": 0.64, "height": 0.09, "reason": "Remove the duplicated lower target grid."},
+        {"x": 0.27, "y": 0.72, "width": 0.03, "height": 0.05, "reason": "Remove the isolated sentence punctuation."}
+      ]
+    },
+    "mk-cyprus-2025-34-q03": {
+      "finalMasks": [
+        {"x": 0.005, "y": 0.72, "width": 0.05, "height": 0.24, "reason": "Remove source marker A below choice 1."},
+        {"x": 0.205, "y": 0.72, "width": 0.05, "height": 0.24, "reason": "Remove source marker B below choice 2."},
+        {"x": 0.405, "y": 0.72, "width": 0.05, "height": 0.24, "reason": "Remove source marker C below choice 3."},
+        {"x": 0.603, "y": 0.72, "width": 0.05, "height": 0.24, "reason": "Remove source marker D below choice 4."},
+        {"x": 0.802, "y": 0.72, "width": 0.05, "height": 0.24, "reason": "Remove source marker E below choice 5."}
+      ],
+      "preserveCanvasAfterFinalMasks": true,
+      "finalChoiceMarkers": [
+        {"choiceIndex": 0, "x": 0.012, "y": 0.75, "width": 0.04, "height": 0.2},
+        {"choiceIndex": 1, "x": 0.21, "y": 0.75, "width": 0.04, "height": 0.2},
+        {"choiceIndex": 2, "x": 0.408, "y": 0.75, "width": 0.04, "height": 0.2},
+        {"choiceIndex": 3, "x": 0.605, "y": 0.75, "width": 0.04, "height": 0.2},
+        {"choiceIndex": 4, "x": 0.804, "y": 0.75, "width": 0.04, "height": 0.2}
+      ]
+    },
+    "mk-cyprus-2021-12-q07": {
+      "finalCrop": {
+        "x": 0.12,
+        "y": 0.25,
+        "width": 0.88,
+        "height": 0.6,
+        "reason": "Keep the complete held-hand chain while removing the stray prompt word and detached semantic answer values."
+      }
+    },
+    "mk-cyprus-2014-12-q12": {
+      "finalMasks": [
+        {"x": 0.385, "y": 0, "width": 0.06, "height": 0.08, "reason": "Remove the isolated prompt word top."}
+      ]
+    },
+    "mk-cyprus-2012-12-q08": {
+      "finalMasks": [
+        {"x": 0.462, "y": 0, "width": 0.015, "height": 0.025, "reason": "Remove the isolated prompt punctuation speck."}
+      ]
+    },
+    "mk-cyprus-2015-12-q07": {
+      "finalMasks": [
+        {"x": 0.735, "y": 0.015, "width": 0.015, "height": 0.025, "reason": "Remove the isolated prompt punctuation speck."}
+      ]
+    },
+    "mk-cyprus-2016-12-q15": {
+      "finalCrop": {
+        "x": 0.1,
+        "y": 0.3,
+        "width": 0.84,
+        "height": 0.69,
+        "reason": "Keep the complete road diagram while removing the isolated prompt word."
+      }
+    },
+    "mk-cyprus-2020-12-a-q08": {
+      "finalCrop": {
+        "x": 0.01,
+        "y": 0.02,
+        "width": 0.35,
+        "height": 0.36,
+        "reason": "Keep the complete three-strand braid and endpoints while excluding the empty semantic-answer table frames."
+      }
+    },
+    "mk-cyprus-2018-12-q12": {
+      "finalCrop": {
+        "x": 0.01,
+        "y": 0.24,
+        "width": 0.45,
+        "height": 0.75,
+        "reason": "Keep the four labelled pieces and complete grey frame while removing the isolated prompt word."
+      }
+    },
+    "mk-cyprus-2019-12-q09": {
+      "finalCrop": {
+        "x": 0.03,
+        "y": 0.31,
+        "width": 0.94,
+        "height": 0.68,
+        "reason": "Keep the complete mouse, maze, five gates, and cheese while removing prompt-derived pixels above them."
+      }
+    }
+  }
+}

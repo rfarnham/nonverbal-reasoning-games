@@ -65,6 +65,14 @@ export type FoldedState = Readonly<{
 
 export type RandomSource = () => number;
 
+export type AuthoredShapeFoldRoundSpec = Readonly<{
+  difficulty: Difficulty;
+  folds: readonly FoldDirection[];
+  punches: HolePattern;
+  correctIndex: number;
+  distractorSalt: number;
+}>;
+
 const PAPER_SIZE = 8;
 const INITIAL_BOUNDS: Bounds = Object.freeze({
   x: 0,
@@ -592,6 +600,65 @@ function buildDistractors(
   }
 
   return distractors;
+}
+
+export function buildAuthoredShapeFoldRounds(
+  specs: readonly AuthoredShapeFoldRoundSpec[],
+  label = "Authored Shape Fold",
+): readonly Round[] {
+  return specs.map((spec, roundIndex) => {
+    if (
+      !Number.isInteger(spec.correctIndex) ||
+      spec.correctIndex < 0 ||
+      spec.correctIndex > 3
+    ) {
+      throw new Error(
+        `${label} round ${roundIndex + 1} has an invalid answer index.`,
+      );
+    }
+    const foldedState = applyFolds(spec.folds);
+    const punches = normalizePattern(spec.punches);
+    const correctPattern = unfoldPunches(spec.folds, punches);
+    const distractors = buildDistractors(
+      spec.folds,
+      foldedState.bounds,
+      punches,
+      correctPattern,
+      spec.distractorSalt,
+    );
+    const options: HolePattern[] = [];
+    const optionKinds: OptionKind[] = [];
+    let distractorIndex = 0;
+    for (let optionIndex = 0; optionIndex < 4; optionIndex += 1) {
+      if (optionIndex === spec.correctIndex) {
+        options.push(correctPattern);
+        optionKinds.push("correct");
+      } else {
+        const distractor = distractors[distractorIndex];
+        options.push(distractor.pattern);
+        optionKinds.push(distractor.kind);
+        distractorIndex += 1;
+      }
+    }
+    const round: Round = {
+      difficulty: spec.difficulty,
+      folds: [...spec.folds],
+      foldSteps: foldedState.steps,
+      foldedBounds: foldedState.bounds,
+      punches,
+      correctPattern,
+      options,
+      optionKinds,
+      correctIndex: spec.correctIndex,
+    };
+    const errors = validateRound(round);
+    if (errors.length > 0) {
+      throw new Error(
+        `${label} round ${roundIndex + 1} is invalid: ${errors.join("; ")}`,
+      );
+    }
+    return round;
+  });
 }
 
 function buildRound(

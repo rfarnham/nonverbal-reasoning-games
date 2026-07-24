@@ -63,13 +63,13 @@ type DifficultyRule = {
   usesBodyColor: boolean;
 };
 
-type AuthoredSpec = {
+export type AuthoredBraidRoundSpec = Readonly<{
   crossingCode: string;
   variant: number;
   correctIndex: number;
   columns: number;
   rows: number;
-};
+}>;
 
 const COLORS: readonly Exclude<RibbonColor, "neutral">[] = [
   "coral",
@@ -595,7 +595,9 @@ function validateAnswerSchedule(
   }
 }
 
-function campaignSpecs(difficulty: Difficulty): readonly AuthoredSpec[] {
+function campaignSpecs(
+  difficulty: Difficulty,
+): readonly AuthoredBraidRoundSpec[] {
   const schedule = ANSWER_SCHEDULES[difficulty];
   const codes = CAMPAIGN_CODES[difficulty];
   validateAnswerSchedule(difficulty, schedule);
@@ -614,6 +616,48 @@ function campaignSpecs(difficulty: Difficulty): readonly AuthoredSpec[] {
   });
 }
 
+export function buildAuthoredBraidRounds(
+  difficulty: Difficulty,
+  specs: readonly AuthoredBraidRoundSpec[],
+  collectionLabel: string,
+): readonly Round[] {
+  validateAnswerSchedule(
+    difficulty,
+    specs.map(({ correctIndex }) => correctIndex),
+  );
+
+  const rounds = specs.map((spec, index) => {
+    const clue = makeWeave(
+      difficulty,
+      spec.columns,
+      spec.rows,
+      spec.crossingCode,
+      spec.variant,
+    );
+    if (!isInterestingWeave(clue, difficulty)) {
+      throw new Error(
+        `${collectionLabel} round ${index + 1} violates ${difficulty} difficulty rules.`,
+      );
+    }
+    const round = assembleRound(clue, difficulty, spec.correctIndex, [
+      index,
+      index + 5,
+      index + 11,
+    ]);
+    if (!round) {
+      throw new Error(
+        `${collectionLabel} round ${index + 1} has ambiguous options.`,
+      );
+    }
+    return round;
+  });
+
+  if (new Set(rounds.map(roundFingerprint)).size !== rounds.length) {
+    throw new Error(`${collectionLabel} rounds must have unique fingerprints.`);
+  }
+  return rounds;
+}
+
 export function buildCampaignRounds(): readonly Round[] {
   const difficulties: readonly Difficulty[] = [
     "Starter",
@@ -622,31 +666,11 @@ export function buildCampaignRounds(): readonly Round[] {
     "Wizard",
   ];
   const rounds = difficulties.flatMap((difficulty) =>
-    campaignSpecs(difficulty).map((spec, index) => {
-      const clue = makeWeave(
-        difficulty,
-        spec.columns,
-        spec.rows,
-        spec.crossingCode,
-        spec.variant,
-      );
-      if (!isInterestingWeave(clue, difficulty)) {
-        throw new Error(
-          `${difficulty} campaign round ${index + 1} violates its difficulty rules.`,
-        );
-      }
-      const round = assembleRound(clue, difficulty, spec.correctIndex, [
-        index,
-        index + 5,
-        index + 11,
-      ]);
-      if (!round) {
-        throw new Error(
-          `${difficulty} campaign round ${index + 1} has ambiguous options.`,
-        );
-      }
-      return round;
-    }),
+    buildAuthoredBraidRounds(
+      difficulty,
+      campaignSpecs(difficulty),
+      `${difficulty} campaign`,
+    ),
   );
 
   if (new Set(rounds.map(roundFingerprint)).size !== rounds.length) {

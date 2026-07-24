@@ -120,6 +120,16 @@ export type StripRound = Readonly<{
   isExample?: true;
 }>;
 
+export type AuthoredChangingStripsRoundSpec = Readonly<{
+  /**
+   * Selects a deterministic curriculum variant from the canonical authored
+   * sequence. Standalone Campaign owns variants 0–11; Journey-only banks use
+   * later variants without copying rule or distractor construction.
+   */
+  authoredIndex: number;
+  correctIndex: 0 | 1 | 2 | 3;
+}>;
+
 export type OptionFeedback = Readonly<{
   correct: boolean;
   kind: OptionKind;
@@ -865,7 +875,7 @@ function authoredSpec(
   }
 
   if (difficulty === "Junior") {
-    const curriculumBlock = Math.floor(index / 4);
+    const curriculumBlock = Math.floor(index / 4) % 3;
     if (curriculumBlock === 0) {
       return {
         input: baseInput,
@@ -956,6 +966,62 @@ function authoredSpec(
   };
 }
 
+export function buildAuthoredChangingStripsRounds(
+  difficulty: Difficulty,
+  specs: readonly AuthoredChangingStripsRoundSpec[],
+  idPrefix: string,
+): readonly StripRound[] {
+  const normalizedPrefix = idPrefix.trim();
+  if (!normalizedPrefix) {
+    throw new Error("Changing Strips authored round IDs need a prefix.");
+  }
+
+  const fingerprints = new Set<string>();
+  return specs.map((spec, index) => {
+    if (
+      !Number.isSafeInteger(spec.authoredIndex) ||
+      spec.authoredIndex < 0
+    ) {
+      throw new Error(
+        `Changing Strips authored index ${spec.authoredIndex} is invalid.`,
+      );
+    }
+    if (
+      !Number.isInteger(spec.correctIndex) ||
+      spec.correctIndex < 0 ||
+      spec.correctIndex > 3
+    ) {
+      throw new Error(
+        `Changing Strips answer position ${spec.correctIndex} is invalid.`,
+      );
+    }
+
+    const authored = authoredSpec(difficulty, spec.authoredIndex);
+    const round = makeRound(
+      `${normalizedPrefix}-${String(index + 1).padStart(2, "0")}`,
+      difficulty,
+      authored.input,
+      authored.rules,
+      authored.processingDirection,
+      spec.correctIndex,
+    );
+    const issues = validateRound(round);
+    if (issues.length > 0) {
+      throw new Error(
+        `${round.id} is invalid: ${issues.join("; ")}`,
+      );
+    }
+    const fingerprint = roundFingerprint(round);
+    if (fingerprints.has(fingerprint)) {
+      throw new Error(
+        `${normalizedPrefix} repeats an authored round fingerprint.`,
+      );
+    }
+    fingerprints.add(fingerprint);
+    return round;
+  });
+}
+
 export function buildCampaignRounds(): Readonly<
   Record<Difficulty, readonly StripRound[]>
 > {
@@ -966,17 +1032,16 @@ export function buildCampaignRounds(): Readonly<
     Wizard: [],
   };
   for (const difficulty of DIFFICULTIES) {
-    byDifficulty[difficulty] = Array.from({ length: 12 }, (_, index) => {
-      const spec = authoredSpec(difficulty, index);
-      return makeRound(
-        `changing-strips-${difficulty.toLowerCase()}-${String(index + 1).padStart(2, "0")}`,
-        difficulty,
-        spec.input,
-        spec.rules,
-        spec.processingDirection,
-        CAMPAIGN_CORRECT_INDEXES[difficulty][index] as 0 | 1 | 2 | 3,
-      );
-    });
+    byDifficulty[difficulty] = buildAuthoredChangingStripsRounds(
+      difficulty,
+      CAMPAIGN_CORRECT_INDEXES[difficulty].map(
+        (correctIndex, authoredIndex) => ({
+          authoredIndex,
+          correctIndex,
+        }),
+      ),
+      `changing-strips-${difficulty.toLowerCase()}`,
+    );
   }
   return byDifficulty;
 }

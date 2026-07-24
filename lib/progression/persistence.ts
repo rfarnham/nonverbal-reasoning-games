@@ -1,19 +1,29 @@
 import {
-  buildJourneyPlan,
+  buildJourneyPlanForVersion,
   findJourneyNode,
   isJourneyNodeUnlocked,
 } from "./journey.ts";
-import { isQuestionReference, questionReferenceKey } from "./questions.ts";
 import {
+  isQuestionReference,
+  questionReferenceIdentityKey,
+  questionReferenceKey,
+} from "./questions.ts";
+import {
+  CURRENT_JOURNEY_PLAN_VERSION,
   PROGRESSION_LEVELS,
   PROGRESSION_SCHEMA_VERSION,
+  firstJourneyLevelForDifficulty,
+  isJourneyLevel,
   type AttemptPhase,
   type AttemptRound,
   type AttemptRoundPhase,
   type AttemptSection,
   type AttemptSettlement,
   type JourneyGame,
+  type JourneyLevel,
   type JourneyPlan,
+  type JourneyPlanVersion,
+  type MissObservation,
   type MissedQuestion,
   type PlayerProfile,
   type ProgressionAttempt,
@@ -21,6 +31,7 @@ import {
   type ProgressionState,
   type RedemptionState,
   type StorageLike,
+  type XpAward,
 } from "./types.ts";
 import { assertProgressionAttemptIntegrity } from "./validation.ts";
 
@@ -53,8 +64,8 @@ const ROUND_PHASES: readonly AttemptRoundPhase[] = [
   "feedback",
   "solved",
 ];
-const ATTEMPT_KINDS = ["normal", "turbo", "culmination"] as const;
-const LEGACY_SCHEMA_VERSIONS = [0, 1] as const;
+const ATTEMPT_KINDS = ["normal", "review", "turbo", "culmination"] as const;
+const LEGACY_SCHEMA_VERSIONS = [0, 1, 2] as const;
 
 function isSupportedSchemaVersion(value: unknown): boolean {
   return (
@@ -102,7 +113,14 @@ function parseLevel(value: unknown): ProgressionLevel | undefined {
     : undefined;
 }
 
-function parseJourneyGames(raw: unknown): readonly JourneyGame[] | undefined {
+function parseJourneyLevel(value: unknown): JourneyLevel | undefined {
+  return isJourneyLevel(value) ? value : undefined;
+}
+
+function parseJourneyGames(
+  raw: unknown,
+  journeyPlanVersion: JourneyPlanVersion,
+): readonly JourneyGame[] | undefined {
   if (!Array.isArray(raw)) return undefined;
   const games = raw
     .map((item) => {
@@ -116,16 +134,26 @@ function parseJourneyGames(raw: unknown): readonly JourneyGame[] | undefined {
       if (!slug || !title) return undefined;
       const contentVersion = textValue(game?.contentVersion);
       const generatorVersion = textValue(game?.generatorVersion);
+      const journeyContentVersion = textValue(game?.journeyContentVersion);
+      const role =
+        game?.role === "review"
+          ? ("review" as const)
+          : ("game" as const);
       return {
         slug,
         title,
+        role,
         ...(contentVersion ? { contentVersion } : {}),
         ...(generatorVersion ? { generatorVersion } : {}),
+        ...(journeyContentVersion ? { journeyContentVersion } : {}),
       };
     })
     .filter((game) => game !== undefined);
   try {
-    return buildJourneyPlan(games).gameSnapshot;
+    return buildJourneyPlanForVersion(
+      games,
+      journeyPlanVersion,
+    ).gameSnapshot;
   } catch {
     return undefined;
   }
@@ -154,11 +182,37 @@ function parseRound(raw: unknown): AttemptRound | undefined {
     return undefined;
   }
   const lastAnswerToken = textValue(round?.lastAnswerToken);
+  const firstAnswerActiveTimeMs =
+    round?.firstAnswerActiveTimeMs === undefined
+      ? undefined
+      : nonNegativeNumber(round.firstAnswerActiveTimeMs);
+  const firstAnsweredAtMs =
+    round?.firstAnsweredAtMs === undefined
+      ? undefined
+      : nonNegativeNumber(round.firstAnsweredAtMs);
+  if (
+    round?.firstAnswerActiveTimeMs !== undefined &&
+    firstAnswerActiveTimeMs === undefined
+  ) {
+    return undefined;
+  }
+  if (
+    round?.firstAnsweredAtMs !== undefined &&
+    firstAnsweredAtMs === undefined
+  ) {
+    return undefined;
+  }
   return {
     question,
     phase,
     attemptCount,
     firstTryCorrect,
+    ...(firstAnswerActiveTimeMs === undefined
+      ? {}
+      : { firstAnswerActiveTimeMs }),
+    ...(firstAnsweredAtMs === undefined
+      ? {}
+      : { firstAnsweredAtMs }),
     ...(lastAnswerToken ? { lastAnswerToken } : {}),
   };
 }
@@ -271,6 +325,9 @@ function parseAttempt(raw: unknown): ProgressionAttempt | undefined {
       ? (attempt.kind as (typeof ATTEMPT_KINDS)[number])
       : undefined;
   const level = parseLevel(attempt?.level);
+  const journeyLevel =
+    parseJourneyLevel(attempt?.journeyLevel) ??
+    (level ? firstJourneyLevelForDifficulty(level) : undefined);
   const phase =
     typeof attempt?.phase === "string" &&
     ATTEMPT_PHASES.includes(attempt.phase as AttemptPhase)
@@ -281,6 +338,7 @@ function parseAttempt(raw: unknown): ProgressionAttempt | undefined {
     !stopId ||
     !kind ||
     !level ||
+    !journeyLevel ||
     !phase ||
     !Array.isArray(attempt?.rounds)
   ) {
@@ -367,6 +425,7 @@ function parseAttempt(raw: unknown): ProgressionAttempt | undefined {
     id,
     stopId,
     kind,
+    journeyLevel,
     level,
     phase,
     rounds: validRounds,
@@ -383,17 +442,52 @@ function parseAttempt(raw: unknown): ProgressionAttempt | undefined {
   };
 }
 
+function parseMissObservation(
+  raw: unknown,
+): MissObservation | undefined {
+  const observation = recordValue(raw);
+  const attemptId = textValue(observation?.attemptId);
+  const stopId = textValue(observation?.stopId);
+  const journeyLevel = parseJourneyLevel(observation?.journeyLevel);
+  const elapsedMs =
+    observation?.elapsedMs === null
+      ? null
+      : nonNegativeNumber(observation?.elapsedMs);
+  const missedAtMs = nonNegativeNumber(observation?.missedAtMs);
+  if (
+    !attemptId ||
+    !stopId ||
+    !journeyLevel ||
+    elapsedMs === undefined ||
+    missedAtMs === undefined
+  ) {
+    return undefined;
+  }
+  return { attemptId, stopId, journeyLevel, elapsedMs, missedAtMs };
+}
+
 function parseMissedQuestion(raw: unknown): MissedQuestion | undefined {
   const missed = recordValue(raw);
   if (!missed || !isQuestionReference(missed.question)) return undefined;
   const missCount = nonNegativeInteger(missed.missCount);
   const lastMissedAtMs = nonNegativeNumber(missed.lastMissedAtMs);
   if (!missCount || lastMissedAtMs === undefined) return undefined;
+  const rawObservations = Array.isArray(missed.observations)
+    ? missed.observations
+    : [];
+  const observations = rawObservations
+    .map(parseMissObservation)
+    .filter(
+      (observation): observation is MissObservation =>
+        observation !== undefined,
+    );
+  if (observations.length !== rawObservations.length) return undefined;
   return {
-    key: questionReferenceKey(missed.question),
+    key: questionReferenceIdentityKey(missed.question),
     question: missed.question,
-    missCount,
+    missCount: Math.max(missCount, observations.length),
     lastMissedAtMs,
+    observations,
   };
 }
 
@@ -410,11 +504,9 @@ function normalizedCompletion(
   );
   const requestedCleared = new Set(stringArray(rawClearedStopIds));
   const requestedAwarded = new Set(stringArray(rawAwardedStopIds));
-  const clearedStopIds: string[] = [];
-  for (const nodeId of orderedNodeIds) {
-    if (!requestedCleared.has(nodeId)) break;
-    clearedStopIds.push(nodeId);
-  }
+  const clearedStopIds = orderedNodeIds.filter((nodeId) =>
+    requestedCleared.has(nodeId),
+  );
   const cleared = new Set(clearedStopIds);
   return {
     clearedStopIds,
@@ -424,24 +516,90 @@ function normalizedCompletion(
   };
 }
 
-function parseProfile(raw: unknown): PlayerProfile | undefined {
+function parseJourneyPlanVersion(
+  value: unknown,
+  sourceSchemaVersion: number,
+): JourneyPlanVersion {
+  if (value === 1 || value === CURRENT_JOURNEY_PLAN_VERSION) return value;
+  return sourceSchemaVersion <= 2 ? 1 : CURRENT_JOURNEY_PLAN_VERSION;
+}
+
+function parseXpAwards(
+  raw: unknown,
+  journey: JourneyPlan,
+  clearedStopIds: readonly string[],
+  legacyAwardedStopIds: readonly string[],
+): readonly XpAward[] | undefined {
+  const cleared = new Set(clearedStopIds);
+  if (raw === undefined) {
+    return legacyAwardedStopIds.flatMap((stopId) => {
+      const node = findJourneyNode(journey, stopId);
+      return node && cleared.has(stopId)
+        ? [{ stopId, amount: node.xp }]
+        : [];
+    });
+  }
+  if (!Array.isArray(raw)) return undefined;
+  const awards: XpAward[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    const award = recordValue(item);
+    const stopId = textValue(award?.stopId);
+    const amount = nonNegativeInteger(award?.amount);
+    if (
+      !stopId ||
+      amount === undefined ||
+      amount < 1 ||
+      seen.has(stopId) ||
+      !cleared.has(stopId) ||
+      !findJourneyNode(journey, stopId)
+    ) {
+      return undefined;
+    }
+    seen.add(stopId);
+    awards.push({ stopId, amount });
+  }
+  return awards;
+}
+
+function parseProfile(
+  raw: unknown,
+  sourceSchemaVersion: number,
+): PlayerProfile | undefined {
   const profile = recordValue(raw);
   const id = textValue(profile?.id);
   const name = textValue(profile?.name);
   const avatarId = textValue(profile?.avatarId);
+  const journeyPlanVersion = parseJourneyPlanVersion(
+    profile?.journeyPlanVersion,
+    sourceSchemaVersion,
+  );
   const gameSnapshot = parseJourneyGames(
     profile?.gameSnapshot ?? profile?.gameSlugs,
+    journeyPlanVersion,
   );
   const createdAtMs = nonNegativeNumber(profile?.createdAtMs) ?? 0;
   const updatedAtMs = nonNegativeNumber(profile?.updatedAtMs) ?? createdAtMs;
   if (!id || !name || !avatarId || !gameSnapshot) return undefined;
 
-  const journey = buildJourneyPlan(gameSnapshot);
-  const { clearedStopIds, awardedStopIds } = normalizedCompletion(
+  const journey = buildJourneyPlanForVersion(
+    gameSnapshot,
+    journeyPlanVersion,
+  );
+  const completion = normalizedCompletion(
     journey,
     profile?.clearedStopIds,
     profile?.awardedStopIds,
   );
+  const xpAwards = parseXpAwards(
+    profile?.xpAwards,
+    journey,
+    completion.clearedStopIds,
+    completion.awardedStopIds,
+  );
+  if (!xpAwards) return undefined;
+  const clearedStopIds = completion.clearedStopIds;
+  const awardedStopIds = xpAwards.map(({ stopId }) => stopId);
   const requestedSettledAttemptIds = new Set(
     stringArray(profile?.settledAttemptIds),
   );
@@ -485,9 +643,38 @@ function parseProfile(raw: unknown): PlayerProfile | undefined {
   const missedByKey = new Map<string, MissedQuestion>();
   for (const missed of missedQuestions) {
     const previous = missedByKey.get(missed.key);
-    if (!previous || missed.lastMissedAtMs >= previous.lastMissedAtMs) {
+    if (!previous) {
       missedByKey.set(missed.key, missed);
+      continue;
     }
+    const latest =
+      missed.lastMissedAtMs >= previous.lastMissedAtMs ? missed : previous;
+    const observations = [...previous.observations, ...missed.observations];
+    const seenObservations = new Set<string>();
+    const uniqueObservations = observations.filter((observation) => {
+      const key = [
+        observation.attemptId,
+        observation.stopId,
+        observation.missedAtMs,
+      ].join(":");
+      if (seenObservations.has(key)) return false;
+      seenObservations.add(key);
+      return true;
+    });
+    missedByKey.set(missed.key, {
+      ...latest,
+      key: missed.key,
+      missCount: Math.max(
+        previous.missCount,
+        missed.missCount,
+        uniqueObservations.length,
+      ),
+      lastMissedAtMs: Math.max(
+        previous.lastMissedAtMs,
+        missed.lastMissedAtMs,
+      ),
+      observations: uniqueObservations,
+    });
   }
   const activeAttemptCandidate =
     profile?.activeAttemptId === null
@@ -512,8 +699,10 @@ function parseProfile(raw: unknown): PlayerProfile | undefined {
     avatarId,
     createdAtMs,
     updatedAtMs,
+    journeyPlanVersion,
     gameSnapshot,
     clearedStopIds,
+    xpAwards,
     awardedStopIds,
     settledAttemptIds,
     missedQuestions: [...missedByKey.values()].sort(
@@ -553,7 +742,7 @@ export function migrateProgressionState(raw: unknown): ProgressionState {
   }
 
   const parsedProfiles = legacyProfiles(state.profiles)
-    .map(parseProfile)
+    .map((profile) => parseProfile(profile, Number(version)))
     .filter((profile) => profile !== undefined);
   const profiles: PlayerProfile[] = [];
   const ids = new Set<string>();

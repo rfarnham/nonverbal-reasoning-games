@@ -8,6 +8,7 @@ import {
   CLEAR_ACCURACY_THRESHOLD,
   PROGRESSION_LEVELS,
   PROGRESSION_SCHEMA_VERSION,
+  REVIEW_QUESTIONS_PER_STOP,
   type AttemptRound,
   type AttemptSection,
   type AttemptSettlement,
@@ -41,6 +42,7 @@ function isPristineRound(round: AttemptRound): boolean {
     round.phase === "answering" &&
     round.attemptCount === 0 &&
     round.firstTryCorrect === null &&
+    round.firstAnsweredAtMs === undefined &&
     round.lastAnswerToken === undefined
   );
 }
@@ -51,6 +53,18 @@ function validateRound(round: AttemptRound, index: number): void {
   }
   if (!isFiniteNonNegativeInteger(round.attemptCount)) {
     fail(`round ${index + 1} has an invalid attempt count`);
+  }
+  if (
+    round.firstAnswerActiveTimeMs !== undefined &&
+    !isFiniteNonNegative(round.firstAnswerActiveTimeMs)
+  ) {
+    fail(`round ${index + 1} has invalid first-answer timing`);
+  }
+  if (
+    round.firstAnsweredAtMs !== undefined &&
+    !isFiniteNonNegative(round.firstAnsweredAtMs)
+  ) {
+    fail(`round ${index + 1} has an invalid first-answer timestamp`);
   }
   if (
     round.phase !== "answering" &&
@@ -138,13 +152,39 @@ function validateQuestionSet(
       );
     }
     attempt.rounds.forEach(({ question }, index) => {
+      const campaignMatch =
+        question.source === "campaign" &&
+        question.questionIndex === index;
+      const journeyMatch =
+        question.source === "journey" &&
+        question.journeyLevel === node.journeyLevel &&
+        question.collectionId === node.collectionId &&
+        question.questionIndex === node.questionOffset + index;
       if (
-        question.source !== "campaign" ||
         question.gameSlug !== node.gameSlug ||
         question.level !== node.level ||
-        question.questionIndex !== index
+        (!campaignMatch && !journeyMatch)
       ) {
         fail(`ordinary question ${index + 1} does not match its stop`);
+      }
+    });
+    return;
+  }
+
+  if (node.kind === "review") {
+    if (attempt.rounds.length !== REVIEW_QUESTIONS_PER_STOP) {
+      fail(`a review stop needs ${REVIEW_QUESTIONS_PER_STOP} questions`);
+    }
+    attempt.rounds.forEach(({ question }, index) => {
+      if (
+        question.source !== "journey" ||
+        question.gameSlug !== node.gameSlug ||
+        question.level !== node.level ||
+        question.journeyLevel !== node.journeyLevel ||
+        question.collectionId !== node.collectionId ||
+        question.questionIndex !== node.questionOffset + index
+      ) {
+        fail(`review question ${index + 1} does not match its stop`);
       }
     });
     return;
@@ -189,32 +229,50 @@ function validateQuestionSet(
     return;
   }
 
-  const expectedQuestionCount =
-    node.gameSlugs.length * node.questionsPerGame;
+  const expectedQuestionCount = node.sections.reduce(
+    (total, section) => total + section.questionCount,
+    0,
+  );
   if (attempt.rounds.length !== expectedQuestionCount) {
     fail(`the culmination needs ${expectedQuestionCount} questions`);
   }
-  node.gameSlugs.forEach((gameSlug, gameIndex) => {
-    const start = gameIndex * node.questionsPerGame;
-    const section = attempt.rounds.slice(start, start + node.questionsPerGame);
-    const approachable = section[0]?.question;
-    if (
-      approachable?.source !== "campaign" ||
-      approachable.gameSlug !== gameSlug ||
-      approachable.level !== "starter"
-    ) {
-      fail(`the ${gameSlug} culmination section has no Starter opener`);
-    }
-    section.forEach(({ question }, questionIndex) => {
+  let start = 0;
+  node.sections.forEach((sectionSpec) => {
+    const section = attempt.rounds.slice(
+      start,
+      start + sectionSpec.questionCount,
+    );
+    if (sectionSpec.selection === "mistakes") {
+      const approachable = section[0]?.question;
       if (
-        question.gameSlug !== gameSlug ||
-        !isAtOrBelowLevel(question.level, node.level)
+        approachable?.source !== "campaign" ||
+        approachable.gameSlug !== sectionSpec.gameSlug ||
+        approachable.level !== "starter"
       ) {
         fail(
-          `${gameSlug} culmination question ${questionIndex + 1} does not match its section`,
+          `the ${sectionSpec.gameSlug} culmination section has no Starter opener`,
+        );
+      }
+    }
+    section.forEach(({ question }, questionIndex) => {
+      const fixedMatch =
+        sectionSpec.selection === "fixed" &&
+        question.source === "journey" &&
+        question.journeyLevel === node.journeyLevel &&
+        question.collectionId === sectionSpec.collectionId &&
+        question.questionIndex ===
+          sectionSpec.questionOffset + questionIndex;
+      if (
+        question.gameSlug !== sectionSpec.gameSlug ||
+        !isAtOrBelowLevel(question.level, node.level) ||
+        (sectionSpec.selection === "fixed" && !fixedMatch)
+      ) {
+        fail(
+          `${sectionSpec.gameSlug} culmination question ${questionIndex + 1} does not match its section`,
         );
       }
     });
+    start += sectionSpec.questionCount;
   });
 }
 
@@ -318,6 +376,7 @@ export function assertProgressionAttemptIntegrity(
     !attempt.id.trim() ||
     attempt.stopId !== node.id ||
     attempt.kind !== node.kind ||
+    attempt.journeyLevel !== node.journeyLevel ||
     attempt.level !== node.level
   ) {
     fail("the attempt does not match its journey stop");

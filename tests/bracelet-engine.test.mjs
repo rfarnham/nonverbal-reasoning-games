@@ -38,7 +38,12 @@ import {
   braceletPresentationForRound,
   tangledLayoutForPresentation,
 } from "../app/games/bracelet-search/tangle-layout.ts";
+import { progressionAdapter } from "../app/games/bracelet-search/progression-adapter.ts";
 import { progressionMetadata } from "../app/games/bracelet-search/progression-metadata.ts";
+import {
+  JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+  buildBraceletJourneyExtraCampaignRounds,
+} from "../app/games/bracelet-search/journey-campaign.ts";
 
 const SIMPLE_DIFFICULTIES = new Set(["Easy", "Medium"]);
 const ADVANCED_DIFFICULTIES = new Set(["Hard", "Wizard"]);
@@ -422,6 +427,11 @@ test("a few advanced Campaign rounds use a real two-tone monochrome scheme", () 
     "1",
     "Campaign palettes do not rewrite saved Infinite streams",
   );
+  assert.equal(
+    progressionMetadata.journeyContentVersion,
+    "1",
+    "Journey-only banks retain their own content version",
+  );
 
   for (const difficulty of DIFFICULTIES) {
     const level = ROUNDS.filter((round) => round.difficulty === difficulty);
@@ -507,6 +517,185 @@ test("a few advanced Campaign rounds use a real two-tone monochrome scheme", () 
       issue.includes("mixes bead color schemes"),
     ),
   );
+});
+
+test("Journey-only Bracelet banks are frozen, valid, balanced, and disjoint", () => {
+  const expectations = {
+    "junior-2": "Medium",
+    "expert-2": "Hard",
+    "wizard-2": "Wizard",
+  };
+  const adapterExpectations = {
+    starter: "Easy",
+    "junior-1": "Medium",
+    "junior-2": "Medium",
+    "expert-1": "Hard",
+    "expert-2": "Hard",
+    "wizard-1": "Wizard",
+    "wizard-2": "Wizard",
+  };
+  const canonicalFingerprints = new Set(ROUNDS.map(roundFingerprint));
+  const journeyFingerprints = new Set();
+
+  assert.deepEqual(
+    Object.keys(JOURNEY_EXTRA_CAMPAIGN_ROUNDS),
+    Object.keys(expectations),
+  );
+  assert.equal(Object.isFrozen(JOURNEY_EXTRA_CAMPAIGN_ROUNDS), true);
+  assert.deepEqual(
+    buildBraceletJourneyExtraCampaignRounds(),
+    JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+  );
+  assert.equal(progressionAdapter.campaignRounds.length, 48);
+  assert.deepEqual(
+    progressionAdapter.campaignRounds.map(roundFingerprint),
+    ROUNDS.map(roundFingerprint),
+    "standalone Campaign remains the canonical 48-round path",
+  );
+  assert.equal(progressionAdapter.contentVersion, "2");
+  assert.equal(progressionAdapter.generatorVersion, "1");
+  assert.equal(progressionAdapter.journeyContentVersion, "1");
+  assert.deepEqual(
+    Object.keys(progressionAdapter.journeyCampaignRounds),
+    Object.keys(adapterExpectations),
+  );
+  for (const [level, difficulty] of Object.entries(adapterExpectations)) {
+    const rounds = progressionAdapter.journeyCampaignRounds[level];
+    assert.equal(rounds.length, 12, `${level}: adapter round count`);
+    assert.ok(
+      rounds.every((round) => round.difficulty === difficulty),
+      `${level}: adapter difficulty`,
+    );
+  }
+
+  for (const [level, difficulty] of Object.entries(expectations)) {
+    const rounds = JOURNEY_EXTRA_CAMPAIGN_ROUNDS[level];
+    const positions = rounds.map(({ correctIndex }) => correctIndex);
+    const presentations = rounds.map(braceletPresentationForRound);
+
+    assert.equal(rounds.length, 12, `${level}: round count`);
+    assert.equal(Object.isFrozen(rounds), true, `${level}: frozen bank`);
+    assert.ok(
+      rounds.every((round) => round.difficulty === difficulty),
+      `${level}: mapped difficulty`,
+    );
+    assert.deepEqual(
+      [0, 1, 2, 3].map(
+        (position) =>
+          positions.filter((value) => value === position).length,
+      ),
+      [3, 3, 3, 3],
+      `${level}: answer balance`,
+    );
+    assert.ok(
+      positions.every(
+        (position, index) =>
+          index === 0 || positions[index - 1] !== position,
+      ),
+      `${level}: no adjacent answer-position repeat`,
+    );
+    assert.ok(
+      new Set(
+        [0, 4, 8].map((start) =>
+          positions.slice(start, start + 4).join(","),
+        ),
+      ).size > 1,
+      `${level}: no repeated four-position cycle`,
+    );
+    assert.deepEqual(
+      ["forward", "reverse"].map(
+        (alignment) =>
+          rounds.filter(
+            ({ occurrence }) => occurrence.alignment === alignment,
+          ).length,
+      ),
+      [6, 6],
+      `${level}: direction balance`,
+    );
+    if (difficulty === "Medium") {
+      assert.ok(
+        presentations.every((presentation) => presentation === "circle"),
+        `${level}: simple rounds stay circular`,
+      );
+    } else {
+      assert.deepEqual(
+        new Set(presentations),
+        new Set(TANGLE_LAYOUT_IDS),
+        `${level}: Journey rounds cover both tangled presentations`,
+      );
+    }
+
+    for (const [index, round] of rounds.entries()) {
+      assert.equal(
+        round.id,
+        `journey:${level}:${String(index + 1).padStart(2, "0")}`,
+      );
+      assertOneExactAnswer(round, `${level} round ${index + 1}`);
+      const fingerprint = roundFingerprint(round);
+      assert.equal(
+        canonicalFingerprints.has(fingerprint),
+        false,
+        `${level} round ${index + 1}: standalone disjointness`,
+      );
+      assert.equal(
+        journeyFingerprints.has(fingerprint),
+        false,
+        `${level} round ${index + 1}: Journey disjointness`,
+      );
+      journeyFingerprints.add(fingerprint);
+
+      const presentation = presentations[index];
+      if (difficulty !== "Medium") {
+        assert.ok(
+          TANGLE_LAYOUT_IDS.includes(presentation),
+          `${level} round ${index + 1}: advanced round is tangled`,
+        );
+        assert.equal(
+          tangledLayoutForPresentation(presentation)?.id,
+          presentation,
+        );
+        for (const view of braceletViews(round.bracelet)) {
+          assert.equal(
+            braceletPresentationForRound({ ...round, bracelet: view }),
+            presentation,
+            `${level} round ${index + 1}: layout is view-invariant`,
+          );
+        }
+      }
+    }
+
+    assert.deepEqual(
+      progressionAdapter.journeyCampaignRounds[level].map(
+        roundFingerprint,
+      ),
+      rounds.map(roundFingerprint),
+      `${level}: adapter uses the frozen Journey bank`,
+    );
+  }
+
+  assert.equal(journeyFingerprints.size, 36);
+  assert.equal(
+    new Set(
+      Object.values(progressionAdapter.journeyCampaignRounds)
+        .flat()
+        .map(roundFingerprint),
+    ).size,
+    84,
+    "all seven Journey banks remain fingerprint-disjoint",
+  );
+
+  const originalRandom = Math.random;
+  Math.random = () => {
+    throw new Error("Journey campaign construction cannot consult randomness.");
+  };
+  try {
+    assert.deepEqual(
+      buildBraceletJourneyExtraCampaignRounds(),
+      JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
+    );
+  } finally {
+    Math.random = originalRandom;
+  }
 });
 
 test("Starter and Junior use generous content differences, never one-feature traps", () => {

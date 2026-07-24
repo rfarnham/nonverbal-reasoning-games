@@ -75,3 +75,14 @@ test("monochrome beads keep dots legible in HTML and SVG", () => {
     /\.beadMark \{[^}]*color: var\(--bead-mark, var\(--ink\)\);/s,
   );
 });
+
+test("Journey HUD names the seven-level board, not its base difficulty", () => {
+  assert.match(
+    pageSource,
+    /levelLabel=\{journeyLevelLabel\(\s*progression\.attempt\.journeyLevel,\s*\)\}/,
+  );
+  assert.doesNotMatch(
+    pageSource,
+    /levelLabel=\{\s*progression\.level\[0\]/,
+  );
+});

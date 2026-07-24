@@ -24,11 +24,11 @@ import {
 } from "@/lib/game-audio";
 import { games } from "@/lib/games";
 import {
-  PROGRESSION_LEVELS,
+  JOURNEY_LEVELS,
   PROGRESSION_STORAGE_KEY,
   activePlayerProfile,
   addPlayerProfile,
-  buildJourneyPlan,
+  buildJourneyPlanForVersion,
   createPlayerProfile,
   createProgressionState,
   deletePlayerProfile,
@@ -43,10 +43,12 @@ import {
   saveProgressionState,
   switchPlayerProfile,
   updatePlayerProfileIdentity,
+  upgradePlayerProfileJourneyPlan,
   upsertProfileAttempt,
+  journeyLevelLabel,
   type JourneyNode,
+  type JourneyLevel,
   type PlayerProfile,
-  type ProgressionLevel,
   type ProgressionLoadStatus,
   type ProgressionState,
 } from "@/lib/progression";
@@ -58,10 +60,6 @@ import {
 } from "./journey-launch";
 
 import styles from "@/app/journey/journey.module.css";
-
-function levelLabel(level: ProgressionLevel) {
-  return `${level.slice(0, 1).toUpperCase()}${level.slice(1)}`;
-}
 
 function profileId() {
   try {
@@ -402,7 +400,7 @@ function nodeAlignment(index: number) {
 }
 
 function finalJourneyNode(
-  journey: ReturnType<typeof buildJourneyPlan>,
+  journey: ReturnType<typeof buildJourneyPlanForVersion>,
 ): JourneyNode | undefined {
   const finalBoard = journey.boards[journey.boards.length - 1];
   return finalBoard?.nodes[finalBoard.nodes.length - 1];
@@ -439,19 +437,25 @@ function JourneyBoard({
   onRestartActive,
 }: {
   profile: PlayerProfile;
-  viewedLevel: ProgressionLevel;
+  viewedLevel: JourneyLevel;
   arrivalNodeId: string | null;
-  onViewLevel: (level: ProgressionLevel) => void;
+  onViewLevel: (level: JourneyLevel) => void;
   onLaunch: (node: JourneyNode) => void;
   onRestartActive: (attemptId: string) => void;
 }) {
   const trailItemRef = useRef<HTMLLIElement>(null);
   const trailButtonRef = useRef<HTMLButtonElement>(null);
   const journey = useMemo(
-    () => buildJourneyPlan(profile.gameSnapshot),
-    [profile.gameSnapshot],
+    () =>
+      buildJourneyPlanForVersion(
+        profile.gameSnapshot,
+        profile.journeyPlanVersion,
+      ),
+    [profile.gameSnapshot, profile.journeyPlanVersion],
   );
-  const board = journey.boards.find(({ level }) => level === viewedLevel)!;
+  const board = journey.boards.find(
+    ({ journeyLevel }) => journeyLevel === viewedLevel,
+  )!;
   const nextNode = nextIncompleteJourneyNode(profile, journey);
   const activeAttempt = profile.activeAttemptId
     ? profile.attempts[profile.activeAttemptId]
@@ -462,7 +466,7 @@ function JourneyBoard({
   const trailNode = activeNode ?? nextNode ?? finalJourneyNode(journey);
   const cleared = new Set(profile.clearedStopIds);
   const completedOnBoard = board.nodes.filter(({ id }) => cleared.has(id)).length;
-  const currentBoardLevel = trailNode?.level ?? "wizard";
+  const currentBoardLevel = trailNode?.journeyLevel ?? "wizard-2";
   const avatarId = isAvatarId(profile.avatarId)
     ? profile.avatarId
     : DEFAULT_AVATAR_ID;
@@ -476,7 +480,7 @@ function JourneyBoard({
     if (
       !shouldRevealTrail ||
       !trailNode ||
-      viewedLevel !== trailNode.level ||
+      viewedLevel !== trailNode.journeyLevel ||
       !trailItemRef.current
     ) {
       return;
@@ -502,9 +506,9 @@ function JourneyBoard({
   return (
     <main className={styles.board}>
       <nav className={styles.boardTabs} aria-label="Journey boards">
-        {PROGRESSION_LEVELS.map((level) => {
+        {JOURNEY_LEVELS.map((level) => {
           const firstNode = journey.boards.find(
-            (candidate) => candidate.level === level,
+            (candidate) => candidate.journeyLevel === level,
           )?.nodes[0];
           const unlocked =
             level === "starter" ||
@@ -526,18 +530,20 @@ function JourneyBoard({
               onClick={() => onViewLevel(level)}
               key={level}
             >
-              {levelLabel(level)}
+              {journeyLevelLabel(level)}
             </button>
           );
         })}
       </nav>
 
       <section className={styles.boardHeader} aria-labelledby="board-title">
-        <p className={styles.kicker}>Journey board · {board.position + 1} of 4</p>
-        <h1 id="board-title">{levelLabel(board.level)}</h1>
+        <p className={styles.kicker}>
+          Journey board · {board.position + 1} of {JOURNEY_LEVELS.length}
+        </p>
+        <h1 id="board-title">{journeyLevelLabel(board.journeyLevel)}</h1>
         <p className={styles.lede}>
-          Follow the trail through every game. Two lessons lead to each Turbo
-          Time, then one upbeat level challenge brings it all together.
+          Follow the trail through every game. Lessons and Turbo Time build
+          toward one upbeat level challenge.
         </p>
         <div className={styles.boardMeta}>
           <span>
@@ -548,7 +554,7 @@ function JourneyBoard({
         <div
           className={styles.boardProgress}
           role="progressbar"
-          aria-label={`${levelLabel(board.level)} board progress`}
+          aria-label={`${journeyLevelLabel(board.journeyLevel)} board progress`}
           aria-valuemin={0}
           aria-valuemax={board.nodes.length}
           aria-valuenow={completedOnBoard}
@@ -561,7 +567,10 @@ function JourneyBoard({
         </div>
       </section>
 
-      <section className={styles.path} aria-label={`${levelLabel(board.level)} path`}>
+      <section
+        className={styles.path}
+        aria-label={`${journeyLevelLabel(board.journeyLevel)} path`}
+      >
         <svg
           className={styles.pathLine}
           viewBox="0 0 100 100"
@@ -577,6 +586,14 @@ function JourneyBoard({
             const game = gameSlug
               ? games.find((candidate) => candidate.slug === gameSlug)
               : undefined;
+            const savedProvider = gameSlug
+              ? profile.gameSnapshot.find(
+                  (candidate) => candidate.slug === gameSlug,
+                )
+              : undefined;
+            const providerTitle =
+              savedProvider?.title ?? game?.title ?? "Journey activity";
+            const isReview = node.kind === "review";
             const unlocked = isJourneyNodeUnlocked(
               journey,
               profile.clearedStopIds,
@@ -597,13 +614,15 @@ function JourneyBoard({
                 ? styles.nodeTurbo
                 : node.kind === "culmination"
                   ? styles.nodeCulmination
+                  : isReview
+                    ? styles.nodeReview
                   : "";
             const label =
               node.kind === "turbo"
-                ? `Turbo Time · ${game?.title ?? "game"}`
+                ? `Turbo Time · ${providerTitle}`
                 : node.kind === "culmination"
-                  ? `${levelLabel(node.level)} level challenge`
-                  : (game?.title ?? "Journey game");
+                  ? `${journeyLevelLabel(node.journeyLevel)} level challenge`
+                  : providerTitle;
             const detail = isActive
               ? "Continue your saved stop"
               : isCleared
@@ -654,7 +673,11 @@ function JourneyBoard({
                       <ShelfIcon aria-hidden="true" focusable="false" />
                     ) : (
                       <span className={styles.nodeSymbol} aria-hidden="true">
-                        {node.kind === "turbo" ? "⚡" : "★"}
+                        {node.kind === "turbo"
+                          ? "⚡"
+                          : node.kind === "review"
+                            ? "◆"
+                            : "★"}
                       </span>
                     )}
                     {isCleared ? (
@@ -696,12 +719,18 @@ export function JourneyClient() {
   const [creatingProfile, setCreatingProfile] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [viewedLevel, setViewedLevel] =
-    useState<ProgressionLevel>("starter");
+    useState<JourneyLevel>("starter");
   const [arrivalNodeId, setArrivalNodeId] = useState<string | null>(null);
 
   const profile = state ? activePlayerProfile(state) : undefined;
   const journey = useMemo(
-    () => (profile ? buildJourneyPlan(profile.gameSnapshot) : null),
+    () =>
+      profile
+        ? buildJourneyPlanForVersion(
+            profile.gameSnapshot,
+            profile.journeyPlanVersion,
+          )
+        : null,
     [profile],
   );
   const nextNode = profile && journey
@@ -720,7 +749,14 @@ export function JourneyClient() {
   useEffect(() => {
     const initialTimer = window.setTimeout(() => {
       const loaded = loadProgressionStateDiagnostic();
-      setState(loaded.state);
+      const currentSnapshot = journeyCatalogSnapshot();
+      const reconciled = {
+        ...loaded.state,
+        profiles: loaded.state.profiles.map((candidate) =>
+          upgradePlayerProfileJourneyPlan(candidate, currentSnapshot),
+        ),
+      };
+      setState(reconciled);
       setStorageIssue(
         loaded.status === "corrupt" ||
           loaded.status === "unsupported" ||
@@ -729,8 +765,11 @@ export function JourneyClient() {
           : null,
       );
       if (
-        loaded.status === "migrated" &&
-        !saveProgressionState(loaded.state)
+        (loaded.status === "migrated" ||
+          (loaded.status === "loaded" &&
+            JSON.stringify(reconciled) !==
+              JSON.stringify(loaded.state))) &&
+        !saveProgressionState(reconciled)
       ) {
         setStorageWarning(true);
       }
@@ -739,7 +778,14 @@ export function JourneyClient() {
     function syncStorage(event: StorageEvent) {
       if (event.key === PROGRESSION_STORAGE_KEY || event.key === null) {
         const loaded = loadProgressionStateDiagnostic();
-        setState(loaded.state);
+        const currentSnapshot = journeyCatalogSnapshot();
+        const reconciled = {
+          ...loaded.state,
+          profiles: loaded.state.profiles.map((candidate) =>
+            upgradePlayerProfileJourneyPlan(candidate, currentSnapshot),
+          ),
+        };
+        setState(reconciled);
         setStorageIssue(
           loaded.status === "corrupt" ||
             loaded.status === "unsupported" ||
@@ -758,7 +804,10 @@ export function JourneyClient() {
 
   useEffect(() => {
     if (!trailNode) return;
-    const timer = window.setTimeout(() => setViewedLevel(trailNode.level), 0);
+    const timer = window.setTimeout(
+      () => setViewedLevel(trailNode.journeyLevel),
+      0,
+    );
     return () => window.clearTimeout(timer);
   }, [trailNode]);
 
@@ -864,7 +913,10 @@ export function JourneyClient() {
       commitState(
         replacePlayerProfile(
           state,
-          discardActiveProgressionAttempt(profile, attemptId),
+          upgradePlayerProfileJourneyPlan(
+            discardActiveProgressionAttempt(profile, attemptId),
+            journeyCatalogSnapshot(),
+          ),
         ),
       );
     } catch {
@@ -898,7 +950,13 @@ export function JourneyClient() {
 
   function retryStorageLoad() {
     const loaded = loadProgressionStateDiagnostic();
-    setState(loaded.state);
+    const currentSnapshot = journeyCatalogSnapshot();
+    setState({
+      ...loaded.state,
+      profiles: loaded.state.profiles.map((candidate) =>
+        upgradePlayerProfileJourneyPlan(candidate, currentSnapshot),
+      ),
+    });
     setStorageIssue(
       loaded.status === "corrupt" ||
         loaded.status === "unsupported" ||

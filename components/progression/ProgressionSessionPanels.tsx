@@ -38,7 +38,7 @@ export function ProgressionCulminationSectionIntro({
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
-      primaryButtonRef.current?.focus();
+      primaryButtonRef.current?.focus({ preventScroll: true });
     });
     return () => window.cancelAnimationFrame(frame);
   }, []);
@@ -51,7 +51,7 @@ export function ProgressionCulminationSectionIntro({
       aria-describedby={descriptionId}
     >
       <p className={styles.sectionLabel} id={labelId}>
-        Level challenge · Game {section.current} of {section.total}
+        Level challenge · Section {section.current} of {section.total}
       </p>
       <p className={styles.sectionCopy} id={descriptionId}>
         Take a moment with this solved example. Begin the next{" "}

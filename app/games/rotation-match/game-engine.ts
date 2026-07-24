@@ -79,6 +79,10 @@ type RoundSpec = RoundSpecBase &
       }
   );
 
+export type AuthoredRotationRoundSpec = RoundSpec & {
+  salts: readonly [number, number, number];
+};
+
 const COLOR_NAMES: Record<TileColor, string> = {
   empty: "empty",
   coral: "coral",
@@ -1108,6 +1112,245 @@ function isValidWizardRound(round: Round): boolean {
     hiddenAnswerIndexes[0] === round.correctIndex &&
     everyTrapIsCloseAndOutsideOrbit
   );
+}
+
+function isValidPattern(pattern: Pattern): boolean {
+  return (
+    pattern.length === 9 &&
+    pattern.every(
+      ({ color, motif, orientation }) =>
+        Object.values(COLOR_NAMES).includes(color) &&
+        (motif === "none" || motif === "cap") &&
+        Number.isInteger(orientation) &&
+        orientation >= 0 &&
+        orientation <= 3 &&
+        (color !== "empty" || (motif === "none" && orientation === 0)) &&
+        (motif !== "none" || orientation === 0),
+    )
+  );
+}
+
+function isInterestingRoundPattern(
+  pattern: Pattern,
+  difficulty: Difficulty,
+): boolean {
+  const authoredRules = {
+    Easy: { minFilled: 3, maxFilled: 5, minMotifs: 0, maxMotifs: 0 },
+    Medium: { minFilled: 5, maxFilled: 6, minMotifs: 0, maxMotifs: 0 },
+    Hard: { minFilled: 5, maxFilled: 7, minMotifs: 2, maxMotifs: 4 },
+    Wizard: { minFilled: 5, maxFilled: 7, minMotifs: 2, maxMotifs: 4 },
+  } as const;
+  const rules = authoredRules[difficulty];
+  const filled = pattern.filter(({ color }) => color !== "empty");
+  const motifCount = filled.filter(({ motif }) => motif === "cap").length;
+  return (
+    filled.length >= rules.minFilled &&
+    filled.length <= rules.maxFilled &&
+    motifCount >= rules.minMotifs &&
+    motifCount <= rules.maxMotifs &&
+    new Set(filled.map(({ color }) => color)).size >= 2 &&
+    new Set(dihedralKeys(pattern)).size === 8
+  );
+}
+
+/**
+ * Validates the complete player-visible round: transform truth, option
+ * uniqueness, misconception semantics, tier density, and Wizard's hidden-rule
+ * orbit. Authored Journey banks use the same proof as generated rounds.
+ */
+export function validateRound(round: Round): readonly string[] {
+  const errors: string[] = [];
+  if (!isGeneratedDifficulty(round.difficulty)) {
+    errors.push(`Unknown difficulty: ${round.difficulty}.`);
+  }
+  if (!isValidPattern(round.clue)) {
+    errors.push("The clue is not a valid 3x3 pattern.");
+  }
+  if (
+    round.options.length !== 4 ||
+    round.optionKinds.length !== 4 ||
+    round.options.some((option) => !isValidPattern(option))
+  ) {
+    errors.push("The round must contain four valid 3x3 options.");
+  }
+  if (
+    !Number.isInteger(round.correctIndex) ||
+    round.correctIndex < 0 ||
+    round.correctIndex > 3
+  ) {
+    errors.push("The correct answer index must be from 0 to 3.");
+  }
+  if (errors.length > 0) return errors;
+
+  if (round.transform.kind === "rotation") {
+    const canonical = makeRotationTransform(
+      round.transform.direction,
+      round.transform.quarterTurns,
+    );
+    if (
+      round.transform.degrees !== canonical.degrees ||
+      round.transform.angleDegrees !== canonical.angleDegrees
+    ) {
+      errors.push("The rotation metadata does not match its direction.");
+    }
+  }
+  if (round.turn !== turnLabel(round.transform)) {
+    errors.push("The player-visible transform label is inconsistent.");
+  }
+
+  const expected = applyTransform(round.clue, round.transform);
+  const expectedKey = patternKey(expected);
+  const optionKeys = round.options.map(patternKey);
+  const exactIndexes = optionKeys.flatMap((key, index) =>
+    key === expectedKey ? [index] : [],
+  );
+  if (patternKey(round.correctPattern) !== expectedKey) {
+    errors.push("The stored answer does not match the stated transform.");
+  }
+  if (
+    exactIndexes.length !== 1 ||
+    exactIndexes[0] !== round.correctIndex
+  ) {
+    errors.push("Exactly one option must match the calculated answer.");
+  }
+  if (new Set(optionKeys).size !== 4) {
+    errors.push("All four answer options must be distinct.");
+  }
+  if (round.optionKinds[round.correctIndex] !== "correct") {
+    errors.push("The correct option must be labelled correct.");
+  }
+  if (
+    round.optionKinds.some(
+      (kind, index) =>
+        (index === round.correctIndex) !== (kind === "correct"),
+    )
+  ) {
+    errors.push("Only the calculated answer may be labelled correct.");
+  }
+  if (!isInterestingRoundPattern(round.clue, round.difficulty)) {
+    errors.push("The clue violates its difficulty density or symmetry rules.");
+  }
+
+  for (const [index, kind] of round.optionKinds.entries()) {
+    if (kind === "correct") continue;
+    const option = round.options[index];
+    const differences = differingTileIndexes(
+      option,
+      round.correctPattern,
+    );
+    if (differences.length === 0) {
+      errors.push(`Option ${index + 1} duplicates the answer.`);
+      continue;
+    }
+    if (kind === "one-block-off") {
+      const removed = differences.filter(
+        (tileIndex) =>
+          option[tileIndex].color === "empty" &&
+          round.correctPattern[tileIndex].color !== "empty",
+      );
+      const added = differences.filter(
+        (tileIndex) =>
+          option[tileIndex].color !== "empty" &&
+          round.correctPattern[tileIndex].color === "empty",
+      );
+      const movedTileMatches =
+        removed.length === 1 &&
+        added.length === 1 &&
+        patternKey([option[added[0]]]) ===
+          patternKey([round.correctPattern[removed[0]]]);
+      if (differences.length !== 2 || !movedTileMatches) {
+        errors.push(
+          `Option ${index + 1} is not an exact one-block movement.`,
+        );
+      }
+    } else if (kind === "one-motif-off") {
+      const tileIndex = differences[0];
+      const candidate = option[tileIndex];
+      const correct = round.correctPattern[tileIndex];
+      if (
+        differences.length !== 1 ||
+        candidate.color !== correct.color ||
+        candidate.motif !== correct.motif ||
+        candidate.orientation === correct.orientation
+      ) {
+        errors.push(
+          `Option ${index + 1} is not an exact motif-orientation mistake.`,
+        );
+      }
+    } else {
+      const axis = mirrorAxisFor(kind);
+      if (
+        axis &&
+        patternKey(option) !==
+          patternKey(reflectPattern(round.clue, axis))
+      ) {
+        errors.push(
+          `Option ${index + 1} does not match its stated reflection.`,
+        );
+      }
+      if (
+        kind === "wrong-rotation" &&
+        !isRotationOf(option, round.clue)
+      ) {
+        errors.push(
+          `Option ${index + 1} is not a rotation misconception.`,
+        );
+      }
+    }
+  }
+
+  if (
+    round.difficulty === "Medium" &&
+    !round.optionKinds.includes("one-block-off")
+  ) {
+    errors.push("Junior rounds need a close one-block distractor.");
+  }
+  if (
+    (round.difficulty === "Hard" ||
+      round.difficulty === "Wizard") &&
+    !round.optionKinds.includes("one-motif-off")
+  ) {
+    errors.push("Expert and Wizard rounds need a motif near-miss.");
+  }
+  if (round.difficulty === "Wizard" && !isValidWizardRound(round)) {
+    errors.push(
+      "Wizard needs one hidden-transform answer and only close orbit-external traps.",
+    );
+  }
+  return errors;
+}
+
+export function buildAuthoredRotationRounds(
+  specs: readonly AuthoredRotationRoundSpec[],
+  label = "Authored Rotation Match",
+): readonly Round[] {
+  return specs.map((spec, roundIndex) => {
+    const clue = decodePattern(spec.pattern, spec.motifs);
+    const transform =
+      spec.axis === undefined
+        ? makeRotationTransform(spec.direction, spec.quarterTurns)
+        : makeReflectionTransform(spec.axis);
+    const round = assembleRound(
+      clue,
+      transform,
+      spec.difficulty,
+      spec.correctIndex,
+      spec.distractors,
+      spec.salts,
+    );
+    if (!round) {
+      throw new Error(
+        `${label} round ${roundIndex + 1} has duplicate answer options.`,
+      );
+    }
+    const errors = validateRound(round);
+    if (errors.length > 0) {
+      throw new Error(
+        `${label} round ${roundIndex + 1} is invalid: ${errors.join(" ")}`,
+      );
+    }
+    return round;
+  });
 }
 
 function isGeneratedDifficulty(

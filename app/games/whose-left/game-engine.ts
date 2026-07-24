@@ -90,6 +90,18 @@ export type ValidationResult = Readonly<{
   errors: readonly string[];
 }>;
 
+export type AuthoredWhoseLeftRoundSpec = Readonly<{
+  id: string;
+  difficulty: Difficulty;
+  points: readonly Point[];
+  sides: string;
+  querySide: Side;
+  correctIndex: number;
+  nameOffset: number;
+  nearMissSalt: number;
+  distractorRotation: number;
+}>;
+
 type PersonIdentity = (typeof PERSON_POOL)[number];
 
 type RouteTemplate = Readonly<{
@@ -765,6 +777,42 @@ function makeRound({
   };
   assertValidRound(round);
   return round;
+}
+
+export function buildAuthoredWhoseLeftRounds(
+  specs: readonly AuthoredWhoseLeftRoundSpec[],
+  label = "Authored Whose Left?",
+): readonly Round[] {
+  const rounds = specs.map((spec, roundIndex) => {
+    if (
+      spec.sides.length !== spec.points.length - 1 ||
+      [...spec.sides].some((side) => side !== "L" && side !== "R")
+    ) {
+      throw new Error(
+        `${label} round ${roundIndex + 1} has invalid side assignments.`,
+      );
+    }
+    return makeRound({
+      id: spec.id,
+      difficulty: spec.difficulty,
+      points: spec.points,
+      sides: [...spec.sides].map((side) =>
+        side === "L" ? "left" : "right",
+      ),
+      querySide: spec.querySide,
+      identities: identitiesFromOffset(
+        spec.points.length - 1,
+        spec.nameOffset,
+      ),
+      correctIndex: spec.correctIndex,
+      nearMissSalt: spec.nearMissSalt,
+      distractorRotation: spec.distractorRotation,
+    });
+  });
+  if (new Set(rounds.map(roundFingerprint)).size !== rounds.length) {
+    throw new Error(`${label} fingerprints must be unique.`);
+  }
+  return deepFreeze(rounds);
 }
 
 function authoredSpec(

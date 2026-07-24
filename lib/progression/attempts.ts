@@ -48,6 +48,7 @@ function makeRound(question: QuestionReference): AttemptRound {
     phase: "answering",
     attemptCount: 0,
     firstTryCorrect: null,
+    firstAnswerActiveTimeMs: 0,
   };
 }
 
@@ -109,6 +110,7 @@ export function createProgressionAttempt({
     id: attemptId,
     stopId: node.id,
     kind: node.kind,
+    journeyLevel: node.journeyLevel,
     level: node.level,
     phase: "playing",
     rounds,
@@ -192,12 +194,17 @@ export function recordQuestionAttempt(
     throw new Error(`Question is not accepting an answer (${current.phase}).`);
   }
 
+  const answeredAtMs = normalizedNow(nowMs);
   const updatedRound: AttemptRound = {
     ...current,
     phase: correct ? "solved" : "feedback",
     attemptCount: current.attemptCount + 1,
     firstTryCorrect:
       current.firstTryCorrect ?? (current.attemptCount === 0 ? correct : false),
+    ...(current.attemptCount === 0 &&
+    current.firstAnsweredAtMs === undefined
+      ? { firstAnsweredAtMs: answeredAtMs }
+      : {}),
     ...(answerToken === undefined ? {} : { lastAnswerToken: answerToken }),
   };
   const rounds = [...attempt.rounds];
@@ -206,7 +213,7 @@ export function recordQuestionAttempt(
   return {
     ...attempt,
     rounds,
-    updatedAtMs: normalizedNow(nowMs),
+    updatedAtMs: answeredAtMs,
   };
 }
 
@@ -331,7 +338,10 @@ export function addAttemptActiveTime(
   attempt: ProgressionAttempt,
   elapsedMs: number,
   nowMs?: number,
-  options: { countTowardTurbo?: boolean } = {},
+  options: {
+    countTowardTurbo?: boolean;
+    countTowardFirstAnswer?: boolean;
+  } = {},
 ): ProgressionAttempt {
   if (!Number.isFinite(elapsedMs) || elapsedMs < 0) {
     throw new Error("Active time must be a finite, non-negative duration.");
@@ -344,8 +354,30 @@ export function addAttemptActiveTime(
       : options.countTowardTurbo === false
         ? attempt.turboRemainingMs
         : Math.max(0, attempt.turboRemainingMs - duration);
+  const currentIndex = attempt.currentRoundIndex;
+  const current =
+    currentIndex === null ? undefined : attempt.rounds[currentIndex];
+  let rounds: readonly AttemptRound[] = attempt.rounds;
+  if (
+    options.countTowardFirstAnswer !== false &&
+    currentIndex !== null &&
+    current &&
+    current.phase === "answering" &&
+    current.attemptCount === 0 &&
+    current.firstTryCorrect === null &&
+    current.firstAnswerActiveTimeMs !== undefined
+  ) {
+    const updatedRounds = [...attempt.rounds];
+    updatedRounds[currentIndex] = {
+      ...current,
+      firstAnswerActiveTimeMs:
+        current.firstAnswerActiveTimeMs + duration,
+    };
+    rounds = updatedRounds;
+  }
   return {
     ...attempt,
+    rounds,
     activeTimeMs: attempt.activeTimeMs + duration,
     ...(remaining === undefined ? {} : { turboRemainingMs: remaining }),
     updatedAtMs: normalizedNow(nowMs),

@@ -33,7 +33,9 @@ function validateGame(game: GameCatalogEntry): GameCatalogEntry {
   }
   if (
     !game.progression.contentVersion.trim() ||
-    !game.progression.generatorVersion.trim()
+    !game.progression.generatorVersion.trim() ||
+    (game.progression.journeyContentVersion !== undefined &&
+      !game.progression.journeyContentVersion.trim())
   ) {
     throw new Error(`Game "${game.slug}" has invalid progression versions.`);
   }

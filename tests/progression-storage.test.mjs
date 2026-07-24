@@ -7,6 +7,7 @@ import {
   addPlayerProfile,
   advanceAttemptQuestion,
   beginCulminationSection,
+  buildLegacyJourneyPlan,
   buildJourneyPlan,
   createCulminationProgressionAttempt,
   createNormalProgressionAttempt,
@@ -21,6 +22,7 @@ import {
   recordQuestionAttempt,
   saveProgressionState,
   settleProgressionAttempt,
+  upgradePlayerProfileJourneyPlan,
   upsertProfileAttempt,
 } from "../lib/progression/index.ts";
 
@@ -30,6 +32,13 @@ const games = Array.from({ length: 8 }, (_, index) => ({
   contentVersion: `campaign-${index + 1}`,
   generatorVersion: `generator-${index + 1}`,
 }));
+const reviewGame = {
+  slug: "spatial-review",
+  title: "Spatial Review",
+  role: "review",
+  journeyContentVersion: "review-1",
+};
+const journeyGames = [...games, reviewGame];
 
 function questions(gameSlug, level) {
   return Array.from({ length: 12 }, (_, questionIndex) => ({
@@ -59,7 +68,7 @@ function memoryStorage() {
 }
 
 test("versioned storage round-trips exact in-progress answer and section state", () => {
-  const journey = buildJourneyPlan(games);
+  const journey = buildJourneyPlan(journeyGames);
   const node = journey.boards[0].nodes[0];
   let attempt = createNormalProgressionAttempt({
     id: "resume-me",
@@ -76,7 +85,7 @@ test("versioned storage round-trips exact in-progress answer and section state",
     id: "profile-1",
     name: "Ada",
     avatarId: "hedgehog",
-    gameSnapshot: games,
+    gameSnapshot: journeyGames,
     nowMs: 1,
   });
   profile = {
@@ -103,7 +112,7 @@ test("versioned storage round-trips exact in-progress answer and section state",
 });
 
 test("schema-v1 culmination at a pristine section opener migrates to a pending intro", () => {
-  const journey = buildJourneyPlan(games);
+  const journey = buildJourneyPlan(journeyGames);
   const node = journey.boards[0].nodes.at(-1);
   let attempt = createCulminationProgressionAttempt({
     id: "legacy-culmination-intro",
@@ -138,7 +147,7 @@ test("schema-v1 culmination at a pristine section opener migrates to a pending i
       id: "legacy-culmination-profile",
       name: "Ada",
       avatarId: "hedgehog",
-      gameSnapshot: games,
+      gameSnapshot: journeyGames,
       nowMs: 1,
     }),
     clearedStopIds: previousStopIds,
@@ -182,7 +191,7 @@ test("schema-v1 culmination at a pristine section opener migrates to a pending i
 });
 
 test("a canonical settled summary survives normalization unchanged", () => {
-  const journey = buildJourneyPlan(games);
+  const journey = buildJourneyPlan(journeyGames);
   const node = journey.boards[0].nodes[0];
   let attempt = createNormalProgressionAttempt({
     id: "settled-summary",
@@ -198,7 +207,7 @@ test("a canonical settled summary survives normalization unchanged", () => {
     id: "settled-profile",
     name: "Ada",
     avatarId: "hedgehog",
-    gameSnapshot: games,
+    gameSnapshot: journeyGames,
     nowMs: 1,
   });
   profile = upsertProfileAttempt(profile, attempt);
@@ -324,7 +333,7 @@ test("invalid profiles are dropped without discarding another local user", () =>
     id: "valid",
     name: "Grace",
     avatarId: "otter",
-    gameSnapshot: games,
+    gameSnapshot: journeyGames,
     nowMs: 1,
   });
   const decoded = decodeProgressionState(
@@ -343,7 +352,7 @@ test("invalid profiles are dropped without discarding another local user", () =>
 });
 
 test("semantic corruption drops an attempt without discarding its profile", () => {
-  const journey = buildJourneyPlan(games);
+  const journey = buildJourneyPlan(journeyGames);
   const normalNode = journey.boards[0].nodes[0];
   const normal = createNormalProgressionAttempt({
     id: "shortened-normal",
@@ -372,7 +381,7 @@ test("semantic corruption drops an attempt without discarding its profile", () =
       id: "corrupt-attempts",
       name: "Ada",
       avatarId: "hedgehog",
-      gameSnapshot: games,
+      gameSnapshot: journeyGames,
       nowMs: 1,
     }),
     clearedStopIds: previousStopIds,
@@ -396,29 +405,37 @@ test("semantic corruption drops an attempt without discarding its profile", () =
   assert.equal(decoded.profiles[0].activeAttemptId, null);
 });
 
-test("completion migration keeps only a canonical cleared prefix and its awards", () => {
-  const journey = buildJourneyPlan(games);
+test("completion normalization preserves valid non-contiguous clears and ledger awards", () => {
+  const journey = buildJourneyPlan(journeyGames);
   const [first, second, third] = journey.boards[0].nodes;
   const profile = {
     ...createPlayerProfile({
       id: "prefix",
       name: "Lin",
       avatarId: "fox",
-      gameSnapshot: games,
+      gameSnapshot: journeyGames,
       nowMs: 1,
     }),
     clearedStopIds: [first.id, third.id],
+    xpAwards: [
+      { stopId: first.id, amount: first.xp },
+      { stopId: third.id, amount: third.xp },
+    ],
     awardedStopIds: [first.id, second.id, third.id, "not-a-stop"],
   };
   const decoded = decodeProgressionState(
     JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion: PROGRESSION_SCHEMA_VERSION,
       activeProfileId: profile.id,
       profiles: [profile],
     }),
   );
-  assert.deepEqual(decoded.profiles[0].clearedStopIds, [first.id]);
-  assert.deepEqual(decoded.profiles[0].awardedStopIds, [first.id]);
+  assert.deepEqual(decoded.profiles[0].clearedStopIds, [first.id, third.id]);
+  assert.deepEqual(decoded.profiles[0].awardedStopIds, [first.id, third.id]);
+  assert.deepEqual(decoded.profiles[0].xpAwards, [
+    { stopId: first.id, amount: first.xp },
+    { stopId: third.id, amount: third.xp },
+  ]);
 });
 
 test("snapshot migration preserves optional per-game content versions", () => {
@@ -426,7 +443,7 @@ test("snapshot migration preserves optional per-game content versions", () => {
     id: "versions",
     name: "Grace",
     avatarId: "otter",
-    gameSnapshot: games,
+    gameSnapshot: journeyGames,
     nowMs: 1,
   });
   const decoded = decodeProgressionState(
@@ -443,5 +460,72 @@ test("snapshot migration preserves optional per-game content versions", () => {
   assert.equal(
     decoded.profiles[0].gameSnapshot[0].generatorVersion,
     "generator-1",
+  );
+});
+
+test("schema-v2 profiles retain old clears and XP before an idle seven-board upgrade", () => {
+  const legacyJourney = buildLegacyJourneyPlan(games);
+  const starterStop = legacyJourney.boards[0].nodes[0];
+  const expertStop = legacyJourney.boards[2].nodes[0];
+  const question = questions(starterStop.gameSlug, "starter")[0];
+  const decoded = decodeProgressionState(
+    JSON.stringify({
+      schemaVersion: 2,
+      activeProfileId: "legacy-seven",
+      profiles: [
+        {
+          id: "legacy-seven",
+          name: "Ada",
+          avatarId: "fox",
+          createdAtMs: 1,
+          updatedAtMs: 2,
+          gameSnapshot: games,
+          clearedStopIds: [starterStop.id, expertStop.id],
+          awardedStopIds: [starterStop.id, expertStop.id],
+          settledAttemptIds: [],
+          missedQuestions: [
+            {
+              key: "legacy-key",
+              question,
+              missCount: 1,
+              lastMissedAtMs: 2,
+            },
+          ],
+          attempts: {},
+          activeAttemptId: null,
+        },
+      ],
+    }),
+  );
+  const legacy = decoded.profiles[0];
+  assert.equal(legacy.journeyPlanVersion, 1);
+  assert.deepEqual(legacy.xpAwards, [
+    { stopId: starterStop.id, amount: 25 },
+    { stopId: expertStop.id, amount: 100 },
+  ]);
+  assert.deepEqual(legacy.missedQuestions[0].observations, []);
+
+  const review = {
+    slug: "math-kangaroo",
+    title: "Math Kangaroo Spatial Review",
+    role: "review",
+    journeyContentVersion: "mk-1",
+  };
+  const upgraded = upgradePlayerProfileJourneyPlan(
+    legacy,
+    [...games, review],
+    3,
+  );
+  assert.equal(upgraded.journeyPlanVersion, 2);
+  assert.equal(
+    upgraded.gameSnapshot.at(-1).slug,
+    "math-kangaroo",
+  );
+  assert.equal(upgraded.clearedStopIds.length, 2);
+  assert.equal(upgraded.xpAwards.reduce((sum, award) => sum + award.amount, 0), 125);
+  assert.ok(
+    upgraded.clearedStopIds.some((stopId) =>
+      stopId.startsWith("expert-1:normal:"),
+    ),
   );
 });

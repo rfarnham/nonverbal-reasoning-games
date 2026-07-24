@@ -1257,6 +1257,87 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
   };
 }
 
+/**
+ * Enforces teaching-level guarantees above algebraic validity. A round can
+ * have one correct answer yet still make a poor lesson—for example, by
+ * displaying the requested creature directly against its answer units, or by
+ * attaching a forgotten-division distractor to a proof that never splits.
+ */
+export function assertSoundTeachingRound(round: Round): TeachingProofPlan {
+  if (
+    round.question.target.length === 1 &&
+    round.question.target[0].count === 1
+  ) {
+    const target = round.question.target;
+    const directlyDisplayed = round.equations.some(({ left, right }) => {
+      const leftIsTarget = expressionsMatch(left, target);
+      const rightIsTarget = expressionsMatch(right, target);
+      const leftIsKnownUnits =
+        left.length > 0 &&
+        left.every(({ creature }) => creature === round.question.unit);
+      const rightIsKnownUnits =
+        right.length > 0 &&
+        right.every(({ creature }) => creature === round.question.unit);
+      return (
+        (leftIsTarget && rightIsKnownUnits) ||
+        (rightIsTarget && leftIsKnownUnits)
+      );
+    });
+    if (directlyDisplayed) {
+      throw new Error(
+        "A teaching round must not display a lone requested creature directly against the answer units.",
+      );
+    }
+  }
+
+  const proof = buildTeachingProof(round);
+  const splitSteps = proof.steps.filter(
+    (step): step is TeachingSplitEvenlyStep =>
+      step.kind === "split-evenly",
+  );
+  for (const step of splitSteps) {
+    if (step.divisor <= 1) {
+      throw new Error("A teaching round must never suggest dividing by one.");
+    }
+    if ("groupCount" in step.before) {
+      if (step.before.groupCount !== step.divisor) {
+        throw new Error(
+          "A teaching split must use the number of groups shown.",
+        );
+      }
+      continue;
+    }
+    if (
+      [...step.before.left, ...step.before.right].some(
+        ({ count }) => count % step.divisor !== 0,
+      )
+    ) {
+      throw new Error(
+        "A teaching split must divide every pictured load evenly.",
+      );
+    }
+  }
+  if (
+    round.optionKinds.includes("forgot-to-divide") &&
+    splitSteps.length === 0
+  ) {
+    throw new Error(
+      "A forgotten-division distractor requires a real split in the proof.",
+    );
+  }
+
+  return proof;
+}
+
+export function hasSoundTeachingRound(round: Round): boolean {
+  try {
+    assertSoundTeachingRound(round);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function teachingProofDurationMs(round: Round): number {
   return buildTeachingProof(round).durationMs;
 }

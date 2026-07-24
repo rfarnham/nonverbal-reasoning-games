@@ -1,4 +1,5 @@
 export * from "./attempts.ts";
+export * from "./game-adapter.ts";
 export * from "./journey.ts";
 export * from "./persistence.ts";
 export * from "./profiles.ts";
