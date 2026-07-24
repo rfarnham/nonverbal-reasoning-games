@@ -18,6 +18,7 @@ import {
   buildJourneyPlanForVersion,
   closeAttemptSummary,
   findJourneyNode,
+  isJourneyTestProfile,
   journeyLevelLabel,
   loadProgressionStateDiagnostic,
   nextIncompleteJourneyNode,
@@ -156,7 +157,11 @@ export function JourneySummaryClient() {
     if (!node) return null;
     const basic = attempt.settlement ?? summarizeAttempt(attempt);
     const xpAwarded =
-      basic.passed && !profile.awardedStopIds.includes(node.id) ? node.xp : 0;
+      !isJourneyTestProfile(profile) &&
+      basic.passed &&
+      !profile.awardedStopIds.includes(node.id)
+        ? node.xp
+        : 0;
     return {
       node,
       settlement: attempt.settlement ?? { ...basic, xpAwarded },
@@ -197,8 +202,12 @@ export function JourneySummaryClient() {
           setCompleting(false);
           return;
         }
-        const nextNode = nextIncompleteJourneyNode(closedProfile);
-        if (nextNode) markJourneyArrival(closedProfile.id, nextNode.id);
+        if (!isJourneyTestProfile(closedProfile)) {
+          const nextNode = nextIncompleteJourneyNode(closedProfile);
+          if (nextNode) markJourneyArrival(closedProfile.id, nextNode.id);
+        } else {
+          markJourneyArrival(closedProfile.id, latest.attempt.stopId);
+        }
         navigateToJourney({ replace: true });
       } catch {
         setStorageWarning(true);
@@ -247,10 +256,13 @@ export function JourneySummaryClient() {
   const isCulmination = node.kind === "culmination";
   const isFinalMastery =
     isCulmination && node.journeyLevel === "wizard-2";
+  const testingMode = isJourneyTestProfile(profile);
   const avatarId = isAvatarId(profile.avatarId)
     ? profile.avatarId
     : DEFAULT_AVATAR_ID;
-  const title = passed
+  const title = testingMode
+    ? "Test run complete"
+    : passed
     ? isFinalMastery
       ? "Journey mastered!"
       : isCulmination
@@ -259,7 +271,9 @@ export function JourneySummaryClient() {
           ? "Brilliant work!"
           : "Trail cleared!"
     : "You finished strong!";
-  const message = passed
+  const message = testingMode
+    ? "You reached the full result screen. Path clears and XP were not recorded for this test profile."
+    : passed
     ? isCulmination
       ? isFinalMastery
         ? "Seven boards, every challenge, and a mountain of brave practice. That deserves a celebration."
@@ -287,7 +301,9 @@ export function JourneySummaryClient() {
         latest.profile,
         latest.attempt,
       );
-      const nextProfile = result.settlement.passed
+      const resultTestingMode = isJourneyTestProfile(result.profile);
+      const nextProfile =
+        result.settlement.passed || resultTestingMode
         ? closeAttemptSummary(result.profile, result.attempt.id)
         : result.profile;
       const nextState = replacePlayerProfile(latest.state, nextProfile);
@@ -297,11 +313,17 @@ export function JourneySummaryClient() {
         return;
       }
 
-      if (result.settlement.passed) {
-        const nextNode = nextIncompleteJourneyNode(nextProfile);
-        if (nextNode) markJourneyArrival(nextProfile.id, nextNode.id);
+      if (result.settlement.passed || resultTestingMode) {
+        if (!resultTestingMode) {
+          const nextNode = nextIncompleteJourneyNode(nextProfile);
+          if (nextNode) markJourneyArrival(nextProfile.id, nextNode.id);
+        } else {
+          markJourneyArrival(nextProfile.id, result.attempt.stopId);
+        }
         setAnnouncement(
-          result.settlement.xpAwarded > 0
+          resultTestingMode
+            ? "Test result complete. Returning to the open map."
+            : result.settlement.xpAwarded > 0
             ? `${result.settlement.xpAwarded} XP added. Moving on.`
             : "Practice complete. Moving on.",
         );
@@ -363,7 +385,12 @@ export function JourneySummaryClient() {
       const practiceReplay =
         currentAttempt.phase === "retry-required" &&
         currentProfile.clearedStopIds.includes(currentAttempt.stopId);
-      if (currentAttempt.phase === "retry-required" && !practiceReplay) {
+      const currentTestingMode = isJourneyTestProfile(currentProfile);
+      if (
+        currentAttempt.phase === "retry-required" &&
+        !practiceReplay &&
+        !currentTestingMode
+      ) {
         const journey = buildJourneyPlanForVersion(
           closedProfile.gameSnapshot,
           closedProfile.journeyPlanVersion,
@@ -391,9 +418,11 @@ export function JourneySummaryClient() {
         setCompleting(false);
         return;
       }
-      if (currentAttempt.phase === "summary") {
+      if (currentAttempt.phase === "summary" && !currentTestingMode) {
         const nextNode = nextIncompleteJourneyNode(closedProfile);
         if (nextNode) markJourneyArrival(closedProfile.id, nextNode.id);
+      } else if (currentTestingMode) {
+        markJourneyArrival(closedProfile.id, currentAttempt.stopId);
       }
       navigateToJourney({ replace: true });
     } catch {
@@ -430,7 +459,9 @@ export function JourneySummaryClient() {
             />
           </div>
           <p className={styles.kicker}>
-            {passed
+            {testingMode
+              ? "Testing mode · Result preview"
+              : passed
               ? `${journeyLevelLabel(node.journeyLevel)} · Stop complete`
               : "Practice complete"}
           </p>
@@ -478,6 +509,8 @@ export function JourneySummaryClient() {
               >
                 {completing
                   ? "Moving on…"
+                  : testingMode
+                    ? "Finish test run"
                   : settlement.xpAwarded > 0
                     ? `Claim ${settlement.xpAwarded} XP`
                     : passed
@@ -493,6 +526,8 @@ export function JourneySummaryClient() {
               >
                 {completing
                   ? "Moving on…"
+                  : testingMode
+                    ? "Back to test map"
                   : passed
                     ? isFinalMastery
                       ? "Back to the full Journey"

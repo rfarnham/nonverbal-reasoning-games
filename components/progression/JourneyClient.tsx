@@ -29,11 +29,14 @@ import {
   activePlayerProfile,
   addPlayerProfile,
   buildJourneyPlanForVersion,
+  canPlayerAccessJourneyNode,
+  closeAttemptSummary,
   createPlayerProfile,
   createProgressionState,
   deletePlayerProfile,
   discardActiveProgressionAttempt,
   findJourneyNode,
+  isJourneyTestProfile,
   isJourneyNodeUnlocked,
   loadProgressionStateDiagnostic,
   nextIncompleteJourneyNode,
@@ -453,9 +456,12 @@ function JourneyBoard({
       ),
     [profile.gameSnapshot, profile.journeyPlanVersion],
   );
-  const board = journey.boards.find(
-    ({ journeyLevel }) => journeyLevel === viewedLevel,
-  )!;
+  const board =
+    journey.boards.find(
+      ({ journeyLevel }) => journeyLevel === viewedLevel,
+    ) ?? journey.boards[0]!;
+  const displayedLevel = board.journeyLevel;
+  const testingMode = isJourneyTestProfile(profile);
   const nextNode = nextIncompleteJourneyNode(profile, journey);
   const activeAttempt = profile.activeAttemptId
     ? profile.attempts[profile.activeAttemptId]
@@ -480,7 +486,7 @@ function JourneyBoard({
     if (
       !shouldRevealTrail ||
       !trailNode ||
-      viewedLevel !== trailNode.journeyLevel ||
+      displayedLevel !== trailNode.journeyLevel ||
       !trailItemRef.current
     ) {
       return;
@@ -500,32 +506,44 @@ function JourneyBoard({
     arrivalNodeId,
     shouldRevealTrail,
     trailNode,
-    viewedLevel,
+    displayedLevel,
   ]);
 
   return (
     <main className={styles.board}>
+      {testingMode ? (
+        <p className={styles.testingBanner} role="status">
+          <strong>Test mode</strong>
+          <span>
+            All available boards and stops are open. Path clears and XP are not
+            recorded. Answers are saved for reload testing; choosing another
+            stop replaces an unfinished test run.
+          </span>
+        </p>
+      ) : null}
       <nav className={styles.boardTabs} aria-label="Journey boards">
         {JOURNEY_LEVELS.map((level) => {
-          const firstNode = journey.boards.find(
+          const candidateBoard = journey.boards.find(
             (candidate) => candidate.journeyLevel === level,
-          )?.nodes[0];
-          const unlocked =
-            level === "starter" ||
-            (firstNode
-              ? isJourneyNodeUnlocked(
+          );
+          const firstNode = candidateBoard?.nodes[0];
+          const unlocked = Boolean(
+            firstNode &&
+              (testingMode ||
+                level === "starter" ||
+                isJourneyNodeUnlocked(
                   journey,
                   profile.clearedStopIds,
                   firstNode.id,
-                )
-              : false);
+                )),
+          );
           return (
             <button
               className={`${styles.boardTab} ${
-                viewedLevel === level ? styles.boardTabActive : ""
+                displayedLevel === level ? styles.boardTabActive : ""
               }`}
               type="button"
-              aria-pressed={viewedLevel === level}
+              aria-pressed={displayedLevel === level}
               disabled={!unlocked}
               onClick={() => onViewLevel(level)}
               key={level}
@@ -549,7 +567,11 @@ function JourneyBoard({
           <span>
             {completedOnBoard} of {board.nodes.length} stops cleared
           </span>
-          <span>{board.availableXp} XP available</span>
+          <span>
+            {testingMode
+              ? "Test runs award 0 XP"
+              : `${board.availableXp} XP available`}
+          </span>
         </div>
         <div
           className={styles.boardProgress}
@@ -594,21 +616,25 @@ function JourneyBoard({
             const providerTitle =
               savedProvider?.title ?? game?.title ?? "Journey activity";
             const isReview = node.kind === "review";
-            const unlocked = isJourneyNodeUnlocked(
+            const unlocked = canPlayerAccessJourneyNode(
+              profile,
               journey,
-              profile.clearedStopIds,
               node.id,
             );
             const isCleared = cleared.has(node.id);
             const isCurrent = nextNode?.id === node.id;
             const isActive = activeAttempt?.stopId === node.id;
             const isTrailPosition = trailNode?.id === node.id;
-            const blockedByActiveAttempt = Boolean(activeAttempt && !isActive);
+            const blockedByActiveAttempt = Boolean(
+              activeAttempt && !isActive && !testingMode,
+            );
             const buttonState = isCurrent || isActive
                 ? styles.nodeCurrent
                 : isCleared
                   ? styles.nodeCleared
-                : styles.nodeLocked;
+                  : testingMode
+                    ? styles.nodeTesting
+                    : styles.nodeLocked;
             const nodeKindClass =
               node.kind === "turbo"
                 ? styles.nodeTurbo
@@ -625,9 +651,13 @@ function JourneyBoard({
                   : providerTitle;
             const detail = isActive
               ? "Continue your saved stop"
-              : isCleared
+              : isCleared && testingMode
+                ? "Cleared · replay in test mode"
+                : isCleared
                 ? "Cleared"
-                : isCurrent
+                : testingMode
+                  ? "Open in test mode · clears and XP not recorded"
+                  : isCurrent
                   ? `${node.xp} XP when cleared`
                   : "Locked";
             const ShelfIcon = game?.ShelfIcon;
@@ -639,7 +669,7 @@ function JourneyBoard({
                 ref={isTrailPosition ? trailItemRef : undefined}
               >
                 <div className={styles.nodeWrap}>
-                  {isTrailPosition && viewedLevel === currentBoardLevel ? (
+                  {isTrailPosition && displayedLevel === currentBoardLevel ? (
                     <span
                       className={`${styles.walker} ${
                         arrivalNodeId === node.id ? styles.walkerArriving : ""
@@ -662,7 +692,7 @@ function JourneyBoard({
                     disabled={
                       !unlocked ||
                       blockedByActiveAttempt ||
-                      (isCleared && !isActive)
+                      (isCleared && !isActive && !testingMode)
                     }
                     aria-label={`${label}. ${detail}`}
                     aria-current={isTrailPosition ? "step" : undefined}
@@ -742,8 +772,13 @@ export function JourneyClient() {
     journey && activeAttempt
       ? findJourneyNode(journey, activeAttempt.stopId)
       : undefined;
+  const arrivalNode =
+    journey && arrivalNodeId
+      ? findJourneyNode(journey, arrivalNodeId)
+      : undefined;
+  const testingMode = Boolean(profile && isJourneyTestProfile(profile));
   const trailNode = journey
-    ? activeNode ?? nextNode ?? finalJourneyNode(journey)
+    ? activeNode ?? arrivalNode ?? nextNode ?? finalJourneyNode(journey)
     : undefined;
 
   useEffect(() => {
@@ -803,13 +838,18 @@ export function JourneyClient() {
   }, []);
 
   useEffect(() => {
-    if (!trailNode) return;
+    if (
+      !trailNode ||
+      (testingMode && !activeNode && !arrivalNode)
+    ) {
+      return;
+    }
     const timer = window.setTimeout(
       () => setViewedLevel(trailNode.journeyLevel),
       0,
     );
     return () => window.clearTimeout(timer);
-  }, [trailNode]);
+  }, [activeNode, arrivalNode, testingMode, trailNode]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -866,26 +906,42 @@ export function JourneyClient() {
     if (!state || !profile || !journey) return;
     const canonicalNode = findJourneyNode(journey, node.id);
     if (!canonicalNode) return;
-    const existing = profile.activeAttemptId
-      ? profile.attempts[profile.activeAttemptId]
+    const testingMode = isJourneyTestProfile(profile);
+    if (!canPlayerAccessJourneyNode(profile, journey, canonicalNode.id)) return;
+    let workingProfile = profile;
+    let existing = workingProfile.activeAttemptId
+      ? workingProfile.attempts[workingProfile.activeAttemptId]
       : undefined;
     if (
-      profile.clearedStopIds.includes(canonicalNode.id) &&
+      !testingMode &&
+      workingProfile.clearedStopIds.includes(canonicalNode.id) &&
       existing?.stopId !== canonicalNode.id
     ) {
       return;
+    }
+    let nextState = state;
+    if (testingMode && existing && existing.stopId !== canonicalNode.id) {
+      try {
+        workingProfile = existing.settlement
+          ? closeAttemptSummary(workingProfile, existing.id)
+          : discardActiveProgressionAttempt(workingProfile, existing.id);
+        nextState = replacePlayerProfile(state, workingProfile);
+        existing = undefined;
+      } catch {
+        setStorageWarning(true);
+        return;
+      }
     }
     let attempt =
       existing && existing.stopId === canonicalNode.id
         ? existing
         : undefined;
-    let nextState = state;
 
     if (!attempt || attempt.phase === "complete") {
       try {
-        attempt = createJourneyAttempt(profile, canonicalNode);
-        const nextProfile = upsertProfileAttempt(profile, attempt);
-        nextState = replacePlayerProfile(state, nextProfile);
+        attempt = createJourneyAttempt(workingProfile, canonicalNode);
+        const nextProfile = upsertProfileAttempt(workingProfile, attempt);
+        nextState = replacePlayerProfile(nextState, nextProfile);
       } catch {
         setStorageWarning(true);
         return;

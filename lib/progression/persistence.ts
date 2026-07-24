@@ -1,8 +1,11 @@
 import {
   buildJourneyPlanForVersion,
   findJourneyNode,
-  isJourneyNodeUnlocked,
 } from "./journey.ts";
+import {
+  canPlayerAccessJourneyNode,
+  isJourneyTestProfile,
+} from "./test-mode.ts";
 import {
   isQuestionReference,
   questionReferenceIdentityKey,
@@ -617,10 +620,16 @@ function parseProfile(
       continue;
     }
     if (
-      !isJourneyNodeUnlocked(journey, clearedStopIds, node.id) ||
+      !canPlayerAccessJourneyNode(
+        { name, clearedStopIds },
+        journey,
+        node.id,
+      ) ||
       (attempt.settlement &&
         (!requestedSettledAttemptIds.has(attempt.id) ||
           (attempt.settlement.passed &&
+            (!isJourneyTestProfile({ name }) ||
+              attempt.settlement.xpAwarded > 0) &&
             (!awardedStopIds.includes(node.id) ||
               !clearedStopIds.includes(node.id))))) ||
       (!attempt.settlement && requestedSettledAttemptIds.has(attempt.id)) ||

@@ -13,6 +13,7 @@ import {
   beginAttemptRedemption,
   beginCulminationSection,
   buildJourneyPlan,
+  canPlayerAccessJourneyNode,
   closeAttemptSummary,
   createCulminationProgressionAttempt,
   createNormalProgressionAttempt,
@@ -25,6 +26,7 @@ import {
   discardActiveProgressionAttempt,
   isClearAccuracy,
   isJourneyNodeUnlocked,
+  isJourneyTestProfile,
   profileXpTotal,
   questionReferenceIdentityKey,
   recordQuestionAttempt,
@@ -33,6 +35,7 @@ import {
   settleProgressionAttempt,
   switchPlayerProfile,
   turboQuestionReference,
+  updatePlayerProfileIdentity,
   upsertProfileAttempt,
 } from "../lib/progression/index.ts";
 
@@ -336,6 +339,107 @@ test("profile boundaries reject shortened, mismatched, locked, and early-ended a
     () => settleProgressionAttempt(profile, finished, journey),
     /persisted active attempt/,
   );
+});
+
+test("the exact test profile can open any real stop without recording Journey progress", () => {
+  const journey = buildJourneyPlan(gamesWithReview);
+  const futureNode = journey.boards[1].nodes[0];
+  const profile = createPlayerProfile({
+    id: "journey-test-profile",
+    name: "testUser123",
+    avatarId: "hedgehog",
+    gameSnapshot: gamesWithReview,
+    nowMs: 1,
+  });
+
+  assert.equal(isJourneyTestProfile(profile), true);
+  assert.ok(
+    journey.boards
+      .flatMap(({ nodes }) => nodes)
+      .every(({ id }) => canPlayerAccessJourneyNode(profile, journey, id)),
+  );
+  assert.equal(
+    canPlayerAccessJourneyNode(profile, journey, "not-a-real-stop"),
+    false,
+  );
+
+  const nearMatch = { ...profile, name: "testuser123" };
+  assert.equal(isJourneyTestProfile(nearMatch), false);
+  assert.equal(
+    canPlayerAccessJourneyNode(nearMatch, journey, futureNode.id),
+    false,
+  );
+
+  const futureAttempt = createNormalProgressionAttempt({
+    id: "future-test-attempt",
+    node: futureNode,
+    campaignQuestions: campaignLevel(
+      futureNode.gameSlug,
+      futureNode.level,
+    ),
+    nowMs: 2,
+  });
+  assert.throws(
+    () => upsertProfileAttempt(nearMatch, futureAttempt),
+    /locked journey stop/,
+  );
+
+  const shortened = {
+    ...futureAttempt,
+    id: "shortened-future-test-attempt",
+    rounds: futureAttempt.rounds.slice(0, 1),
+  };
+  assert.throws(
+    () => upsertProfileAttempt(profile, shortened),
+    /ordinary stop needs 12 questions/,
+  );
+
+  const finished = finishNormalAttempt(futureAttempt, 12);
+  const withAttempt = upsertProfileAttempt(profile, finished);
+  const result = settleProgressionAttempt(
+    withAttempt,
+    finished,
+    journey,
+    100,
+  );
+  assert.equal(result.settlement.passed, true);
+  assert.equal(result.settlement.xpAwarded, 0);
+  assert.deepEqual(result.profile.clearedStopIds, []);
+  assert.deepEqual(result.profile.awardedStopIds, []);
+  assert.deepEqual(result.profile.xpAwards, []);
+  assert.equal(profileXpTotal(result.profile), 0);
+});
+
+test("renaming out of test mode drops a normally locked active test run", () => {
+  const journey = buildJourneyPlan(gamesWithReview);
+  const futureNode = journey.boards[3].nodes[0];
+  let profile = createPlayerProfile({
+    id: "rename-test-profile",
+    name: "testUser123",
+    avatarId: "hedgehog",
+    gameSnapshot: gamesWithReview,
+    nowMs: 1,
+  });
+  const attempt = createNormalProgressionAttempt({
+    id: "rename-test-attempt",
+    node: futureNode,
+    campaignQuestions: campaignLevel(
+      futureNode.gameSlug,
+      futureNode.level,
+    ),
+    nowMs: 2,
+  });
+  profile = upsertProfileAttempt(profile, attempt);
+
+  const renamed = updatePlayerProfileIdentity(profile, {
+    name: "Ada",
+    nowMs: 3,
+  });
+  assert.equal(renamed.name, "Ada");
+  assert.equal(renamed.activeAttemptId, null);
+  assert.equal(renamed.attempts[attempt.id], undefined);
+  assert.deepEqual(renamed.clearedStopIds, []);
+  assert.deepEqual(renamed.xpAwards, []);
 });
 
 function finishNormalAttempt(attempt, correctCount) {

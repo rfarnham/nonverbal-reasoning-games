@@ -111,6 +111,122 @@ test("versioned storage round-trips exact in-progress answer and section state",
   assert.equal(resumed.rounds[0].lastAnswerToken, "choice-2");
 });
 
+test("storage retains locked-position attempts only for the exact test profile", () => {
+  const journey = buildJourneyPlan(journeyGames);
+  const futureNode = journey.boards[1].nodes[0];
+  const attempt = createNormalProgressionAttempt({
+    id: "future-storage-test-attempt",
+    node: futureNode,
+    campaignQuestions: questions(futureNode.gameSlug, futureNode.level),
+    nowMs: 2,
+  });
+  let testProfile = createPlayerProfile({
+    id: "future-storage-test-profile",
+    name: "testUser123",
+    avatarId: "hedgehog",
+    gameSnapshot: journeyGames,
+    nowMs: 1,
+  });
+  testProfile = upsertProfileAttempt(testProfile, attempt);
+
+  const testStorage = memoryStorage();
+  assert.equal(
+    saveProgressionState(
+      addPlayerProfile(createProgressionState(), testProfile),
+      testStorage,
+    ),
+    true,
+  );
+  const reloadedTestProfile = loadProgressionState(testStorage).profiles[0];
+  assert.equal(reloadedTestProfile.activeAttemptId, attempt.id);
+  assert.equal(
+    reloadedTestProfile.attempts[attempt.id].stopId,
+    futureNode.id,
+  );
+
+  let finishedAttempt = attempt;
+  for (let index = 0; index < 12; index += 1) {
+    finishedAttempt = recordQuestionAttempt(finishedAttempt, {
+      correct: true,
+      nowMs: 10 + index,
+    });
+    finishedAttempt = advanceAttemptQuestion(
+      finishedAttempt,
+      30 + index,
+    );
+  }
+  let settledTestProfile = upsertProfileAttempt(
+    {
+      ...testProfile,
+      attempts: {},
+      activeAttemptId: null,
+    },
+    finishedAttempt,
+  );
+  settledTestProfile = settleProgressionAttempt(
+    settledTestProfile,
+    finishedAttempt,
+    journey,
+    50,
+  ).profile;
+  const settledStorage = memoryStorage();
+  assert.equal(
+    saveProgressionState(
+      addPlayerProfile(createProgressionState(), settledTestProfile),
+      settledStorage,
+    ),
+    true,
+  );
+  const reloadedSettlement = loadProgressionState(settledStorage).profiles[0];
+  assert.equal(
+    reloadedSettlement.attempts[attempt.id].phase,
+    "summary",
+  );
+  assert.equal(
+    reloadedSettlement.attempts[attempt.id].settlement.xpAwarded,
+    0,
+  );
+  assert.deepEqual(reloadedSettlement.clearedStopIds, []);
+  assert.deepEqual(reloadedSettlement.xpAwards, []);
+  const tamperedTestSettlement = JSON.parse(
+    settledStorage.entries.get(PROGRESSION_STORAGE_KEY),
+  );
+  tamperedTestSettlement.profiles[0].attempts[
+    attempt.id
+  ].settlement.xpAwarded = futureNode.xp;
+  const rejectedTestSettlement = decodeProgressionStateDiagnostic(
+    JSON.stringify(tamperedTestSettlement),
+  );
+  assert.equal(rejectedTestSettlement.status, "corrupt");
+  assert.equal(
+    rejectedTestSettlement.state.profiles[0].attempts[attempt.id],
+    undefined,
+  );
+
+  const normalProfile = {
+    ...createPlayerProfile({
+      id: "future-storage-normal-profile",
+      name: "TestUser123",
+      avatarId: "hedgehog",
+      gameSnapshot: journeyGames,
+      nowMs: 1,
+    }),
+    attempts: { [attempt.id]: attempt },
+    activeAttemptId: attempt.id,
+  };
+  const normalStorage = memoryStorage();
+  assert.equal(
+    saveProgressionState(
+      addPlayerProfile(createProgressionState(), normalProfile),
+      normalStorage,
+    ),
+    true,
+  );
+  const reloadedNormalProfile = loadProgressionState(normalStorage).profiles[0];
+  assert.equal(reloadedNormalProfile.activeAttemptId, null);
+  assert.deepEqual(reloadedNormalProfile.attempts, {});
+});
+
 test("schema-v1 culmination at a pristine section opener migrates to a pending intro", () => {
   const journey = buildJourneyPlan(journeyGames);
   const node = journey.boards[0].nodes.at(-1);

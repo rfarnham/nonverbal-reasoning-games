@@ -317,6 +317,50 @@ test("browser session preserves first attempts through retry and redemption", ()
   assert.equal(savedAttempt.rounds[0].firstTryCorrect, false);
 });
 
+test("browser session answers a future stop opened by the exact test profile", () => {
+  const gameAdapter = adapter();
+  const futureNode = buildJourneyPlan(journeyGames).boards[1].nodes[0];
+  const attempt = createNormalProgressionAttempt({
+    id: "future-test-browser-attempt",
+    node: futureNode,
+    campaignQuestions: campaignQuestionReferences(gameAdapter, "junior"),
+    nowMs: 2,
+  });
+  let profile = createPlayerProfile({
+    id: "future-test-browser-profile",
+    name: "testUser123",
+    avatarId: "hedgehog",
+    gameSnapshot: journeyGames,
+    nowMs: 1,
+  });
+  profile = upsertProfileAttempt(profile, attempt);
+  const storage = memoryStorage();
+  assert.equal(
+    saveProgressionState(
+      addPlayerProfile(createProgressionState(), profile),
+      storage,
+    ),
+    true,
+  );
+
+  let session = loadProgressionBrowserSession(gameAdapter, {
+    attemptId: attempt.id,
+    storage,
+  });
+  assert.equal(session.mode, "controlled");
+  assert.equal(session.current.round.id, "Junior-0");
+
+  session = answerProgressionBrowserSession(
+    gameAdapter,
+    attempt.id,
+    { correct: true, answerToken: "0", nowMs: 3 },
+    { storage },
+  );
+  assert.equal(session.mode, "controlled");
+  assert.equal(session.attempt.rounds[0].phase, "solved");
+  assert.equal(session.attempt.rounds[0].firstTryCorrect, true);
+});
+
 test("Turbo charges feedback and solved transitions but not explanation pauses", () => {
   const gameAdapter = adapter();
   const node = buildJourneyPlan(journeyGames).boards[0].nodes[2];
