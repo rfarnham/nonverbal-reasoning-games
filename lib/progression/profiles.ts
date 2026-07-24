@@ -10,6 +10,10 @@ import {
   questionReferenceIdentityKey,
 } from "./questions.ts";
 import {
+  canPlayerAccessJourneyNode,
+  isJourneyTestProfile,
+} from "./test-mode.ts";
+import {
   CURRENT_JOURNEY_PLAN_VERSION,
   PROGRESSION_SCHEMA_VERSION,
   type AttemptSettlement,
@@ -217,7 +221,7 @@ export function updatePlayerProfileIdentity(
   profile: PlayerProfile,
   changes: { name?: string; avatarId?: string; nowMs?: number },
 ): PlayerProfile {
-  return {
+  const updatedProfile = {
     ...profile,
     ...(changes.name === undefined
       ? {}
@@ -227,6 +231,32 @@ export function updatePlayerProfileIdentity(
       : { avatarId: requiredText(changes.avatarId, "Avatar ID") }),
     updatedAtMs: nowOrCurrent(changes.nowMs),
   };
+  const activeAttempt = updatedProfile.activeAttemptId
+    ? updatedProfile.attempts[updatedProfile.activeAttemptId]
+    : undefined;
+  if (
+    isJourneyTestProfile(profile) &&
+    !isJourneyTestProfile(updatedProfile) &&
+    activeAttempt &&
+    !isJourneyNodeUnlocked(
+      profileJourney(updatedProfile),
+      updatedProfile.clearedStopIds,
+      activeAttempt.stopId,
+    )
+  ) {
+    return activeAttempt.settlement
+      ? closeAttemptSummary(
+          updatedProfile,
+          activeAttempt.id,
+          changes.nowMs,
+        )
+      : discardActiveProgressionAttempt(
+          updatedProfile,
+          activeAttempt.id,
+          changes.nowMs,
+        );
+  }
+  return updatedProfile;
 }
 
 export function replacePlayerProfile(
@@ -295,7 +325,7 @@ export function upsertProfileAttempt(
     throw new Error("Attempt does not match a stop in this profile's journey.");
   }
   assertProgressionAttemptIntegrity(attempt, node);
-  if (!isJourneyNodeUnlocked(journey, profile.clearedStopIds, node.id)) {
+  if (!canPlayerAccessJourneyNode(profile, journey, node.id)) {
     throw new Error("Attempt belongs to a locked journey stop.");
   }
   const existing = profile.attempts[attempt.id];
@@ -458,19 +488,15 @@ export function settleProgressionAttempt(
       "Finish all questions and redemption before settling an attempt.",
     );
   }
-  if (
-    !isJourneyNodeUnlocked(
-      canonicalJourney,
-      profile.clearedStopIds,
-      canonicalNode.id,
-    )
-  ) {
+  if (!canPlayerAccessJourneyNode(profile, canonicalJourney, canonicalNode.id)) {
     throw new Error("A locked journey stop cannot settle.");
   }
 
   const now = nowOrCurrent(nowMs);
   const preliminary = summarizeAttempt(attempt, 0, now);
-  const firstAward = preliminary.passed &&
+  const recordsJourneyProgress = !isJourneyTestProfile(profile);
+  const firstAward = recordsJourneyProgress &&
+    preliminary.passed &&
     !profile.awardedStopIds.includes(canonicalNode.id);
   const settlement: AttemptSettlement = {
     ...preliminary,
@@ -484,7 +510,7 @@ export function settleProgressionAttempt(
   };
   const updatedProfile: PlayerProfile = {
     ...profile,
-    clearedStopIds: settlement.passed
+    clearedStopIds: recordsJourneyProgress && settlement.passed
       ? uniqueStrings([...profile.clearedStopIds, canonicalNode.id])
       : profile.clearedStopIds,
     awardedStopIds: firstAward

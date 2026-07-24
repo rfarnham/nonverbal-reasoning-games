@@ -392,6 +392,14 @@ handle blocked, corrupt, stale, and quota-exceeded storage without crashing.
 There are no accounts, cookies sent to a server, cloud sync, or remote runtime
 assets.
 
+For local QA, the exact, case-sensitive profile name `testUser123` enables a
+clearly labeled test mode. Test mode MUST make every real board and stop
+navigable, allow cleared-stop replay, and replace an unfinished test run when
+another stop is selected. It MUST NOT bypass canonical question/attempt
+validation, award XP, or change the Journey clear ledger. Renaming away from
+the sentinel MUST safely discard any active attempt that is locked under the
+profile's real progress.
+
 ## Infinite mode
 
 Infinite mode generates puzzles on demand and uses the same Starter, Junior,

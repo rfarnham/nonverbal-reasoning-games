@@ -312,7 +312,7 @@ test("Journey summary rebases writes, restores focus, and rejects mid-stop previ
   );
   assert.match(
     summary,
-    /if \(result\.settlement\.passed\)[\s\S]{0,1000}navigateToJourney\(\{ replace: true \}\)/,
+    /if \(result\.settlement\.passed \|\| resultTestingMode\)[\s\S]{0,1200}navigateToJourney\(\{ replace: true \}\)/,
   );
   assert.match(summary, /loaded\.attempt\.phase !== "summary"/);
   assert.match(launch, /window\.location\.replace\(target\)/);
@@ -323,7 +323,7 @@ test("Journey map keeps cleared stops non-gating and animates finite avatar trav
   const client = await source("components/progression/JourneyClient.tsx");
   const journeyStyles = await source("app/journey/journey.module.css");
   assert.doesNotMatch(client, /replay for practice/);
-  assert.match(client, /\(isCleared && !isActive\)/);
+  assert.match(client, /\(isCleared && !isActive && !testingMode\)/);
   assert.match(
     client,
     /activeNode \?\? nextNode \?\? finalJourneyNode\(journey\)/,
@@ -331,8 +331,8 @@ test("Journey map keeps cleared stops non-gating and animates finite avatar trav
   assert.match(client, /aria-current=\{isTrailPosition \? "step" : undefined\}/);
   assert.match(client, /setArrivalNodeId\(null\), 950/);
   assert.match(client, /scrollIntoView/);
-  assert.match(client, /viewedLevel !== trailNode\.journeyLevel/);
-  assert.doesNotMatch(client, /viewedLevel !== trailNode\.level/);
+  assert.match(client, /displayedLevel !== trailNode\.journeyLevel/);
+  assert.doesNotMatch(client, /displayedLevel !== trailNode\.level/);
   assert.match(client, /profile\.gameSnapshot\.find/);
   assert.doesNotMatch(client, /Math Kangaroo spatial review/);
   assert.match(client, /Restart stop/);
@@ -340,4 +340,52 @@ test("Journey map keeps cleared stops non-gating and animates finite avatar trav
   assert.match(journeyStyles, /\.walkerArriving/);
   assert.match(journeyStyles, /@keyframes walker-follow-path/);
   assert.match(journeyStyles, /\.profileButton > span:last-child/);
+});
+
+test("the exact test profile exposes free Journey navigation without recording progress", async () => {
+  const testMode = await source("lib/progression/test-mode.ts");
+  const client = await source("components/progression/JourneyClient.tsx");
+  const summary = await source(
+    "components/progression/JourneySummaryClient.tsx",
+  );
+  const journeyStyles = await source("app/journey/journey.module.css");
+
+  assert.match(
+    testMode,
+    /JOURNEY_TEST_PROFILE_NAME = "testUser123"/,
+  );
+  assert.match(
+    testMode,
+    /profile\.name === JOURNEY_TEST_PROFILE_NAME/,
+  );
+  assert.match(testMode, /if \(!findJourneyNode\(journey, stopId\)\) return false/);
+  assert.match(client, /<strong>Test mode<\/strong>/);
+  assert.match(client, /Path clears and XP are not\s+recorded/);
+  assert.match(client, /styles\.nodeTesting/);
+  assert.match(client, /!isActive && !testingMode/);
+  assert.match(client, /isCleared && !isActive && !testingMode/);
+  assert.match(
+    client,
+    /activeNode \?\? arrivalNode \?\? nextNode \?\? finalJourneyNode\(journey\)/,
+  );
+  assert.match(client, /testingMode && !activeNode && !arrivalNode/);
+  assert.match(
+    client,
+    /journey\.boards\.find\([\s\S]{0,120}viewedLevel[\s\S]{0,80}\?\? journey\.boards\[0\]!/,
+  );
+  assert.match(client, /const unlocked = Boolean\(\s*firstNode &&/);
+  assert.match(
+    client,
+    /existing\.settlement[\s\S]{0,180}closeAttemptSummary[\s\S]{0,180}discardActiveProgressionAttempt/,
+  );
+  assert.match(summary, /isJourneyTestProfile\(profile\)/);
+  assert.match(summary, /"Finish test run"/);
+  assert.match(summary, /"Back to test map"/);
+  assert.match(summary, /Path clears and XP were not recorded/);
+  assert.match(
+    summary,
+    /markJourneyArrival\(nextProfile\.id, result\.attempt\.stopId\)/,
+  );
+  assert.match(journeyStyles, /\.testingBanner/);
+  assert.match(journeyStyles, /\.nodeTesting/);
 });

@@ -314,6 +314,27 @@
   padding: 56px 0 100px;
 }
 
+.testingBanner {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid #9a6a00;
+  border-radius: 16px;
+  background: #fff2bd;
+  color: #594000;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.testingBanner strong {
+  flex: 0 0 auto;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
 .boardTabs {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
@@ -513,6 +534,13 @@
   color: #7d796f;
   box-shadow: 4px 5px 0 #aaa599;
   filter: saturate(0.25);
+}
+
+.nodeTesting {
+  border-color: var(--journey-focus);
+  background: #e8f3ff;
+  color: #0b5798;
+  box-shadow: 5px 6px 0 #5799ee;
 }
 
 .nodeTurbo {
@@ -887,6 +915,12 @@
     padding: 22px 17px 26px;
     border-radius: 21px;
     box-shadow: 5px 6px 0 var(--journey-ink);
+  }
+
+  .testingBanner {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
   }
 
   .nodeList {
