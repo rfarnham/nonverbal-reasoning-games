@@ -30,11 +30,11 @@ export function cosmeticJourneyLevelForXp(
   xp: number,
 ): CosmeticJourneyLevel {
   const normalizedXp = Number.isFinite(xp) ? Math.max(0, xp) : 0;
-  return (
-    COSMETIC_JOURNEY_LEVELS.findLast(
-      (milestone) => normalizedXp >= milestone.xpRequired,
-    ) ?? COSMETIC_JOURNEY_LEVELS[0]!
-  );
+  for (let index = COSMETIC_JOURNEY_LEVELS.length - 1; index >= 0; index -= 1) {
+    const milestone = COSMETIC_JOURNEY_LEVELS[index]!;
+    if (normalizedXp >= milestone.xpRequired) return milestone;
+  }
+  return COSMETIC_JOURNEY_LEVELS[0]!;
 }
 
 export function cosmeticJourneyLevelCrossed(

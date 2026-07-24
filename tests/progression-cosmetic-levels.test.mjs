@@ -31,6 +31,28 @@ test("cosmetic levels derive from lifetime XP without changing progression", () 
   assert.equal(cosmeticJourneyLevelForXp(47_575).level, 16);
 });
 
+test("cosmetic levels work in legacy browsers without Array.findLast", () => {
+  const descriptor = Object.getOwnPropertyDescriptor(
+    Array.prototype,
+    "findLast",
+  );
+  try {
+    Object.defineProperty(Array.prototype, "findLast", {
+      configurable: true,
+      value: undefined,
+      writable: true,
+    });
+    assert.equal(cosmeticJourneyLevelForXp(6_000).level, 9);
+    assert.equal(cosmeticJourneyLevelCrossed(5_975, 6_000)?.level, 9);
+  } finally {
+    if (descriptor) {
+      Object.defineProperty(Array.prototype, "findLast", descriptor);
+    } else {
+      delete Array.prototype.findLast;
+    }
+  }
+});
+
 test("a splash is requested only when an XP award crosses a milestone", () => {
   assert.equal(cosmeticJourneyLevelCrossed(25, 50), null);
   assert.equal(cosmeticJourneyLevelCrossed(100, 125), null);
