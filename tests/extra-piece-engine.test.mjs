@@ -7,12 +7,18 @@ import {
   DIFFICULTY_RULES,
   ROUNDS,
   PuzzleGenerationError,
+  enumeratePiecePlacements,
   generateInfiniteRound,
   isChiral,
   pieceCanonicalKey,
   possibleExtraIndexes,
   reflectPieceCells,
+  rotatePieceCells,
   roundFingerprint,
+  solveRound,
+  starterInventoryMatchIndexes,
+  starterInventoryResidual,
+  starterSymbolInventory,
   validateRound,
 } from "../app/games/extra-piece/game-engine.ts";
 import { JOURNEY_EXTRA_CAMPAIGN_ROUNDS } from "../app/games/extra-piece/journey-campaign.ts";
@@ -98,8 +104,15 @@ test("the curriculum stays monochrome while increasing size and chirality", () =
         .filter((_, index) => index !== round.correctIndex)
         .map(({ cells }) => cells.length)
         .sort();
+      const motifs = new Set(
+        round.board.map(({ mark }) => mark.motif),
+      );
       return (
-        round.board.every(({ mark }) => mark.motif === "none") &&
+        round.scaffold === "symbols" &&
+        ["arrow", "circle", "diamond", "star"].every((motif) =>
+          motifs.has(motif),
+        ) &&
+        motifs.size === 4 &&
         String(usedAreas) === "3,4,4,5" &&
         round.pieces[round.correctIndex].cells.length === 4 &&
         round.pieces.filter(({ cells }) => cells.length === 4).length === 3
@@ -153,6 +166,34 @@ test("the curriculum stays monochrome while increasing size and chirality", () =
   }
 });
 
+test("Starter mirrors the source question's zero-backtracking symbol strategy", () => {
+  for (const round of roundsAt("Easy")) {
+    assert.deepEqual(starterInventoryMatchIndexes(round), [
+      round.correctIndex,
+    ]);
+    assert.deepEqual(
+      starterInventoryResidual(round),
+      starterSymbolInventory(
+        round.pieces[round.correctIndex].cells,
+      ),
+    );
+
+    const shapeOnlyRound = {
+      ...round,
+      scaffold: "silhouette",
+    };
+    assert.ok(possibleExtraIndexes(shapeOnlyRound).length >= 2);
+
+    const forcedUsedPieces = round.pieces.filter(
+      (_, pieceIndex) =>
+        pieceIndex !== round.correctIndex &&
+        enumeratePiecePlacements(round, pieceIndex).length === 1,
+    );
+    assert.ok(forcedUsedPieces.length >= 2);
+    assert.equal(solveRound(round, 2, round.correctIndex).length, 1);
+  }
+});
+
 test("every puzzle proves one and only one possible extra piece", () => {
   for (const round of ROUNDS) {
     assert.deepEqual(possibleExtraIndexes(round), [round.correctIndex]);
@@ -180,11 +221,60 @@ test("fingerprints ignore option order and input-piece rotation", () => {
     ...round,
     pieces: round.pieces.map((piece) => ({
       ...piece,
-      cells: piece.cells.map((cell) => ({ ...cell })),
+      cells: rotatePieceCells(piece.cells, 1),
     })),
   };
   assert.equal(roundFingerprint(reversed), roundFingerprint(round));
   assert.equal(roundFingerprint(rotated), roundFingerprint(round));
+});
+
+test("visible picture symbols and arrow turns are part of the puzzle state", () => {
+  const round = roundsAt("Easy")[0];
+  const changedBoard = round.board.map((cell, index) =>
+    index === 0
+      ? {
+          ...cell,
+          mark: {
+            ...cell.mark,
+            motif:
+              cell.mark.motif === "star" ? "diamond" : "star",
+          },
+        }
+      : cell,
+  );
+  assert.notEqual(
+    roundFingerprint({ ...round, board: changedBoard }),
+    roundFingerprint(round),
+  );
+
+  const arrow = {
+    x: 0,
+    y: 0,
+    mark: { color: "ink", motif: "arrow", orientation: 0 },
+  };
+  const [turnedArrow] = rotatePieceCells([arrow], 1);
+  assert.equal(turnedArrow.mark.orientation, 1);
+
+  const headingChanged = {
+    ...round,
+    pieces: round.pieces.map((piece) => ({
+      ...piece,
+      cells: piece.cells.map((cell) => ({
+        ...cell,
+        mark:
+          cell.mark.motif === "arrow"
+            ? {
+                ...cell.mark,
+                orientation: (cell.mark.orientation + 1) % 4,
+              }
+            : cell.mark,
+      })),
+    })),
+  };
+  assert.deepEqual(
+    starterInventoryResidual(headingChanged),
+    starterInventoryResidual(round),
+  );
 });
 
 test("Infinite generation is deterministic and valid across a broad corpus", {
@@ -290,6 +380,10 @@ test("the route exposes semantic choices, shortcuts, and reduced motion", async 
   assert.match(page, /aria-live="polite"/);
   assert.match(page, /readSoundPreference/);
   assert.match(page, /ProgressionGameHud/);
+  assert.match(page, /motif === "star"/);
+  assert.match(page, /motif === "diamond"/);
+  assert.match(page, /motif === "circle"/);
+  assert.match(page, /Count the symbols first/);
   assert.match(css, /@media \(max-width: 820px\)/);
   assert.match(css, /@media \(max-width: 620px\)/);
   assert.match(css, /@media \(max-width: 390px\)/);

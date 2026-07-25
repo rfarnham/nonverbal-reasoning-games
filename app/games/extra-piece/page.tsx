@@ -47,6 +47,7 @@ import {
   type Difficulty,
   type ExtraPieceRound,
   type Mark,
+  type Motif,
   type Piece,
   type PiecePlacement,
   type QuarterTurn,
@@ -263,14 +264,114 @@ function Chevron({
   );
 }
 
+function starPoints(
+  centerX: number,
+  centerY: number,
+  outerRadius: number,
+) {
+  const innerRadius = outerRadius * 0.46;
+  return Array.from({ length: 10 }, (_, index) => {
+    const radius = index % 2 === 0 ? outerRadius : innerRadius;
+    const angle = -Math.PI / 2 + (index * Math.PI) / 5;
+    return `${centerX + Math.cos(angle) * radius},${
+      centerY + Math.sin(angle) * radius
+    }`;
+  }).join(" ");
+}
+
+function MotifMark({
+  x,
+  y,
+  size,
+  motif,
+  orientation,
+}: {
+  x: number;
+  y: number;
+  size: number;
+  motif: Motif;
+  orientation: QuarterTurn;
+}) {
+  if (motif === "none") return null;
+  if (motif === "chevron") {
+    return (
+      <Chevron
+        x={x}
+        y={y}
+        size={size}
+        orientation={orientation}
+      />
+    );
+  }
+
+  const centerX = x + size / 2;
+  const centerY = y + size / 2;
+  const radius = size * 0.23;
+  const strokeWidth = Math.max(2, size * 0.065);
+  const shared = {
+    fill: "none",
+    stroke: "#17213d",
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    strokeWidth,
+  };
+
+  if (motif === "star") {
+    return (
+      <polygon
+        {...shared}
+        points={starPoints(centerX, centerY, radius * 1.08)}
+      />
+    );
+  }
+  if (motif === "diamond") {
+    return (
+      <polygon
+        {...shared}
+        points={`${centerX},${centerY - radius} ${
+          centerX + radius
+        },${centerY} ${centerX},${centerY + radius} ${
+          centerX - radius
+        },${centerY}`}
+      />
+    );
+  }
+  if (motif === "circle") {
+    return (
+      <circle
+        {...shared}
+        cx={centerX}
+        cy={centerY}
+        r={radius * 0.82}
+      />
+    );
+  }
+  return (
+    <g
+      transform={`rotate(${orientation * 90} ${centerX} ${centerY})`}
+    >
+      <path
+        {...shared}
+        d={`M ${centerX} ${centerY + radius} V ${
+          centerY - radius * 0.42
+        } M ${centerX - radius * 0.58} ${
+          centerY - radius * 0.02
+        } L ${centerX} ${centerY - radius} L ${
+          centerX + radius * 0.58
+        } ${centerY - radius * 0.02}`}
+      />
+    </g>
+  );
+}
+
 function pieceLabel(piece: Piece, optionNumber?: number) {
   const prefix =
     optionNumber === undefined ? "A candidate piece" : `Piece ${optionNumber}`;
   const motifs = piece.cells.filter(
-    ({ mark }) => mark.motif === "chevron",
+    ({ mark }) => mark.motif !== "none",
   ).length;
   return `${prefix} made from ${piece.cells.length} joined squares${
-    motifs > 0 ? " with directional marks" : ""
+    motifs > 0 ? " with monochrome picture symbols" : ""
   }. Inspect its visual shape.`;
 }
 
@@ -314,11 +415,12 @@ function PieceVisual({
               stroke="#17213d"
               strokeWidth="2.4"
             />
-            {mark.motif === "chevron" ? (
-              <Chevron
+            {mark.motif !== "none" ? (
+              <MotifMark
                 x={cellX}
                 y={cellY}
                 size={unit}
+                motif={mark.motif}
                 orientation={mark.orientation}
               />
             ) : null}
@@ -376,7 +478,11 @@ function BoardVisual({
       }`}
       viewBox={`0 0 ${size} ${size}`}
       role="img"
-      aria-label={`A ${round.boardSize} by ${round.boardSize} target square. Work out which candidate pieces can fill it without overlaps or gaps.`}
+      aria-label={`A ${round.boardSize} by ${round.boardSize} target square${
+        round.scaffold === "symbols"
+          ? " marked with repeated stars, diamonds, circles, and arrows"
+          : ""
+      }. Work out which candidate pieces can fill it without overlaps or gaps.`}
     >
       {round.board.map(({ x, y, mark }) => {
         const placement = solutionAt.get(`${x},${y}`);
@@ -423,11 +529,12 @@ function BoardVisual({
               }
               strokeWidth={isHighlighted ? 4 : 2}
             />
-            {visibleMark?.motif === "chevron" ? (
-              <Chevron
+            {visibleMark && visibleMark.motif !== "none" ? (
+              <MotifMark
                 x={x * cellSize}
                 y={y * cellSize}
                 size={cellSize}
+                motif={visibleMark.motif}
                 orientation={visibleMark.orientation}
               />
             ) : null}
@@ -1359,7 +1466,8 @@ export default function ExtraPiecePage() {
             <p className={styles.kicker}>Example</p>
             <h1 id="tutorial-title">Which piece is left over?</h1>
             <p className={styles.exampleRule}>
-              Turn pieces to fill the square. Do not flip them over.
+              Count the symbols first. Then turn pieces to match them.
+              Do not flip them over.
             </p>
             <div className={styles.exampleFlow}>
               <div className={styles.exampleBoard}>
@@ -1720,7 +1828,9 @@ export default function ExtraPiecePage() {
                   <p className={styles.kicker}>Build the square</p>
                   <h1 id="round-prompt">Which piece is left over?</h1>
                   <span className={styles.turnRule}>
-                    ↻ Turn only · no flipping
+                    {round.difficulty === "Easy"
+                      ? "↻ Match symbols · turn only · no flipping"
+                      : "↻ Turn only · no flipping"}
                   </span>
                 </section>
                 <div
@@ -1854,7 +1964,9 @@ export default function ExtraPiecePage() {
                         Correct
                       </strong>
                       <span className={styles.feedbackDetail}>
-                        Every other piece fills the square.
+                        {round.difficulty === "Easy"
+                          ? "The other pieces contain exactly the symbols the square needs."
+                          : "Every other piece fills the square."}
                       </span>
                       <button
                         className={styles.nextButton}
