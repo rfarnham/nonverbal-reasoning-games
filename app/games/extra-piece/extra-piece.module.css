@@ -572,14 +572,6 @@
   opacity: 0.45;
 }
 
-.unknownPatternMark {
-  fill: var(--ink);
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  font-size: 30px;
-  font-weight: 900;
-  pointer-events: none;
-}
-
 .solutionRegionLabel circle {
   fill: var(--ink);
   stroke: var(--panel);
