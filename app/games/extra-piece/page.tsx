@@ -514,7 +514,7 @@ function BoardVisual({
                 : ""
             }${
               unknownCount > 0
-                ? `, including ${unknownCount} gray question-mark cells that accept any symbol`
+                ? `, including ${unknownCount} dotted gray wildcard cells that accept any symbol`
                 : ""
             }. Work out which candidate pieces can fill it without overlaps or gaps.`
       }
@@ -562,7 +562,8 @@ function BoardVisual({
               rx="3"
               fill={isHighlighted ? "#f7cbc5" : fill}
               fillOpacity="1"
-              strokeDasharray={showUnknown ? "7 5" : undefined}
+              strokeDasharray={showUnknown ? "2 6" : undefined}
+              strokeLinecap={showUnknown ? "round" : undefined}
               stroke={
                 isHighlighted
                   ? "#bf493e"
@@ -582,18 +583,6 @@ function BoardVisual({
                 motif={visibleMark.motif}
                 orientation={visibleMark.orientation}
               />
-            ) : null}
-            {showUnknown ? (
-              <text
-                className={styles.unknownPatternMark}
-                x={x * cellSize + cellSize / 2}
-                y={y * cellSize + cellSize / 2}
-                textAnchor="middle"
-                dominantBaseline="central"
-                aria-hidden="true"
-              >
-                ?
-              </text>
             ) : null}
             {revealSolution &&
             showSolutionLabels &&
@@ -2075,7 +2064,7 @@ export default function ExtraPiecePage() {
                   <h1 id="round-prompt">Which piece is left over?</h1>
                   <span className={styles.turnRule}>
                     {hiddenPatternCount(round) > 0
-                      ? `? = any symbol · ${hiddenPatternCount(
+                      ? `Dotted gray cells = any symbol · ${hiddenPatternCount(
                           round,
                         )} open cells · turn only · no flipping`
                       : round.difficulty === "Medium"

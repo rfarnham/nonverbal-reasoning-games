@@ -1,5 +1,5 @@
 export const progressionMetadata = {
-  contentVersion: "3",
-  generatorVersion: "3",
-  journeyContentVersion: "3",
+  contentVersion: "4",
+  generatorVersion: "4",
+  journeyContentVersion: "4",
 } as const;

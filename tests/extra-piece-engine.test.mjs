@@ -246,6 +246,46 @@ test("Starter and Junior use the source question's zero-backtracking symbol stra
   }
 });
 
+test("Starter shuffles all four symbols instead of fixing arrows to one edge", () => {
+  const starters = roundsAt("Easy");
+  const arrowSignatures = starters.map((round) =>
+    round.board
+      .filter(({ mark }) => mark.motif === "arrow")
+      .map(({ x, y }) => `${x},${y}`)
+      .sort()
+      .join(";"),
+  );
+  const signatureCounts = [...new Set(arrowSignatures)].map(
+    (signature) =>
+      arrowSignatures.filter((candidate) => candidate === signature)
+        .length,
+  );
+
+  assert.ok(new Set(arrowSignatures).size >= 6);
+  assert.ok(Math.max(...signatureCounts) <= 3);
+  assert.ok(
+    starters.filter((round) =>
+      round.board
+        .filter(({ x }) => x === round.boardSize - 1)
+        .every(({ mark }) => mark.motif === "arrow"),
+    ).length <= 2,
+  );
+  for (let y = 0; y < 4; y += 1) {
+    for (let x = 0; x < 4; x += 1) {
+      assert.ok(
+        new Set(
+          starters.map(
+            (round) =>
+              round.board.find(
+                (cell) => cell.x === x && cell.y === y,
+              ).mark.motif,
+          ),
+        ).size >= 2,
+      );
+    }
+  }
+});
+
 test("Expert and Wizard unknowns remove shortcuts without removing the proof", () => {
   for (const difficulty of ["Hard", "Wizard"]) {
     const rules = DIFFICULTY_RULES[difficulty];
@@ -632,11 +672,11 @@ test("the Journey adapter resolves Campaign and generated references", () => {
   assert.equal(validateRound(generated).valid, true);
 });
 
-test("the changed Campaign, generator, and Journey banks use version 3", () => {
+test("the changed Campaign, generator, and Journey banks use version 4", () => {
   assert.deepEqual(progressionMetadata, {
-    contentVersion: "3",
-    generatorVersion: "3",
-    journeyContentVersion: "3",
+    contentVersion: "4",
+    generatorVersion: "4",
+    journeyContentVersion: "4",
   });
 });
 
@@ -663,9 +703,11 @@ test("the route exposes semantic choices, shortcuts, and reduced motion", async 
   assert.match(page, /motif === "diamond"/);
   assert.match(page, /motif === "circle"/);
   assert.match(page, /Count the symbols first/);
-  assert.match(page, /\? = any symbol/);
-  assert.match(page, /gray question-mark cells that accept any symbol/);
-  assert.match(page, /unknownPatternMark/);
+  assert.match(page, /Dotted gray cells = any symbol/);
+  assert.match(page, /dotted gray wildcard cells that accept any symbol/);
+  assert.doesNotMatch(page, /unknownPatternMark/);
+  assert.match(page, /strokeDasharray=\{showUnknown \? "2 6"/);
+  assert.match(page, /strokeLinecap=\{showUnknown \? "round"/);
   assert.match(page, /aria-pressed=\{marked\}/);
   assert.match(page, /data-working-cell=/);
   assert.match(page, /Use arrow keys to move and Space to mark/);
@@ -675,7 +717,7 @@ test("the route exposes semantic choices, shortcuts, and reduced motion", async 
   assert.match(page, /Clear marks/);
   assert.match(page, /matchedFill=\{matchedFill\}/);
   assert.match(page, /solutionRegionLabel/);
-  assert.match(css, /\.unknownPatternMark/);
+  assert.doesNotMatch(css, /\.unknownPatternMark/);
   assert.match(css, /\.workingCellButton:focus-visible/);
   assert.match(css, /\.workingCellButton\[aria-pressed="true"\]/);
   assert.match(css, /\.solutionRegionLabel/);

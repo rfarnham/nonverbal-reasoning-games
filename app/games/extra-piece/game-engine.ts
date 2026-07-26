@@ -592,18 +592,15 @@ function marksForRegions(
       : FIVE_BY_FIVE_SYMBOL_TEMPLATES;
   const symbolTemplate =
     symbolTemplates[randomIndex(symbolTemplates.length, random)];
-  const symmetricSymbols =
+  const templateSymbols =
     scaffold === "symbols"
-      ? shuffled(
-          ["star", "diamond", "circle"] as const,
-          random,
-        )
-      : (["star", "diamond", "circle"] as const);
+      ? shuffled(STARTER_SYMBOLS, random)
+      : STARTER_SYMBOLS;
   const starterSymbolByCode: Readonly<Record<string, Motif>> = {
-    S: symmetricSymbols[0],
-    D: symmetricSymbols[1],
-    C: symmetricSymbols[2],
-    A: "arrow",
+    S: templateSymbols[0],
+    D: templateSymbols[1],
+    C: templateSymbols[2],
+    A: templateSymbols[3],
   };
   const arrowOrientation =
     scaffold === "symbols"
@@ -1766,7 +1763,7 @@ export function analyzeWrongAttempt(
     );
     const unknownCopy =
       hasHiddenPatterns && crossesUnknownPattern
-        ? ", including across the ? cells"
+        ? ", including across the dotted gray cells"
         : "";
     return {
       placement,
