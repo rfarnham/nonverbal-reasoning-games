@@ -25,6 +25,17 @@ import { JOURNEY_EXTRA_CAMPAIGN_ROUNDS } from "../app/games/extra-piece/journey-
 import { progressionAdapter } from "../app/games/extra-piece/progression-adapter.ts";
 import { progressionMetadata } from "../app/games/extra-piece/progression-metadata.ts";
 import {
+  SOLUTION_PRESENTATIONS,
+  solutionCellAssignments,
+  solutionPresentationForPiece,
+} from "../app/games/extra-piece/solution-presentation.ts";
+import {
+  EMPTY_WORKING_GRID,
+  clearWorkingCells,
+  toggleWorkingCell,
+  workingCellsForRound,
+} from "../app/games/extra-piece/working-grid.ts";
+import {
   campaignQuestionReferences,
   resolveProgressionQuestion,
 } from "../lib/progression/game-adapter.ts";
@@ -317,6 +328,89 @@ test("every puzzle proves one and only one possible extra piece", () => {
   }
 });
 
+test("the working grid toggles and clears marks without affecting other rounds", () => {
+  const firstToggle = toggleWorkingCell(
+    EMPTY_WORKING_GRID,
+    "round-a",
+    "0,0",
+  );
+  assert.deepEqual(workingCellsForRound(EMPTY_WORKING_GRID, "round-a"), []);
+  assert.deepEqual(workingCellsForRound(firstToggle, "round-a"), ["0,0"]);
+
+  const twoRounds = toggleWorkingCell(firstToggle, "round-b", "2,3");
+  const twoMarks = toggleWorkingCell(twoRounds, "round-a", "1,0");
+  assert.deepEqual(workingCellsForRound(twoMarks, "round-a"), [
+    "0,0",
+    "1,0",
+  ]);
+  assert.deepEqual(workingCellsForRound(twoMarks, "round-b"), ["2,3"]);
+
+  const toggledOff = toggleWorkingCell(twoMarks, "round-a", "0,0");
+  assert.deepEqual(workingCellsForRound(toggledOff, "round-a"), ["1,0"]);
+  assert.deepEqual(workingCellsForRound(twoMarks, "round-a"), [
+    "0,0",
+    "1,0",
+  ]);
+
+  const cleared = clearWorkingCells(toggledOff, "round-a");
+  assert.deepEqual(workingCellsForRound(cleared, "round-a"), []);
+  assert.deepEqual(workingCellsForRound(cleared, "round-b"), ["2,3"]);
+  assert.equal(clearWorkingCells(cleared, "missing"), cleared);
+});
+
+test("solved layouts color every target cell and uniquely match every used piece", () => {
+  const allRounds = [
+    ...ROUNDS,
+    ...Object.values(JOURNEY_EXTRA_CAMPAIGN_ROUNDS).flat(),
+  ];
+  for (const round of allRounds) {
+    const assignments = solutionCellAssignments(round);
+    const usedPieceIndexes = round.solution
+      .map(({ pieceIndex }) => pieceIndex)
+      .sort((left, right) => left - right);
+    const presentedPieceIndexes = [
+      ...new Set(assignments.map(({ pieceIndex }) => pieceIndex)),
+    ].sort((left, right) => left - right);
+    const presentationIds = usedPieceIndexes.map(
+      (pieceIndex) => solutionPresentationForPiece(pieceIndex).id,
+    );
+
+    assert.equal(assignments.length, round.boardSize ** 2);
+    assert.equal(
+      new Set(assignments.map(({ key }) => key)).size,
+      round.boardSize ** 2,
+    );
+    assert.deepEqual(presentedPieceIndexes, usedPieceIndexes);
+    assert.equal(usedPieceIndexes.includes(round.correctIndex), false);
+    assert.equal(
+      new Set(presentationIds).size,
+      usedPieceIndexes.length,
+    );
+    for (const assignment of assignments) {
+      assert.equal(
+        assignment.presentationId,
+        solutionPresentationForPiece(assignment.pieceIndex).id,
+      );
+    }
+  }
+
+  assert.equal(SOLUTION_PRESENTATIONS.length, 6);
+  assert.notEqual(
+    solutionPresentationForPiece(0).id,
+    solutionPresentationForPiece(5).id,
+  );
+  assert.ok(
+    ROUNDS.some(
+      (round) =>
+        round.pieces.length === 6 &&
+        round.correctIndex !== 0 &&
+        round.correctIndex !== 5 &&
+        round.solution.some(({ pieceIndex }) => pieceIndex === 0) &&
+        round.solution.some(({ pieceIndex }) => pieceIndex === 5),
+    ),
+  );
+});
+
 test("validation rejects hidden-pattern curriculum drift", () => {
   const starter = roundsAt("Easy")[0];
   const starterWithUnknown = {
@@ -572,7 +666,19 @@ test("the route exposes semantic choices, shortcuts, and reduced motion", async 
   assert.match(page, /\? = any symbol/);
   assert.match(page, /gray question-mark cells that accept any symbol/);
   assert.match(page, /unknownPatternMark/);
+  assert.match(page, /aria-pressed=\{marked\}/);
+  assert.match(page, /data-working-cell=/);
+  assert.match(page, /Use arrow keys to move and Space to mark/);
+  assert.match(page, /event\.key === "Enter"/);
+  assert.match(page, /event\.key === "Space"/);
+  assert.match(page, /Select squares to mark what you’ve checked/);
+  assert.match(page, /Clear marks/);
+  assert.match(page, /matchedFill=\{matchedFill\}/);
+  assert.match(page, /solutionRegionLabel/);
   assert.match(css, /\.unknownPatternMark/);
+  assert.match(css, /\.workingCellButton:focus-visible/);
+  assert.match(css, /\.workingCellButton\[aria-pressed="true"\]/);
+  assert.match(css, /\.solutionRegionLabel/);
   assert.match(css, /@media \(max-width: 820px\)/);
   assert.match(css, /@media \(max-width: 620px\)/);
   assert.match(css, /@media \(max-width: 390px\)/);

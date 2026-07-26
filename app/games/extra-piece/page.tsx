@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 
 import { ProgressionGameHud } from "@/components/progression/ProgressionGameHud";
@@ -56,6 +57,14 @@ import {
 } from "./game-engine";
 import { extraPieceGame } from "./game-info";
 import { progressionAdapter } from "./progression-adapter";
+import { solutionPresentationForPiece } from "./solution-presentation";
+import {
+  EMPTY_WORKING_GRID,
+  clearWorkingCells,
+  toggleWorkingCell,
+  workingCellsForRound,
+  type WorkingGridState,
+} from "./working-grid";
 import styles from "./extra-piece.module.css";
 
 type GamePhase = "idle" | "animating" | "wrong-review" | "answered";
@@ -101,13 +110,6 @@ const WRONG_REVIEW_MS = 2200;
 const REDUCED_WRONG_REVIEW_MS = 1300;
 const CAMPAIGN_PROBLEMS_PER_LEVEL = 12;
 const CAMPAIGN_TOTAL = 48;
-const SOLUTION_FILLS = [
-  "#fffdf8",
-  "#ece9e1",
-  "#d9dcd7",
-  "#f5f2eb",
-  "#c9ceca",
-] as const;
 
 const CAMPAIGN_LEVELS: ReadonlyArray<{
   id: CampaignLevelId;
@@ -380,11 +382,13 @@ function PieceVisual({
   piece,
   scaffold,
   optionNumber,
+  matchedFill = null,
   className = "",
 }: {
   piece: Piece;
   scaffold: Scaffold;
   optionNumber?: number;
+  matchedFill?: string | null;
   className?: string;
 }) {
   const { width, height } = pieceBounds(piece);
@@ -395,14 +399,19 @@ function PieceVisual({
       className={`${styles.pieceVisual} ${className}`}
       viewBox={`0 0 ${width * unit + pad * 2} ${height * unit + pad * 2}`}
       role="img"
-      aria-label={pieceLabel(piece, optionNumber)}
+      aria-label={`${pieceLabel(piece, optionNumber)}${
+        matchedFill && optionNumber !== undefined
+          ? ` It is color-matched to board region ${optionNumber}.`
+          : ""
+      }`}
       preserveAspectRatio="xMidYMid meet"
     >
       {piece.cells.map(({ x, y, mark }, index) => {
         const cellX = x * unit + pad;
         const cellY = y * unit + pad;
-        const fill =
-          scaffold === "color" || scaffold === "color-orientation"
+        const fill = matchedFill
+          ? matchedFill
+          : scaffold === "color" || scaffold === "color-orientation"
             ? FILL_BY_COLOR[mark.color]
             : "#fffdf8";
         return (
@@ -451,11 +460,13 @@ function markForPlacedCell(
 function BoardVisual({
   round,
   revealSolution = false,
+  showSolutionLabels = true,
   highlightedPlacement = null,
   compact = false,
 }: {
   round: ExtraPieceRound;
   revealSolution?: boolean;
+  showSolutionLabels?: boolean;
   highlightedPlacement?: PiecePlacement | null;
   compact?: boolean;
 }) {
@@ -463,10 +474,20 @@ function BoardVisual({
   const size = round.boardSize * cellSize;
   const unknownCount = hiddenPatternCount(round);
   const solutionAt = new Map<string, PiecePlacement>();
+  const solutionLabelAt = new Map<string, PiecePlacement>();
   if (revealSolution) {
     for (const placement of round.solution) {
       for (const cell of placement.cells) {
         solutionAt.set(`${cell.x},${cell.y}`, placement);
+      }
+      const labelCell = [...placement.cells].sort(
+        (left, right) => left.y - right.y || left.x - right.x,
+      )[0];
+      if (labelCell) {
+        solutionLabelAt.set(
+          `${labelCell.x},${labelCell.y}`,
+          placement,
+        );
       }
     }
   }
@@ -480,29 +501,36 @@ function BoardVisual({
       }`}
       viewBox={`0 0 ${size} ${size}`}
       role="img"
-      aria-label={`A ${round.boardSize} by ${round.boardSize} target square${
-        round.scaffold === "symbols"
-          ? " marked with repeated stars, diamonds, circles, and arrows"
-          : ""
-      }${
-        unknownCount > 0
-          ? `, including ${unknownCount} gray question-mark cells that accept any symbol`
-          : ""
-      }. Work out which candidate pieces can fill it without overlaps or gaps.`}
+      aria-label={
+        revealSolution
+          ? `Solved ${round.boardSize} by ${round.boardSize} square. ${
+              showSolutionLabels
+                ? "Each colored region is labeled with its matching piece number."
+                : "Colored regions show the completed tiling."
+            } Piece ${round.correctIndex + 1} is left over.`
+          : `A ${round.boardSize} by ${round.boardSize} target square${
+              round.scaffold === "symbols"
+                ? " marked with repeated stars, diamonds, circles, and arrows"
+                : ""
+            }${
+              unknownCount > 0
+                ? `, including ${unknownCount} gray question-mark cells that accept any symbol`
+                : ""
+            }. Work out which candidate pieces can fill it without overlaps or gaps.`
+      }
     >
       {round.board.map(({ x, y, mark, hidden }) => {
         const placement = solutionAt.get(`${x},${y}`);
-        const solutionFill = placement
-          ? SOLUTION_FILLS[
-              placement.pieceIndex % SOLUTION_FILLS.length
-            ]
+        const matchedFill = placement
+          ? solutionPresentationForPiece(placement.pieceIndex).fill
           : null;
+        const solutionLabel = solutionLabelAt.get(`${x},${y}`);
         const isHighlighted = highlighted.has(`${x},${y}`);
         const showUnknown =
           Boolean(hidden) && !revealSolution && !isHighlighted;
         const fill =
-          revealSolution && solutionFill
-            ? solutionFill
+          revealSolution && matchedFill
+            ? matchedFill
             : showUnknown
               ? "#e4e0d7"
               : round.scaffold === "color" ||
@@ -533,7 +561,7 @@ function BoardVisual({
               height={cellSize - 3}
               rx="3"
               fill={isHighlighted ? "#f7cbc5" : fill}
-              fillOpacity={revealSolution ? 0.72 : 1}
+              fillOpacity="1"
               strokeDasharray={showUnknown ? "7 5" : undefined}
               stroke={
                 isHighlighted
@@ -567,10 +595,170 @@ function BoardVisual({
                 ?
               </text>
             ) : null}
+            {revealSolution &&
+            showSolutionLabels &&
+            solutionLabel ? (
+              <g
+                className={styles.solutionRegionLabel}
+                aria-hidden="true"
+              >
+                <circle
+                  cx={x * cellSize + 11}
+                  cy={y * cellSize + 11}
+                  r="9"
+                />
+                <text
+                  x={x * cellSize + 11}
+                  y={y * cellSize + 11}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                >
+                  {solutionLabel.pieceIndex + 1}
+                </text>
+              </g>
+            ) : null}
           </g>
         );
       })}
     </svg>
+  );
+}
+
+function moveWorkingCellFocus(
+  event: ReactKeyboardEvent<HTMLButtonElement>,
+  x: number,
+  y: number,
+  boardSize: number,
+) {
+  const movement: Readonly<Record<string, readonly [number, number]>> = {
+    ArrowLeft: [-1, 0],
+    ArrowRight: [1, 0],
+    ArrowUp: [0, -1],
+    ArrowDown: [0, 1],
+  };
+  const delta = movement[event.key];
+  if (!delta) return;
+  event.preventDefault();
+  const nextX = Math.max(
+    0,
+    Math.min(boardSize - 1, x + delta[0]),
+  );
+  const nextY = Math.max(
+    0,
+    Math.min(boardSize - 1, y + delta[1]),
+  );
+  const nextButton =
+    event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(
+      `button[data-working-cell="${nextX}-${nextY}"]`,
+    );
+  nextButton?.focus();
+}
+
+function WorkingBoard({
+  round,
+  workingCells,
+  interactive,
+  revealSolution,
+  highlightedPlacement,
+  onToggle,
+  onClear,
+}: {
+  round: ExtraPieceRound;
+  workingCells: ReadonlySet<string>;
+  interactive: boolean;
+  revealSolution: boolean;
+  highlightedPlacement: PiecePlacement | null;
+  onToggle: (cellKey: string) => void;
+  onClear: () => void;
+}) {
+  const markedCount = workingCells.size;
+  const markedCopy =
+    markedCount === 0
+      ? "No marks"
+      : `${markedCount} marked`;
+  return (
+    <div className={styles.workingBoard}>
+      <div className={styles.interactiveBoard}>
+        <BoardVisual
+          round={round}
+          revealSolution={revealSolution}
+          highlightedPlacement={highlightedPlacement}
+        />
+        {interactive ? (
+          <div
+            className={styles.workingGrid}
+            role="group"
+            aria-label="Working grid. Use arrow keys to move and Space to mark squares as checked."
+            style={
+              {
+                "--board-size": String(round.boardSize),
+              } as CustomProperties
+            }
+          >
+            {round.board.map(({ x, y }) => {
+              const cellKey = `${x},${y}`;
+              const marked = workingCells.has(cellKey);
+              return (
+                <button
+                  className={styles.workingCellButton}
+                  type="button"
+                  data-working-cell={`${x}-${y}`}
+                  tabIndex={x === 0 && y === 0 ? 0 : -1}
+                  aria-pressed={marked}
+                  aria-label={`Row ${y + 1}, column ${x + 1}, ${
+                    marked ? "marked as checked" : "not marked"
+                  }.`}
+                  onClick={() => onToggle(cellKey)}
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === " " ||
+                      event.key === "Space" ||
+                      event.key === "Spacebar" ||
+                      event.key === "Enter"
+                    ) {
+                      event.preventDefault();
+                      onToggle(cellKey);
+                      return;
+                    }
+                    moveWorkingCellFocus(
+                      event,
+                      x,
+                      y,
+                      round.boardSize,
+                    );
+                  }}
+                  key={cellKey}
+                >
+                  {marked ? (
+                    <span
+                      className={styles.workingCellCheck}
+                      aria-hidden="true"
+                    >
+                      ✓
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+      {interactive ? (
+        <div className={styles.workingTools}>
+          <span>Select squares to mark what you’ve checked.</span>
+          <div>
+            <span aria-live="polite">{markedCopy}</span>
+            <button
+              type="button"
+              onClick={onClear}
+              disabled={markedCount === 0}
+            >
+              Clear marks
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -623,6 +811,8 @@ export default function ExtraPiecePage() {
     useState<string | null>(null);
   const [historicalReview, setHistoricalReview] =
     useState<HistoricalReview | null>(null);
+  const [workingGrid, setWorkingGrid] =
+    useState<WorkingGridState>(EMPTY_WORKING_GRID);
 
   const optionButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const nextButtonRef = useRef<HTMLButtonElement>(null);
@@ -670,6 +860,10 @@ export default function ExtraPiecePage() {
       ? campaignSessionRound
       : (roundQueue[roundCursor] ?? roundQueue[0]);
   const round = activeSessionRound?.round ?? ROUNDS[0];
+  const workingRoundId = activeSessionRound?.id ?? "";
+  const activeWorkingCells = new Set(
+    workingCellsForRound(workingGrid, workingRoundId),
+  );
   const sessionLength = roundQueue.length;
   const progress = roundCursor + (phase === "answered" ? 1 : 0);
   const isLastRedemptionRound =
@@ -723,6 +917,23 @@ export default function ExtraPiecePage() {
     }
     return analyzeWrongAttempt(round, selectedIndex).message;
   }, [round, selectedIndex]);
+
+  const toggleActiveWorkingCell = useCallback(
+    (cellKey: string) => {
+      if (!workingRoundId || phase !== "idle") return;
+      setWorkingGrid((current) =>
+        toggleWorkingCell(current, workingRoundId, cellKey),
+      );
+    },
+    [phase, workingRoundId],
+  );
+
+  const clearActiveWorkingCells = useCallback(() => {
+    if (!workingRoundId || phase !== "idle") return;
+    setWorkingGrid((current) =>
+      clearWorkingCells(current, workingRoundId),
+    );
+  }, [phase, workingRoundId]);
 
   const clearAttemptTimer = useCallback(() => {
     if (phaseTimerRef.current) {
@@ -962,6 +1173,7 @@ export default function ExtraPiecePage() {
     setStarted(true);
     setComplete(false);
     setHistoricalReview(null);
+    setWorkingGrid(EMPTY_WORKING_GRID);
     resetAttemptState();
     shouldFocusFirstOption.current = true;
   }, [resetAttemptState, resumeAudio]);
@@ -999,6 +1211,7 @@ export default function ExtraPiecePage() {
     setStarted(true);
     setComplete(false);
     setHistoricalReview(null);
+    setWorkingGrid(EMPTY_WORKING_GRID);
     resetAttemptState();
     shouldFocusFirstOption.current = true;
   }, [resetAttemptState, resumeAudio]);
@@ -1500,7 +1713,11 @@ export default function ExtraPiecePage() {
             </p>
             <div className={styles.exampleFlow}>
               <div className={styles.exampleBoard}>
-                <BoardVisual round={TUTORIAL} revealSolution />
+                <BoardVisual
+                  round={TUTORIAL}
+                  revealSolution
+                  showSolutionLabels={false}
+                />
                 <span className={styles.exampleCaption}>
                   These pieces fill the square
                 </span>
@@ -1874,13 +2091,21 @@ export default function ExtraPiecePage() {
                     className={styles.targetPanel}
                     aria-label="Target square"
                   >
-                    <BoardVisual
+                    <WorkingBoard
                       round={round}
+                      workingCells={activeWorkingCells}
+                      interactive={
+                        phase === "idle" &&
+                        !historicalReview &&
+                        Boolean(activeSessionRound)
+                      }
                       revealSolution={
                         phase === "animating" ||
                         phase === "answered"
                       }
                       highlightedPlacement={highlightedPlacement}
+                      onToggle={toggleActiveWorkingCell}
+                      onClear={clearActiveWorkingCells}
                     />
                   </section>
                   <section
@@ -1904,9 +2129,21 @@ export default function ExtraPiecePage() {
                           phase === "wrong-review" &&
                           isSelected &&
                           !isCorrect;
+                        const solvedPlacement = round.solution.find(
+                          (placement) =>
+                            placement.pieceIndex === optionIndex,
+                        );
+                        const showSolvedLayout =
+                          phase === "animating" ||
+                          phase === "answered";
+                        const matchedFill =
+                          showSolvedLayout && solvedPlacement
+                            ? solutionPresentationForPiece(
+                                optionIndex,
+                              ).fill
+                            : null;
                         const muted =
-                          (phase === "answered" && !isCorrect) ||
-                          (phase === "wrong-review" && !isSelected);
+                          phase === "wrong-review" && !isSelected;
                         return (
                           <button
                             className={`${styles.optionButton} ${
@@ -1915,6 +2152,10 @@ export default function ExtraPiecePage() {
                                 : ""
                             } ${
                               showWrong ? styles.wrongOption : ""
+                            } ${
+                              matchedFill
+                                ? styles.matchedOption
+                                : ""
                             } ${muted ? styles.mutedOption : ""}`}
                             type="button"
                             onClick={() => chooseOption(optionIndex)}
@@ -1927,6 +2168,8 @@ export default function ExtraPiecePage() {
                                 ? " Correct extra piece."
                                 : showWrong
                                   ? " Your answer; this piece fits."
+                                  : matchedFill
+                                    ? ` It fills board region ${optionIndex + 1}.`
                                   : ""
                             }`}
                             aria-keyshortcuts={`${optionIndex + 1}`}
@@ -1946,6 +2189,7 @@ export default function ExtraPiecePage() {
                               piece={piece}
                               scaffold={round.scaffold}
                               optionNumber={optionIndex + 1}
+                              matchedFill={matchedFill}
                             />
                             {showCorrect ? (
                               <span
@@ -1997,9 +2241,9 @@ export default function ExtraPiecePage() {
                         Correct
                       </strong>
                       <span className={styles.feedbackDetail}>
-                        {hiddenPatternCount(round) > 0
-                          ? "The other pieces fill every cell. The ? cells take the symbols they bring."
-                          : "The other pieces contain exactly the symbols the square needs."}
+                        Each color and number shows where the other
+                        pieces fit. Piece {round.correctIndex + 1} is
+                        left over.
                       </span>
                       <button
                         className={styles.nextButton}
