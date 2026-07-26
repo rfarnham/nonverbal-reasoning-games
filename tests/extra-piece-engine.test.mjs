@@ -9,20 +9,21 @@ import {
   PuzzleGenerationError,
   enumeratePiecePlacements,
   generateInfiniteRound,
-  isChiral,
-  pieceCanonicalKey,
+  hiddenPatternCount,
+  hiddenPlacementGain,
   possibleExtraIndexes,
-  reflectPieceCells,
   rotatePieceCells,
   roundFingerprint,
   solveRound,
   starterInventoryMatchIndexes,
   starterInventoryResidual,
   starterSymbolInventory,
+  symbolInventoryCompatibleExtraIndexes,
   validateRound,
 } from "../app/games/extra-piece/game-engine.ts";
 import { JOURNEY_EXTRA_CAMPAIGN_ROUNDS } from "../app/games/extra-piece/journey-campaign.ts";
 import { progressionAdapter } from "../app/games/extra-piece/progression-adapter.ts";
+import { progressionMetadata } from "../app/games/extra-piece/progression-metadata.ts";
 import {
   campaignQuestionReferences,
   resolveProgressionQuestion,
@@ -85,7 +86,49 @@ test("Campaign answer positions are balanced for each candidate count", () => {
   }
 });
 
-test("the curriculum stays monochrome while increasing size and chirality", () => {
+test("the curriculum grows from a 4x4 pattern to 5x5 patterns with progressive unknowns", () => {
+  assert.deepEqual(
+    Object.fromEntries(
+      DIFFICULTIES.map((difficulty) => [
+        difficulty,
+        {
+          boardSize: DIFFICULTY_RULES[difficulty].boardSize,
+          scaffold: DIFFICULTY_RULES[difficulty].scaffold,
+          hiddenPatternCount:
+            DIFFICULTY_RULES[difficulty].hiddenPatternCount,
+        },
+      ]),
+    ),
+    {
+      Easy: {
+        boardSize: 4,
+        scaffold: "symbols",
+        hiddenPatternCount: 0,
+      },
+      Medium: {
+        boardSize: 5,
+        scaffold: "symbols",
+        hiddenPatternCount: 0,
+      },
+      Hard: {
+        boardSize: 5,
+        scaffold: "symbols",
+        hiddenPatternCount: 4,
+      },
+      Wizard: {
+        boardSize: 5,
+        scaffold: "symbols",
+        hiddenPatternCount: 8,
+      },
+    },
+  );
+
+  const pictureSymbols = new Set([
+    "arrow",
+    "circle",
+    "diamond",
+    "star",
+  ]);
   for (const difficulty of DIFFICULTIES) {
     const rules = DIFFICULTY_RULES[difficulty];
     for (const round of roundsAt(difficulty)) {
@@ -95,6 +138,30 @@ test("the curriculum stays monochrome while increasing size and chirality", () =
       assert.ok(
         round.board.every(({ mark }) => mark.color === "ink"),
       );
+      assert.ok(
+        round.board.every(({ mark }) =>
+          pictureSymbols.has(mark.motif),
+        ),
+      );
+      assert.ok(
+        round.pieces.every((piece) =>
+          piece.cells.every(
+            ({ mark }) =>
+              mark.color === "ink" &&
+              pictureSymbols.has(mark.motif),
+          ),
+        ),
+      );
+      assert.equal(
+        hiddenPatternCount(round),
+        rules.hiddenPatternCount,
+      );
+      const visibleMotifs = new Set(
+        round.board
+          .filter(({ hidden }) => !hidden)
+          .map(({ mark }) => mark.motif),
+      );
+      assert.deepEqual(visibleMotifs, pictureSymbols);
     }
   }
 
@@ -119,55 +186,29 @@ test("the curriculum stays monochrome while increasing size and chirality", () =
       );
     }),
   );
-  assert.ok(
-    roundsAt("Medium").every((round) =>
-      round.board.some(({ mark }) => mark.motif === "chevron"),
-    ),
-  );
-  assert.ok(
-    roundsAt("Hard").every((round) =>
-      round.board.every(({ mark }) => mark.color === "ink"),
-    ),
-  );
-  assert.ok(
-    roundsAt("Wizard").every((round) => {
-      const motifCount = round.board.filter(
-        ({ mark }) => mark.motif === "chevron",
-      ).length;
-      return (
-        round.board.every(({ mark }) => mark.color === "ink") &&
-        motifCount > 0 &&
-        motifCount <= 10
-      );
-    }),
-  );
 
   for (const round of [
+    ...roundsAt("Medium"),
     ...roundsAt("Hard"),
     ...roundsAt("Wizard"),
   ]) {
+    assert.deepEqual(
+      round.pieces
+        .filter((_, index) => index !== round.correctIndex)
+        .map(({ cells }) => cells.length)
+        .sort(),
+      [5, 5, 5, 5, 5],
+    );
     const extra = round.pieces[round.correctIndex];
-    const source = round.pieces.find(
-      (piece) =>
-        piece.kind === "used" &&
-        piece.sourceRegion === extra.sourceRegion,
-    );
-    assert.ok(source);
-    assert.equal(extra.extraKind, "mirror-trap");
-    assert.equal(isChiral(source.cells), true);
-    assert.notEqual(
-      pieceCanonicalKey(source.cells, false),
-      pieceCanonicalKey(extra.cells, false),
-    );
-    assert.equal(
-      pieceCanonicalKey(source.cells, false),
-      pieceCanonicalKey(reflectPieceCells(extra.cells), false),
-    );
+    assert.equal(extra.extraKind, "one-cell-near-miss");
   }
 });
 
-test("Starter mirrors the source question's zero-backtracking symbol strategy", () => {
-  for (const round of roundsAt("Easy")) {
+test("Starter and Junior use the source question's zero-backtracking symbol strategy", () => {
+  for (const round of [
+    ...roundsAt("Easy"),
+    ...roundsAt("Medium"),
+  ]) {
     assert.deepEqual(starterInventoryMatchIndexes(round), [
       round.correctIndex,
     ]);
@@ -194,6 +235,71 @@ test("Starter mirrors the source question's zero-backtracking symbol strategy", 
   }
 });
 
+test("Expert and Wizard unknowns remove shortcuts without removing the proof", () => {
+  for (const difficulty of ["Hard", "Wizard"]) {
+    const rules = DIFFICULTY_RULES[difficulty];
+    for (const round of roundsAt(difficulty)) {
+      const inventoryCandidates =
+        symbolInventoryCompatibleExtraIndexes(round);
+      assert.ok(
+        inventoryCandidates.length >=
+          rules.minimumInventoryCandidates,
+      );
+      assert.ok(inventoryCandidates.includes(round.correctIndex));
+      assert.ok(
+        hiddenPlacementGain(round) >= rules.minimumPlacementGain,
+      );
+      assert.deepEqual(possibleExtraIndexes(round), [
+        round.correctIndex,
+      ]);
+
+      const hiddenRegions = new Map();
+      for (const cell of round.board.filter(({ hidden }) => hidden)) {
+        hiddenRegions.set(
+          cell.sourceRegion,
+          (hiddenRegions.get(cell.sourceRegion) ?? 0) + 1,
+        );
+      }
+      assert.ok(hiddenRegions.size >= 4);
+      assert.ok(
+        [...hiddenRegions.values()].every(
+          (count) => count <= (difficulty === "Hard" ? 1 : 2),
+        ),
+      );
+
+      const changedConcealedMarks = {
+        ...round,
+        board: round.board.map((cell) =>
+          cell.hidden
+            ? {
+                ...cell,
+                mark: {
+                  ...cell.mark,
+                  motif:
+                    cell.mark.motif === "star"
+                      ? "diamond"
+                      : "star",
+                },
+              }
+            : cell,
+        ),
+      };
+      assert.deepEqual(
+        possibleExtraIndexes(changedConcealedMarks),
+        possibleExtraIndexes(round),
+      );
+      assert.equal(
+        roundFingerprint(changedConcealedMarks),
+        roundFingerprint(round),
+      );
+    }
+  }
+  assert.ok(
+    DIFFICULTY_RULES.Wizard.hiddenPatternCount >
+      DIFFICULTY_RULES.Hard.hiddenPatternCount,
+  );
+});
+
 test("every puzzle proves one and only one possible extra piece", () => {
   for (const round of ROUNDS) {
     assert.deepEqual(possibleExtraIndexes(round), [round.correctIndex]);
@@ -211,6 +317,44 @@ test("every puzzle proves one and only one possible extra piece", () => {
   }
 });
 
+test("validation rejects hidden-pattern curriculum drift", () => {
+  const starter = roundsAt("Easy")[0];
+  const starterWithUnknown = {
+    ...starter,
+    board: starter.board.map((cell, index) =>
+      index === 0 ? { ...cell, hidden: true } : cell,
+    ),
+  };
+  assert.ok(
+    validateRound(starterWithUnknown).issues.includes(
+      "The number of hidden patterns does not match the difficulty.",
+    ),
+  );
+
+  const expert = roundsAt("Hard")[0];
+  const revealedExpertCell = {
+    ...expert,
+    board: expert.board.map((cell) =>
+      cell.hidden ? { ...cell, hidden: false } : cell,
+    ),
+  };
+  assert.ok(
+    validateRound(revealedExpertCell).issues.includes(
+      "The number of hidden patterns does not match the difficulty.",
+    ),
+  );
+
+  const juniorWithOldArrowScaffold = {
+    ...roundsAt("Medium")[0],
+    scaffold: "orientation",
+  };
+  assert.ok(
+    validateRound(juniorWithOldArrowScaffold).issues.includes(
+      "Scaffold does not match the difficulty.",
+    ),
+  );
+});
+
 test("fingerprints ignore option order and input-piece rotation", () => {
   const round = ROUNDS[17];
   const reversed = {
@@ -226,6 +370,39 @@ test("fingerprints ignore option order and input-piece rotation", () => {
   };
   assert.equal(roundFingerprint(reversed), roundFingerprint(round));
   assert.equal(roundFingerprint(rotated), roundFingerprint(round));
+});
+
+test("fingerprints record unknown locations but not concealed motifs", () => {
+  const round = roundsAt("Hard")[0];
+  const hiddenIndex = round.board.findIndex(({ hidden }) => hidden);
+  assert.ok(hiddenIndex >= 0);
+  const changedConcealedMark = {
+    ...round,
+    board: round.board.map((cell, index) =>
+      index === hiddenIndex
+        ? {
+            ...cell,
+            mark: {
+              ...cell.mark,
+              motif:
+                cell.mark.motif === "circle" ? "star" : "circle",
+            },
+          }
+        : cell,
+    ),
+  };
+  assert.equal(
+    roundFingerprint(changedConcealedMark),
+    roundFingerprint(round),
+  );
+
+  const revealed = {
+    ...round,
+    board: round.board.map((cell, index) =>
+      index === hiddenIndex ? { ...cell, hidden: false } : cell,
+    ),
+  };
+  assert.notEqual(roundFingerprint(revealed), roundFingerprint(round));
 });
 
 test("visible picture symbols and arrow turns are part of the puzzle state", () => {
@@ -361,6 +538,14 @@ test("the Journey adapter resolves Campaign and generated references", () => {
   assert.equal(validateRound(generated).valid, true);
 });
 
+test("the changed Campaign, generator, and Journey banks use version 3", () => {
+  assert.deepEqual(progressionMetadata, {
+    contentVersion: "3",
+    generatorVersion: "3",
+    journeyContentVersion: "3",
+  });
+});
+
 test("the route exposes semantic choices, shortcuts, and reduced motion", async () => {
   const [page, css] = await Promise.all([
     readFile(
@@ -384,6 +569,10 @@ test("the route exposes semantic choices, shortcuts, and reduced motion", async 
   assert.match(page, /motif === "diamond"/);
   assert.match(page, /motif === "circle"/);
   assert.match(page, /Count the symbols first/);
+  assert.match(page, /\? = any symbol/);
+  assert.match(page, /gray question-mark cells that accept any symbol/);
+  assert.match(page, /unknownPatternMark/);
+  assert.match(css, /\.unknownPatternMark/);
   assert.match(css, /@media \(max-width: 820px\)/);
   assert.match(css, /@media \(max-width: 620px\)/);
   assert.match(css, /@media \(max-width: 390px\)/);

@@ -8,7 +8,7 @@ export const gameInfo = {
   title: "Extra Piece",
   description:
     "Turn patterned pieces in your mind and find the one that cannot belong in the square.",
-  skills: ["Spatial composition", "Mental rotation", "Chirality"],
+  skills: ["Spatial composition", "Mental rotation", "Pattern matching"],
   estimatedMinutes: 12,
   progression: progressionMetadata,
   shelfOrder: 85,

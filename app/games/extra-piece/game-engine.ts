@@ -31,6 +31,8 @@ export type BoardCell = Readonly<{
   x: number;
   y: number;
   mark: Mark;
+  sourceRegion: number;
+  hidden?: boolean;
 }>;
 
 export type PieceCell = Readonly<{
@@ -94,6 +96,9 @@ type DifficultyRules = Readonly<{
   regionSizes: readonly number[];
   scaffold: Scaffold;
   extraKind: ExtraKind;
+  hiddenPatternCount: number;
+  minimumInventoryCandidates: number;
+  minimumPlacementGain: number;
 }>;
 
 export const DIFFICULTIES = [
@@ -111,24 +116,36 @@ export const DIFFICULTY_RULES: Readonly<
     regionSizes: [3, 4, 4, 5],
     scaffold: "symbols",
     extraKind: "one-cell-near-miss",
+    hiddenPatternCount: 0,
+    minimumInventoryCandidates: 1,
+    minimumPlacementGain: 0,
   },
   Medium: {
     boardSize: 5,
     regionSizes: [5, 5, 5, 5, 5],
-    scaffold: "orientation",
+    scaffold: "symbols",
     extraKind: "one-cell-near-miss",
+    hiddenPatternCount: 0,
+    minimumInventoryCandidates: 1,
+    minimumPlacementGain: 0,
   },
   Hard: {
     boardSize: 5,
     regionSizes: [5, 5, 5, 5, 5],
-    scaffold: "orientation",
-    extraKind: "mirror-trap",
+    scaffold: "symbols",
+    extraKind: "one-cell-near-miss",
+    hiddenPatternCount: 4,
+    minimumInventoryCandidates: 2,
+    minimumPlacementGain: 2,
   },
   Wizard: {
     boardSize: 5,
     regionSizes: [5, 5, 5, 5, 5],
-    scaffold: "monochrome",
-    extraKind: "mirror-trap",
+    scaffold: "symbols",
+    extraKind: "one-cell-near-miss",
+    hiddenPatternCount: 8,
+    minimumInventoryCandidates: 3,
+    minimumPlacementGain: 6,
   },
 };
 
@@ -170,6 +187,36 @@ const STARTER_SYMBOL_TEMPLATES = [
     "S", "S", "D", "A",
     "C", "S", "D", "A",
     "C", "C", "C", "A",
+  ],
+] as const;
+const FIVE_BY_FIVE_SYMBOL_TEMPLATES = [
+  [
+    "S", "S", "D", "D", "A",
+    "S", "S", "D", "A", "A",
+    "S", "C", "D", "D", "A",
+    "C", "C", "C", "D", "A",
+    "C", "C", "C", "A", "A",
+  ],
+  [
+    "A", "A", "S", "S", "S",
+    "A", "D", "D", "S", "C",
+    "A", "D", "S", "S", "C",
+    "A", "D", "D", "C", "C",
+    "A", "A", "C", "C", "C",
+  ],
+  [
+    "S", "D", "D", "A", "A",
+    "S", "S", "D", "A", "C",
+    "S", "D", "D", "A", "C",
+    "S", "C", "C", "C", "C",
+    "A", "A", "C", "D", "D",
+  ],
+  [
+    "C", "C", "S", "S", "A",
+    "C", "D", "S", "A", "A",
+    "C", "D", "D", "S", "A",
+    "C", "C", "D", "S", "A",
+    "A", "A", "D", "S", "S",
   ],
 ] as const;
 
@@ -282,6 +329,55 @@ export function starterInventoryMatchIndexes(
     }))
     .filter(({ key }) => key === residualKey)
     .map(({ index }) => index);
+}
+
+export function hiddenPatternCount(
+  round: Pick<ExtraPieceRound, "board">,
+): number {
+  return round.board.filter(({ hidden }) => hidden).length;
+}
+
+export function symbolInventoryCompatibleExtraIndexes(
+  round: Pick<ExtraPieceRound, "board" | "pieces">,
+): readonly number[] {
+  const visibleBoard = round.board.filter(({ hidden }) => !hidden);
+  const visibleInventory = starterSymbolInventory(visibleBoard);
+  const visibleSymbolCount = STARTER_SYMBOLS.reduce(
+    (total, symbol) => total + visibleInventory[symbol],
+    0,
+  );
+  const unknownCount = hiddenPatternCount(round);
+
+  return round.pieces
+    .map((_, excludedIndex) => {
+      const remaining = emptyStarterInventory();
+      let remainingCellCount = 0;
+      for (const [pieceIndex, piece] of round.pieces.entries()) {
+        if (pieceIndex === excludedIndex) continue;
+        remainingCellCount += piece.cells.length;
+        const inventory = starterSymbolInventory(piece.cells);
+        for (const symbol of STARTER_SYMBOLS) {
+          remaining[symbol] += inventory[symbol];
+        }
+      }
+      const canSupplyVisibleSymbols = STARTER_SYMBOLS.every(
+        (symbol) => remaining[symbol] >= visibleInventory[symbol],
+      );
+      const hiddenRemainder = STARTER_SYMBOLS.reduce(
+        (total, symbol) =>
+          total + remaining[symbol] - visibleInventory[symbol],
+        0,
+      );
+      return {
+        excludedIndex,
+        compatible:
+          canSupplyVisibleSymbols &&
+          visibleSymbolCount + unknownCount === remainingCellCount &&
+          hiddenRemainder === unknownCount,
+      };
+    })
+    .filter(({ compatible }) => compatible)
+    .map(({ excludedIndex }) => excludedIndex);
 }
 
 function normalizeCells(cells: readonly PieceCell[]): PieceCell[] {
@@ -486,15 +582,16 @@ function hamiltonianPath(
 
 function marksForRegions(
   regions: readonly (readonly PlacementCell[])[],
+  boardSize: 4 | 5,
   scaffold: Scaffold,
   random: RandomSource,
 ): readonly (readonly MutableCell[])[] {
-  const starterTemplate =
-    scaffold === "symbols"
-      ? STARTER_SYMBOL_TEMPLATES[
-          randomIndex(STARTER_SYMBOL_TEMPLATES.length, random)
-        ]
-      : STARTER_SYMBOL_TEMPLATES[0];
+  const symbolTemplates =
+    boardSize === 4
+      ? STARTER_SYMBOL_TEMPLATES
+      : FIVE_BY_FIVE_SYMBOL_TEMPLATES;
+  const symbolTemplate =
+    symbolTemplates[randomIndex(symbolTemplates.length, random)];
   const symmetricSymbols =
     scaffold === "symbols"
       ? shuffled(
@@ -517,7 +614,7 @@ function marksForRegions(
     region.map(({ x, y }, cellIndex) => {
       const color = "ink";
       if (scaffold === "symbols") {
-        const code = starterTemplate[y * 4 + x];
+        const code = symbolTemplate[y * boardSize + x];
         const motif = starterSymbolByCode[code] ?? "circle";
         return {
           x,
@@ -580,9 +677,11 @@ function marksMatch(left: Mark, right: Mark, scaffold: Scaffold): boolean {
   return true;
 }
 
-function boardMap(round: Pick<ExtraPieceRound, "board">): Map<string, Mark> {
+function boardMap(
+  round: Pick<ExtraPieceRound, "board">,
+): Map<string, BoardCell> {
   return new Map(
-    round.board.map((cell) => [cellCoordinateKey(cell), cell.mark]),
+    round.board.map((cell) => [cellCoordinateKey(cell), cell]),
   );
 }
 
@@ -613,12 +712,17 @@ export function enumeratePiecePlacements(
         offsetX += 1
       ) {
         const matches = cells.every((cell) => {
-          const targetMark = target.get(
+          const targetCell = target.get(
             `${cell.x + offsetX},${cell.y + offsetY}`,
           );
           return (
-            targetMark !== undefined &&
-            marksMatch(cell.mark, targetMark, round.scaffold)
+            targetCell !== undefined &&
+            (targetCell.hidden ||
+              marksMatch(
+                cell.mark,
+                targetCell.mark,
+                round.scaffold,
+              ))
           );
         });
         if (!matches) continue;
@@ -742,6 +846,34 @@ export function possibleExtraIndexes(
     );
 }
 
+export function hiddenPlacementGain(
+  round: Pick<
+    ExtraPieceRound,
+    "board" | "boardSize" | "pieces" | "scaffold"
+  >,
+): number {
+  if (hiddenPatternCount(round) === 0) return 0;
+  const fullyShownRound = {
+    ...round,
+    board: round.board.map((cell) => ({
+      ...cell,
+      hidden: false,
+    })),
+  };
+  const visiblePlacements = round.pieces.reduce(
+    (total, _, pieceIndex) =>
+      total + enumeratePiecePlacements(round, pieceIndex).length,
+    0,
+  );
+  const fullyShownPlacements = round.pieces.reduce(
+    (total, _, pieceIndex) =>
+      total +
+      enumeratePiecePlacements(fullyShownRound, pieceIndex).length,
+    0,
+  );
+  return visiblePlacements - fullyShownPlacements;
+}
+
 function mutatePiece(
   piece: Piece,
   random: RandomSource,
@@ -787,7 +919,7 @@ function mutatePiece(
   return null;
 }
 
-function relabelStarterExtra(
+function relabelSymbolExtra(
   cells: readonly PieceCell[],
   usedPieces: readonly Piece[],
   random: RandomSource,
@@ -833,17 +965,141 @@ function relabelStarterExtra(
   return null;
 }
 
+function boardWithHiddenPatterns(
+  round: ExtraPieceRound,
+  count: number,
+  minimumInventoryCandidates: number,
+  minimumPlacementGain: number,
+  random: RandomSource,
+): readonly BoardCell[] | null {
+  if (count === 0) return round.board;
+  const extraInventory = starterSymbolInventory(
+    round.pieces[round.correctIndex].cells,
+  );
+  const distractorIndexes = round.pieces
+    .map((_, pieceIndex) => pieceIndex)
+    .filter((pieceIndex) => pieceIndex !== round.correctIndex);
+
+  for (let attempt = 0; attempt < 96; attempt += 1) {
+    const targetIndexes = shuffled(distractorIndexes, random).slice(
+      0,
+      Math.max(1, minimumInventoryCandidates - 1),
+    );
+    const required = emptyStarterInventory();
+    for (const targetIndex of targetIndexes) {
+      const targetInventory = starterSymbolInventory(
+        round.pieces[targetIndex].cells,
+      );
+      for (const symbol of STARTER_SYMBOLS) {
+        required[symbol] = Math.max(
+          required[symbol],
+          targetInventory[symbol] - extraInventory[symbol],
+        );
+      }
+    }
+    const requiredCount = STARTER_SYMBOLS.reduce(
+      (total, symbol) => total + required[symbol],
+      0,
+    );
+    if (requiredCount > count) continue;
+
+    const hiddenIndexes = new Set<number>();
+    let enoughRequiredCells = true;
+    for (const symbol of STARTER_SYMBOLS) {
+      const matchingIndexes = shuffled(
+        round.board
+          .map((cell, cellIndex) => ({ cell, cellIndex }))
+          .filter(({ cell }) => cell.mark.motif === symbol)
+          .map(({ cellIndex }) => cellIndex),
+        random,
+      );
+      if (matchingIndexes.length < required[symbol]) {
+        enoughRequiredCells = false;
+        break;
+      }
+      for (
+        let index = 0;
+        index < required[symbol];
+        index += 1
+      ) {
+        hiddenIndexes.add(matchingIndexes[index]);
+      }
+    }
+    if (!enoughRequiredCells) continue;
+
+    for (const cellIndex of shuffled(
+      round.board.map((_, index) => index),
+      random,
+    )) {
+      if (hiddenIndexes.size >= count) break;
+      hiddenIndexes.add(cellIndex);
+    }
+    if (hiddenIndexes.size !== count) continue;
+
+    const board = round.board.map((cell, cellIndex) => ({
+      ...cell,
+      hidden: hiddenIndexes.has(cellIndex),
+    }));
+    const hiddenCells = board.filter(({ hidden }) => hidden);
+    const hiddenRegions = new Map<number, number>();
+    for (const cell of hiddenCells) {
+      hiddenRegions.set(
+        cell.sourceRegion,
+        (hiddenRegions.get(cell.sourceRegion) ?? 0) + 1,
+      );
+    }
+    const maximumPerRegion = count <= 4 ? 1 : 2;
+    if (
+      hiddenRegions.size < 4 ||
+      [...hiddenRegions.values()].some(
+        (regionCount) => regionCount > maximumPerRegion,
+      )
+    ) {
+      continue;
+    }
+    const visibleSymbols = starterSymbolInventory(
+      board.filter(({ hidden }) => !hidden),
+    );
+    if (
+      STARTER_SYMBOLS.some(
+        (symbol) => visibleSymbols[symbol] < 2,
+      )
+    ) {
+      continue;
+    }
+    const candidate = { ...round, board };
+    const inventoryCandidates =
+      symbolInventoryCompatibleExtraIndexes(candidate);
+    if (
+      inventoryCandidates.length < minimumInventoryCandidates ||
+      !inventoryCandidates.includes(round.correctIndex) ||
+      hiddenPlacementGain(candidate) < minimumPlacementGain
+    ) {
+      continue;
+    }
+    const possibleExtras = possibleExtraIndexes(candidate);
+    if (
+      possibleExtras.length === 1 &&
+      possibleExtras[0] === round.correctIndex
+    ) {
+      return board;
+    }
+  }
+  return null;
+}
+
 function rotateBoard(
   board: readonly BoardCell[],
   boardSize: number,
 ): BoardCell[] {
   return board
-    .map(({ x, y, mark }) => ({
-      x: boardSize - 1 - y,
-      y: x,
+    .map((cell) => ({
+      ...cell,
+      x: boardSize - 1 - cell.y,
+      y: cell.x,
       mark: {
-        ...mark,
-        orientation: rotateOrientation(mark.orientation, 1),
+        ...cell.mark,
+        orientation: rotateOrientation(cell.mark.orientation, 1),
       },
     }))
     .sort((left, right) => left.y - right.y || left.x - right.x);
@@ -852,7 +1108,7 @@ function rotateBoard(
 function boardKey(board: readonly BoardCell[]): string {
   return [...board]
     .sort((left, right) => left.y - right.y || left.x - right.x)
-    .map(({ mark }) => markKey(mark))
+    .map(({ hidden, mark }) => (hidden ? "?" : markKey(mark)))
     .join("");
 }
 
@@ -893,12 +1149,19 @@ export function buildCandidate(
   });
   const markedRegions = marksForRegions(
     rawRegions,
+    rules.boardSize,
     rules.scaffold,
     random,
   );
   const board = markedRegions
-    .flat()
-    .map(({ x, y, mark }) => ({ x, y, mark: { ...mark } }))
+    .flatMap((region, sourceRegion) =>
+      region.map(({ x, y, mark }) => ({
+        x,
+        y,
+        mark: { ...mark },
+        sourceRegion,
+      })),
+    )
     .sort((left, right) => left.y - right.y || left.x - right.x);
   const solutionPieces: Piece[] = markedRegions.map((region, regionIndex) => {
     const inputRotation = randomIndex(4, random) as QuarterTurn;
@@ -937,8 +1200,8 @@ export function buildCandidate(
       ? reflectPieceCells(source.cells)
       : mutatePiece(source, random);
   const extraCells =
-    difficulty === "Easy" && rawExtraCells
-      ? relabelStarterExtra(
+    rules.scaffold === "symbols" && rawExtraCells
+      ? relabelSymbolExtra(
           rawExtraCells,
           solutionPieces,
           random,
@@ -976,7 +1239,7 @@ export function buildCandidate(
   const correctIndex = shuffledPieces.findIndex(
     ({ kind }) => kind === "extra",
   );
-  const partialRound = {
+  const fullyShownRound = {
     id: "candidate",
     difficulty,
     scaffold: rules.scaffold,
@@ -986,7 +1249,7 @@ export function buildCandidate(
     correctIndex,
     solution: [],
   } satisfies ExtraPieceRound;
-  const possibleExtras = possibleExtraIndexes(partialRound);
+  const possibleExtras = possibleExtraIndexes(fullyShownRound);
   if (
     possibleExtras.length !== 1 ||
     possibleExtras[0] !== correctIndex
@@ -994,23 +1257,23 @@ export function buildCandidate(
     return null;
   }
   if (
-    difficulty === "Easy" &&
+    (difficulty === "Easy" || difficulty === "Medium") &&
     (new Set(board.map(({ mark }) => mark.motif)).size !==
       STARTER_SYMBOLS.length ||
-      starterInventoryMatchIndexes(partialRound).length !== 1 ||
-      starterInventoryMatchIndexes(partialRound)[0] !== correctIndex)
+      starterInventoryMatchIndexes(fullyShownRound).length !== 1 ||
+      starterInventoryMatchIndexes(fullyShownRound)[0] !== correctIndex)
   ) {
     return null;
   }
-  if (difficulty === "Easy") {
+  if (difficulty === "Easy" || difficulty === "Medium") {
     const shapeOnlyRound = {
-      ...partialRound,
+      ...fullyShownRound,
       scaffold: "silhouette" as const,
     };
-    const forcedUsedPieces = partialRound.pieces.filter(
+    const forcedUsedPieces = fullyShownRound.pieces.filter(
       (_, pieceIndex) =>
         pieceIndex !== correctIndex &&
-        enumeratePiecePlacements(partialRound, pieceIndex).length === 1,
+        enumeratePiecePlacements(fullyShownRound, pieceIndex).length === 1,
     ).length;
     if (
       possibleExtraIndexes(shapeOnlyRound).length < 2 ||
@@ -1019,9 +1282,21 @@ export function buildCandidate(
       return null;
     }
   }
+  const hiddenBoard = boardWithHiddenPatterns(
+    fullyShownRound,
+    rules.hiddenPatternCount,
+    rules.minimumInventoryCandidates,
+    rules.minimumPlacementGain,
+    random,
+  );
+  if (!hiddenBoard) return null;
+  const partialRound = {
+    ...fullyShownRound,
+    board: hiddenBoard,
+  } satisfies ExtraPieceRound;
   const solutions = solveRound(
     partialRound,
-    difficulty === "Easy" ? 2 : 1,
+    difficulty === "Easy" || difficulty === "Medium" ? 2 : 1,
     correctIndex,
   );
   if (solutions.length !== 1) return null;
@@ -1096,12 +1371,12 @@ function buildInfiniteVariant(
 
   if (randomIndex(2, random) === 1) {
     board = board
-      .map(({ x, y, mark }) => ({
-        x: base.boardSize - 1 - x,
-        y,
+      .map((cell) => ({
+        ...cell,
+        x: base.boardSize - 1 - cell.x,
         mark: {
-          ...mark,
-          orientation: ((4 - mark.orientation) % 4) as QuarterTurn,
+          ...cell.mark,
+          orientation: ((4 - cell.mark.orientation) % 4) as QuarterTurn,
         },
       }))
       .sort((left, right) => left.y - right.y || left.x - right.x);
@@ -1138,6 +1413,14 @@ function buildInfiniteVariant(
   if (
     possibleExtras.length !== 1 ||
     possibleExtras[0] !== correctIndex
+  ) {
+    return null;
+  }
+  const rules = DIFFICULTY_RULES[base.difficulty];
+  if (
+    symbolInventoryCompatibleExtraIndexes(partial).length <
+      rules.minimumInventoryCandidates ||
+    hiddenPlacementGain(partial) < rules.minimumPlacementGain
   ) {
     return null;
   }
@@ -1243,6 +1526,16 @@ export function validateRound(round: ExtraPieceRound): ValidationResult {
   if (new Set(round.board.map(cellCoordinateKey)).size !== round.board.length) {
     issues.push("The target board contains duplicate cells.");
   }
+  if (
+    rules.regionSizes.some(
+      (regionSize, sourceRegion) =>
+        round.board.filter(
+          (cell) => cell.sourceRegion === sourceRegion,
+        ).length !== regionSize,
+    )
+  ) {
+    issues.push("The target board has invalid source-region metadata.");
+  }
   if (round.pieces.length !== round.boardSize + 1) {
     issues.push("There must be exactly one more piece than the square uses.");
   }
@@ -1337,56 +1630,53 @@ export function validateRound(round: ExtraPieceRound): ValidationResult {
     issues.push("The extra must be an equal-area near-match.");
   }
   if (
-    (round.difficulty === "Hard" || round.difficulty === "Wizard") &&
-    (extra?.extraKind !== "mirror-trap" || !isChiral(extra.cells))
+    extra &&
+    extra.extraKind !== rules.extraKind
   ) {
-    issues.push("Advanced rounds require a genuinely chiral mirror trap.");
+    issues.push("The extra-piece construction does not match the difficulty.");
   }
   if (
-    round.difficulty === "Wizard" &&
-    round.board.some(({ mark }) => mark.color !== "ink")
+    hiddenPatternCount(round) !== rules.hiddenPatternCount
   ) {
-    issues.push("Wizard must use one monochrome ink treatment.");
+    issues.push("The number of hidden patterns does not match the difficulty.");
   }
   if (
-    round.difficulty === "Wizard" &&
-    round.board.filter(({ mark }) => mark.motif === "chevron").length > 10
-  ) {
-    issues.push("Wizard must keep its orientation scaffold sparse.");
-  }
-  if (
-    round.difficulty === "Easy" &&
     round.board.some(
       ({ mark }) =>
         mark.color !== "ink" || !isStarterSymbol(mark.motif),
+    ) ||
+    round.pieces.some((piece) =>
+      piece.cells.some(
+        ({ mark }) =>
+          mark.color !== "ink" || !isStarterSymbol(mark.motif),
+      ),
     )
   ) {
-    issues.push("Starter must use monochrome picture symbols.");
+    issues.push("Every level must use monochrome picture symbols.");
   }
   if (
-    round.difficulty === "Easy" &&
     new Set(round.board.map(({ mark }) => mark.motif)).size !==
       STARTER_SYMBOLS.length
   ) {
-    issues.push("Starter must show all four picture-symbol families.");
+    issues.push("Every target must show all four picture-symbol families.");
   }
   if (
-    round.difficulty === "Easy" &&
+    (round.difficulty === "Easy" || round.difficulty === "Medium") &&
     (starterInventoryMatchIndexes(round).length !== 1 ||
       starterInventoryMatchIndexes(round)[0] !== round.correctIndex)
   ) {
     issues.push(
-      "Starter symbol subtraction must identify the extra without backtracking.",
+      "Starter and Junior symbol subtraction must identify the extra without backtracking.",
     );
   }
-  if (round.difficulty === "Easy") {
+  if (round.difficulty === "Easy" || round.difficulty === "Medium") {
     const shapeOnlyRound = {
       ...round,
       scaffold: "silhouette" as const,
     };
     if (possibleExtraIndexes(shapeOnlyRound).length < 2) {
       issues.push(
-        "Starter patterns must remove an ambiguity left by the silhouettes.",
+        "Introductory patterns must remove an ambiguity left by the silhouettes.",
       );
     }
     const forcedUsedPieces = round.pieces.filter(
@@ -1396,12 +1686,60 @@ export function validateRound(round: ExtraPieceRound): ValidationResult {
     ).length;
     if (forcedUsedPieces < 2) {
       issues.push(
-        "Starter must offer at least two pattern-anchored pieces.",
+        "Starter and Junior must offer at least two pattern-anchored pieces.",
       );
     }
     if (solveRound(round, 2, round.correctIndex).length !== 1) {
       issues.push(
-        "Starter must confirm with one unambiguous marked tiling.",
+        "Starter and Junior must confirm with one unambiguous marked tiling.",
+      );
+    }
+  }
+  if (round.difficulty === "Hard" || round.difficulty === "Wizard") {
+    const hiddenRegions = new Map<number, number>();
+    for (const cell of round.board.filter(({ hidden }) => hidden)) {
+      hiddenRegions.set(
+        cell.sourceRegion,
+        (hiddenRegions.get(cell.sourceRegion) ?? 0) + 1,
+      );
+    }
+    const maximumPerRegion =
+      rules.hiddenPatternCount <= 4 ? 1 : 2;
+    if (
+      hiddenRegions.size < 4 ||
+      [...hiddenRegions.values()].some(
+        (count) => count > maximumPerRegion,
+      )
+    ) {
+      issues.push(
+        "Hidden patterns must be distributed across the tiling.",
+      );
+    }
+    const visibleSymbols = starterSymbolInventory(
+      round.board.filter(({ hidden }) => !hidden),
+    );
+    if (
+      STARTER_SYMBOLS.some(
+        (symbol) => visibleSymbols[symbol] < 2,
+      )
+    ) {
+      issues.push(
+        "Every picture-symbol family needs at least two visible clues.",
+      );
+    }
+    const inventoryCandidates =
+      symbolInventoryCompatibleExtraIndexes(round);
+    if (
+      inventoryCandidates.length < rules.minimumInventoryCandidates ||
+      !inventoryCandidates.includes(round.correctIndex)
+    ) {
+      issues.push(
+        "Hidden patterns must defeat simple symbol subtraction.",
+      );
+    }
+    if (hiddenPlacementGain(round) < rules.minimumPlacementGain) {
+      issues.push(
+        "Hidden patterns must create additional plausible placements.",
       );
     }
   }
@@ -1419,12 +1757,22 @@ export function analyzeWrongAttempt(
     throw new Error("The selected piece is not part of the solved tiling.");
   }
   const needsTurn = placement.rotation !== 0;
-  if (round.difficulty === "Easy") {
+  if (round.scaffold === "symbols") {
+    const hasHiddenPatterns = hiddenPatternCount(round) > 0;
+    const crossesUnknownPattern = placement.cells.some(({ x, y }) =>
+      round.board.some(
+        (cell) => cell.x === x && cell.y === y && cell.hidden,
+      ),
+    );
+    const unknownCopy =
+      hasHiddenPatterns && crossesUnknownPattern
+        ? ", including across the ? cells"
+        : "";
     return {
       placement,
       message: needsTurn
-        ? `Piece ${selectedIndex + 1}'s symbols match after a turn, so the square still needs it.`
-        : `Piece ${selectedIndex + 1}'s symbols match the square, so it is not the extra piece.`,
+        ? `Piece ${selectedIndex + 1} fits the shown symbols after a turn${unknownCopy}, so the square still needs it.`
+        : `Piece ${selectedIndex + 1} fits the shown symbols${unknownCopy}, so it is not the extra piece.`,
     };
   }
   return {

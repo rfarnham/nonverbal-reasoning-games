@@ -40,6 +40,7 @@ import {
   TUTORIAL,
   analyzeWrongAttempt,
   generateInfiniteRound,
+  hiddenPatternCount,
   pieceBounds,
   rotatePieceCells,
   roundFingerprint,
@@ -460,6 +461,7 @@ function BoardVisual({
 }) {
   const cellSize = 52;
   const size = round.boardSize * cellSize;
+  const unknownCount = hiddenPatternCount(round);
   const solutionAt = new Map<string, PiecePlacement>();
   if (revealSolution) {
     for (const placement of round.solution) {
@@ -482,27 +484,39 @@ function BoardVisual({
         round.scaffold === "symbols"
           ? " marked with repeated stars, diamonds, circles, and arrows"
           : ""
+      }${
+        unknownCount > 0
+          ? `, including ${unknownCount} gray question-mark cells that accept any symbol`
+          : ""
       }. Work out which candidate pieces can fill it without overlaps or gaps.`}
     >
-      {round.board.map(({ x, y, mark }) => {
+      {round.board.map(({ x, y, mark, hidden }) => {
         const placement = solutionAt.get(`${x},${y}`);
         const solutionFill = placement
           ? SOLUTION_FILLS[
               placement.pieceIndex % SOLUTION_FILLS.length
             ]
           : null;
+        const isHighlighted = highlighted.has(`${x},${y}`);
+        const showUnknown =
+          Boolean(hidden) && !revealSolution && !isHighlighted;
         const fill =
           revealSolution && solutionFill
             ? solutionFill
-            : round.scaffold === "color" ||
-                round.scaffold === "color-orientation"
-              ? FILL_BY_COLOR[mark.color]
-              : "#fffdf8";
-        const isHighlighted = highlighted.has(`${x},${y}`);
+            : showUnknown
+              ? "#e4e0d7"
+              : round.scaffold === "color" ||
+                  round.scaffold === "color-orientation"
+                ? FILL_BY_COLOR[mark.color]
+                : "#fffdf8";
         const visibleMark =
           highlightedPlacement && isHighlighted
             ? markForPlacedCell(round, highlightedPlacement, x, y)
-            : mark;
+            : revealSolution && placement
+              ? markForPlacedCell(round, placement, x, y)
+              : hidden
+                ? null
+                : mark;
         return (
           <g key={`${x}-${y}`}>
             <rect
@@ -520,12 +534,15 @@ function BoardVisual({
               rx="3"
               fill={isHighlighted ? "#f7cbc5" : fill}
               fillOpacity={revealSolution ? 0.72 : 1}
+              strokeDasharray={showUnknown ? "7 5" : undefined}
               stroke={
                 isHighlighted
                   ? "#bf493e"
                   : revealSolution
                     ? "#17213d"
-                    : "#8c918f"
+                    : showUnknown
+                      ? "#657087"
+                      : "#8c918f"
               }
               strokeWidth={isHighlighted ? 4 : 2}
             />
@@ -537,6 +554,18 @@ function BoardVisual({
                 motif={visibleMark.motif}
                 orientation={visibleMark.orientation}
               />
+            ) : null}
+            {showUnknown ? (
+              <text
+                className={styles.unknownPatternMark}
+                x={x * cellSize + cellSize / 2}
+                y={y * cellSize + cellSize / 2}
+                textAnchor="middle"
+                dominantBaseline="central"
+                aria-hidden="true"
+              >
+                ?
+              </text>
             ) : null}
           </g>
         );
@@ -1828,9 +1857,13 @@ export default function ExtraPiecePage() {
                   <p className={styles.kicker}>Build the square</p>
                   <h1 id="round-prompt">Which piece is left over?</h1>
                   <span className={styles.turnRule}>
-                    {round.difficulty === "Easy"
-                      ? "↻ Match symbols · turn only · no flipping"
-                      : "↻ Turn only · no flipping"}
+                    {hiddenPatternCount(round) > 0
+                      ? `? = any symbol · ${hiddenPatternCount(
+                          round,
+                        )} open cells · turn only · no flipping`
+                      : round.difficulty === "Medium"
+                        ? "5 × 5 · match symbols · turn only · no flipping"
+                        : "↻ Match symbols · turn only · no flipping"}
                   </span>
                 </section>
                 <div
@@ -1964,9 +1997,9 @@ export default function ExtraPiecePage() {
                         Correct
                       </strong>
                       <span className={styles.feedbackDetail}>
-                        {round.difficulty === "Easy"
-                          ? "The other pieces contain exactly the symbols the square needs."
-                          : "Every other piece fills the square."}
+                        {hiddenPatternCount(round) > 0
+                          ? "The other pieces fill every cell. The ? cells take the symbols they bring."
+                          : "The other pieces contain exactly the symbols the square needs."}
                       </span>
                       <button
                         className={styles.nextButton}
