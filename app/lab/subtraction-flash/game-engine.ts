@@ -3,11 +3,10 @@ export const REVIEW_SPACING = 4;
 
 export const ANSWER_VALUES = [2, 3, 4, 5, 6, 7, 8, 9] as const;
 export const VISUAL_ORIENTATIONS = ["horizontal", "vertical"] as const;
-export const SPOKEN_VARIANTS = ["question", "paced", "brisk"] as const;
+export const LISTEN_COPIES = 3;
 
 export type AnswerValue = (typeof ANSWER_VALUES)[number];
 export type VisualOrientation = (typeof VISUAL_ORIENTATIONS)[number];
-export type SpokenVariant = (typeof SPOKEN_VARIANTS)[number];
 export type PracticeMode = "visual" | "listen";
 export type RandomSource = () => number;
 
@@ -22,7 +21,6 @@ export type SubtractionCard = Readonly<
   SubtractionFact & {
     id: string;
     orientation: VisualOrientation;
-    spokenVariant: SpokenVariant;
     isReview: boolean;
   }
 >;
@@ -106,20 +104,18 @@ function cardCopiesForFact(
   cycle: number,
 ): SubtractionCard[] {
   if (mode === "visual") {
-    return VISUAL_ORIENTATIONS.map((orientation, index) => ({
+    return VISUAL_ORIENTATIONS.map((orientation) => ({
       ...fact,
       id: `${mode}:${cycle}:${fact.factKey}:${orientation}`,
       orientation,
-      spokenVariant: SPOKEN_VARIANTS[index],
       isReview: false,
     }));
   }
 
-  return SPOKEN_VARIANTS.map((spokenVariant, index) => ({
+  return Array.from({ length: LISTEN_COPIES }, (_, index) => ({
     ...fact,
-    id: `${mode}:${cycle}:${fact.factKey}:${spokenVariant}`,
+    id: `${mode}:${cycle}:${fact.factKey}:copy-${index + 1}`,
     orientation: VISUAL_ORIENTATIONS[index % VISUAL_ORIENTATIONS.length],
-    spokenVariant,
     isReview: false,
   }));
 }
@@ -273,7 +269,7 @@ export function createSubtractionDeck(
     SUBTRACTION_FACTS.length *
     (mode === "visual"
       ? VISUAL_ORIENTATIONS.length
-      : SPOKEN_VARIANTS.length);
+      : LISTEN_COPIES);
   const recentFactKeys: string[] = [];
   const reviewedFactKeys = new Set<string>();
   const pendingReviews: SubtractionCard[] = [];

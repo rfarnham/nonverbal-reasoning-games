@@ -3,9 +3,9 @@ import test from "node:test";
 
 import {
   ANSWER_VALUES,
+  LISTEN_COPIES,
   REVIEW_SPACING,
   SLOW_RESPONSE_MS,
-  SPOKEN_VARIANTS,
   SUBTRACTION_FACTS,
   VISUAL_ORIENTATIONS,
   buildAnswerOptions,
@@ -63,20 +63,18 @@ test("visual cycles balance both layouts and keep duplicate facts apart", () => 
   }
 });
 
-test("listening cycles ask every fact once in each voice cadence", () => {
+test("listening cycles ask every fact the same number of times", () => {
   const cards = createBaseDeck("listen", {
     random: createSeededRandom(812),
   });
-  assert.equal(cards.length, 108);
+  assert.equal(cards.length, SUBTRACTION_FACTS.length * LISTEN_COPIES);
   assertFactSpacing(cards);
 
   for (const fact of SUBTRACTION_FACTS) {
     const copies = cards.filter((card) => card.factKey === fact.factKey);
-    assert.equal(copies.length, 3);
-    assert.deepEqual(
-      new Set(copies.map((card) => card.spokenVariant)),
-      new Set(SPOKEN_VARIANTS),
-    );
+    assert.equal(copies.length, LISTEN_COPIES);
+    assert.equal(new Set(copies.map((card) => card.id)).size, LISTEN_COPIES);
+    assert.ok(copies.every((card) => !("spokenVariant" in card)));
   }
 });
 

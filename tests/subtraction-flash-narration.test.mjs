@@ -26,43 +26,59 @@ const outputRoot = new URL(
   import.meta.url,
 );
 
-const variants = ["question", "paced", "brisk"];
+const numberWords = new Map([
+  [2, "two"],
+  [3, "three"],
+  [4, "four"],
+  [5, "five"],
+  [6, "six"],
+  [7, "seven"],
+  [8, "eight"],
+  [9, "nine"],
+  [11, "eleven"],
+  [12, "twelve"],
+  [13, "thirteen"],
+  [14, "fourteen"],
+  [15, "fifteen"],
+  [16, "sixteen"],
+  [17, "seventeen"],
+  [18, "eighteen"],
+]);
 
-test("every valid borrow fact has three audited local readings", async () => {
+test("every valid borrow fact has one audited fact-only reading", async () => {
   assert.deepEqual(manifest.narrator, SUITE_NARRATOR_PROVENANCE);
-  assert.equal(Object.keys(manifest.cues).length, 108);
+  assert.equal(Object.keys(manifest.cues).length, 36);
 
   for (let minuend = 11; minuend <= 18; minuend += 1) {
     for (let subtrahend = 2; subtrahend <= 9; subtrahend += 1) {
       const requiresBorrow = minuend % 10 < subtrahend;
+      const cueId = `${minuend}-${subtrahend}`;
+      const cue = manifest.cues[cueId];
 
-      for (const variant of variants) {
-        const cueId = `${minuend}-${subtrahend}-${variant}`;
-        const cue = manifest.cues[cueId];
-
-        if (!requiresBorrow) {
-          assert.equal(cue, undefined, `${cueId} must not enter the deck`);
-          continue;
-        }
-
-        assert.ok(cue, `${cueId} exists`);
-        assert.match(
-          cue.file,
-          new RegExp(`^${minuend}-minus-${subtrahend}-${variant}\\.mp3$`),
-        );
-        assert.ok(cue.audioDurationMs >= 1_800, `${cueId} is intelligible`);
-        assert.ok(cue.audioDurationMs <= 5_000, `${cueId} stays brisk`);
-        assert.equal(cue.minVisualMs, 0);
-        assert.equal(cue.lingerMs, 0);
-        assert.match(cue.sha256, /^[a-f\d]{64}$/);
-
-        const asset = new URL(cue.file, outputRoot);
-        assert.ok((await stat(asset)).size > 10_000, `${cueId} audio exists`);
-        const digest = createHash("sha256")
-          .update(await readFile(asset))
-          .digest("hex");
-        assert.equal(digest, cue.sha256, `${cueId} matches its manifest`);
+      if (!requiresBorrow) {
+        assert.equal(cue, undefined, `${cueId} must not enter the deck`);
+        continue;
       }
+
+      assert.ok(cue, `${cueId} exists`);
+      assert.equal(cue.file, `${minuend}-minus-${subtrahend}.mp3`);
+      assert.equal(
+        cue.speechText,
+        `${numberWords.get(minuend)} minus ${numberWords.get(subtrahend)}?`,
+      );
+      assert.doesNotMatch(cue.speechText, /\b(?:what|is|answer)\b/i);
+      assert.ok(cue.audioDurationMs >= 1_500, `${cueId} is intelligible`);
+      assert.ok(cue.audioDurationMs <= 3_000, `${cueId} stays brisk`);
+      assert.equal(cue.minVisualMs, 0);
+      assert.equal(cue.lingerMs, 0);
+      assert.match(cue.sha256, /^[a-f\d]{64}$/);
+
+      const asset = new URL(cue.file, outputRoot);
+      assert.ok((await stat(asset)).size > 10_000, `${cueId} audio exists`);
+      const digest = createHash("sha256")
+        .update(await readFile(asset))
+        .digest("hex");
+      assert.equal(digest, cue.sha256, `${cueId} matches its manifest`);
     }
   }
 });

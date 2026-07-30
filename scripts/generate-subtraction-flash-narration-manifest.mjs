@@ -24,27 +24,6 @@ const NUMBER_WORDS = new Map([
   [18, "eighteen"],
 ]);
 
-const VARIANTS = [
-  {
-    id: "question",
-    speech(minuend, subtrahend) {
-      return `What is ${minuend} minus ${subtrahend}?`;
-    },
-  },
-  {
-    id: "paced",
-    speech(minuend, subtrahend) {
-      return `${minuend}... minus ${subtrahend}. What is the answer?`;
-    },
-  },
-  {
-    id: "brisk",
-    speech(minuend, subtrahend) {
-      return `${minuend} minus ${subtrahend}?`;
-    },
-  },
-];
-
 async function readExistingCues() {
   try {
     const source = JSON.parse(await readFile(manifestUrl, "utf8"));
@@ -61,27 +40,27 @@ for (let minuend = 11; minuend <= 18; minuend += 1) {
   for (let subtrahend = 2; subtrahend <= 9; subtrahend += 1) {
     if (minuend % 10 >= subtrahend) continue;
 
-    for (const variant of VARIANTS) {
-      const cueId = `${minuend}-${subtrahend}-${variant.id}`;
-      const speechText = variant.speech(
-        NUMBER_WORDS.get(minuend),
-        NUMBER_WORDS.get(subtrahend),
-      );
-      const file = `${minuend}-minus-${subtrahend}-${variant.id}.mp3`;
-      const previous = existingCues[cueId];
-      const canKeepAudit =
-        previous?.speechText === speechText && previous?.file === file;
+    const cueId = `${minuend}-${subtrahend}`;
+    const speechText =
+      `${NUMBER_WORDS.get(minuend)} minus ${NUMBER_WORDS.get(subtrahend)}?`;
+    const file = `${minuend}-minus-${subtrahend}.mp3`;
+    const previous =
+      existingCues[cueId] ?? existingCues[`${cueId}-brisk`];
+    const previousFileIsCurrentOrLegacy =
+      previous?.file === file ||
+      previous?.file === `${minuend}-minus-${subtrahend}-brisk.mp3`;
+    const canKeepAudit =
+      previous?.speechText === speechText && previousFileIsCurrentOrLegacy;
 
-      cues[cueId] = {
-        caption: "Listen for the subtraction problem.",
-        speechText,
-        file,
-        audioDurationMs: canKeepAudit ? previous.audioDurationMs : 0,
-        minVisualMs: 0,
-        lingerMs: 0,
-        sha256: canKeepAudit ? previous.sha256 : "",
-      };
-    }
+    cues[cueId] = {
+      caption: "Listen.",
+      speechText,
+      file,
+      audioDurationMs: canKeepAudit ? previous.audioDurationMs : 0,
+      minVisualMs: 0,
+      lingerMs: 0,
+      sha256: canKeepAudit ? previous.sha256 : "",
+    };
   }
 }
 

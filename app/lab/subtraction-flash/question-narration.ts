@@ -4,10 +4,7 @@ import {
   type GameNarrationClip,
 } from "@/lib/game-narration";
 
-import type {
-  SpokenVariant,
-  SubtractionCard,
-} from "./game-engine";
+import type { SubtractionCard } from "./game-engine";
 
 const ASSET_ROOT =
   "/audio/narration/kokoro-82m-v1-af-heart/subtraction-flash";
@@ -38,8 +35,7 @@ export const SUBTRACTION_QUESTION_NARRATION =
   defineGameNarrationManifest(clips, narrationSource.narrator);
 
 export function subtractionNarrationCueId(
-  card: Pick<SubtractionCard, "minuend" | "subtrahend" | "spokenVariant">,
+  card: Pick<SubtractionCard, "minuend" | "subtrahend">,
 ): SubtractionNarrationCueId {
-  const variant: SpokenVariant = card.spokenVariant;
-  return `${card.minuend}-${card.subtrahend}-${variant}` as SubtractionNarrationCueId;
+  return `${card.minuend}-${card.subtrahend}` as SubtractionNarrationCueId;
 }
