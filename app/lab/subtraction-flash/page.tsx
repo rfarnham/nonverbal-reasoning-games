@@ -40,25 +40,13 @@ type RoundState = Readonly<{
 
 type ModeRounds = Record<PracticeMode, RoundState | null>;
 
+const RESULT_FLASH_MS = 520;
+
 function ArrowLeftIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
         d="M14.5 5 7.5 12l7 7"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function ArrowRightIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="m9.5 5 7 7-7 7"
         stroke="currentColor"
         strokeWidth="2"
         strokeLinecap="round"
@@ -185,13 +173,11 @@ export default function SubtractionFlashPage() {
   });
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [answeredCount, setAnsweredCount] = useState(0);
 
   const modeRef = useRef<PracticeMode>("visual");
   const soundEnabledRef = useRef(true);
   const audioContextRef = useRef<AudioContext | null>(null);
   const playbackTokenRef = useRef(0);
-  const nextButtonRef = useRef<HTMLButtonElement | null>(null);
   const answerButtonRefs = useRef<
     Partial<Record<AnswerValue, HTMLButtonElement | null>>
   >({});
@@ -320,13 +306,12 @@ export default function SubtractionFlashPage() {
           correct,
         },
       }));
-      setAnsweredCount((count) => count + 1);
       playEarcon(correct);
     },
     [answerReady, decks, mode, playEarcon, rounds, stopSpeaking],
   );
 
-  const handleNext = useCallback(() => {
+  const advanceRound = useCallback(() => {
     const deck = decks[mode];
 
     stopSpeaking();
@@ -345,9 +330,9 @@ export default function SubtractionFlashPage() {
       setMode(nextMode);
 
       let targetRound = rounds[nextMode];
-      if (!targetRound) {
+      if (!targetRound || targetRound.selectedAnswer !== null) {
         targetRound = newRound(deck.next(), nextMode);
-      } else if (targetRound.selectedAnswer === null) {
+      } else {
         targetRound = {
           ...targetRound,
           startedAt: nextMode === "visual" ? performance.now() : null,
@@ -437,15 +422,25 @@ export default function SubtractionFlashPage() {
     if (!currentRound) return;
 
     const frame = requestAnimationFrame(() => {
-      if (currentRound.selectedAnswer !== null) {
-        nextButtonRef.current?.focus();
-      } else if (answerReady) {
+      if (answerReady) {
         answerButtonRefs.current[ANSWER_VALUES[0]]?.focus();
       }
     });
 
     return () => cancelAnimationFrame(frame);
   }, [answerReady, currentRound]);
+
+  useEffect(() => {
+    if (!currentRound || currentRound.selectedAnswer === null) return;
+
+    const answeredMode = mode;
+    const timer = window.setTimeout(() => {
+      if (modeRef.current === answeredMode) {
+        advanceRound();
+      }
+    }, RESULT_FLASH_MS);
+    return () => window.clearTimeout(timer);
+  }, [advanceRound, currentRound, mode]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -481,40 +476,7 @@ export default function SubtractionFlashPage() {
       <header className={styles.topbar}>
         <Link className={styles.backLink} href="/" aria-label="All games">
           <ArrowLeftIcon />
-          <span className={styles.backLabel}>All games</span>
         </Link>
-
-        <div className={styles.gameTitle}>
-          <span className={styles.titleMark} aria-hidden="true">
-            −
-          </span>
-          <span>Borrow Flash</span>
-        </div>
-
-        <button
-          className={styles.soundButton}
-          type="button"
-          aria-pressed={soundEnabled}
-          aria-label={`Sound ${soundEnabled ? "on" : "off"}. Toggle sound.`}
-          onClick={handleSoundToggle}
-        >
-          <SoundIcon enabled={soundEnabled} />
-          <span className={styles.soundLabel}>Sound</span>
-          <span className={styles.soundState} aria-hidden="true">
-            {soundEnabled ? "On" : "Off"}
-          </span>
-        </button>
-      </header>
-
-      <main className={styles.main}>
-        <section className={styles.intro} aria-labelledby="game-heading">
-          <p className={styles.kicker}>Cross-ten subtraction</p>
-          <h1 id="game-heading">Borrow Flash</h1>
-          <p className={styles.introText}>
-            Choose once, then move on. Tricky facts return once later in the
-            shuffle.
-          </p>
-        </section>
 
         <nav className={styles.modeSwitch} aria-label="Practice style">
           <button
@@ -537,71 +499,85 @@ export default function SubtractionFlashPage() {
           </button>
         </nav>
 
-        <section className={styles.board} aria-label="Subtraction practice">
-          <div className={styles.statusRow}>
-            <span>
-              {mode === "visual" ? "Card deck" : "Listening deck"}
-            </span>
-            <span>
-              <strong>
-                {currentRound
-                  ? `Card ${currentRound.draw.drawNumber}`
-                  : "Shuffling"}
-              </strong>
-              {" · "}
-              {answeredCount} answered
-            </span>
-          </div>
+        <button
+          className={styles.soundButton}
+          type="button"
+          aria-pressed={soundEnabled}
+          aria-label={`Sound ${soundEnabled ? "on" : "off"}. Toggle sound.`}
+          onClick={handleSoundToggle}
+        >
+          <SoundIcon enabled={soundEnabled} />
+        </button>
+      </header>
 
+      <main className={styles.main}>
+        <section className={styles.board} aria-labelledby="game-heading">
+          <h1 className={styles.visuallyHidden} id="game-heading">
+            Borrow Flash
+          </h1>
           <div className={styles.promptArea}>
             {!currentRound ? (
-              <div className={styles.loadingCard}>Shuffling cards…</div>
+              <div className={styles.loadingCard} aria-label="Shuffling cards" />
             ) : mode === "visual" ? (
               <VisualProblem round={currentRound} />
             ) : (
-              <div
+              <button
                 className={`${styles.listeningCard} ${
                   isSpeaking ? styles.speaking : ""
                 }`}
-                aria-label="Spoken subtraction question"
+                type="button"
+                aria-label={
+                  !soundEnabled
+                    ? "Sound is off"
+                    : isSpeaking
+                      ? "Playing subtraction question"
+                      : "Replay subtraction question"
+                }
+                disabled={
+                  !soundEnabled ||
+                  isSpeaking ||
+                  currentRound.selectedAnswer !== null
+                }
+                onClick={() => speakQuestion(currentRound)}
               >
-                <div className={styles.speakerOrb}>
+                <span className={styles.speakerOrb}>
                   <SpeakerIcon />
-                </div>
-                <p className={styles.listeningTitle}>
-                  {isSpeaking
-                    ? "Listen…"
-                    : !soundEnabled && currentRound.startedAt === null
-                      ? "Sound is off"
-                      : "Question ready"}
-                </p>
-                <p className={styles.listeningHint}>
-                  {soundEnabled
-                    ? "No number card is shown in this mode."
-                    : "Sound is off. Turn it on or switch to Cards."}
-                </p>
-                <button
-                  className={styles.replayButton}
-                  type="button"
-                  disabled={
-                    !soundEnabled ||
-                    isSpeaking ||
-                    currentRound.selectedAnswer !== null
-                  }
-                  onClick={() => speakQuestion(currentRound)}
-                >
-                  <SpeakerIcon />
-                  Replay question
-                </button>
-              </div>
+                </span>
+                {!soundEnabled ? (
+                  <span className={styles.listeningState}>Sound off</span>
+                ) : null}
+              </button>
             )}
+
+            <div
+              className={`${styles.resultFlash} ${
+                currentRound?.correct === true
+                  ? styles.resultCorrect
+                  : currentRound?.correct === false
+                    ? styles.resultIncorrect
+                    : ""
+              }`}
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              {currentRound?.correct !== null &&
+              currentRound?.correct !== undefined ? (
+                <>
+                  <span className={styles.resultSymbol} aria-hidden="true">
+                    {currentRound.correct ? "✓" : "×"}
+                  </span>
+                  {currentRound.correct ? "Correct" : "Incorrect"}
+                </>
+              ) : null}
+            </div>
           </div>
 
           <section
             className={styles.answerSection}
             aria-labelledby="answer-heading"
           >
-            <h2 className={styles.answerHeading} id="answer-heading">
+            <h2 className={styles.visuallyHidden} id="answer-heading">
               Choose the answer
             </h2>
             <div className={styles.answerGrid}>
@@ -634,51 +610,6 @@ export default function SubtractionFlashPage() {
                   </button>
                 );
               })}
-            </div>
-
-            <div className={styles.feedbackRow}>
-              <p
-                className={`${styles.feedback} ${
-                  currentRound?.correct === true
-                    ? styles.feedbackCorrect
-                    : currentRound?.correct === false
-                      ? styles.feedbackIncorrect
-                      : ""
-                }`}
-                role="status"
-                aria-live="polite"
-              >
-                {currentRound?.correct === true ? (
-                  <>
-                    <span className={styles.feedbackSymbol} aria-hidden="true">
-                      ✓
-                    </span>
-                    Correct
-                  </>
-                ) : currentRound?.correct === false ? (
-                  <>
-                    <span className={styles.feedbackSymbol} aria-hidden="true">
-                      ×
-                    </span>
-                    Incorrect
-                  </>
-                ) : (
-                  "One answer per card."
-                )}
-              </p>
-
-              {currentRound?.selectedAnswer !== null &&
-              currentRound?.selectedAnswer !== undefined ? (
-                <button
-                  ref={nextButtonRef}
-                  className={styles.nextButton}
-                  type="button"
-                  onClick={handleNext}
-                >
-                  Next card
-                  <ArrowRightIcon />
-                </button>
-              ) : null}
             </div>
           </section>
         </section>
