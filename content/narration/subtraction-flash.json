@@ -1,0 +1,984 @@
+{
+  "narrator": {
+    "model": "hexgrad/Kokoro-82M",
+    "revision": "f3ff3571791e39611d31c381e3a41a3af07b4987",
+    "voice": "af_heart",
+    "speed": 0.88,
+    "sampleRate": 24000,
+    "format": "mp3"
+  },
+  "cues": {
+    "11-2-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is eleven minus two?",
+      "file": "11-minus-2-question.mp3",
+      "audioDurationMs": 2325,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "4ed8a1576b81e2048a42168f2b6d7f42212d5598296c3f78effd1babdf47381f"
+    },
+    "11-2-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "eleven... minus two. What is the answer?",
+      "file": "11-minus-2-paced.mp3",
+      "audioDurationMs": 3375,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "1928d0ffcc5e3f6d6b1fb66f27fc12d80c6f849c7d8e11d5a8ce4693041feb67"
+    },
+    "11-2-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "eleven minus two?",
+      "file": "11-minus-2-brisk.mp3",
+      "audioDurationMs": 2075,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "826a2d0ea67358c35a893423508c0450654a332fb4f1c69c44c19dd01f9a8d49"
+    },
+    "11-3-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is eleven minus three?",
+      "file": "11-minus-3-question.mp3",
+      "audioDurationMs": 2300,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "bd791f9aa8a05f7d79d0a355ea6970681213037d330d1f4bae23984e70acc8d9"
+    },
+    "11-3-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "eleven... minus three. What is the answer?",
+      "file": "11-minus-3-paced.mp3",
+      "audioDurationMs": 3400,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "22084e7f34519626e39651401f67c04cb86adc50a1e344cdd839812aca427604"
+    },
+    "11-3-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "eleven minus three?",
+      "file": "11-minus-3-brisk.mp3",
+      "audioDurationMs": 2100,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "26d45cd9673875ed14323da62c392df1d56857318afa2f9bae584e4d9040df6f"
+    },
+    "11-4-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is eleven minus four?",
+      "file": "11-minus-4-question.mp3",
+      "audioDurationMs": 2375,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "42d4253c8aed3f77d18c579ac053305a5254f8387c8288de88250f9d50d88f84"
+    },
+    "11-4-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "eleven... minus four. What is the answer?",
+      "file": "11-minus-4-paced.mp3",
+      "audioDurationMs": 3325,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "774ad99cd3e0b683b3ec786c4320c06e9c1444fa2e980eb6896d07ef6df0376b"
+    },
+    "11-4-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "eleven minus four?",
+      "file": "11-minus-4-brisk.mp3",
+      "audioDurationMs": 2100,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "c0cabff5a2c82889bf6bc8a72b8d0219dfeb82e9f1a522a6e0ad31fae68c6090"
+    },
+    "11-5-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is eleven minus five?",
+      "file": "11-minus-5-question.mp3",
+      "audioDurationMs": 2375,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "d72a97f794594562ca80a028e48c969e52ace09f09d5b36e059aee2977d0f039"
+    },
+    "11-5-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "eleven... minus five. What is the answer?",
+      "file": "11-minus-5-paced.mp3",
+      "audioDurationMs": 3350,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "6f464f3c2f7b6fb1f2d8150deaa0016ff83856093412c98f54a7294edd7dcb90"
+    },
+    "11-5-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "eleven minus five?",
+      "file": "11-minus-5-brisk.mp3",
+      "audioDurationMs": 2150,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "b860aa3768007326b51691bd739e257dd1583604ea4df6265e72b5cf11e68b29"
+    },
+    "11-6-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is eleven minus six?",
+      "file": "11-minus-6-question.mp3",
+      "audioDurationMs": 2325,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "7f4494e9e70fd8d18949050f50977b3e99aad554c3ac1bfde29b44dab2fd9398"
+    },
+    "11-6-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "eleven... minus six. What is the answer?",
+      "file": "11-minus-6-paced.mp3",
+      "audioDurationMs": 3475,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "0e137cfcb4ff1f73a16f43bc9c014df5f4100e3fad7eb78f260914c2677d1caa"
+    },
+    "11-6-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "eleven minus six?",
+      "file": "11-minus-6-brisk.mp3",
+      "audioDurationMs": 2100,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "53de708091b00048e4ea039be8718126481977e586fb0438a6e65204976913e1"
+    },
+    "11-7-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is eleven minus seven?",
+      "file": "11-minus-7-question.mp3",
+      "audioDurationMs": 2400,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "57f2c83a2aad677b81ba761f63f363fa3b7ab76a54daac548196dd2645bf7a65"
+    },
+    "11-7-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "eleven... minus seven. What is the answer?",
+      "file": "11-minus-7-paced.mp3",
+      "audioDurationMs": 3450,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "cf007d58a23e3a47e65cced944a6c2b13808d20980bd6e99e64200714446dbdd"
+    },
+    "11-7-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "eleven minus seven?",
+      "file": "11-minus-7-brisk.mp3",
+      "audioDurationMs": 2150,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "d0ceeb4360dc24a4418d38b50512ae7159fda06d3c4a8de59a9bee1355682594"
+    },
+    "11-8-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is eleven minus eight?",
+      "file": "11-minus-8-question.mp3",
+      "audioDurationMs": 2325,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "bec8c307c5b0b20a12a1509839e9160b55d6a200f8760189978a2c1756df06a6"
+    },
+    "11-8-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "eleven... minus eight. What is the answer?",
+      "file": "11-minus-8-paced.mp3",
+      "audioDurationMs": 3325,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "7a9ac77eee074c2a9aabbb33541501fc3773c3b22cc3457fe3f2c2d22b718e9f"
+    },
+    "11-8-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "eleven minus eight?",
+      "file": "11-minus-8-brisk.mp3",
+      "audioDurationMs": 2100,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "6c9cda8e605d329090ccddc9b58934c923cc2f706cffdbbed4daefa8b86a7c28"
+    },
+    "11-9-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is eleven minus nine?",
+      "file": "11-minus-9-question.mp3",
+      "audioDurationMs": 2350,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "2d18a3f73febbed7144e243b814435fe2b6b4637b310c6ca62375d9849272d06"
+    },
+    "11-9-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "eleven... minus nine. What is the answer?",
+      "file": "11-minus-9-paced.mp3",
+      "audioDurationMs": 3375,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "c5471be738ddce7aa15d4cb9c3dd10e1affbf9922fc9ca8fd4780037e8fcaacc"
+    },
+    "11-9-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "eleven minus nine?",
+      "file": "11-minus-9-brisk.mp3",
+      "audioDurationMs": 2100,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "f810677ddab62629793316443d2007c5c801cdcee53dfba83c0736485ba396d7"
+    },
+    "12-3-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is twelve minus three?",
+      "file": "12-minus-3-question.mp3",
+      "audioDurationMs": 2200,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "6150a2dd9582e4230749e0008a40ea121ce2e8339fed129cf81f2cb00c19954e"
+    },
+    "12-3-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "twelve... minus three. What is the answer?",
+      "file": "12-minus-3-paced.mp3",
+      "audioDurationMs": 3275,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "aef4c814127692fb88ce73f18c829d47d9b59c807d057210399b19465397c167"
+    },
+    "12-3-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "twelve minus three?",
+      "file": "12-minus-3-brisk.mp3",
+      "audioDurationMs": 2000,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "23a00a12b9d3f3402f6a1713f78813ac3ddbe28a030e30191b5a9caa32242531"
+    },
+    "12-4-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is twelve minus four?",
+      "file": "12-minus-4-question.mp3",
+      "audioDurationMs": 2250,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "0712737448d65b23acba204e995f088a90d61b562bbb18780dcf102ca6c90a9b"
+    },
+    "12-4-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "twelve... minus four. What is the answer?",
+      "file": "12-minus-4-paced.mp3",
+      "audioDurationMs": 3275,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "472858521308898a897bf9343e97c2fd70a405dfb8b662addb49f97e1f067b5d"
+    },
+    "12-4-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "twelve minus four?",
+      "file": "12-minus-4-brisk.mp3",
+      "audioDurationMs": 2025,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "9981d92716c841fb1b0bda863dc967cbc978751aaa8414e209a648256003c261"
+    },
+    "12-5-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is twelve minus five?",
+      "file": "12-minus-5-question.mp3",
+      "audioDurationMs": 2225,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "500f2a3870a88e05d3084e69321ace4518f794c8499da38115d8e271815f5a7a"
+    },
+    "12-5-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "twelve... minus five. What is the answer?",
+      "file": "12-minus-5-paced.mp3",
+      "audioDurationMs": 3225,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "0022ab807d7a16bb0c34ec777f6ae0278eb1e23c19c3d6000d04e4fd6b915a3c"
+    },
+    "12-5-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "twelve minus five?",
+      "file": "12-minus-5-brisk.mp3",
+      "audioDurationMs": 2100,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "deb7b1f8ad7dc308de514c9e13190cf24f4a58c0f7e3bd7940b4dd5ed386aded"
+    },
+    "12-6-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is twelve minus six?",
+      "file": "12-minus-6-question.mp3",
+      "audioDurationMs": 2200,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "909af5d557c6a6936f584684a5892609065371ffa32c658f41f265232107fa6e"
+    },
+    "12-6-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "twelve... minus six. What is the answer?",
+      "file": "12-minus-6-paced.mp3",
+      "audioDurationMs": 3275,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "fed4c992675954cd9a79c9b1fb59bdbff8b433dc94973e792d4c6c2313ba9d2c"
+    },
+    "12-6-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "twelve minus six?",
+      "file": "12-minus-6-brisk.mp3",
+      "audioDurationMs": 2050,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "30473531c152fb9461cc8f01e10f9cf8c090371f123898b3c833fd1a85974cf6"
+    },
+    "12-7-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is twelve minus seven?",
+      "file": "12-minus-7-question.mp3",
+      "audioDurationMs": 2250,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "b0b9974c2e0aec224b07095c599de917f4c12021cc01a750c074435db9007451"
+    },
+    "12-7-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "twelve... minus seven. What is the answer?",
+      "file": "12-minus-7-paced.mp3",
+      "audioDurationMs": 3275,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "9929494c4f21fc47de2ebc7a5dfa9b070a7f664aa0f9288630b3c3ff9b73949e"
+    },
+    "12-7-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "twelve minus seven?",
+      "file": "12-minus-7-brisk.mp3",
+      "audioDurationMs": 2025,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "6043008e52d2f2b9ee86178750c4118cd3dbf6f475be4f36666cb990d96087ae"
+    },
+    "12-8-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is twelve minus eight?",
+      "file": "12-minus-8-question.mp3",
+      "audioDurationMs": 2175,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "476061856e6cc9ebb6d5beb7c3d6daaf11f3e4a57952cc6fc760251ca39a771a"
+    },
+    "12-8-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "twelve... minus eight. What is the answer?",
+      "file": "12-minus-8-paced.mp3",
+      "audioDurationMs": 3200,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "79c23c5ef842514e9449ec1dd0d9ec52e90a35acd49dc881e0f067123e9e4b1c"
+    },
+    "12-8-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "twelve minus eight?",
+      "file": "12-minus-8-brisk.mp3",
+      "audioDurationMs": 2025,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "09833558774c0cf891e00e7db1518860266c52b288077c2d6f683f20ef535a7e"
+    },
+    "12-9-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is twelve minus nine?",
+      "file": "12-minus-9-question.mp3",
+      "audioDurationMs": 2250,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "dd66237cc6ff4ecccdcff578c01c04846fd7eaf0687685a1850139156a6c1306"
+    },
+    "12-9-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "twelve... minus nine. What is the answer?",
+      "file": "12-minus-9-paced.mp3",
+      "audioDurationMs": 3275,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "61a88a1a9bb1e3f3a0464b9ec5626a7f516278187cdd1531085bcb38dd75a415"
+    },
+    "12-9-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "twelve minus nine?",
+      "file": "12-minus-9-brisk.mp3",
+      "audioDurationMs": 2025,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "6b14dc1e3e8116a14f4d49c0162e7b151b0dca57becbb6e923b0d581438f5b47"
+    },
+    "13-4-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is thirteen minus four?",
+      "file": "13-minus-4-question.mp3",
+      "audioDurationMs": 2350,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "0a07fa342b2590b23110a791e94306d6784667f28d5ba979f41c2e01fff8a83e"
+    },
+    "13-4-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "thirteen... minus four. What is the answer?",
+      "file": "13-minus-4-paced.mp3",
+      "audioDurationMs": 3425,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "83d85076add066cc401dcf488150fcfc0cd1e6a7657cc5013da7e21f09af295d"
+    },
+    "13-4-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "thirteen minus four?",
+      "file": "13-minus-4-brisk.mp3",
+      "audioDurationMs": 2075,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "31ec0a540cf406d967f51f43fb7a4639d097ed753b531f2e20ad96706cca5c49"
+    },
+    "13-5-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is thirteen minus five?",
+      "file": "13-minus-5-question.mp3",
+      "audioDurationMs": 2300,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "7ef72f8fb3afb8df75d0d5b27523f885b6f3e02d4458aa7748a83a9202e4a6d5"
+    },
+    "13-5-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "thirteen... minus five. What is the answer?",
+      "file": "13-minus-5-paced.mp3",
+      "audioDurationMs": 3450,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "247e10a557d300336c6ed329554730de93deba15fbea964b9e5195b169938378"
+    },
+    "13-5-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "thirteen minus five?",
+      "file": "13-minus-5-brisk.mp3",
+      "audioDurationMs": 2075,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "fd471de3d6ab3834e66558b43f8be20ed919d70431af392c7c601e8bad306d70"
+    },
+    "13-6-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is thirteen minus six?",
+      "file": "13-minus-6-question.mp3",
+      "audioDurationMs": 2225,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "df01cf70f14be534fa84a22e97f7dcf5aee45132d313171e6b56f4622b4e8446"
+    },
+    "13-6-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "thirteen... minus six. What is the answer?",
+      "file": "13-minus-6-paced.mp3",
+      "audioDurationMs": 3550,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "f1ddba7ec951716e255e5deb6709fa87ed9629daac94df3eab0ae9e53a0cc756"
+    },
+    "13-6-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "thirteen minus six?",
+      "file": "13-minus-6-brisk.mp3",
+      "audioDurationMs": 2025,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "a1282b68afe4b654a431e3ff897a84feafff56994de30207ae65109fd71fd700"
+    },
+    "13-7-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is thirteen minus seven?",
+      "file": "13-minus-7-question.mp3",
+      "audioDurationMs": 2250,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "92703bbe872c68d283ab28a9e48de8e971d635dffed736e7c23539aaaa85ad4e"
+    },
+    "13-7-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "thirteen... minus seven. What is the answer?",
+      "file": "13-minus-7-paced.mp3",
+      "audioDurationMs": 3575,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "6db5ae6e74ba4c467fa7616835760b7491d1e4562266ba16e342455725a15414"
+    },
+    "13-7-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "thirteen minus seven?",
+      "file": "13-minus-7-brisk.mp3",
+      "audioDurationMs": 2100,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "3992abf495c63346d82505a54afa41d1486330fa68571ee2f551c07900954789"
+    },
+    "13-8-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is thirteen minus eight?",
+      "file": "13-minus-8-question.mp3",
+      "audioDurationMs": 2225,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "7f0987b72cbedf7be7f9b2bfd13c275dfa3bd33b8ff3fdde5a31aaf893d295ca"
+    },
+    "13-8-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "thirteen... minus eight. What is the answer?",
+      "file": "13-minus-8-paced.mp3",
+      "audioDurationMs": 3400,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "a17a8d49a8bf76cb03481fcee7d851425925a18d6ca7a32bb2031534386f997a"
+    },
+    "13-8-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "thirteen minus eight?",
+      "file": "13-minus-8-brisk.mp3",
+      "audioDurationMs": 2100,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "423b01126e9470f03ea165d0566d966789c030d5b344a149736cb5c0daed6f40"
+    },
+    "13-9-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is thirteen minus nine?",
+      "file": "13-minus-9-question.mp3",
+      "audioDurationMs": 2300,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "daa4d4f689dda34df4c2fc92769b6d074028b952a6280fbdcfec2865e8f1b15e"
+    },
+    "13-9-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "thirteen... minus nine. What is the answer?",
+      "file": "13-minus-9-paced.mp3",
+      "audioDurationMs": 3500,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "f971883d91d3aa28279887945b041aee372bcd251105b87136146459ff875e69"
+    },
+    "13-9-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "thirteen minus nine?",
+      "file": "13-minus-9-brisk.mp3",
+      "audioDurationMs": 2100,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "3deb18517e71b14818ded18bbb00bb89c61b1ea731161b1f29ebd894419c75fc"
+    },
+    "14-5-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is fourteen minus five?",
+      "file": "14-minus-5-question.mp3",
+      "audioDurationMs": 2300,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "4476e3cc5f757ce7196516e6616b9788f60003d14ca146a7616625f1f5b4bcc8"
+    },
+    "14-5-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "fourteen... minus five. What is the answer?",
+      "file": "14-minus-5-paced.mp3",
+      "audioDurationMs": 3450,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "4a1834f564325cd6b5db4ce102bc978b01e85fe3fd2763b74eb5362e2d41043c"
+    },
+    "14-5-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "fourteen minus five?",
+      "file": "14-minus-5-brisk.mp3",
+      "audioDurationMs": 2200,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "4e18a35ab1da76665c1841466beb38a3ab354e0b7baabda374e90e77f991e190"
+    },
+    "14-6-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is fourteen minus six?",
+      "file": "14-minus-6-question.mp3",
+      "audioDurationMs": 2275,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "3f462f13e6a267823fa74feedd610944927276765da0816b7c00845e74fdb71c"
+    },
+    "14-6-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "fourteen... minus six. What is the answer?",
+      "file": "14-minus-6-paced.mp3",
+      "audioDurationMs": 3475,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "ce4cc8c817d15be217fde0b9c05b888f91e39e01578052fe8398ebfc8c35a9fa"
+    },
+    "14-6-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "fourteen minus six?",
+      "file": "14-minus-6-brisk.mp3",
+      "audioDurationMs": 2150,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "2ce4ea7c3756eeb5c010b9aa0b2e07587ef34984f67e2b68f338ec40342074b2"
+    },
+    "14-7-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is fourteen minus seven?",
+      "file": "14-minus-7-question.mp3",
+      "audioDurationMs": 2325,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "30581cc0558e85d90b314dcd8f2f7b7ec05a13b2186962daaa32d161c356e542"
+    },
+    "14-7-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "fourteen... minus seven. What is the answer?",
+      "file": "14-minus-7-paced.mp3",
+      "audioDurationMs": 3550,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "8bc8549ed4a81b10010fbb67a8fe7002f44686f1a3d55b4865f62008df4d9bc5"
+    },
+    "14-7-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "fourteen minus seven?",
+      "file": "14-minus-7-brisk.mp3",
+      "audioDurationMs": 2175,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "fe24521903f8c83181a984c3a9cf29229e0e3736593fb2fc54c1153d57c77fef"
+    },
+    "14-8-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is fourteen minus eight?",
+      "file": "14-minus-8-question.mp3",
+      "audioDurationMs": 2250,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "051b15ac7707b589d59b93d88c8fe6ab209fc638169c9de129f4c398baaca239"
+    },
+    "14-8-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "fourteen... minus eight. What is the answer?",
+      "file": "14-minus-8-paced.mp3",
+      "audioDurationMs": 3400,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "8ac3acb89e11cd39d6b49675a7278df892606e824574a4bcb0daefbca019be2c"
+    },
+    "14-8-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "fourteen minus eight?",
+      "file": "14-minus-8-brisk.mp3",
+      "audioDurationMs": 2125,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "4248b937b2a48e9dd8d4ccef691004c1e5e94b9614ae33bafb30a52359f7b099"
+    },
+    "14-9-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is fourteen minus nine?",
+      "file": "14-minus-9-question.mp3",
+      "audioDurationMs": 2325,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "c76f53ecfc37a0da4cba2c376fa850d3a4f38f2b649668ea3c4754436766699a"
+    },
+    "14-9-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "fourteen... minus nine. What is the answer?",
+      "file": "14-minus-9-paced.mp3",
+      "audioDurationMs": 3450,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "dba4068d43466a880221f843988c014cd9b7506a5a573c2807c40d1d34c43165"
+    },
+    "14-9-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "fourteen minus nine?",
+      "file": "14-minus-9-brisk.mp3",
+      "audioDurationMs": 2125,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "df8057845cfd3aece92fe68a396651d28c14193d56cbc3b59af40e31f801daba"
+    },
+    "15-6-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is fifteen minus six?",
+      "file": "15-minus-6-question.mp3",
+      "audioDurationMs": 2225,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "9ec79a393a70b55328f65366d9c3eea9b0d88b496e9bd46bfffaf3be499e2932"
+    },
+    "15-6-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "fifteen... minus six. What is the answer?",
+      "file": "15-minus-6-paced.mp3",
+      "audioDurationMs": 3525,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "b6c0f64dcd39d4964b7afcca9efce5973ef285acc3ff842416d10e2a5e668b76"
+    },
+    "15-6-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "fifteen minus six?",
+      "file": "15-minus-6-brisk.mp3",
+      "audioDurationMs": 2050,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "60b7a05abc3ee67ef045942b88896b946285096e541b1811231fc0ec4cbae798"
+    },
+    "15-7-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is fifteen minus seven?",
+      "file": "15-minus-7-question.mp3",
+      "audioDurationMs": 2250,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "3c79d7f3e57b8836c52ce3c9890b467b59c862168eeeed5143384fc879cbb88c"
+    },
+    "15-7-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "fifteen... minus seven. What is the answer?",
+      "file": "15-minus-7-paced.mp3",
+      "audioDurationMs": 3575,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "40cf0d0aeca79b307ffa7cbc2901a3a3b4bf88ac1343d5fe6b2050abb1f8a7b7"
+    },
+    "15-7-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "fifteen minus seven?",
+      "file": "15-minus-7-brisk.mp3",
+      "audioDurationMs": 2100,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "12efadec11413ccb1b3621d454073088ddfba2dff6073fc7cae40472ac302b58"
+    },
+    "15-8-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is fifteen minus eight?",
+      "file": "15-minus-8-question.mp3",
+      "audioDurationMs": 2175,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "b38f524f7a8220eed1a06cdac3056425d644adec3aa4d4ba438f4c325222460b"
+    },
+    "15-8-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "fifteen... minus eight. What is the answer?",
+      "file": "15-minus-8-paced.mp3",
+      "audioDurationMs": 3350,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "bf673130108aadee9183c8119fd8cb071edcf69b6187e05ee5c913c9222cfa52"
+    },
+    "15-8-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "fifteen minus eight?",
+      "file": "15-minus-8-brisk.mp3",
+      "audioDurationMs": 2100,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "270cc58e58c2818576c8c8cefc81fe2bbda01a5b472adf154a5e1d35017ee9ac"
+    },
+    "15-9-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is fifteen minus nine?",
+      "file": "15-minus-9-question.mp3",
+      "audioDurationMs": 2250,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "816b4b62eb17740f6b86d1d7c03de5fa1ea642e457a792f41518717c960c6ee6"
+    },
+    "15-9-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "fifteen... minus nine. What is the answer?",
+      "file": "15-minus-9-paced.mp3",
+      "audioDurationMs": 3525,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "9cf4464ca80997fb7f9c29ca2a154f0a33258ea3c4c3097670172fe79568173e"
+    },
+    "15-9-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "fifteen minus nine?",
+      "file": "15-minus-9-brisk.mp3",
+      "audioDurationMs": 2075,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "eda2107e16dfd97a4d091eb39c5071adb33ab74ca7d3cdfd5a47ccb1924c5d9e"
+    },
+    "16-7-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is sixteen minus seven?",
+      "file": "16-minus-7-question.mp3",
+      "audioDurationMs": 2275,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "9107f9df027ae38ba4d813a4d81a9c30af3e577478af0b0ba8404841f0e5b4b2"
+    },
+    "16-7-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "sixteen... minus seven. What is the answer?",
+      "file": "16-minus-7-paced.mp3",
+      "audioDurationMs": 3600,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "07f8d1d30cc4e617e33aec50e819d81ccdf275bc6c87ce3615b16678700180cc"
+    },
+    "16-7-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "sixteen minus seven?",
+      "file": "16-minus-7-brisk.mp3",
+      "audioDurationMs": 2175,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "456d3c68f8e91b022fc0891ea64487e4b41b989caefd33a566782a0486f6d01f"
+    },
+    "16-8-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is sixteen minus eight?",
+      "file": "16-minus-8-question.mp3",
+      "audioDurationMs": 2250,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "8b5698d81911c85a47e04292b223c0d74282f47d87ec8e40002a24182756da90"
+    },
+    "16-8-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "sixteen... minus eight. What is the answer?",
+      "file": "16-minus-8-paced.mp3",
+      "audioDurationMs": 3500,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "faa746cf68cf2eaaccb0e1d94a6cefcdaed0c95bf61c82d0088ecc0c3afb912c"
+    },
+    "16-8-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "sixteen minus eight?",
+      "file": "16-minus-8-brisk.mp3",
+      "audioDurationMs": 2050,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "23dbe48baec517437c37041ef449a011ce5409e2a26bb1d9085416f62156d393"
+    },
+    "16-9-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is sixteen minus nine?",
+      "file": "16-minus-9-question.mp3",
+      "audioDurationMs": 2300,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "e3a5b24f41e27ebd6debb660f59d57332452656e406ba3ed33de303b114345b8"
+    },
+    "16-9-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "sixteen... minus nine. What is the answer?",
+      "file": "16-minus-9-paced.mp3",
+      "audioDurationMs": 3575,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "23145acc7ef7e8012821f3cb3d41605cb60a58ee475fcc67665b277aeadf1f51"
+    },
+    "16-9-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "sixteen minus nine?",
+      "file": "16-minus-9-brisk.mp3",
+      "audioDurationMs": 2100,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "7c7533d8ea25ec6e237b97f9ca75ce2d4c9e2927082dd99518cf23d0e22d3410"
+    },
+    "17-8-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is seventeen minus eight?",
+      "file": "17-minus-8-question.mp3",
+      "audioDurationMs": 2400,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "e3412a80fc06c830235c53b33f0f67de8002ecd6a2dd945073faca82622784c3"
+    },
+    "17-8-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "seventeen... minus eight. What is the answer?",
+      "file": "17-minus-8-paced.mp3",
+      "audioDurationMs": 3575,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "392401ede74860268a4a7cf8e18df241e5ca7a43a754a3505d87bc4b8f83d9dd"
+    },
+    "17-8-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "seventeen minus eight?",
+      "file": "17-minus-8-brisk.mp3",
+      "audioDurationMs": 2100,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "69c0b323e2fd0ac023feac99dd31e5344e7fd659b008bf140dc982aec60bbb50"
+    },
+    "17-9-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is seventeen minus nine?",
+      "file": "17-minus-9-question.mp3",
+      "audioDurationMs": 2425,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "e2b43fe322e0822225c9d4ba680beb52d2034a5c1b3de99330ab861f86956df0"
+    },
+    "17-9-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "seventeen... minus nine. What is the answer?",
+      "file": "17-minus-9-paced.mp3",
+      "audioDurationMs": 3725,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "832bc777f3742b4d5b9927c0e627148a5997acc625bd9d4e9cf3743348f25425"
+    },
+    "17-9-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "seventeen minus nine?",
+      "file": "17-minus-9-brisk.mp3",
+      "audioDurationMs": 2175,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "97d4b66597a70825f1580a8e68db2c9ad19d457543206e85711e2af2e6d3fc29"
+    },
+    "18-9-question": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "What is eighteen minus nine?",
+      "file": "18-minus-9-question.mp3",
+      "audioDurationMs": 2275,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "d6ff40761eb4c1692751e1768886bf5932c9787a7e410590e1886dbb171c676f"
+    },
+    "18-9-paced": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "eighteen... minus nine. What is the answer?",
+      "file": "18-minus-9-paced.mp3",
+      "audioDurationMs": 3425,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "d0ccf0917b2ba04d58f2cdbb7d575f2fb62765cacd3456938563db1861c6e9a2"
+    },
+    "18-9-brisk": {
+      "caption": "Listen for the subtraction problem.",
+      "speechText": "eighteen minus nine?",
+      "file": "18-minus-9-brisk.mp3",
+      "audioDurationMs": 2125,
+      "minVisualMs": 0,
+      "lingerMs": 0,
+      "sha256": "b23200eda88e177b5995edfd5e75292622cb73d389e22028631097e146a4859a"
+    }
+  }
+}

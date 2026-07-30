@@ -1,0 +1,199 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  ANSWER_VALUES,
+  REVIEW_SPACING,
+  SLOW_RESPONSE_MS,
+  SPOKEN_VARIANTS,
+  SUBTRACTION_FACTS,
+  VISUAL_ORIENTATIONS,
+  buildAnswerOptions,
+  createBaseDeck,
+  createSeededRandom,
+  createSubtractionDeck,
+  requiresBorrow,
+} from "../app/lab/subtraction-flash/game-engine.ts";
+
+function assertFactSpacing(cards, preceding = []) {
+  const keys = [...preceding, ...cards.map((card) => card.factKey)];
+
+  for (let index = REVIEW_SPACING; index < keys.length; index += 1) {
+    assert.ok(
+      !keys.slice(index - REVIEW_SPACING, index).includes(keys[index]),
+      `${keys[index]} repeated inside the ${REVIEW_SPACING}-card cooldown`,
+    );
+  }
+}
+
+test("the fact catalogue contains exactly the 36 borrow-required facts", () => {
+  assert.equal(SUBTRACTION_FACTS.length, 36);
+  assert.equal(
+    new Set(SUBTRACTION_FACTS.map((fact) => fact.factKey)).size,
+    SUBTRACTION_FACTS.length,
+  );
+
+  for (const fact of SUBTRACTION_FACTS) {
+    assert.ok(fact.minuend >= 11 && fact.minuend <= 18);
+    assert.ok(fact.subtrahend >= 2 && fact.subtrahend <= 9);
+    assert.ok(requiresBorrow(fact.minuend, fact.subtrahend));
+    assert.equal(fact.answer, fact.minuend - fact.subtrahend);
+    assert.ok(ANSWER_VALUES.includes(fact.answer));
+  }
+
+  assert.equal(requiresBorrow(13, 4), true);
+  assert.equal(requiresBorrow(11, 3), true);
+  assert.equal(requiresBorrow(15, 2), false);
+});
+
+test("visual cycles balance both layouts and keep duplicate facts apart", () => {
+  const cards = createBaseDeck("visual", {
+    random: createSeededRandom(91),
+  });
+  assert.equal(cards.length, 72);
+  assertFactSpacing(cards);
+
+  for (const fact of SUBTRACTION_FACTS) {
+    const copies = cards.filter((card) => card.factKey === fact.factKey);
+    assert.equal(copies.length, 2);
+    assert.deepEqual(
+      new Set(copies.map((card) => card.orientation)),
+      new Set(VISUAL_ORIENTATIONS),
+    );
+  }
+});
+
+test("listening cycles ask every fact once in each voice cadence", () => {
+  const cards = createBaseDeck("listen", {
+    random: createSeededRandom(812),
+  });
+  assert.equal(cards.length, 108);
+  assertFactSpacing(cards);
+
+  for (const fact of SUBTRACTION_FACTS) {
+    const copies = cards.filter((card) => card.factKey === fact.factKey);
+    assert.equal(copies.length, 3);
+    assert.deepEqual(
+      new Set(copies.map((card) => card.spokenVariant)),
+      new Set(SPOKEN_VARIANTS),
+    );
+  }
+});
+
+test("a seed reproduces the same shuffled cycle", () => {
+  const first = createBaseDeck("listen", {
+    random: createSeededRandom(2_026),
+  }).map((card) => card.id);
+  const second = createBaseDeck("listen", {
+    random: createSeededRandom(2_026),
+  }).map((card) => card.id);
+  assert.deepEqual(first, second);
+});
+
+test("cycle reshuffles preserve spacing across the boundary", () => {
+  const deck = createSubtractionDeck({
+    mode: "visual",
+    random: createSeededRandom(77),
+  });
+  const draws = Array.from({ length: 78 }, () => deck.next());
+  const firstCycle = draws.filter((draw) => draw.cycle === 1);
+
+  assert.equal(firstCycle.length, 72);
+  assert.equal(draws.at(-1).cycle, 2);
+  assertFactSpacing(draws.map((draw) => draw.card));
+
+  const counts = new Map();
+  for (const { card } of firstCycle) {
+    counts.set(card.factKey, (counts.get(card.factKey) ?? 0) + 1);
+  }
+  assert.deepEqual(new Set(counts.values()), new Set([2]));
+});
+
+test("wrong and over-four-second facts return once, then stop", () => {
+  const deck = createSubtractionDeck({
+    mode: "listen",
+    random: createSeededRandom(515),
+  });
+  const first = deck.next().card;
+  const queued = deck.recordOutcome(first, {
+    correct: false,
+    elapsedMs: 800,
+  });
+  assert.deepEqual(queued, {
+    flagged: true,
+    reinserted: true,
+    reason: "incorrect",
+  });
+
+  const intervening = [];
+  let review;
+  for (let index = 0; index < 130; index += 1) {
+    const draw = deck.next();
+    if (draw.card.id === `${first.id}:review`) {
+      review = draw.card;
+      break;
+    }
+    intervening.push(draw.card);
+  }
+
+  assert.ok(review, "the flagged card returns");
+  assert.ok(intervening.length >= REVIEW_SPACING);
+  assert.equal(review.isReview, true);
+  assert.equal(
+    deck.recordOutcome(review, {
+      correct: false,
+      elapsedMs: SLOW_RESPONSE_MS + 1,
+    }).reinserted,
+    false,
+  );
+
+  const onTime = deck.next().card;
+  assert.equal(
+    deck.recordOutcome(onTime, {
+      correct: true,
+      elapsedMs: SLOW_RESPONSE_MS,
+    }).flagged,
+    false,
+  );
+  const slow = deck.next().card;
+  assert.deepEqual(
+    deck.recordOutcome(slow, {
+      correct: true,
+      elapsedMs: SLOW_RESPONSE_MS + 1,
+    }),
+    { flagged: true, reinserted: true, reason: "slow" },
+  );
+});
+
+test("repeated misses cannot create an infinite review loop", () => {
+  const deck = createSubtractionDeck({
+    mode: "visual",
+    random: createSeededRandom(19),
+  });
+  let reviewCount = 0;
+
+  for (let index = 0; index < 500; index += 1) {
+    const { card } = deck.next();
+    if (card.isReview) reviewCount += 1;
+    deck.recordOutcome(card, {
+      correct: false,
+      elapsedMs: SLOW_RESPONSE_MS + 10,
+    });
+  }
+
+  assert.ok(reviewCount > 0);
+  assert.ok(reviewCount <= SUBTRACTION_FACTS.length);
+  assert.equal(
+    deck.snapshot().reviewedFactCount,
+    SUBTRACTION_FACTS.length,
+  );
+});
+
+test("the answer list is stable, distinct, and always contains the result", () => {
+  for (const fact of SUBTRACTION_FACTS) {
+    const answers = buildAnswerOptions(fact);
+    assert.deepEqual(answers, ANSWER_VALUES);
+    assert.equal(new Set(answers).size, answers.length);
+    assert.ok(answers.includes(fact.answer));
+  }
+});
