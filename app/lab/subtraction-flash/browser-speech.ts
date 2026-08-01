@@ -161,9 +161,8 @@ export function getSpeechRecognitionConstructor(
 }
 
 /**
- * Creates a short, one-answer recognition session. Calling start remains the
- * responsibility of the visible microphone control so permission is requested
- * from a user gesture.
+ * Creates a short, one-answer recognition session. The caller decides when to
+ * start it; Subtraction Flash starts as soon as its prompt finishes.
  */
 export function createDigitSpeechRecognition(
   scope?: BrowserSpeechRecognitionScope,

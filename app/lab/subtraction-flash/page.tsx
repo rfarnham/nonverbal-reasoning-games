@@ -571,14 +571,22 @@ function HandwritingAnswer({
 
 type SpeechAnswerProps = Readonly<{
   disabled: boolean;
-  focusRef: MutableRefObject<HTMLButtonElement | null>;
+  microphonePermission: MicrophonePermission;
   onBeforeListen: () => void;
   onAnswer: (answer: AnswerValue, answeredAt: number) => void;
 }>;
 
+type MicrophonePermission =
+  | "idle"
+  | "requesting"
+  | "ready"
+  | "blocked"
+  | "unavailable";
+
 type SpeechState = Readonly<{
   kind:
     | "idle"
+    | "starting"
     | "listening"
     | "retry"
     | "blocked"
@@ -630,17 +638,21 @@ function speechErrorMessage(
 
 function SpeechAnswer({
   disabled,
-  focusRef,
+  microphonePermission,
   onBeforeListen,
   onAnswer,
 }: SpeechAnswerProps) {
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const watchdogRef = useRef<number | null>(null);
+  const retryTimerRef = useRef<number | null>(null);
   const sessionTokenRef = useRef(0);
+  const attemptRef = useRef(0);
+  const autoStartedRef = useRef(false);
+  const [retryNonce, setRetryNonce] = useState(0);
   const [supported, setSupported] = useState<boolean | null>(null);
   const [speechState, setSpeechState] = useState<SpeechState>({
-    kind: "idle",
-    message: "Tap to speak",
+    kind: "starting",
+    message: "Starting…",
     transcript: null,
   });
 
@@ -654,6 +666,10 @@ function SpeechAnswer({
   const cancelRecognition = useCallback(() => {
     sessionTokenRef.current += 1;
     clearWatchdog();
+    if (retryTimerRef.current !== null) {
+      window.clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
     const recognition = recognitionRef.current;
     recognitionRef.current = null;
     if (!recognition) return;
@@ -662,6 +678,7 @@ function SpeechAnswer({
     recognition.onerror = null;
     recognition.onnomatch = null;
     recognition.onresult = null;
+    recognition.onstart = null;
     recognition.onspeechend = null;
     try {
       recognition.abort();
@@ -684,15 +701,7 @@ function SpeechAnswer({
     if (disabled) cancelRecognition();
   }, [cancelRecognition, disabled]);
 
-  useEffect(() => {
-    if (!supported || disabled) return;
-    const frame = requestAnimationFrame(() => {
-      focusRef.current?.focus();
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [disabled, focusRef, supported]);
-
-  const startListening = () => {
+  const startListening = useCallback(() => {
     if (disabled) return;
     cancelRecognition();
     onBeforeListen();
@@ -712,16 +721,31 @@ function SpeechAnswer({
     let handled = false;
     recognitionRef.current = recognition;
     setSpeechState({
-      kind: "listening",
-      message: "Listening…",
+      kind: "starting",
+      message: "Starting…",
       transcript: null,
     });
 
-    const finishWithoutAnswer = (nextState: SpeechState) => {
+    const finishWithoutAnswer = (
+      nextState: SpeechState,
+      retryAutomatically = false,
+    ) => {
       if (sessionTokenRef.current !== token || handled) return;
       handled = true;
       clearWatchdog();
       setSpeechState(nextState);
+      if (retryAutomatically && attemptRef.current < 2) {
+        retryTimerRef.current = window.setTimeout(() => {
+          retryTimerRef.current = null;
+          autoStartedRef.current = false;
+          setSpeechState({
+            kind: "starting",
+            message: "Listening again…",
+            transcript: null,
+          });
+          setRetryNonce((value) => value + 1);
+        }, 600);
+      }
       try {
         recognition.stop();
       } catch {
@@ -745,11 +769,14 @@ function SpeechAnswer({
             transcript = alternative.transcript.trim();
           }
         }
-        finishWithoutAnswer({
-          kind: "retry",
-          message: "Say one digit, 2–9",
-          transcript,
-        });
+        finishWithoutAnswer(
+          {
+            kind: "retry",
+            message: "Say one digit, 2–9",
+            transcript,
+          },
+          true,
+        );
         return;
       }
 
@@ -769,16 +796,46 @@ function SpeechAnswer({
     };
 
     recognition.onnomatch = () => {
-      finishWithoutAnswer({
-        kind: "retry",
-        message: "Didn’t hear 2–9",
-        transcript: null,
-      });
+      finishWithoutAnswer(
+        {
+          kind: "retry",
+          message: "Didn’t hear 2–9",
+          transcript: null,
+        },
+        true,
+      );
     };
 
     recognition.onerror = (event) => {
       if (event.error === "aborted") return;
-      finishWithoutAnswer(speechErrorMessage(event.error));
+      finishWithoutAnswer(
+        speechErrorMessage(event.error),
+        event.error === "no-speech",
+      );
+    };
+
+    recognition.onstart = () => {
+      if (sessionTokenRef.current !== token || handled) return;
+      setSpeechState({
+        kind: "listening",
+        message: "Listening…",
+        transcript: null,
+      });
+      watchdogRef.current = window.setTimeout(() => {
+        finishWithoutAnswer(
+          {
+            kind: "retry",
+            message: "Didn’t hear 2–9",
+            transcript: null,
+          },
+          true,
+        );
+        try {
+          recognition.abort();
+        } catch {
+          // The browser may already have ended.
+        }
+      }, 8_000);
     };
 
     recognition.onspeechend = () => {
@@ -800,21 +857,20 @@ function SpeechAnswer({
           message: "Didn’t hear 2–9",
           transcript: null,
         });
+        if (attemptRef.current < 2) {
+          retryTimerRef.current = window.setTimeout(() => {
+            retryTimerRef.current = null;
+            autoStartedRef.current = false;
+            setSpeechState({
+              kind: "starting",
+              message: "Listening again…",
+              transcript: null,
+            });
+            setRetryNonce((value) => value + 1);
+          }, 600);
+        }
       }
     };
-
-    watchdogRef.current = window.setTimeout(() => {
-      finishWithoutAnswer({
-        kind: "retry",
-        message: "Didn’t hear 2–9",
-        transcript: null,
-      });
-      try {
-        recognition.abort();
-      } catch {
-        // The browser may already have ended.
-      }
-    }, 8_000);
 
     try {
       recognition.start();
@@ -825,34 +881,59 @@ function SpeechAnswer({
         transcript: null,
       });
     }
-  };
+  }, [cancelRecognition, clearWatchdog, disabled, onAnswer, onBeforeListen]);
 
-  const visibleMessage =
-    disabled && supported
-      ? "Wait for the question"
-      : supported === false
-        ? "Speech unavailable"
-        : speechState.message;
+  useEffect(() => {
+    if (
+      !supported ||
+      disabled ||
+      microphonePermission !== "ready" ||
+      autoStartedRef.current
+    ) {
+      return;
+    }
+    autoStartedRef.current = true;
+    attemptRef.current += 1;
+    let started = false;
+    const frame = requestAnimationFrame(() => {
+      started = true;
+      startListening();
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      if (!started) autoStartedRef.current = false;
+    };
+  }, [
+    disabled,
+    microphonePermission,
+    retryNonce,
+    startListening,
+    supported,
+  ]);
+
+  let visibleMessage = speechState.message;
+  if (supported === false) visibleMessage = "Speech unavailable";
+  if (disabled && supported) visibleMessage = "Waiting…";
+  if (microphonePermission === "requesting") {
+    visibleMessage = "Allow microphone";
+  } else if (microphonePermission === "blocked") {
+    visibleMessage = "Microphone blocked";
+  } else if (microphonePermission === "unavailable") {
+    visibleMessage = "No microphone";
+  }
 
   return (
-    <div className={styles.speechSurface}>
-      <button
-        ref={(node) => {
-          focusRef.current = node;
-        }}
-        className={styles.micButton}
-        type="button"
+    <div
+      className={styles.speechSurface}
+      data-speech-state={speechState.kind}
+    >
+      <div
+        className={styles.micIndicator}
         data-listening={speechState.kind === "listening"}
-        disabled={disabled || supported !== true}
-        aria-label={
-          speechState.kind === "listening"
-            ? "Listening for answer"
-            : "Speak answer"
-        }
-        onClick={startListening}
+        aria-hidden="true"
       >
         <MicIcon />
-      </button>
+      </div>
       <div
         className={styles.speechStatus}
         role="status"
@@ -877,13 +958,15 @@ export default function SubtractionFlashPage() {
   });
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isQuestionSpeaking, setIsQuestionSpeaking] = useState(false);
+  const [microphonePermission, setMicrophonePermission] =
+    useState<MicrophonePermission>("idle");
 
   const modeRef = useRef<PracticeMode>("visual");
   const soundEnabledRef = useRef(true);
+  const microphonePermissionRef = useRef<MicrophonePermission>("idle");
   const audioContextRef = useRef<AudioContext | null>(null);
   const playbackTokenRef = useRef(0);
   const drawFocusRef = useRef<HTMLCanvasElement | null>(null);
-  const speechFocusRef = useRef<HTMLButtonElement | null>(null);
   const answerButtonRefs = useRef<
     Partial<Record<AnswerValue, HTMLButtonElement | null>>
   >({});
@@ -1028,9 +1111,58 @@ export default function SubtractionFlashPage() {
     [answerReady, decks, mode, playEarcon, rounds, stopSpeaking],
   );
 
-  const handleAnswerModeChange = useCallback((nextMode: AnswerMode) => {
-    setAnswerMode(nextMode);
+  const primeMicrophonePermission = useCallback(() => {
+    if (microphonePermissionRef.current !== "idle") return;
+    if (getSpeechRecognitionConstructor() === null) {
+      microphonePermissionRef.current = "ready";
+      setMicrophonePermission("ready");
+      return;
+    }
+
+    const getUserMedia = navigator.mediaDevices?.getUserMedia?.bind(
+      navigator.mediaDevices,
+    );
+    if (!getUserMedia) {
+      microphonePermissionRef.current = "ready";
+      setMicrophonePermission("ready");
+      return;
+    }
+
+    microphonePermissionRef.current = "requesting";
+    setMicrophonePermission("requesting");
+    let request: Promise<MediaStream>;
+    try {
+      request = getUserMedia({ audio: true });
+    } catch {
+      microphonePermissionRef.current = "unavailable";
+      setMicrophonePermission("unavailable");
+      return;
+    }
+
+    void request
+      .then((stream) => {
+        for (const track of stream.getTracks()) track.stop();
+        microphonePermissionRef.current = "ready";
+        setMicrophonePermission("ready");
+      })
+      .catch((error: unknown) => {
+        const blocked =
+          error instanceof DOMException &&
+          (error.name === "NotAllowedError" ||
+            error.name === "SecurityError");
+        const nextPermission = blocked ? "blocked" : "unavailable";
+        microphonePermissionRef.current = nextPermission;
+        setMicrophonePermission(nextPermission);
+      });
   }, []);
+
+  const handleAnswerModeChange = useCallback(
+    (nextMode: AnswerMode) => {
+      if (nextMode === "speak") primeMicrophonePermission();
+      setAnswerMode(nextMode);
+    },
+    [primeMicrophonePermission],
+  );
 
   const advanceRound = useCallback(() => {
     const deck = decks[mode];
@@ -1146,9 +1278,7 @@ export default function SubtractionFlashPage() {
       if (answerReady) {
         if (answerMode === "draw") {
           drawFocusRef.current?.focus();
-        } else if (answerMode === "speak") {
-          speechFocusRef.current?.focus();
-        } else {
+        } else if (answerMode === "tap") {
           answerButtonRefs.current[ANSWER_VALUES[0]]?.focus();
         }
       }
@@ -1396,7 +1526,7 @@ export default function SubtractionFlashPage() {
                 <SpeechAnswer
                   key={`${mode}:${currentRound?.draw.card.id ?? "loading"}`}
                   disabled={!answerReady}
-                  focusRef={speechFocusRef}
+                  microphonePermission={microphonePermission}
                   onBeforeListen={stopSpeaking}
                   onAnswer={(answer, answeredAt) =>
                     submitAnswer(answer, "speak", answeredAt)

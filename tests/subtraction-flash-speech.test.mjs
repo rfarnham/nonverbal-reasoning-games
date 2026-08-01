@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
@@ -7,6 +8,11 @@ import {
   parseSpokenAnswer,
   readSpokenAnswer,
 } from "../app/lab/subtraction-flash/browser-speech.ts";
+
+const pageSource = await readFile(
+  new URL("../app/lab/subtraction-flash/page.tsx", import.meta.url),
+  "utf8",
+);
 
 test("spoken digits and constrained homophones parse to answers 2 through 9", () => {
   const examples = new Map([
@@ -132,4 +138,12 @@ test("answer reading returns null when no final alternative is one digit", () =>
     }),
     null,
   );
+});
+
+test("Speak starts automatically after the prompt becomes ready", () => {
+  assert.doesNotMatch(pageSource, /Tap to speak/);
+  assert.doesNotMatch(pageSource, /onClick=\{startListening\}/);
+  assert.match(pageSource, /const frame = requestAnimationFrame/);
+  assert.match(pageSource, /startListening\(\);/);
+  assert.match(pageSource, /!supported \|\|\s+disabled \|\|/);
 });
