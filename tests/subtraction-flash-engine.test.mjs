@@ -187,6 +187,64 @@ test("repeated misses cannot create an infinite review loop", () => {
   );
 });
 
+test("finite decks stop after one complete cycle", () => {
+  for (const [mode, expectedCount] of [
+    ["visual", 72],
+    ["listen", 108],
+  ]) {
+    const deck = createSubtractionDeck({
+      mode,
+      repeat: false,
+      random: createSeededRandom(404),
+    });
+    let count = 0;
+
+    while (!deck.snapshot().exhausted) {
+      const { card } = deck.next();
+      count += 1;
+      deck.recordOutcome(card, { correct: true, elapsedMs: 500 });
+    }
+
+    assert.equal(count, expectedCount);
+    assert.equal(deck.snapshot().cycle, 1);
+    assert.throws(() => deck.next(), /exhausted/);
+  }
+});
+
+test("a late review drains without starting a second finite cycle", () => {
+  const deck = createSubtractionDeck({
+    mode: "visual",
+    repeat: false,
+    random: createSeededRandom(123),
+  });
+  let finalBaseCard;
+
+  for (let index = 0; index < 72; index += 1) {
+    const { card } = deck.next();
+    if (index === 71) {
+      finalBaseCard = card;
+      deck.recordOutcome(card, { correct: false, elapsedMs: 800 });
+    } else {
+      deck.recordOutcome(card, { correct: true, elapsedMs: 800 });
+    }
+  }
+
+  assert.ok(finalBaseCard);
+  assert.equal(deck.snapshot().exhausted, false);
+  assert.equal(deck.snapshot().remaining, 1);
+
+  const review = deck.next().card;
+  assert.equal(review.id, `${finalBaseCard.id}:review`);
+  assert.equal(review.isReview, true);
+  deck.recordOutcome(review, {
+    correct: false,
+    elapsedMs: SLOW_RESPONSE_MS + 1,
+  });
+
+  assert.equal(deck.snapshot().exhausted, true);
+  assert.equal(deck.snapshot().cycle, 1);
+});
+
 test("the answer list is stable, distinct, and always contains the result", () => {
   for (const fact of SUBTRACTION_FACTS) {
     const answers = buildAnswerOptions(fact);

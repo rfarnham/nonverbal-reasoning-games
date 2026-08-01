@@ -52,6 +52,7 @@ export type SubtractionDeck = Readonly<{
     drawCount: number;
     remaining: number;
     reviewedFactCount: number;
+    exhausted: boolean;
   }>;
 }>;
 
@@ -261,10 +262,12 @@ export function createSubtractionDeck(
   options: Readonly<{
     mode: PracticeMode;
     random?: RandomSource;
+    repeat?: boolean;
   }>,
 ): SubtractionDeck {
   const { mode } = options;
   const random = options.random ?? Math.random;
+  const repeat = options.repeat ?? true;
   const baseDeckSize =
     SUBTRACTION_FACTS.length *
     (mode === "visual"
@@ -277,7 +280,7 @@ export function createSubtractionDeck(
   let cycle = 0;
   let drawCount = 0;
 
-  const refill = () => {
+  const refillBaseDeck = () => {
     cycle += 1;
     queue = createBaseDeck(mode, {
       random,
@@ -293,11 +296,26 @@ export function createSubtractionDeck(
     }
   };
 
+  const drainPendingReviews = () => {
+    if (pendingReviews.length === 0) return;
+    queue = shuffledWithFactSpacing(
+      pendingReviews.splice(0),
+      random,
+      recentFactKeys,
+    );
+  };
+
   return {
     next() {
-      if (queue.length === 0) refill();
+      if (queue.length === 0) {
+        if (cycle === 0 || repeat) {
+          refillBaseDeck();
+        } else {
+          drainPendingReviews();
+        }
+      }
       const card = queue.shift();
-      if (!card) throw new Error("Subtraction deck could not draw a card.");
+      if (!card) throw new Error("Subtraction deck is exhausted.");
 
       drawCount += 1;
       recentFactKeys.push(card.factKey);
@@ -355,6 +373,11 @@ export function createSubtractionDeck(
         drawCount,
         remaining: queue.length + pendingReviews.length,
         reviewedFactCount: reviewedFactKeys.size,
+        exhausted:
+          !repeat &&
+          cycle > 0 &&
+          queue.length === 0 &&
+          pendingReviews.length === 0,
       };
     },
   };

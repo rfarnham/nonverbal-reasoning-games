@@ -95,6 +95,10 @@
   color: #fff;
 }
 
+.modeButton:disabled {
+  cursor: default;
+}
+
 .main {
   width: min(960px, calc(100% - 32px));
   min-height: 0;
@@ -115,6 +119,88 @@
   box-shadow: 0 18px 52px rgb(23 33 61 / 9%);
 }
 
+.sessionChooser {
+  min-height: 0;
+  display: grid;
+  align-content: center;
+  gap: clamp(28px, 5vw, 48px);
+  padding: clamp(30px, 7vw, 72px);
+  background: #f5f0e5;
+}
+
+.sessionChoiceHeading {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.sessionChoiceHeading span,
+.resultsKicker {
+  color: var(--coral);
+  font-size: 0.75rem;
+  font-weight: 880;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.sessionChoiceHeading h2 {
+  margin: 0;
+  font-size: clamp(2.25rem, 6vw, 4.4rem);
+  font-weight: 900;
+  letter-spacing: -0.065em;
+  line-height: 0.95;
+}
+
+.sessionChoiceGrid {
+  width: min(100%, 790px);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  justify-self: center;
+}
+
+.sessionChoice {
+  min-width: 0;
+  min-height: 164px;
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  padding: 24px 20px;
+  border: 2px solid #bdb7aa;
+  border-radius: 24px;
+  background: var(--panel);
+  color: var(--ink);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform 100ms ease,
+    border-color 100ms ease;
+}
+
+.sessionChoice:hover {
+  border-color: var(--ink);
+  transform: translateY(-2px);
+}
+
+.sessionChoice:active {
+  transform: translateY(1px);
+}
+
+.sessionChoice strong {
+  font-size: clamp(1.25rem, 2.5vw, 1.65rem);
+  font-weight: 880;
+  letter-spacing: -0.035em;
+}
+
+.sessionChoice span {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 720;
+  line-height: 1.35;
+}
+
 .promptArea {
   --prompt-size: min(460px, 70vw, 52svh);
   position: relative;
@@ -123,6 +209,77 @@
   place-items: center;
   padding: 24px;
   background: #f5f0e5;
+}
+
+.promptArea[data-running="true"] {
+  padding-top: 82px;
+}
+
+.sessionHud {
+  position: absolute;
+  inset: 18px 24px auto;
+  z-index: 1;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  pointer-events: none;
+}
+
+.sessionName,
+.sessionReadout,
+.finishButton {
+  border: 1px solid #c8c2b4;
+  border-radius: 999px;
+  background: rgb(255 253 248 / 94%);
+}
+
+.sessionName {
+  padding: 9px 14px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 880;
+  letter-spacing: 0.065em;
+  text-transform: uppercase;
+}
+
+.sessionReadout {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sessionReadout strong {
+  font-size: 1rem;
+  font-weight: 880;
+}
+
+.sessionReadout span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 780;
+}
+
+.finishButton {
+  min-height: 40px;
+  padding: 0 17px;
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #fff;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 840;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.finishButton:disabled {
+  cursor: default;
+  opacity: 0.38;
 }
 
 .questionCard,
@@ -377,6 +534,11 @@
   color: #fff;
 }
 
+.answerModeButton:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
 .answerSurface {
   min-height: 78px;
   display: grid;
@@ -603,6 +765,124 @@
   font-size: 0.86rem;
 }
 
+.resultsDialog {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100svh - 32px);
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 32px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 28px 90px rgb(23 33 61 / 28%);
+}
+
+.resultsDialog::backdrop {
+  background: rgb(23 33 61 / 46%);
+  backdrop-filter: blur(2px);
+}
+
+.resultsSplash {
+  display: grid;
+  justify-items: center;
+  gap: 22px;
+  padding: clamp(30px, 6vw, 50px);
+  text-align: center;
+}
+
+.resultsKicker {
+  margin: 0;
+}
+
+.resultsSplash h2 {
+  max-width: 430px;
+  margin: 0;
+  font-size: clamp(2rem, 6vw, 3.35rem);
+  font-weight: 900;
+  letter-spacing: -0.06em;
+  line-height: 0.98;
+}
+
+.resultsSplash h2:focus {
+  outline: none;
+}
+
+.resultsHero {
+  margin: 2px 0 4px;
+  color: var(--correct);
+  font-size: clamp(3.2rem, 11vw, 5.4rem);
+  font-weight: 920;
+  letter-spacing: -0.075em;
+  line-height: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+
+.resultsStats {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: #f5f0e5;
+}
+
+.resultsStats div {
+  display: grid;
+  gap: 6px;
+  padding: 16px 10px;
+}
+
+.resultsStats div + div {
+  border-left: 1px solid var(--line);
+}
+
+.resultsStats dt {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 820;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.resultsStats dd {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 880;
+  font-variant-numeric: tabular-nums;
+}
+
+.resultsActions {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.playAgainButton,
+.chooseModeButton {
+  min-height: 50px;
+  padding: 0 22px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.playAgainButton {
+  background: var(--ink);
+  color: #fff;
+}
+
+.chooseModeButton {
+  border-color: var(--line);
+  background: var(--panel);
+  color: var(--ink);
+}
+
 .loadingCard {
   color: transparent;
 }
@@ -622,11 +902,15 @@
 .backLink:focus-visible,
 .soundButton:focus-visible,
 .modeButton:focus-visible,
+.sessionChoice:focus-visible,
+.finishButton:focus-visible,
 .listeningCard:focus-visible,
 .answerButton:focus-visible,
 .answerModeButton:focus-visible,
 .digitCanvas:focus-visible,
-.clearButton:focus-visible {
+.clearButton:focus-visible,
+.playAgainButton:focus-visible,
+.chooseModeButton:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 4px;
 }
@@ -695,9 +979,73 @@
     border-radius: 24px;
   }
 
+  .sessionChooser {
+    gap: 24px;
+    padding: 28px 18px;
+  }
+
+  .sessionChoiceHeading h2 {
+    font-size: clamp(2.2rem, 12vw, 3.15rem);
+  }
+
+  .sessionChoiceGrid {
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+
+  .sessionChoice {
+    min-height: 82px;
+    gap: 4px;
+    padding: 15px 18px;
+    border-radius: 18px;
+  }
+
+  .sessionChoice strong {
+    font-size: 1.2rem;
+  }
+
+  .sessionChoice span {
+    font-size: 0.8rem;
+  }
+
   .promptArea {
     --prompt-size: min(460px, 70vw, 46svh);
     padding: 18px;
+  }
+
+  .promptArea[data-running="true"] {
+    padding-top: 72px;
+  }
+
+  .sessionHud {
+    inset: 11px 12px auto;
+    min-height: 42px;
+    gap: 6px;
+  }
+
+  .sessionName {
+    padding: 8px 10px;
+    font-size: 0.61rem;
+  }
+
+  .sessionReadout {
+    min-height: 38px;
+    gap: 8px;
+    padding: 6px 11px;
+  }
+
+  .sessionReadout strong {
+    font-size: 0.9rem;
+  }
+
+  .sessionReadout span {
+    font-size: 0.7rem;
+  }
+
+  .finishButton {
+    min-height: 38px;
+    padding-inline: 13px;
+    font-size: 0.74rem;
   }
 
   .questionCard,
@@ -792,6 +1140,29 @@
 
   .speechStatus strong {
     font-size: 1rem;
+  }
+
+  .resultsDialog {
+    width: calc(100vw - 16px);
+    max-height: calc(100svh - 16px);
+    border-radius: 24px;
+  }
+
+  .resultsSplash {
+    gap: 18px;
+    padding: 28px 20px 22px;
+  }
+
+  .resultsStats div {
+    padding: 14px 7px;
+  }
+
+  .resultsStats dd {
+    font-size: 1.15rem;
+  }
+
+  .resultsActions {
+    grid-template-columns: 1fr;
   }
 }
 

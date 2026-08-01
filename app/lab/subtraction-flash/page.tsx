@@ -19,6 +19,7 @@ import { createGameNarrationPlayer } from "@/lib/game-narration";
 
 import {
   ANSWER_VALUES,
+  SLOW_RESPONSE_MS,
   buildAnswerOptions,
   createSubtractionDeck,
   type AnswerValue,
@@ -41,9 +42,50 @@ import {
   SUBTRACTION_QUESTION_NARRATION,
   subtractionNarrationCueId,
 } from "./question-narration";
+import {
+  SESSION_MODES,
+  TWO_MINUTE_SESSION_MS,
+  createSessionClock,
+  formatCountdownTime,
+  formatElapsedTime,
+  isTimedAnswerAllowed,
+  pauseSessionClock,
+  readSessionElapsed,
+  resumeSessionClock,
+  sessionAccuracy,
+  sessionEncouragement,
+  type SessionClock,
+  type SessionMode,
+} from "./session-engine";
 import styles from "./subtraction-flash.module.css";
 
 type AnswerMode = "tap" | "draw" | "speak";
+type SessionPhase = "choosing" | "playing" | "settling" | "results";
+type SessionFinishReason = "manual" | "time" | "deck";
+type SessionPauseReason = "hidden";
+
+type SessionProgress = Readonly<{
+  id: number;
+  mode: SessionMode;
+  clock: SessionClock;
+  answered: number;
+  correct: number;
+  slow: number;
+  reviews: number;
+  baseDeckSize: number;
+  cardsRemaining: number;
+}>;
+
+type SessionResult = Readonly<{
+  mode: SessionMode;
+  finishReason: SessionFinishReason;
+  elapsedMs: number;
+  answered: number;
+  correct: number;
+  slow: number;
+  reviews: number;
+  baseDeckSize: number;
+}>;
 
 type RoundState = Readonly<{
   draw: DeckDraw;
@@ -58,6 +100,18 @@ type ModeRounds = Record<PracticeMode, RoundState | null>;
 
 const TAP_RESULT_FLASH_MS = 520;
 const RECOGNIZED_RESULT_FLASH_MS = 900;
+
+const SESSION_LABELS: Record<SessionMode, string> = {
+  infinite: "Infinite",
+  "two-minute": "2 minutes",
+  "deck-sprint": "Deck sprint",
+};
+
+const SESSION_DESCRIPTIONS: Record<SessionMode, string> = {
+  infinite: "Finish whenever you like",
+  "two-minute": "Most correct before time is up",
+  "deck-sprint": "Finish one shuffled deck",
+};
 
 function ArrowLeftIcon() {
   return (
@@ -229,12 +283,16 @@ function VisualProblem({ round }: Readonly<{ round: RoundState }>) {
   );
 }
 
-function newRound(draw: DeckDraw, mode: PracticeMode): RoundState {
+function newRound(
+  draw: DeckDraw,
+  mode: PracticeMode,
+  sessionElapsedMs: number,
+): RoundState {
   return {
     draw,
     selectedAnswer: null,
     correct: null,
-    startedAt: mode === "visual" ? performance.now() : null,
+    startedAt: mode === "visual" ? sessionElapsedMs : null,
     answeredWith: null,
     interpretation: null,
   };
@@ -956,17 +1014,44 @@ export default function SubtractionFlashPage() {
     visual: null,
     listen: null,
   });
+  const [sessionPhase, setSessionPhase] =
+    useState<SessionPhase>("choosing");
+  const [sessionProgress, setSessionProgress] = useState<SessionProgress>({
+    id: 0,
+    mode: "infinite",
+    clock: createSessionClock(0, false),
+    answered: 0,
+    correct: 0,
+    slow: 0,
+    reviews: 0,
+    baseDeckSize: 0,
+    cardsRemaining: 0,
+  });
+  const [sessionResult, setSessionResult] =
+    useState<SessionResult | null>(null);
+  const [clockNow, setClockNow] = useState(0);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isQuestionSpeaking, setIsQuestionSpeaking] = useState(false);
   const [microphonePermission, setMicrophonePermission] =
     useState<MicrophonePermission>("idle");
 
   const modeRef = useRef<PracticeMode>("visual");
+  const roundsRef = useRef<ModeRounds>({ visual: null, listen: null });
+  const deckRef = useRef<SubtractionDeck | null>(null);
+  const sessionProgressRef = useRef(sessionProgress);
+  const sessionPhaseRef = useRef<SessionPhase>("choosing");
+  const sessionIdRef = useRef(0);
+  const answerLockRef = useRef<string | null>(null);
+  const resultTimerRef = useRef<number | null>(null);
+  const pauseReasonsRef = useRef(new Set<SessionPauseReason>());
   const soundEnabledRef = useRef(true);
   const microphonePermissionRef = useRef<MicrophonePermission>("idle");
   const audioContextRef = useRef<AudioContext | null>(null);
   const playbackTokenRef = useRef(0);
   const drawFocusRef = useRef<HTMLCanvasElement | null>(null);
+  const resultsDialogRef = useRef<HTMLDialogElement | null>(null);
+  const resultsHeadingRef = useRef<HTMLHeadingElement | null>(null);
+  const firstSessionChoiceRef = useRef<HTMLButtonElement | null>(null);
   const answerButtonRefs = useRef<
     Partial<Record<AnswerValue, HTMLButtonElement | null>>
   >({});
@@ -974,20 +1059,26 @@ export default function SubtractionFlashPage() {
   const [narrationPlayer] = useState(() =>
     createGameNarrationPlayer(SUBTRACTION_QUESTION_NARRATION),
   );
-  const [decks] = useState<Record<PracticeMode, SubtractionDeck>>(() => ({
-    visual: createSubtractionDeck({ mode: "visual" }),
-    listen: createSubtractionDeck({ mode: "listen" }),
-  }));
 
   const currentRound = rounds[mode];
   const answerOptions = currentRound
     ? buildAnswerOptions(currentRound.draw.card)
     : ANSWER_VALUES;
   const answerReady =
+    sessionPhase === "playing" &&
+    sessionProgress.clock.runningSince !== null &&
     currentRound !== null &&
     currentRound.selectedAnswer === null &&
+    !(answerMode === "speak" && microphonePermission === "requesting") &&
+    !(mode === "listen" && !soundEnabled) &&
     (mode === "visual" ||
       (currentRound.startedAt !== null && !isQuestionSpeaking));
+
+  const elapsedMs = readSessionElapsed(sessionProgress.clock, clockNow);
+  const remainingTimedMs = Math.max(
+    0,
+    TWO_MINUTE_SESSION_MS - elapsedMs,
+  );
 
   const ensureAudioContext = useCallback(() => {
     if (!audioContextRef.current) {
@@ -1014,28 +1105,71 @@ export default function SubtractionFlashPage() {
     [ensureAudioContext],
   );
 
+  const replaceSessionProgress = useCallback((next: SessionProgress) => {
+    sessionProgressRef.current = next;
+    setSessionProgress(next);
+  }, []);
+
+  const pauseSessionFor = useCallback(
+    (reason: SessionPauseReason, now = performance.now()) => {
+      const reasons = pauseReasonsRef.current;
+      if (reasons.has(reason)) return;
+      const wasRunning = reasons.size === 0;
+      reasons.add(reason);
+      if (!wasRunning || sessionPhaseRef.current !== "playing") return;
+
+      const progress = sessionProgressRef.current;
+      replaceSessionProgress({
+        ...progress,
+        clock: pauseSessionClock(progress.clock, now),
+      });
+      setClockNow(now);
+    },
+    [replaceSessionProgress],
+  );
+
+  const resumeSessionFor = useCallback(
+    (reason: SessionPauseReason, now = performance.now()) => {
+      const reasons = pauseReasonsRef.current;
+      if (!reasons.delete(reason) || reasons.size > 0) return;
+      if (sessionPhaseRef.current !== "playing") return;
+
+      const progress = sessionProgressRef.current;
+      replaceSessionProgress({
+        ...progress,
+        clock: resumeSessionClock(progress.clock, now),
+      });
+      setClockNow(now);
+    },
+    [replaceSessionProgress],
+  );
+
   const markListeningRoundReady = useCallback((cardId: string) => {
     if (modeRef.current !== "listen") return;
+    const previous = roundsRef.current;
+    const listeningRound = previous.listen;
+    if (
+      !listeningRound ||
+      listeningRound.draw.card.id !== cardId ||
+      listeningRound.selectedAnswer !== null ||
+      listeningRound.startedAt !== null
+    ) {
+      return;
+    }
 
-    setRounds((previous) => {
-      const listeningRound = previous.listen;
-      if (
-        !listeningRound ||
-        listeningRound.draw.card.id !== cardId ||
-        listeningRound.selectedAnswer !== null ||
-        listeningRound.startedAt !== null
-      ) {
-        return previous;
-      }
-
-      return {
-        ...previous,
-        listen: {
-          ...listeningRound,
-          startedAt: performance.now(),
-        },
-      };
-    });
+    const now = performance.now();
+    const nextRounds: ModeRounds = {
+      ...previous,
+      listen: {
+        ...listeningRound,
+        startedAt: readSessionElapsed(
+          sessionProgressRef.current.clock,
+          now,
+        ),
+      },
+    };
+    roundsRef.current = nextRounds;
+    setRounds(nextRounds);
   }, []);
 
   const speakQuestion = useCallback(
@@ -1071,44 +1205,156 @@ export default function SubtractionFlashPage() {
     setIsQuestionSpeaking(false);
   }, [narrationPlayer]);
 
+  const finishSession = useCallback(
+    (
+      finishReason: SessionFinishReason,
+      finishedAtMs?: number,
+      revealDelayMs = 0,
+    ) => {
+      if (sessionPhaseRef.current !== "playing") return;
+
+      const now = performance.now();
+      const progress = sessionProgressRef.current;
+      const elapsed = Math.max(
+        0,
+        finishedAtMs ?? readSessionElapsed(progress.clock, now),
+      );
+      const frozenProgress: SessionProgress = {
+        ...progress,
+        clock: { elapsedMs: elapsed, runningSince: null },
+      };
+
+      sessionPhaseRef.current = "settling";
+      setSessionPhase("settling");
+      replaceSessionProgress(frozenProgress);
+      setClockNow(now);
+      stopSpeaking();
+
+      const result: SessionResult = {
+        mode: progress.mode,
+        finishReason,
+        elapsedMs: elapsed,
+        answered: progress.answered,
+        correct: progress.correct,
+        slow: progress.slow,
+        reviews: progress.reviews,
+        baseDeckSize: progress.baseDeckSize,
+      };
+
+      const reveal = () => {
+        resultTimerRef.current = null;
+        sessionPhaseRef.current = "results";
+        setSessionPhase("results");
+        setSessionResult(result);
+      };
+
+      if (revealDelayMs > 0) {
+        resultTimerRef.current = window.setTimeout(reveal, revealDelayMs);
+      } else {
+        reveal();
+      }
+    },
+    [replaceSessionProgress, stopSpeaking],
+  );
+
   const submitAnswer = useCallback(
     (
       answer: AnswerValue,
       answeredWith: AnswerMode = "tap",
       answeredAt = performance.now(),
     ) => {
-      const round = rounds[mode];
-      const deck = decks[mode];
-      if (!round || round.selectedAnswer !== null || !answerReady) {
+      if (sessionPhaseRef.current !== "playing") return;
+      const activeMode = modeRef.current;
+      const round = roundsRef.current[activeMode];
+      const deck = deckRef.current;
+      if (
+        !round ||
+        !deck ||
+        round.selectedAnswer !== null ||
+        round.startedAt === null ||
+        answerLockRef.current === round.draw.card.id
+      ) {
         return;
       }
 
-      const correct = answer === round.draw.card.answer;
-      const elapsedMs =
-        round.startedAt === null
-          ? 0
-          : Math.max(0, answeredAt - round.startedAt);
-      deck.recordOutcome(round.draw.card, { correct, elapsedMs });
+      const progress = sessionProgressRef.current;
+      if (
+        progress.clock.runningSince === null ||
+        (activeMode === "listen" && !soundEnabledRef.current)
+      ) {
+        return;
+      }
+      const activeElapsedMs = readSessionElapsed(
+        progress.clock,
+        answeredAt,
+      );
+      if (
+        progress.mode === "two-minute" &&
+        !isTimedAnswerAllowed(activeElapsedMs)
+      ) {
+        finishSession("time", TWO_MINUTE_SESSION_MS);
+        return;
+      }
 
-      if (mode === "listen") stopSpeaking();
-      setRounds((previous) => ({
-        ...previous,
-        [mode]: {
-          ...round,
-          selectedAnswer: answer,
-          correct,
-          answeredWith,
-          interpretation:
-            answeredWith === "draw"
-              ? `Read as ${answer}`
-              : answeredWith === "speak"
-                ? `Heard ${answer}`
-                : null,
-        },
-      }));
-      playEarcon(correct);
+      answerLockRef.current = round.draw.card.id;
+      const correct = answer === round.draw.card.answer;
+      const answerElapsedMs = Math.max(
+        0,
+        activeElapsedMs - round.startedAt,
+      );
+      deck.recordOutcome(round.draw.card, {
+        correct,
+        elapsedMs: answerElapsedMs,
+      });
+
+      const answeredRound: RoundState = {
+        ...round,
+        selectedAnswer: answer,
+        correct,
+        answeredWith,
+        interpretation:
+          answeredWith === "draw"
+            ? `Read as ${answer}`
+            : answeredWith === "speak"
+              ? `Heard ${answer}`
+              : null,
+      };
+      const nextRounds: ModeRounds = {
+        ...roundsRef.current,
+        [activeMode]: answeredRound,
+      };
+      roundsRef.current = nextRounds;
+      setRounds(nextRounds);
+
+      const deckSnapshot = deck.snapshot();
+      const nextProgress: SessionProgress = {
+        ...progress,
+        answered: progress.answered + 1,
+        correct: progress.correct + (correct ? 1 : 0),
+        slow:
+          progress.slow + (answerElapsedMs > SLOW_RESPONSE_MS ? 1 : 0),
+        reviews: progress.reviews + (round.draw.card.isReview ? 1 : 0),
+        cardsRemaining: deckSnapshot.remaining,
+      };
+      replaceSessionProgress(nextProgress);
+
+      if (activeMode === "listen") stopSpeaking();
+      if (answeredWith !== "speak") playEarcon(correct);
+
+      const feedbackDelay =
+        answeredWith === "tap"
+          ? TAP_RESULT_FLASH_MS
+          : RECOGNIZED_RESULT_FLASH_MS;
+      if (progress.mode === "deck-sprint" && deckSnapshot.exhausted) {
+        finishSession("deck", activeElapsedMs, feedbackDelay);
+      } else if (
+        progress.mode === "two-minute" &&
+        activeElapsedMs >= TWO_MINUTE_SESSION_MS
+      ) {
+        finishSession("time", TWO_MINUTE_SESSION_MS, feedbackDelay);
+      }
     },
-    [answerReady, decks, mode, playEarcon, rounds, stopSpeaking],
+    [finishSession, playEarcon, replaceSessionProgress, stopSpeaking],
   );
 
   const primeMicrophonePermission = useCallback(() => {
@@ -1165,42 +1411,119 @@ export default function SubtractionFlashPage() {
   );
 
   const advanceRound = useCallback(() => {
-    const deck = decks[mode];
+    if (sessionPhaseRef.current !== "playing") return;
+    const deck = deckRef.current;
+    if (!deck || deck.snapshot().exhausted) return;
+    const activeMode = modeRef.current;
+    const now = performance.now();
+    const activeElapsedMs = readSessionElapsed(
+      sessionProgressRef.current.clock,
+      now,
+    );
+    if (
+      sessionProgressRef.current.mode === "two-minute" &&
+      activeElapsedMs >= TWO_MINUTE_SESSION_MS
+    ) {
+      finishSession("time", TWO_MINUTE_SESSION_MS);
+      return;
+    }
 
     stopSpeaking();
-    const round = newRound(deck.next(), mode);
-    setRounds((previous) => ({ ...previous, [mode]: round }));
-    if (mode === "listen") speakQuestion(round);
-  }, [decks, mode, speakQuestion, stopSpeaking]);
+    answerLockRef.current = null;
+    const round = newRound(deck.next(), activeMode, activeElapsedMs);
+    const nextRounds: ModeRounds = {
+      visual: activeMode === "visual" ? round : null,
+      listen: activeMode === "listen" ? round : null,
+    };
+    roundsRef.current = nextRounds;
+    setRounds(nextRounds);
+    if (activeMode === "listen") speakQuestion(round);
+  }, [finishSession, speakQuestion, stopSpeaking]);
+
+  const beginSession = useCallback(
+    (sessionMode: SessionMode) => {
+      if (
+        sessionPhaseRef.current === "playing" ||
+        sessionPhaseRef.current === "settling"
+      ) {
+        return;
+      }
+      if (resultTimerRef.current !== null) {
+        window.clearTimeout(resultTimerRef.current);
+        resultTimerRef.current = null;
+      }
+      stopSpeaking();
+
+      const activeMode = modeRef.current;
+      const now = performance.now();
+      const pauseReasons = pauseReasonsRef.current;
+      pauseReasons.clear();
+      if (document.hidden) pauseReasons.add("hidden");
+
+      const deck = createSubtractionDeck({
+        mode: activeMode,
+        repeat: sessionMode !== "deck-sprint",
+      });
+      const firstDraw = deck.next();
+      const nextId = sessionIdRef.current + 1;
+      sessionIdRef.current = nextId;
+      const progress: SessionProgress = {
+        id: nextId,
+        mode: sessionMode,
+        clock: createSessionClock(now, pauseReasons.size === 0),
+        answered: 0,
+        correct: 0,
+        slow: 0,
+        reviews: 0,
+        baseDeckSize: firstDraw.baseDeckSize,
+        cardsRemaining: firstDraw.remaining + 1,
+      };
+      const round = newRound(firstDraw, activeMode, 0);
+      const nextRounds: ModeRounds = {
+        visual: activeMode === "visual" ? round : null,
+        listen: activeMode === "listen" ? round : null,
+      };
+
+      deckRef.current = deck;
+      answerLockRef.current = null;
+      roundsRef.current = nextRounds;
+      sessionPhaseRef.current = "playing";
+      setRounds(nextRounds);
+      replaceSessionProgress(progress);
+      setClockNow(now);
+      setSessionResult(null);
+      setSessionPhase("playing");
+
+      if (answerMode === "speak") primeMicrophonePermission();
+      if (activeMode === "listen" && soundEnabledRef.current) {
+        speakQuestion(round);
+      }
+    },
+    [
+      answerMode,
+      primeMicrophonePermission,
+      replaceSessionProgress,
+      speakQuestion,
+      stopSpeaking,
+    ],
+  );
 
   const handleModeChange = useCallback(
     (nextMode: PracticeMode) => {
-      if (nextMode === mode) return;
-      const deck = decks[nextMode];
-
+      if (
+        nextMode === modeRef.current ||
+        sessionPhaseRef.current !== "choosing"
+      ) {
+        return;
+      }
       stopSpeaking();
       modeRef.current = nextMode;
       setMode(nextMode);
-
-      let targetRound = rounds[nextMode];
-      if (!targetRound || targetRound.selectedAnswer !== null) {
-        targetRound = newRound(deck.next(), nextMode);
-      } else {
-        targetRound = {
-          ...targetRound,
-          startedAt: nextMode === "visual" ? performance.now() : null,
-        };
-      }
-
-      setRounds((previous) => ({
-        ...previous,
-        [nextMode]: targetRound,
-      }));
-      if (nextMode === "listen" && targetRound.selectedAnswer === null) {
-        speakQuestion(targetRound);
-      }
+      const emptyRounds: ModeRounds = { visual: null, listen: null };
+      roundsRef.current = emptyRounds;
+      setRounds(emptyRounds);
     },
-    [decks, mode, rounds, speakQuestion, stopSpeaking],
+    [stopSpeaking],
   );
 
   const handleSoundToggle = useCallback(() => {
@@ -1219,9 +1542,10 @@ export default function SubtractionFlashPage() {
     if (context?.state === "suspended") {
       void context.resume().catch(() => undefined);
     }
-    const listeningRound = rounds.listen;
+    const listeningRound = roundsRef.current.listen;
     if (
-      mode === "listen" &&
+      sessionPhaseRef.current === "playing" &&
+      modeRef.current === "listen" &&
       listeningRound &&
       listeningRound.selectedAnswer === null
     ) {
@@ -1229,9 +1553,7 @@ export default function SubtractionFlashPage() {
     }
   }, [
     ensureAudioContext,
-    mode,
     narrationPlayer,
-    rounds.listen,
     speakQuestion,
     stopSpeaking,
   ]);
@@ -1251,17 +1573,80 @@ export default function SubtractionFlashPage() {
   }, [narrationPlayer, soundEnabled]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setRounds({
-        visual: newRound(decks.visual.next(), "visual"),
-        listen: null,
+    const handleVisibilityChange = () => {
+      const now = performance.now();
+      if (document.hidden) {
+        pauseSessionFor("hidden", now);
+        if (modeRef.current === "listen") stopSpeaking();
+        return;
+      }
+
+      resumeSessionFor("hidden", now);
+      const listeningRound = roundsRef.current.listen;
+      if (
+        sessionPhaseRef.current === "playing" &&
+        modeRef.current === "listen" &&
+        soundEnabledRef.current &&
+        listeningRound &&
+        listeningRound.selectedAnswer === null
+      ) {
+        speakQuestion(listeningRound);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange,
+      );
+  }, [pauseSessionFor, resumeSessionFor, speakQuestion, stopSpeaking]);
+
+  useEffect(() => {
+    if (sessionPhase !== "playing") return;
+
+    const updateClock = () => {
+      const now = performance.now();
+      setClockNow(now);
+      const progress = sessionProgressRef.current;
+      if (
+        progress.mode === "two-minute" &&
+        readSessionElapsed(progress.clock, now) >= TWO_MINUTE_SESSION_MS
+      ) {
+        const round = roundsRef.current[modeRef.current];
+        finishSession(
+          "time",
+          TWO_MINUTE_SESSION_MS,
+          round && round.selectedAnswer !== null ? 240 : 0,
+        );
+      }
+    };
+
+    updateClock();
+    const timer = window.setInterval(updateClock, 200);
+    return () => window.clearInterval(timer);
+  }, [finishSession, sessionPhase, sessionProgress.id]);
+
+  useEffect(() => {
+    const dialog = resultsDialogRef.current;
+    if (!dialog) return;
+
+    if (sessionResult) {
+      if (!dialog.open) dialog.showModal();
+      const frame = requestAnimationFrame(() => {
+        resultsHeadingRef.current?.focus();
       });
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [decks]);
+      return () => cancelAnimationFrame(frame);
+    }
+
+    if (dialog.open) dialog.close();
+  }, [sessionResult]);
 
   useEffect(() => {
     return () => {
+      if (resultTimerRef.current !== null) {
+        window.clearTimeout(resultTimerRef.current);
+      }
       narrationPlayer.dispose();
       const context = audioContextRef.current;
       audioContextRef.current = null;
@@ -1303,6 +1688,7 @@ export default function SubtractionFlashPage() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (sessionPhaseRef.current !== "playing") return;
       const target = event.target;
       if (
         target instanceof HTMLElement &&
@@ -1322,6 +1708,31 @@ export default function SubtractionFlashPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [submitAnswer]);
 
+  const returnToModeChoice = useCallback(() => {
+    if (resultTimerRef.current !== null) {
+      window.clearTimeout(resultTimerRef.current);
+      resultTimerRef.current = null;
+    }
+    stopSpeaking();
+    sessionPhaseRef.current = "choosing";
+    deckRef.current = null;
+    answerLockRef.current = null;
+    pauseReasonsRef.current.clear();
+    const emptyRounds: ModeRounds = { visual: null, listen: null };
+    roundsRef.current = emptyRounds;
+    setRounds(emptyRounds);
+    setSessionResult(null);
+    setSessionPhase("choosing");
+  }, [stopSpeaking]);
+
+  useEffect(() => {
+    if (sessionPhase !== "choosing" || sessionProgress.id === 0) return;
+    const frame = requestAnimationFrame(() => {
+      firstSessionChoiceRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [sessionPhase, sessionProgress.id]);
+
   const answerState = (answer: AnswerValue) => {
     if (!currentRound || currentRound.selectedAnswer === null) return "idle";
     if (answer === currentRound.selectedAnswer) {
@@ -1329,6 +1740,17 @@ export default function SubtractionFlashPage() {
     }
     return "muted";
   };
+
+  const resultAccuracy = sessionResult
+    ? sessionAccuracy(sessionResult.correct, sessionResult.answered)
+    : null;
+  const resultHero = sessionResult
+    ? sessionResult.mode === "deck-sprint"
+      ? formatElapsedTime(sessionResult.elapsedMs, true)
+      : sessionResult.mode === "two-minute"
+        ? `${sessionResult.correct} correct`
+        : `${sessionResult.answered} answered`
+    : "";
 
   return (
     <div className={styles.page}>
@@ -1342,6 +1764,7 @@ export default function SubtractionFlashPage() {
             className={styles.modeButton}
             type="button"
             aria-pressed={mode === "visual"}
+            disabled={sessionPhase !== "choosing"}
             onClick={() => handleModeChange("visual")}
           >
             <CardsIcon />
@@ -1351,6 +1774,7 @@ export default function SubtractionFlashPage() {
             className={styles.modeButton}
             type="button"
             aria-pressed={mode === "listen"}
+            disabled={sessionPhase !== "choosing"}
             onClick={() => handleModeChange("listen")}
           >
             <SpeakerIcon />
@@ -1378,165 +1802,327 @@ export default function SubtractionFlashPage() {
           <h1 className={styles.visuallyHidden} id="game-heading">
             Borrow Flash
           </h1>
-          <div className={styles.promptArea}>
-            {!currentRound ? (
-              <div className={styles.loadingCard} aria-label="Shuffling cards" />
-            ) : mode === "visual" ? (
-              <VisualProblem round={currentRound} />
-            ) : (
-              <button
-                className={`${styles.listeningCard} ${
-                  isQuestionSpeaking ? styles.speaking : ""
-                }`}
-                type="button"
-                aria-label={
-                  !soundEnabled
-                    ? "Sound is off"
-                    : isQuestionSpeaking
-                      ? "Playing subtraction question"
-                      : "Replay subtraction question"
-                }
-                disabled={
-                  !soundEnabled ||
-                  isQuestionSpeaking ||
-                  currentRound.selectedAnswer !== null
-                }
-                onClick={() => speakQuestion(currentRound)}
-              >
-                <span className={styles.speakerOrb}>
-                  <SpeakerIcon />
-                </span>
-                {!soundEnabled ? (
-                  <span className={styles.listeningState}>Sound off</span>
-                ) : null}
-              </button>
-            )}
-
-            <div
-              className={`${styles.resultFlash} ${
-                currentRound?.correct === true
-                  ? styles.resultCorrect
-                  : currentRound?.correct === false
-                    ? styles.resultIncorrect
-                    : ""
-              }`}
-              role="status"
-              aria-live="polite"
-              aria-atomic="true"
+          {sessionPhase === "choosing" ? (
+            <section
+              className={styles.sessionChooser}
+              aria-labelledby="session-choice-heading"
             >
-              {currentRound?.correct !== null &&
-              currentRound?.correct !== undefined ? (
-                <div className={styles.resultContent}>
-                  <div className={styles.resultVerdict}>
-                    <span className={styles.resultSymbol} aria-hidden="true">
-                      {currentRound.correct ? "✓" : "×"}
-                    </span>
-                    {currentRound.correct ? "Correct" : "Incorrect"}
+              <div className={styles.sessionChoiceHeading}>
+                <span>{mode === "visual" ? "Cards" : "Listen"}</span>
+                <h2 id="session-choice-heading">Choose a run</h2>
+              </div>
+              <div className={styles.sessionChoiceGrid}>
+                {SESSION_MODES.map((sessionMode, index) => (
+                  <button
+                    key={sessionMode}
+                    ref={index === 0 ? firstSessionChoiceRef : undefined}
+                    className={styles.sessionChoice}
+                    type="button"
+                    onClick={() => beginSession(sessionMode)}
+                  >
+                    <strong>{SESSION_LABELS[sessionMode]}</strong>
+                    <span>{SESSION_DESCRIPTIONS[sessionMode]}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : (
+            <>
+              <div className={styles.promptArea} data-running="true">
+                <div className={styles.sessionHud}>
+                  <span className={styles.sessionName}>
+                    {SESSION_LABELS[sessionProgress.mode]}
+                  </span>
+                  <div className={styles.sessionReadout}>
+                    {sessionProgress.mode === "infinite" ? (
+                      <strong>{sessionProgress.answered} answered</strong>
+                    ) : sessionProgress.mode === "two-minute" ? (
+                      <>
+                        <strong role="timer">
+                          {formatCountdownTime(remainingTimedMs)}
+                        </strong>
+                        <span>{sessionProgress.correct} correct</span>
+                      </>
+                    ) : (
+                      <>
+                        <strong>{sessionProgress.cardsRemaining} left</strong>
+                        <span>{formatElapsedTime(elapsedMs)}</span>
+                      </>
+                    )}
                   </div>
-                  {currentRound.interpretation ? (
-                    <span className={styles.resultInterpretation}>
-                      {currentRound.interpretation}
-                    </span>
+                  {sessionProgress.mode === "infinite" ? (
+                    <button
+                      className={styles.finishButton}
+                      type="button"
+                      disabled={
+                        sessionPhase !== "playing" ||
+                        sessionProgress.answered === 0
+                      }
+                      onClick={() => finishSession("manual")}
+                    >
+                      Finish
+                    </button>
                   ) : null}
                 </div>
-              ) : null}
-            </div>
-          </div>
 
-          <section
-            className={styles.answerSection}
-            aria-labelledby="answer-heading"
-          >
-            <h2 className={styles.visuallyHidden} id="answer-heading">
-              Give the answer
-            </h2>
-            <nav className={styles.answerModeSwitch} aria-label="Answer input">
-              <button
-                className={styles.answerModeButton}
-                type="button"
-                aria-pressed={answerMode === "tap"}
-                onClick={() => handleAnswerModeChange("tap")}
-              >
-                <TapIcon />
-                Tap
-              </button>
-              <button
-                className={styles.answerModeButton}
-                type="button"
-                aria-pressed={answerMode === "draw"}
-                onClick={() => handleAnswerModeChange("draw")}
-              >
-                <DrawIcon />
-                Draw
-              </button>
-              <button
-                className={styles.answerModeButton}
-                type="button"
-                aria-pressed={answerMode === "speak"}
-                onClick={() => handleAnswerModeChange("speak")}
-              >
-                <MicIcon />
-                Speak
-              </button>
-            </nav>
+                {!currentRound ? (
+                  <div
+                    className={styles.loadingCard}
+                    aria-label="Shuffling cards"
+                  />
+                ) : mode === "visual" ? (
+                  <VisualProblem round={currentRound} />
+                ) : (
+                  <button
+                    className={`${styles.listeningCard} ${
+                      isQuestionSpeaking ? styles.speaking : ""
+                    }`}
+                    type="button"
+                    aria-label={
+                      !soundEnabled
+                        ? "Sound is off"
+                        : isQuestionSpeaking
+                          ? "Playing subtraction question"
+                          : "Replay subtraction question"
+                    }
+                    disabled={
+                      sessionPhase !== "playing" ||
+                      !soundEnabled ||
+                      isQuestionSpeaking ||
+                      currentRound.selectedAnswer !== null
+                    }
+                    onClick={() => speakQuestion(currentRound)}
+                  >
+                    <span className={styles.speakerOrb}>
+                      <SpeakerIcon />
+                    </span>
+                    {!soundEnabled ? (
+                      <span className={styles.listeningState}>Sound off</span>
+                    ) : null}
+                  </button>
+                )}
 
-            <div className={styles.answerSurface}>
-              {answerMode === "tap" ? (
-                <div className={styles.answerGrid}>
-                  {answerOptions.map((answer) => {
-                    const state = answerState(answer);
-                    const selected = currentRound?.selectedAnswer === answer;
-                    const stateLabel =
-                      state === "correct"
-                        ? ", correct"
-                        : state === "incorrect"
-                          ? ", incorrect"
-                          : "";
-
-                    return (
-                      <button
-                        key={answer}
-                        ref={(node) => {
-                          answerButtonRefs.current[answer] = node;
-                        }}
-                        className={styles.answerButton}
-                        type="button"
-                        data-state={state}
-                        disabled={!answerReady}
-                        aria-keyshortcuts={String(answer)}
-                        aria-label={`${answer}${stateLabel}`}
-                        aria-pressed={selected}
-                        onClick={() => submitAnswer(answer)}
-                      >
-                        {answer}
-                      </button>
-                    );
-                  })}
+                <div
+                  className={`${styles.resultFlash} ${
+                    currentRound?.correct === true
+                      ? styles.resultCorrect
+                      : currentRound?.correct === false
+                        ? styles.resultIncorrect
+                        : ""
+                  }`}
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
+                  {currentRound?.correct !== null &&
+                  currentRound?.correct !== undefined ? (
+                    <div className={styles.resultContent}>
+                      <div className={styles.resultVerdict}>
+                        <span
+                          className={styles.resultSymbol}
+                          aria-hidden="true"
+                        >
+                          {currentRound.correct ? "✓" : "×"}
+                        </span>
+                        {currentRound.correct ? "Correct" : "Incorrect"}
+                      </div>
+                      {currentRound.interpretation ? (
+                        <span className={styles.resultInterpretation}>
+                          {currentRound.interpretation}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
-              ) : answerMode === "draw" ? (
-                <HandwritingAnswer
-                  key={`${mode}:${currentRound?.draw.card.id ?? "loading"}`}
-                  disabled={!answerReady}
-                  focusRef={drawFocusRef}
-                  onAnswer={(answer, answeredAt) =>
-                    submitAnswer(answer, "draw", answeredAt)
-                  }
-                />
-              ) : (
-                <SpeechAnswer
-                  key={`${mode}:${currentRound?.draw.card.id ?? "loading"}`}
-                  disabled={!answerReady}
-                  microphonePermission={microphonePermission}
-                  onBeforeListen={stopSpeaking}
-                  onAnswer={(answer, answeredAt) =>
-                    submitAnswer(answer, "speak", answeredAt)
-                  }
-                />
-              )}
-            </div>
-          </section>
+              </div>
+
+              <section
+                className={styles.answerSection}
+                aria-labelledby="answer-heading"
+              >
+                <h2 className={styles.visuallyHidden} id="answer-heading">
+                  Give the answer
+                </h2>
+                <nav
+                  className={styles.answerModeSwitch}
+                  aria-label="Answer input"
+                >
+                  <button
+                    className={styles.answerModeButton}
+                    type="button"
+                    aria-pressed={answerMode === "tap"}
+                    disabled={sessionPhase !== "playing"}
+                    onClick={() => handleAnswerModeChange("tap")}
+                  >
+                    <TapIcon />
+                    Tap
+                  </button>
+                  <button
+                    className={styles.answerModeButton}
+                    type="button"
+                    aria-pressed={answerMode === "draw"}
+                    disabled={sessionPhase !== "playing"}
+                    onClick={() => handleAnswerModeChange("draw")}
+                  >
+                    <DrawIcon />
+                    Draw
+                  </button>
+                  <button
+                    className={styles.answerModeButton}
+                    type="button"
+                    aria-pressed={answerMode === "speak"}
+                    disabled={sessionPhase !== "playing"}
+                    onClick={() => handleAnswerModeChange("speak")}
+                  >
+                    <MicIcon />
+                    Speak
+                  </button>
+                </nav>
+
+                <div className={styles.answerSurface}>
+                  {answerMode === "tap" ? (
+                    <div className={styles.answerGrid}>
+                      {answerOptions.map((answer) => {
+                        const state = answerState(answer);
+                        const selected =
+                          currentRound?.selectedAnswer === answer;
+                        const stateLabel =
+                          state === "correct"
+                            ? ", correct"
+                            : state === "incorrect"
+                              ? ", incorrect"
+                              : "";
+
+                        return (
+                          <button
+                            key={answer}
+                            ref={(node) => {
+                              answerButtonRefs.current[answer] = node;
+                            }}
+                            className={styles.answerButton}
+                            type="button"
+                            data-state={state}
+                            disabled={!answerReady}
+                            aria-keyshortcuts={String(answer)}
+                            aria-label={`${answer}${stateLabel}`}
+                            aria-pressed={selected}
+                            onClick={() => submitAnswer(answer)}
+                          >
+                            {answer}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : answerMode === "draw" ? (
+                    <HandwritingAnswer
+                      key={`${sessionProgress.id}:${mode}:${
+                        currentRound?.draw.card.id ?? "loading"
+                      }`}
+                      disabled={!answerReady}
+                      focusRef={drawFocusRef}
+                      onAnswer={(answer, answeredAt) =>
+                        submitAnswer(answer, "draw", answeredAt)
+                      }
+                    />
+                  ) : (
+                    <SpeechAnswer
+                      key={`${sessionProgress.id}:${mode}:${
+                        currentRound?.draw.card.id ?? "loading"
+                      }`}
+                      disabled={!answerReady}
+                      microphonePermission={microphonePermission}
+                      onBeforeListen={stopSpeaking}
+                      onAnswer={(answer, answeredAt) =>
+                        submitAnswer(answer, "speak", answeredAt)
+                      }
+                    />
+                  )}
+                </div>
+              </section>
+            </>
+          )}
         </section>
       </main>
+
+      <dialog
+        ref={resultsDialogRef}
+        className={styles.resultsDialog}
+        aria-labelledby="results-heading"
+        onCancel={(event) => {
+          event.preventDefault();
+          returnToModeChoice();
+        }}
+      >
+        {sessionResult ? (
+          <div className={styles.resultsSplash}>
+            <p className={styles.resultsKicker}>
+              {SESSION_LABELS[sessionResult.mode]}
+              {sessionResult.mode === "deck-sprint"
+                ? ` · ${sessionResult.baseDeckSize}-card deck`
+                : ""}
+            </p>
+            <h2
+              ref={resultsHeadingRef}
+              id="results-heading"
+              tabIndex={-1}
+            >
+              {sessionEncouragement(
+                sessionResult.correct,
+                sessionResult.answered,
+              )}
+            </h2>
+            <p className={styles.resultsHero}>{resultHero}</p>
+            <dl className={styles.resultsStats}>
+              <div>
+                <dt>Accuracy</dt>
+                <dd>
+                  {resultAccuracy === null ? "—" : `${resultAccuracy}%`}
+                </dd>
+              </div>
+              <div>
+                <dt>
+                  {sessionResult.mode === "deck-sprint"
+                    ? "Answered"
+                    : sessionResult.mode === "two-minute"
+                      ? "Answered"
+                      : "Correct"}
+                </dt>
+                <dd>
+                  {sessionResult.mode === "infinite"
+                    ? sessionResult.correct
+                    : sessionResult.answered}
+                </dd>
+              </div>
+              <div>
+                <dt>
+                  {sessionResult.mode === "deck-sprint" ? "Reviews" : "Time"}
+                </dt>
+                <dd>
+                  {sessionResult.mode === "deck-sprint"
+                    ? sessionResult.reviews
+                    : formatElapsedTime(sessionResult.elapsedMs)}
+                </dd>
+              </div>
+            </dl>
+            <div className={styles.resultsActions}>
+              <button
+                className={styles.playAgainButton}
+                type="button"
+                onClick={() => beginSession(sessionResult.mode)}
+              >
+                Play again
+              </button>
+              <button
+                className={styles.chooseModeButton}
+                type="button"
+                onClick={returnToModeChoice}
+              >
+                Choose mode
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </dialog>
     </div>
   );
 }
