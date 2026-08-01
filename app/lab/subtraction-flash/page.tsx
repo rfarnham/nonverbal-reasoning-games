@@ -30,7 +30,6 @@ import {
 import {
   createDigitSpeechRecognition,
   getSpeechRecognitionConstructor,
-  readSpokenAnswer,
   type BrowserSpeechRecognition,
   type BrowserSpeechRecognitionErrorCode,
 } from "./browser-speech";
@@ -57,6 +56,7 @@ import {
   type SessionClock,
   type SessionMode,
 } from "./session-engine";
+import { SpokenAnswerStreamGate } from "./speech-answer-stream";
 import styles from "./subtraction-flash.module.css";
 
 type AnswerMode = "tap" | "draw" | "speak";
@@ -99,7 +99,21 @@ type RoundState = Readonly<{
 type ModeRounds = Record<PracticeMode, RoundState | null>;
 
 const TAP_RESULT_FLASH_MS = 520;
-const RECOGNIZED_RESULT_FLASH_MS = 900;
+const DRAW_RESULT_FLASH_MS = 900;
+
+function resultFlashDuration(answeredWith: AnswerMode | null) {
+  return answeredWith === "draw"
+    ? DRAW_RESULT_FLASH_MS
+    : TAP_RESULT_FLASH_MS;
+}
+
+function speechAnswerRoundId(
+  sessionId: number,
+  mode: PracticeMode,
+  cardId: string,
+) {
+  return `${sessionId}:${mode}:${cardId}`;
+}
 
 const SESSION_LABELS: Record<SessionMode, string> = {
   infinite: "Infinite",
@@ -628,10 +642,12 @@ function HandwritingAnswer({
 }
 
 type SpeechAnswerProps = Readonly<{
-  disabled: boolean;
+  accepting: boolean;
+  active: boolean;
+  answerGate: SpokenAnswerStreamGate;
   microphonePermission: MicrophonePermission;
-  onBeforeListen: () => void;
   onAnswer: (answer: AnswerValue, answeredAt: number) => void;
+  roundId: string | null;
 }>;
 
 type MicrophonePermission =
@@ -646,6 +662,7 @@ type SpeechState = Readonly<{
     | "idle"
     | "starting"
     | "listening"
+    | "heard"
     | "retry"
     | "blocked"
     | "unsupported";
@@ -695,17 +712,15 @@ function speechErrorMessage(
 }
 
 function SpeechAnswer({
-  disabled,
+  accepting,
+  active,
+  answerGate,
   microphonePermission,
-  onBeforeListen,
   onAnswer,
+  roundId,
 }: SpeechAnswerProps) {
-  const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
-  const watchdogRef = useRef<number | null>(null);
-  const retryTimerRef = useRef<number | null>(null);
-  const sessionTokenRef = useRef(0);
-  const attemptRef = useRef(0);
-  const autoStartedRef = useRef(false);
+  const acceptingRef = useRef(accepting);
+  const onAnswerRef = useRef(onAnswer);
   const [retryNonce, setRetryNonce] = useState(0);
   const [supported, setSupported] = useState<boolean | null>(null);
   const [speechState, setSpeechState] = useState<SpeechState>({
@@ -714,270 +729,263 @@ function SpeechAnswer({
     transcript: null,
   });
 
-  const clearWatchdog = useCallback(() => {
-    if (watchdogRef.current !== null) {
-      window.clearTimeout(watchdogRef.current);
-      watchdogRef.current = null;
-    }
-  }, []);
+  useEffect(() => {
+    acceptingRef.current = accepting;
+    answerGate.updateRound(roundId, accepting);
+  }, [accepting, answerGate, roundId]);
 
-  const cancelRecognition = useCallback(() => {
-    sessionTokenRef.current += 1;
-    clearWatchdog();
-    if (retryTimerRef.current !== null) {
-      window.clearTimeout(retryTimerRef.current);
-      retryTimerRef.current = null;
-    }
-    const recognition = recognitionRef.current;
-    recognitionRef.current = null;
-    if (!recognition) return;
+  useEffect(() => {
+    onAnswerRef.current = onAnswer;
+  }, [onAnswer]);
 
-    recognition.onend = null;
-    recognition.onerror = null;
-    recognition.onnomatch = null;
-    recognition.onresult = null;
-    recognition.onstart = null;
-    recognition.onspeechend = null;
-    try {
-      recognition.abort();
-    } catch {
-      // Some browser engines throw when an idle recognizer is aborted.
-    }
-  }, [clearWatchdog]);
+  useEffect(() => {
+    if (!accepting) return;
+    if (!answerGate.peekBufferedAnswer()) return;
+
+    const frame = requestAnimationFrame(() => {
+      const bufferedAnswer = answerGate.takeBufferedAnswer();
+      if (!bufferedAnswer) return;
+      setSpeechState({
+        kind: "heard",
+        message: `Heard ${bufferedAnswer.answer}`,
+        transcript: bufferedAnswer.transcript,
+      });
+      onAnswerRef.current(bufferedAnswer.answer, performance.now());
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [accepting, answerGate, roundId]);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
       setSupported(getSpeechRecognitionConstructor() !== null);
     });
-    return () => {
-      cancelAnimationFrame(frame);
-      cancelRecognition();
-    };
-  }, [cancelRecognition]);
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
-    if (disabled) cancelRecognition();
-  }, [cancelRecognition, disabled]);
+    if (!active || !supported || microphonePermission !== "ready") return;
 
-  const startListening = useCallback(() => {
-    if (disabled) return;
-    cancelRecognition();
-    onBeforeListen();
+    let disposed = false;
+    let fatal = false;
+    let activeRecognition: BrowserSpeechRecognition | null = null;
+    let recognitionToken = 0;
+    let restartTimer: number | null = null;
 
-    const recognition = createDigitSpeechRecognition();
-    if (!recognition) {
-      setSupported(false);
-      setSpeechState({
-        kind: "unsupported",
-        message: "Speech unavailable",
-        transcript: null,
-      });
-      return;
-    }
+    const detachRecognition = (recognition: BrowserSpeechRecognition) => {
+      recognition.onend = null;
+      recognition.onerror = null;
+      recognition.onnomatch = null;
+      recognition.onresult = null;
+      recognition.onstart = null;
+      recognition.onspeechend = null;
+      recognition.onspeechstart = null;
+    };
 
-    const token = sessionTokenRef.current;
-    let handled = false;
-    recognitionRef.current = recognition;
-    setSpeechState({
-      kind: "starting",
-      message: "Starting…",
-      transcript: null,
-    });
-
-    const finishWithoutAnswer = (
-      nextState: SpeechState,
-      retryAutomatically = false,
-    ) => {
-      if (sessionTokenRef.current !== token || handled) return;
-      handled = true;
-      clearWatchdog();
-      setSpeechState(nextState);
-      if (retryAutomatically && attemptRef.current < 2) {
-        retryTimerRef.current = window.setTimeout(() => {
-          retryTimerRef.current = null;
-          autoStartedRef.current = false;
-          setSpeechState({
-            kind: "starting",
-            message: "Listening again…",
-            transcript: null,
-          });
-          setRetryNonce((value) => value + 1);
-        }, 600);
-      }
+    const stopActiveRecognition = () => {
+      recognitionToken += 1;
+      const recognition = activeRecognition;
+      activeRecognition = null;
+      if (!recognition) return;
+      detachRecognition(recognition);
       try {
-        recognition.stop();
+        recognition.abort();
       } catch {
-        // The browser may already have ended this one-shot session.
+        // Some browser engines throw when an idle recognizer is aborted.
       }
     };
 
-    recognition.onresult = (event) => {
-      if (sessionTokenRef.current !== token || handled) return;
-      const match = readSpokenAnswer(event);
-      if (!match) {
-        let transcript: string | null = null;
-        for (
-          let index = event.resultIndex;
-          index < event.results.length && transcript === null;
-          index += 1
-        ) {
-          const result = event.results.item(index);
-          const alternative = result?.item(0);
-          if (result?.isFinal && alternative?.transcript) {
-            transcript = alternative.transcript.trim();
-          }
-        }
-        finishWithoutAnswer(
-          {
-            kind: "retry",
-            message: "Say one digit, 2–9",
-            transcript,
-          },
-          true,
-        );
+    let startRecognition: () => void = () => undefined;
+    const scheduleRestart = () => {
+      if (disposed || fatal || document.hidden || restartTimer !== null) return;
+      restartTimer = window.setTimeout(() => {
+        restartTimer = null;
+        startRecognition();
+      }, 80);
+    };
+
+    startRecognition = () => {
+      if (disposed || fatal || document.hidden || activeRecognition) return;
+
+      const recognition = createDigitSpeechRecognition();
+      if (!recognition) {
+        fatal = true;
+        setSupported(false);
+        setSpeechState({
+          kind: "unsupported",
+          message: "Speech unavailable",
+          transcript: null,
+        });
         return;
       }
 
-      handled = true;
-      clearWatchdog();
+      const token = recognitionToken + 1;
+      recognitionToken = token;
+      activeRecognition = recognition;
+      answerGate.beginRecognitionSession();
       setSpeechState({
-        kind: "idle",
-        message: `Heard ${match.answer}`,
-        transcript: match.transcript,
-      });
-      onAnswer(match.answer, performance.now());
-      try {
-        recognition.stop();
-      } catch {
-        // The browser may already have ended this one-shot session.
-      }
-    };
-
-    recognition.onnomatch = () => {
-      finishWithoutAnswer(
-        {
-          kind: "retry",
-          message: "Didn’t hear 2–9",
-          transcript: null,
-        },
-        true,
-      );
-    };
-
-    recognition.onerror = (event) => {
-      if (event.error === "aborted") return;
-      finishWithoutAnswer(
-        speechErrorMessage(event.error),
-        event.error === "no-speech",
-      );
-    };
-
-    recognition.onstart = () => {
-      if (sessionTokenRef.current !== token || handled) return;
-      setSpeechState({
-        kind: "listening",
-        message: "Listening…",
+        kind: "starting",
+        message: "Starting…",
         transcript: null,
       });
-      watchdogRef.current = window.setTimeout(() => {
-        finishWithoutAnswer(
-          {
-            kind: "retry",
-            message: "Didn’t hear 2–9",
-            transcript: null,
-          },
-          true,
-        );
-        try {
-          recognition.abort();
-        } catch {
-          // The browser may already have ended.
+
+      recognition.onresult = (event) => {
+        if (recognitionToken !== token) return;
+        const match = answerGate.read(event);
+        if (match) {
+          setSpeechState({
+            kind: "heard",
+            message: `Heard ${match.answer}`,
+            transcript: match.transcript,
+          });
+          onAnswerRef.current(match.answer, performance.now());
+          return;
         }
-      }, 8_000);
-    };
 
-    recognition.onspeechend = () => {
-      try {
-        recognition.stop();
-      } catch {
-        // The browser may already be stopping.
-      }
-    };
+        if (!answerGate.isListeningForAnswer() || !acceptingRef.current) {
+          return;
+        }
+        for (
+          let index = event.resultIndex;
+          index < event.results.length;
+          index += 1
+        ) {
+          const result = event.results.item(index);
+          const transcript = result?.item(0)?.transcript.trim();
+          if (!result?.isFinal || !transcript) continue;
+          setSpeechState({
+            kind: "listening",
+            message: "Say one digit, 2–9",
+            transcript,
+          });
+          break;
+        }
+      };
 
-    recognition.onend = () => {
-      if (sessionTokenRef.current !== token) return;
-      clearWatchdog();
-      recognitionRef.current = null;
-      if (!handled) {
-        handled = true;
+      recognition.onnomatch = () => {
+        if (recognitionToken !== token || !acceptingRef.current) return;
         setSpeechState({
-          kind: "retry",
-          message: "Didn’t hear 2–9",
+          kind: "listening",
+          message: "Say one digit, 2–9",
           transcript: null,
         });
-        if (attemptRef.current < 2) {
-          retryTimerRef.current = window.setTimeout(() => {
-            retryTimerRef.current = null;
-            autoStartedRef.current = false;
-            setSpeechState({
-              kind: "starting",
-              message: "Listening again…",
-              transcript: null,
-            });
-            setRetryNonce((value) => value + 1);
-          }, 600);
-        }
+      };
+
+      recognition.onerror = (event) => {
+        if (recognitionToken !== token || event.error === "aborted") return;
+        if (event.error === "no-speech") return;
+        fatal = true;
+        setSpeechState(speechErrorMessage(event.error));
+      };
+
+      recognition.onstart = () => {
+        if (recognitionToken !== token) return;
+        setSpeechState({
+          kind: "listening",
+          message: "Listening…",
+          transcript: null,
+        });
+      };
+
+      recognition.onspeechstart = () => {
+        if (recognitionToken !== token) return;
+        answerGate.speechStarted();
+      };
+
+      recognition.onspeechend = () => {
+        if (recognitionToken !== token) return;
+        answerGate.speechEnded();
+      };
+
+      recognition.onend = () => {
+        if (recognitionToken !== token) return;
+        detachRecognition(recognition);
+        activeRecognition = null;
+        scheduleRestart();
+      };
+
+      try {
+        recognition.start();
+      } catch {
+        fatal = true;
+        detachRecognition(recognition);
+        activeRecognition = null;
+        setSpeechState({
+          kind: "retry",
+          message: "Speech paused",
+          transcript: null,
+        });
       }
     };
 
-    try {
-      recognition.start();
-    } catch {
-      finishWithoutAnswer({
-        kind: "unsupported",
-        message: "Speech unavailable",
-        transcript: null,
-      });
-    }
-  }, [cancelRecognition, clearWatchdog, disabled, onAnswer, onBeforeListen]);
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        if (restartTimer !== null) {
+          window.clearTimeout(restartTimer);
+          restartTimer = null;
+        }
+        stopActiveRecognition();
+        return;
+      }
+      startRecognition();
+    };
 
-  useEffect(() => {
-    if (
-      !supported ||
-      disabled ||
-      microphonePermission !== "ready" ||
-      autoStartedRef.current
-    ) {
-      return;
-    }
-    autoStartedRef.current = true;
-    attemptRef.current += 1;
-    let started = false;
-    const frame = requestAnimationFrame(() => {
-      started = true;
-      startListening();
-    });
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    startRecognition();
+
     return () => {
-      cancelAnimationFrame(frame);
-      if (!started) autoStartedRef.current = false;
+      disposed = true;
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange,
+      );
+      if (restartTimer !== null) window.clearTimeout(restartTimer);
+      stopActiveRecognition();
     };
   }, [
-    disabled,
+    active,
+    answerGate,
     microphonePermission,
     retryNonce,
-    startListening,
     supported,
   ]);
 
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      setSpeechState((previous) => {
+        if (
+          previous.kind === "blocked" ||
+          previous.kind === "retry" ||
+          previous.kind === "unsupported"
+        ) {
+          return previous;
+        }
+        return {
+          kind: "listening",
+          message: "Listening…",
+          transcript: null,
+        };
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [roundId]);
+
   let visibleMessage = speechState.message;
   if (supported === false) visibleMessage = "Speech unavailable";
-  if (disabled && supported) visibleMessage = "Waiting…";
+  if (!active && supported) visibleMessage = "Mic off";
   if (microphonePermission === "requesting") {
     visibleMessage = "Allow microphone";
   } else if (microphonePermission === "blocked") {
     visibleMessage = "Microphone blocked";
   } else if (microphonePermission === "unavailable") {
     visibleMessage = "No microphone";
+  } else if (
+    active &&
+    speechState.kind === "listening" &&
+    speechState.transcript === null
+  ) {
+    visibleMessage = accepting
+      ? "Listening…"
+      : "Mic on · wait for the question";
   }
 
   return (
@@ -987,7 +995,9 @@ function SpeechAnswer({
     >
       <div
         className={styles.micIndicator}
-        data-listening={speechState.kind === "listening"}
+        data-listening={
+          speechState.kind === "listening" && accepting
+        }
         aria-hidden="true"
       >
         <MicIcon />
@@ -1001,6 +1011,16 @@ function SpeechAnswer({
         <strong>{visibleMessage}</strong>
         {speechState.transcript ? (
           <span>“{speechState.transcript}”</span>
+        ) : null}
+        {speechState.kind === "retry" &&
+        microphonePermission === "ready" ? (
+          <button
+            className={styles.micRetryButton}
+            type="button"
+            onClick={() => setRetryNonce((value) => value + 1)}
+          >
+            Try microphone again
+          </button>
         ) : null}
       </div>
     </div>
@@ -1059,6 +1079,7 @@ export default function SubtractionFlashPage() {
   const [narrationPlayer] = useState(() =>
     createGameNarrationPlayer(SUBTRACTION_QUESTION_NARRATION),
   );
+  const [speechAnswerGate] = useState(() => new SpokenAnswerStreamGate());
 
   const currentRound = rounds[mode];
   const answerOptions = currentRound
@@ -1144,45 +1165,67 @@ export default function SubtractionFlashPage() {
     [replaceSessionProgress],
   );
 
-  const markListeningRoundReady = useCallback((cardId: string) => {
-    if (modeRef.current !== "listen") return;
-    const previous = roundsRef.current;
-    const listeningRound = previous.listen;
-    if (
-      !listeningRound ||
-      listeningRound.draw.card.id !== cardId ||
-      listeningRound.selectedAnswer !== null ||
-      listeningRound.startedAt !== null
-    ) {
-      return;
-    }
+  const markListeningRoundReady = useCallback(
+    (cardId: string) => {
+      if (modeRef.current !== "listen") return;
+      const previous = roundsRef.current;
+      const listeningRound = previous.listen;
+      if (
+        !listeningRound ||
+        listeningRound.draw.card.id !== cardId ||
+        listeningRound.selectedAnswer !== null
+      ) {
+        return;
+      }
 
-    const now = performance.now();
-    const nextRounds: ModeRounds = {
-      ...previous,
-      listen: {
-        ...listeningRound,
-        startedAt: readSessionElapsed(
-          sessionProgressRef.current.clock,
-          now,
-        ),
-      },
-    };
-    roundsRef.current = nextRounds;
-    setRounds(nextRounds);
-  }, []);
+      const roundId = speechAnswerRoundId(
+        sessionIdRef.current,
+        "listen",
+        cardId,
+      );
+      if (listeningRound.startedAt !== null) {
+        speechAnswerGate.updateRound(roundId, true);
+        return;
+      }
+
+      const now = performance.now();
+      const nextRounds: ModeRounds = {
+        ...previous,
+        listen: {
+          ...listeningRound,
+          startedAt: readSessionElapsed(
+            sessionProgressRef.current.clock,
+            now,
+          ),
+        },
+      };
+      roundsRef.current = nextRounds;
+      speechAnswerGate.updateRound(roundId, true);
+      setRounds(nextRounds);
+    },
+    [speechAnswerGate],
+  );
 
   const speakQuestion = useCallback(
     (round: RoundState) => {
       if (!soundEnabledRef.current || round.selectedAnswer !== null) return;
 
+      const cueId = subtractionNarrationCueId(round.draw.card);
+      speechAnswerGate.beginPrompt(
+        speechAnswerRoundId(
+          sessionIdRef.current,
+          "listen",
+          round.draw.card.id,
+        ),
+        SUBTRACTION_QUESTION_NARRATION.clips[cueId].transcript,
+      );
       const playbackToken = playbackTokenRef.current + 1;
       playbackTokenRef.current = playbackToken;
       setIsQuestionSpeaking(true);
       narrationPlayer.prime();
 
       void narrationPlayer
-        .play([subtractionNarrationCueId(round.draw.card)])
+        .play([cueId])
         .then((result) => {
           if (playbackTokenRef.current !== playbackToken) return;
           setIsQuestionSpeaking(false);
@@ -1196,7 +1239,7 @@ export default function SubtractionFlashPage() {
           markListeningRoundReady(round.draw.card.id);
         });
     },
-    [markListeningRoundReady, narrationPlayer],
+    [markListeningRoundReady, narrationPlayer, speechAnswerGate],
   );
 
   const stopSpeaking = useCallback(() => {
@@ -1341,10 +1384,7 @@ export default function SubtractionFlashPage() {
       if (activeMode === "listen") stopSpeaking();
       if (answeredWith !== "speak") playEarcon(correct);
 
-      const feedbackDelay =
-        answeredWith === "tap"
-          ? TAP_RESULT_FLASH_MS
-          : RECOGNIZED_RESULT_FLASH_MS;
+      const feedbackDelay = resultFlashDuration(answeredWith);
       if (progress.mode === "deck-sprint" && deckSnapshot.exhausted) {
         finishSession("deck", activeElapsedMs, feedbackDelay);
       } else if (
@@ -1680,9 +1720,7 @@ export default function SubtractionFlashPage() {
       if (modeRef.current === answeredMode) {
         advanceRound();
       }
-    }, currentRound.answeredWith === "tap"
-      ? TAP_RESULT_FLASH_MS
-      : RECOGNIZED_RESULT_FLASH_MS);
+    }, resultFlashDuration(currentRound.answeredWith));
     return () => window.clearTimeout(timer);
   }, [advanceRound, currentRound, mode]);
 
@@ -2026,14 +2064,25 @@ export default function SubtractionFlashPage() {
                     />
                   ) : (
                     <SpeechAnswer
-                      key={`${sessionProgress.id}:${mode}:${
-                        currentRound?.draw.card.id ?? "loading"
-                      }`}
-                      disabled={!answerReady}
+                      key={`${sessionProgress.id}:${mode}`}
+                      accepting={answerReady}
+                      active={
+                        sessionPhase === "playing" &&
+                        (mode !== "listen" || soundEnabled)
+                      }
+                      answerGate={speechAnswerGate}
                       microphonePermission={microphonePermission}
-                      onBeforeListen={stopSpeaking}
                       onAnswer={(answer, answeredAt) =>
                         submitAnswer(answer, "speak", answeredAt)
+                      }
+                      roundId={
+                        currentRound
+                          ? speechAnswerRoundId(
+                              sessionProgress.id,
+                              mode,
+                              currentRound.draw.card.id,
+                            )
+                          : null
                       }
                     />
                   )}

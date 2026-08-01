@@ -24,16 +24,47 @@ const NUMBER_WORDS = new Map([
   [18, "eighteen"],
 ]);
 
-async function readExistingCues() {
+const TRIM_EDGE_SILENCE_FILTER =
+  "silenceremove=start_periods=1:start_duration=0.04:" +
+  "start_threshold=-50dB:start_silence=0.15:detection=rms," +
+  "areverse," +
+  "silenceremove=start_periods=1:start_duration=0.04:" +
+  "start_threshold=-50dB:start_silence=0.15:detection=rms," +
+  "areverse";
+
+const NARRATOR = Object.freeze({
+  model: "hexgrad/Kokoro-82M",
+  revision: "f3ff3571791e39611d31c381e3a41a3af07b4987",
+  voice: "af_heart",
+  speed: 0.88,
+  sampleRate: 24_000,
+  format: "mp3",
+});
+
+const POSTPROCESS = Object.freeze({
+  trimEdgeSilence: true,
+  ffmpegAudioFilter: TRIM_EDGE_SILENCE_FILTER,
+  ffmpegAudioCodec: "libmp3lame",
+  audioBitrateKbps: 48,
+});
+
+async function readExistingManifest() {
   try {
-    const source = JSON.parse(await readFile(manifestUrl, "utf8"));
-    return source.cues ?? {};
+    return JSON.parse(await readFile(manifestUrl, "utf8"));
   } catch {
-    return {};
+    return { cues: {} };
   }
 }
 
-const existingCues = await readExistingCues();
+const existingManifest = await readExistingManifest();
+const existingCues = existingManifest.cues ?? {};
+const auditRecipeMatches =
+  Object.entries(NARRATOR).every(
+    ([key, value]) => existingManifest.narrator?.[key] === value,
+  ) &&
+  Object.entries(POSTPROCESS).every(
+    ([key, value]) => existingManifest.postprocess?.[key] === value,
+  );
 const cues = {};
 
 for (let minuend = 11; minuend <= 18; minuend += 1) {
@@ -50,7 +81,9 @@ for (let minuend = 11; minuend <= 18; minuend += 1) {
       previous?.file === file ||
       previous?.file === `${minuend}-minus-${subtrahend}-brisk.mp3`;
     const canKeepAudit =
-      previous?.speechText === speechText && previousFileIsCurrentOrLegacy;
+      auditRecipeMatches &&
+      previous?.speechText === speechText &&
+      previousFileIsCurrentOrLegacy;
 
     cues[cueId] = {
       caption: "Listen.",
@@ -65,14 +98,8 @@ for (let minuend = 11; minuend <= 18; minuend += 1) {
 }
 
 const manifest = {
-  narrator: {
-    model: "hexgrad/Kokoro-82M",
-    revision: "f3ff3571791e39611d31c381e3a41a3af07b4987",
-    voice: "af_heart",
-    speed: 0.88,
-    sampleRate: 24_000,
-    format: "mp3",
-  },
+  narrator: NARRATOR,
+  postprocess: POSTPROCESS,
   cues,
 };
 

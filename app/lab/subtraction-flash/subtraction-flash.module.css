@@ -765,6 +765,20 @@
   font-size: 0.86rem;
 }
 
+.micRetryButton {
+  width: fit-content;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 820;
+  cursor: pointer;
+}
+
 .resultsDialog {
   width: min(560px, calc(100vw - 32px));
   max-height: calc(100svh - 32px);
@@ -909,6 +923,7 @@
 .answerModeButton:focus-visible,
 .digitCanvas:focus-visible,
 .clearButton:focus-visible,
+.micRetryButton:focus-visible,
 .playAgainButton:focus-visible,
 .chooseModeButton:focus-visible {
   outline: 3px solid var(--focus);

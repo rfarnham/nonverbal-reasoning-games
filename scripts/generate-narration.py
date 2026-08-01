@@ -28,6 +28,23 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = ROOT / "content/narration/libra-proof.json"
 DEFAULT_OUTPUT = ROOT / "public/audio/narration/kokoro-82m-v1-af-heart"
 UNLOCK_OUTPUT = ROOT / "public/audio/narration/narration-unlock.mp3"
+def probe_audio_duration_ms(path: Path) -> int:
+    result = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "csv=p=0",
+            str(path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return round(float(result.stdout.strip()) * 1000)
 
 
 def render_unlock_clip(sample_rate: int) -> None:
@@ -68,6 +85,24 @@ def render(
     voice = narrator["voice"]
     sample_rate = int(narrator["sampleRate"])
     speed = float(narrator["speed"])
+    postprocess = manifest.get("postprocess", {})
+    trim_edge_silence = bool(postprocess.get("trimEdgeSilence", False))
+    trim_edge_silence_filter = postprocess.get("ffmpegAudioFilter")
+    trim_audio_codec = postprocess.get("ffmpegAudioCodec")
+    trim_audio_bitrate = postprocess.get("audioBitrateKbps")
+    if trim_edge_silence:
+        if not isinstance(trim_edge_silence_filter, str):
+            raise ValueError(
+                "trimEdgeSilence requires an audited ffmpegAudioFilter recipe"
+            )
+        if not isinstance(trim_audio_codec, str):
+            raise ValueError(
+                "trimEdgeSilence requires an audited ffmpegAudioCodec"
+            )
+        if not isinstance(trim_audio_bitrate, int) or trim_audio_bitrate <= 0:
+            raise ValueError(
+                "trimEdgeSilence requires a positive audioBitrateKbps"
+            )
     render_unlock_clip(sample_rate)
 
     config_path = hf_hub_download(
@@ -115,24 +150,37 @@ def render(
             wav_path = temp_dir / f"{cue_id}.wav"
             destination = output_dir / cue["file"]
             sf.write(wav_path, audio, sample_rate, subtype="PCM_16")
-            subprocess.run(
+            ffmpeg_command = [
+                "ffmpeg",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-i",
+                str(wav_path),
+            ]
+            if trim_edge_silence:
+                ffmpeg_command.extend(["-af", trim_edge_silence_filter])
+                ffmpeg_command.extend(["-c:a", trim_audio_codec])
+            ffmpeg_command.extend(
                 [
-                    "ffmpeg",
-                    "-hide_banner",
-                    "-loglevel",
-                    "error",
-                    "-y",
-                    "-i",
-                    str(wav_path),
                     "-ac",
                     "1",
                     "-b:a",
-                    "48k",
+                    (
+                        f"{trim_audio_bitrate}k"
+                        if trim_edge_silence
+                        else "48k"
+                    ),
                     str(destination),
-                ],
-                check=True,
+                ]
             )
-            cue["audioDurationMs"] = round(len(audio) / sample_rate * 1000)
+            subprocess.run(ffmpeg_command, check=True)
+            cue["audioDurationMs"] = (
+                probe_audio_duration_ms(destination)
+                if trim_edge_silence
+                else round(len(audio) / sample_rate * 1000)
+            )
             cue["sha256"] = hashlib.sha256(destination.read_bytes()).hexdigest()
             print(f"{cue_id}: {cue['audioDurationMs']} ms -> {destination.name}")
 

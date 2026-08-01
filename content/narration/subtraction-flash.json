@@ -7,330 +7,336 @@
     "sampleRate": 24000,
     "format": "mp3"
   },
+  "postprocess": {
+    "trimEdgeSilence": true,
+    "ffmpegAudioFilter": "silenceremove=start_periods=1:start_duration=0.04:start_threshold=-50dB:start_silence=0.15:detection=rms,areverse,silenceremove=start_periods=1:start_duration=0.04:start_threshold=-50dB:start_silence=0.15:detection=rms,areverse",
+    "ffmpegAudioCodec": "libmp3lame",
+    "audioBitrateKbps": 48
+  },
   "cues": {
     "11-2": {
       "caption": "Listen.",
       "speechText": "eleven minus two?",
       "file": "11-minus-2.mp3",
-      "audioDurationMs": 2075,
+      "audioDurationMs": 1360,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "826a2d0ea67358c35a893423508c0450654a332fb4f1c69c44c19dd01f9a8d49"
+      "sha256": "e11b0f55f311a330418c9b15da517b34048ccb01b96e16b24423eaedba346359"
     },
     "11-3": {
       "caption": "Listen.",
       "speechText": "eleven minus three?",
       "file": "11-minus-3.mp3",
-      "audioDurationMs": 2100,
+      "audioDurationMs": 1378,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "26d45cd9673875ed14323da62c392df1d56857318afa2f9bae584e4d9040df6f"
+      "sha256": "ac7161a986518a4397d45e553ffe24017f4b238c443ec7f0d123daa5bf7931ef"
     },
     "11-4": {
       "caption": "Listen.",
       "speechText": "eleven minus four?",
       "file": "11-minus-4.mp3",
-      "audioDurationMs": 2100,
+      "audioDurationMs": 1385,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "c0cabff5a2c82889bf6bc8a72b8d0219dfeb82e9f1a522a6e0ad31fae68c6090"
+      "sha256": "3ae1b8f37ebd3a8e4e6cd2cabfc6244b0d45f661434b622f5fc36075219d0dbb"
     },
     "11-5": {
       "caption": "Listen.",
       "speechText": "eleven minus five?",
       "file": "11-minus-5.mp3",
-      "audioDurationMs": 2150,
+      "audioDurationMs": 1448,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "b860aa3768007326b51691bd739e257dd1583604ea4df6265e72b5cf11e68b29"
+      "sha256": "ab1ca420ca1fc2796727493dda40d738834970ac0dd36071db1d7b2d2d0a6092"
     },
     "11-6": {
       "caption": "Listen.",
       "speechText": "eleven minus six?",
       "file": "11-minus-6.mp3",
-      "audioDurationMs": 2100,
+      "audioDurationMs": 1462,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "53de708091b00048e4ea039be8718126481977e586fb0438a6e65204976913e1"
+      "sha256": "0cb0960e53e1874568ca815d9ea9e0320bb61c989f9a4d75ec575c5d08bc0b49"
     },
     "11-7": {
       "caption": "Listen.",
       "speechText": "eleven minus seven?",
       "file": "11-minus-7.mp3",
-      "audioDurationMs": 2150,
+      "audioDurationMs": 1468,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "d0ceeb4360dc24a4418d38b50512ae7159fda06d3c4a8de59a9bee1355682594"
+      "sha256": "e7de5b153098f5709d80c0c6942274dc6ead7041de3f52bba3b31ff47cdd07c9"
     },
     "11-8": {
       "caption": "Listen.",
       "speechText": "eleven minus eight?",
       "file": "11-minus-8.mp3",
-      "audioDurationMs": 2100,
+      "audioDurationMs": 1406,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "6c9cda8e605d329090ccddc9b58934c923cc2f706cffdbbed4daefa8b86a7c28"
+      "sha256": "f08985db6f6ce1cfdc3afe8d24e074462c26ae11238ddc2aa52e441b7fe062a3"
     },
     "11-9": {
       "caption": "Listen.",
       "speechText": "eleven minus nine?",
       "file": "11-minus-9.mp3",
-      "audioDurationMs": 2100,
+      "audioDurationMs": 1368,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "f810677ddab62629793316443d2007c5c801cdcee53dfba83c0736485ba396d7"
+      "sha256": "d5b407e70980f5514471212c3b636d79e6b521429946b647e5a6b36ecd2147a4"
     },
     "12-3": {
       "caption": "Listen.",
       "speechText": "twelve minus three?",
       "file": "12-minus-3.mp3",
-      "audioDurationMs": 2000,
+      "audioDurationMs": 1304,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "23a00a12b9d3f3402f6a1713f78813ac3ddbe28a030e30191b5a9caa32242531"
+      "sha256": "3e487c64bb388f87ce26a25a80efab2be837567f1920a582946cbf330b8af06e"
     },
     "12-4": {
       "caption": "Listen.",
       "speechText": "twelve minus four?",
       "file": "12-minus-4.mp3",
-      "audioDurationMs": 2025,
+      "audioDurationMs": 1324,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "9981d92716c841fb1b0bda863dc967cbc978751aaa8414e209a648256003c261"
+      "sha256": "241edf82bfa9798ab32d9d1a1330f77a254f1553d0e1afcfc50adb880cbf359a"
     },
     "12-5": {
       "caption": "Listen.",
       "speechText": "twelve minus five?",
       "file": "12-minus-5.mp3",
-      "audioDurationMs": 2100,
+      "audioDurationMs": 1400,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "deb7b1f8ad7dc308de514c9e13190cf24f4a58c0f7e3bd7940b4dd5ed386aded"
+      "sha256": "eb5c6334a73cde5d6f4bf219aa747f69b613f5ee688b341ce4c30f4c0077a33e"
     },
     "12-6": {
       "caption": "Listen.",
       "speechText": "twelve minus six?",
       "file": "12-minus-6.mp3",
-      "audioDurationMs": 2050,
+      "audioDurationMs": 1397,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "30473531c152fb9461cc8f01e10f9cf8c090371f123898b3c833fd1a85974cf6"
+      "sha256": "6c522c5b676367047d3901983fbbec0d864c46ea9d05e7b2ef911b80ad834b2f"
     },
     "12-7": {
       "caption": "Listen.",
       "speechText": "twelve minus seven?",
       "file": "12-minus-7.mp3",
-      "audioDurationMs": 2025,
+      "audioDurationMs": 1363,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "6043008e52d2f2b9ee86178750c4118cd3dbf6f475be4f36666cb990d96087ae"
+      "sha256": "a0fdf3fccf155ade73001a7ddcd6bd67732fb232a66c61fffc2e7194b5812b68"
     },
     "12-8": {
       "caption": "Listen.",
       "speechText": "twelve minus eight?",
       "file": "12-minus-8.mp3",
-      "audioDurationMs": 2025,
+      "audioDurationMs": 1335,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "09833558774c0cf891e00e7db1518860266c52b288077c2d6f683f20ef535a7e"
+      "sha256": "c2f49522c1c0546d1243a3e7cf2aaae8a94b478c291d0292d6ea396fd309a21b"
     },
     "12-9": {
       "caption": "Listen.",
       "speechText": "twelve minus nine?",
       "file": "12-minus-9.mp3",
-      "audioDurationMs": 2025,
+      "audioDurationMs": 1309,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "6b14dc1e3e8116a14f4d49c0162e7b151b0dca57becbb6e923b0d581438f5b47"
+      "sha256": "70a500b8d30e66588752cad05b9a4620311c7136a9a156afd8cfe88a4eb67be1"
     },
     "13-4": {
       "caption": "Listen.",
       "speechText": "thirteen minus four?",
       "file": "13-minus-4.mp3",
-      "audioDurationMs": 2075,
+      "audioDurationMs": 1374,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "31ec0a540cf406d967f51f43fb7a4639d097ed753b531f2e20ad96706cca5c49"
+      "sha256": "d63c04f71afc196fa23ae564d5771cdd35b9c8ceb148f1159fc405f3c9c81473"
     },
     "13-5": {
       "caption": "Listen.",
       "speechText": "thirteen minus five?",
       "file": "13-minus-5.mp3",
-      "audioDurationMs": 2075,
+      "audioDurationMs": 1377,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "fd471de3d6ab3834e66558b43f8be20ed919d70431af392c7c601e8bad306d70"
+      "sha256": "3d358bddebd9513677e2bbc4f2d7dc661af09f0a172388a468af91d930ec8659"
     },
     "13-6": {
       "caption": "Listen.",
       "speechText": "thirteen minus six?",
       "file": "13-minus-6.mp3",
-      "audioDurationMs": 2025,
+      "audioDurationMs": 1398,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "a1282b68afe4b654a431e3ff897a84feafff56994de30207ae65109fd71fd700"
+      "sha256": "2221d0fa4c7c8ac0dd5826b96ab227f17d0f8282755b32dd1b1dac68e660e660"
     },
     "13-7": {
       "caption": "Listen.",
       "speechText": "thirteen minus seven?",
       "file": "13-minus-7.mp3",
-      "audioDurationMs": 2100,
+      "audioDurationMs": 1408,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "3992abf495c63346d82505a54afa41d1486330fa68571ee2f551c07900954789"
+      "sha256": "07acc6df45377f46979c96ac7f26aee342506470999012b8f54f456d8271f186"
     },
     "13-8": {
       "caption": "Listen.",
       "speechText": "thirteen minus eight?",
       "file": "13-minus-8.mp3",
-      "audioDurationMs": 2100,
+      "audioDurationMs": 1376,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "423b01126e9470f03ea165d0566d966789c030d5b344a149736cb5c0daed6f40"
+      "sha256": "236faef363fb5929efb8ea07ddabc23187660bc9f23cdba5987208e6f37b1512"
     },
     "13-9": {
       "caption": "Listen.",
       "speechText": "thirteen minus nine?",
       "file": "13-minus-9.mp3",
-      "audioDurationMs": 2100,
+      "audioDurationMs": 1379,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "3deb18517e71b14818ded18bbb00bb89c61b1ea731161b1f29ebd894419c75fc"
+      "sha256": "dfdea476eadc7d7c1a71c330fee7c5ef0929d04d2186198dbc0d988bb5b47928"
     },
     "14-5": {
       "caption": "Listen.",
       "speechText": "fourteen minus five?",
       "file": "14-minus-5.mp3",
-      "audioDurationMs": 2200,
+      "audioDurationMs": 1520,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "4e18a35ab1da76665c1841466beb38a3ab354e0b7baabda374e90e77f991e190"
+      "sha256": "78b2ca7847760606604c3ec2731cf000cb0b3fc80253748b9240440210f32d40"
     },
     "14-6": {
       "caption": "Listen.",
       "speechText": "fourteen minus six?",
       "file": "14-minus-6.mp3",
-      "audioDurationMs": 2150,
+      "audioDurationMs": 1538,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "2ce4ea7c3756eeb5c010b9aa0b2e07587ef34984f67e2b68f338ec40342074b2"
+      "sha256": "9c5ae807c03fcf9635d9ae5b287baa17299bfef38b1b715894c56b1d7ebee4be"
     },
     "14-7": {
       "caption": "Listen.",
       "speechText": "fourteen minus seven?",
       "file": "14-minus-7.mp3",
-      "audioDurationMs": 2175,
+      "audioDurationMs": 1531,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "fe24521903f8c83181a984c3a9cf29229e0e3736593fb2fc54c1153d57c77fef"
+      "sha256": "9afe1acbd35b3a1174f76966b29ea2865c637fb64fea4c917afda110ac8f197b"
     },
     "14-8": {
       "caption": "Listen.",
       "speechText": "fourteen minus eight?",
       "file": "14-minus-8.mp3",
-      "audioDurationMs": 2125,
+      "audioDurationMs": 1454,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "4248b937b2a48e9dd8d4ccef691004c1e5e94b9614ae33bafb30a52359f7b099"
+      "sha256": "e66b8165c25ad09c8288ce759fac481c36580c1d131f5ac8addbdef34d54d750"
     },
     "14-9": {
       "caption": "Listen.",
       "speechText": "fourteen minus nine?",
       "file": "14-minus-9.mp3",
-      "audioDurationMs": 2125,
+      "audioDurationMs": 1456,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "df8057845cfd3aece92fe68a396651d28c14193d56cbc3b59af40e31f801daba"
+      "sha256": "963189edcc6755a43772c4d5ff5750c55bb65224442e63fda074e81cb1ef76c4"
     },
     "15-6": {
       "caption": "Listen.",
       "speechText": "fifteen minus six?",
       "file": "15-minus-6.mp3",
-      "audioDurationMs": 2050,
+      "audioDurationMs": 1461,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "60b7a05abc3ee67ef045942b88896b946285096e541b1811231fc0ec4cbae798"
+      "sha256": "f6773c7b6754ef02e5527680256e291b57c0876b260c3f4b8a007cc0cfc3e0fd"
     },
     "15-7": {
       "caption": "Listen.",
       "speechText": "fifteen minus seven?",
       "file": "15-minus-7.mp3",
-      "audioDurationMs": 2100,
+      "audioDurationMs": 1461,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "12efadec11413ccb1b3621d454073088ddfba2dff6073fc7cae40472ac302b58"
+      "sha256": "5de467dae23c57f6549376f38bbf06beab72295886f0a7b9192c21c617b6630f"
     },
     "15-8": {
       "caption": "Listen.",
       "speechText": "fifteen minus eight?",
       "file": "15-minus-8.mp3",
-      "audioDurationMs": 2100,
+      "audioDurationMs": 1427,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "270cc58e58c2818576c8c8cefc81fe2bbda01a5b472adf154a5e1d35017ee9ac"
+      "sha256": "50b9d0d02fdbda2f2d29cb74a92d70e5a50c65f676796f206978d7d553a2dc87"
     },
     "15-9": {
       "caption": "Listen.",
       "speechText": "fifteen minus nine?",
       "file": "15-minus-9.mp3",
-      "audioDurationMs": 2075,
+      "audioDurationMs": 1410,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "eda2107e16dfd97a4d091eb39c5071adb33ab74ca7d3cdfd5a47ccb1924c5d9e"
+      "sha256": "7c1bdcf2a41ddfc5df1eac0492864f1de02eec76220f174b3576587f0438a6e4"
     },
     "16-7": {
       "caption": "Listen.",
       "speechText": "sixteen minus seven?",
       "file": "16-minus-7.mp3",
-      "audioDurationMs": 2175,
+      "audioDurationMs": 1524,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "456d3c68f8e91b022fc0891ea64487e4b41b989caefd33a566782a0486f6d01f"
+      "sha256": "946099685faafa9cebf6f3fe96283f0bd8548ba6fcee0f749e27f8e19dfb288e"
     },
     "16-8": {
       "caption": "Listen.",
       "speechText": "sixteen minus eight?",
       "file": "16-minus-8.mp3",
-      "audioDurationMs": 2050,
+      "audioDurationMs": 1418,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "23dbe48baec517437c37041ef449a011ce5409e2a26bb1d9085416f62156d393"
+      "sha256": "2be5d84e2126a161e7d669fae6b965404ba564695e569b7ad296c31f2bcc504a"
     },
     "16-9": {
       "caption": "Listen.",
       "speechText": "sixteen minus nine?",
       "file": "16-minus-9.mp3",
-      "audioDurationMs": 2100,
+      "audioDurationMs": 1449,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "7c7533d8ea25ec6e237b97f9ca75ce2d4c9e2927082dd99518cf23d0e22d3410"
+      "sha256": "e8cba1e0edc394f1d3f6a1b6cf6fc5d760b2c3537b05fda6ff8908e293636e94"
     },
     "17-8": {
       "caption": "Listen.",
       "speechText": "seventeen minus eight?",
       "file": "17-minus-8.mp3",
-      "audioDurationMs": 2100,
+      "audioDurationMs": 1498,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "69c0b323e2fd0ac023feac99dd31e5344e7fd659b008bf140dc982aec60bbb50"
+      "sha256": "757d9ac6cd704373544cd33e47f13765d8b604a48388ff573d375fc64439629e"
     },
     "17-9": {
       "caption": "Listen.",
       "speechText": "seventeen minus nine?",
       "file": "17-minus-9.mp3",
-      "audioDurationMs": 2175,
+      "audioDurationMs": 1545,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "97d4b66597a70825f1580a8e68db2c9ad19d457543206e85711e2af2e6d3fc29"
+      "sha256": "1f21742c5ffe98f5b17706cde3dd0ab675af943830be2e8308eb360471aaafdf"
     },
     "18-9": {
       "caption": "Listen.",
       "speechText": "eighteen minus nine?",
       "file": "18-minus-9.mp3",
-      "audioDurationMs": 2125,
+      "audioDurationMs": 1382,
       "minVisualMs": 0,
       "lingerMs": 0,
-      "sha256": "b23200eda88e177b5995edfd5e75292622cb73d389e22028631097e146a4859a"
+      "sha256": "d0d658dd80b0fa2cd1a04c7090151802e70426cba73e909ba1abd5908a9a8300"
     }
   }
 }

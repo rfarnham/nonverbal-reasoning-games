@@ -95,6 +95,26 @@ const SPOKEN_ANSWERS: Readonly<Record<string, AnswerValue>> = Object.freeze({
   nine: 9,
 });
 
+const CANONICAL_SPOKEN_ANSWERS: Readonly<Record<string, AnswerValue>> =
+  Object.freeze({
+    "2": 2,
+    two: 2,
+    "3": 3,
+    three: 3,
+    "4": 4,
+    four: 4,
+    "5": 5,
+    five: 5,
+    "6": 6,
+    six: 6,
+    "7": 7,
+    seven: 7,
+    "8": 8,
+    eight: 8,
+    "9": 9,
+    nine: 9,
+  });
+
 function normalizeSpokenAnswer(transcript: string): string {
   return transcript
     .normalize("NFKC")
@@ -110,6 +130,18 @@ function normalizeSpokenAnswer(transcript: string): string {
  */
 export function parseSpokenAnswer(transcript: string): AnswerValue | null {
   return SPOKEN_ANSWERS[normalizeSpokenAnswer(transcript)] ?? null;
+}
+
+/**
+ * Parses only an unambiguous number word or digit. Interim hypotheses use this
+ * stricter vocabulary so a transient “to”, “for”, or “ate” cannot submit.
+ */
+export function parseCanonicalSpokenAnswer(
+  transcript: string,
+): AnswerValue | null {
+  return (
+    CANONICAL_SPOKEN_ANSWERS[normalizeSpokenAnswer(transcript)] ?? null
+  );
 }
 
 /**
@@ -161,8 +193,8 @@ export function getSpeechRecognitionConstructor(
 }
 
 /**
- * Creates a short, one-answer recognition session. The caller decides when to
- * start it; Subtraction Flash starts as soon as its prompt finishes.
+ * Creates the continuous recognition stream used by Subtraction Flash. The
+ * caller gates prompt audio and decides when a recognized digit may submit.
  */
 export function createDigitSpeechRecognition(
   scope?: BrowserSpeechRecognitionScope,
@@ -173,8 +205,8 @@ export function createDigitSpeechRecognition(
   try {
     const recognition = new Constructor();
     recognition.lang = "en-US";
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.continuous = true;
+    recognition.interimResults = true;
     recognition.maxAlternatives = 5;
     return recognition;
   } catch {

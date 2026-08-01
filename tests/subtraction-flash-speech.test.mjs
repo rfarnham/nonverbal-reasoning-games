@@ -8,6 +8,10 @@ import {
   parseSpokenAnswer,
   readSpokenAnswer,
 } from "../app/lab/subtraction-flash/browser-speech.ts";
+import {
+  readStreamingSpokenAnswer,
+  SpokenAnswerStreamGate,
+} from "../app/lab/subtraction-flash/speech-answer-stream.ts";
 
 const pageSource = await readFile(
   new URL("../app/lab/subtraction-flash/page.tsx", import.meta.url),
@@ -73,7 +77,7 @@ test("constructor lookup prefers the standard API and falls back to WebKit", () 
   assert.equal(getSpeechRecognitionConstructor({}), null);
 });
 
-test("digit recognition sessions use brisk one-shot browser settings", () => {
+test("digit recognition creates a constrained browser recognizer", () => {
   class FakeRecognition {
     lang = "";
     continuous = true;
@@ -87,8 +91,8 @@ test("digit recognition sessions use brisk one-shot browser settings", () => {
 
   assert.ok(recognition);
   assert.equal(recognition.lang, "en-US");
-  assert.equal(recognition.continuous, false);
-  assert.equal(recognition.interimResults, false);
+  assert.equal(recognition.continuous, true);
+  assert.equal(recognition.interimResults, true);
   assert.equal(recognition.maxAlternatives, 5);
 });
 
@@ -109,8 +113,8 @@ function resultList(results) {
   });
 }
 
-test("answer reading ignores interim text and checks ranked final alternatives", () => {
-  const match = readSpokenAnswer({
+test("answer reading returns the leading interim digit immediately", () => {
+  const match = readStreamingSpokenAnswer({
     resultIndex: 0,
     results: resultList([
       result([{ transcript: "seven", confidence: 0.99 }], false),
@@ -122,13 +126,78 @@ test("answer reading ignores interim text and checks ranked final alternatives",
   });
 
   assert.deepEqual(match, {
-    answer: 8,
-    confidence: 0.62,
-    transcript: "eight",
+    answer: 7,
+    confidence: 0.99,
+    transcript: "seven",
   });
 });
 
-test("answer reading returns null when no final alternative is one digit", () => {
+test("interim reading never promotes a lower-ranked guess", () => {
+  assert.equal(
+    readStreamingSpokenAnswer({
+      resultIndex: 0,
+      results: resultList([
+        result(
+          [
+            { transcript: "heaven", confidence: 0.7 },
+            { transcript: "seven", confidence: 0.62 },
+          ],
+          false,
+        ),
+      ]),
+    }),
+    null,
+  );
+});
+
+test("interim reading rejects ambiguous homophones until they are final", () => {
+  for (const [transcript, answer] of [
+    ["to", 2],
+    ["too", 2],
+    ["for", 4],
+    ["fore", 4],
+    ["ate", 8],
+  ]) {
+    const interim = {
+      resultIndex: 0,
+      results: resultList([
+        result([{ transcript, confidence: 0.9 }], false),
+      ]),
+    };
+    const final = {
+      resultIndex: 0,
+      results: resultList([result([{ transcript, confidence: 0.9 }])]),
+    };
+
+    assert.equal(readStreamingSpokenAnswer(interim), null, transcript);
+    assert.equal(
+      readStreamingSpokenAnswer(final)?.answer,
+      answer,
+      transcript,
+    );
+  }
+});
+
+test("final reading checks ranked alternatives", () => {
+  assert.deepEqual(
+    readStreamingSpokenAnswer({
+      resultIndex: 0,
+      results: resultList([
+        result([
+          { transcript: "heaven", confidence: 0.7 },
+          { transcript: "eight", confidence: 0.62 },
+        ]),
+      ]),
+    }),
+    {
+      answer: 8,
+      confidence: 0.62,
+      transcript: "eight",
+    },
+  );
+});
+
+test("answer reading returns null when no alternative is one digit", () => {
   assert.equal(
     readSpokenAnswer({
       resultIndex: 0,
@@ -140,10 +209,337 @@ test("answer reading returns null when no final alternative is one digit", () =>
   );
 });
 
-test("Speak starts automatically after the prompt becomes ready", () => {
+test("the stream trims prompt results and accepts an overlapping answer", () => {
+  const gate = new SpokenAnswerStreamGate();
+  gate.beginRecognitionSession();
+  gate.beginPrompt("round-1", "eleven minus four?");
+  gate.speechStarted();
+
+  const promptInterim = {
+    resultIndex: 0,
+    results: resultList([
+      result(
+        [{ transcript: "eleven minus four", confidence: 0.96 }],
+        false,
+      ),
+    ]),
+  };
+  assert.equal(gate.read(promptInterim), null);
+
+  gate.updateRound("round-1", true);
+  const bufferedPromptFinal = {
+    resultIndex: 0,
+    results: resultList([
+      result([{ transcript: "eleven minus four", confidence: 0.98 }]),
+    ]),
+  };
+  assert.equal(gate.read(bufferedPromptFinal), null);
+
+  // No new speech boundary is required: an answer that overlaps the tail of
+  // the prompt is still a fresh recognition result and can land immediately.
+  const answerInterim = {
+    resultIndex: 1,
+    results: resultList([
+      bufferedPromptFinal.results.item(0),
+      result([{ transcript: "seven", confidence: 0.91 }], false),
+    ]),
+  };
+  assert.deepEqual(gate.read(answerInterim), {
+    answer: 7,
+    confidence: 0.91,
+    transcript: "seven",
+  });
+});
+
+test("the stream trims a prompt when its interim slot becomes the answer", () => {
+  const gate = new SpokenAnswerStreamGate();
+  gate.beginRecognitionSession();
+  gate.beginPrompt("round-1", "eleven minus four?");
+  gate.speechStarted();
+  assert.equal(
+    gate.read({
+      resultIndex: 0,
+      results: resultList([
+        result(
+          [{ transcript: "eleven minus four", confidence: 0.95 }],
+          false,
+        ),
+      ]),
+    }),
+    null,
+  );
+
+  gate.updateRound("round-1", true);
+  assert.deepEqual(
+    gate.read({
+      resultIndex: 0,
+      results: resultList([
+        result([{ transcript: "seven", confidence: 0.92 }], false),
+      ]),
+    }),
+    { answer: 7, confidence: 0.92, transcript: "seven" },
+  );
+});
+
+test("prompt-tail revisions and lower alternatives never become answers", () => {
+  for (const finalizedAlternatives of [
+    [
+      { transcript: "eleven minus four", confidence: 0.98 },
+      { transcript: "four", confidence: 0.7 },
+    ],
+    [{ transcript: "four", confidence: 0.98 }],
+  ]) {
+    const gate = new SpokenAnswerStreamGate();
+    gate.beginRecognitionSession();
+    gate.beginPrompt("round-1", "eleven minus four?");
+    gate.speechStarted();
+    assert.equal(
+      gate.read({
+        resultIndex: 0,
+        results: resultList([
+          result(
+            [
+              {
+                transcript: "eleven minus four",
+                confidence: 0.95,
+              },
+            ],
+            false,
+          ),
+        ]),
+      }),
+      null,
+    );
+
+    gate.updateRound("round-1", true);
+    assert.equal(
+      gate.read({
+        resultIndex: 0,
+        results: resultList([result(finalizedAlternatives)]),
+      }),
+      null,
+    );
+  }
+});
+
+test("fresh slots stay leader-only until prompt-side speech ends", () => {
+  const gate = new SpokenAnswerStreamGate();
+  gate.beginRecognitionSession();
+  gate.beginPrompt("round-1", "eleven minus four?");
+  gate.speechStarted();
+  assert.equal(
+    gate.read({
+      resultIndex: 0,
+      results: resultList([
+        result(
+          [{ transcript: "eleven minus four", confidence: 0.95 }],
+          false,
+        ),
+      ]),
+    }),
+    null,
+  );
+  gate.updateRound("round-1", true);
+
+  const promptSideAlternatives = {
+    resultIndex: 1,
+    results: resultList([
+      result([{ transcript: "eleven minus four", confidence: 0.98 }]),
+      result([
+        { transcript: "heaven", confidence: 0.8 },
+        { transcript: "four", confidence: 0.65 },
+      ]),
+    ]),
+  };
+  assert.equal(gate.read(promptSideAlternatives), null);
+
+  gate.speechEnded();
+  gate.speechStarted();
+  const freshAnswerAlternatives = {
+    resultIndex: 2,
+    results: resultList([
+      promptSideAlternatives.results.item(0),
+      promptSideAlternatives.results.item(1),
+      result([
+        { transcript: "heaven", confidence: 0.8 },
+        { transcript: "four", confidence: 0.65 },
+      ]),
+    ]),
+  };
+  assert.equal(gate.read(freshAnswerAlternatives)?.answer, 4);
+});
+
+test("an answer appended during the prompt is ready when the gate opens", () => {
+  const gate = new SpokenAnswerStreamGate();
+  gate.beginRecognitionSession();
+  gate.beginPrompt("round-1", "eleven minus four?");
+  gate.speechStarted();
+  assert.equal(
+    gate.read({
+      resultIndex: 0,
+      results: resultList([
+        result(
+          [
+            {
+              transcript: "eleven minus four seven",
+              confidence: 0.9,
+            },
+          ],
+          false,
+        ),
+      ]),
+    }),
+    null,
+  );
+
+  gate.updateRound("round-1", true);
+  const expected = {
+    answer: 7,
+    confidence: 0.9,
+    transcript: "seven",
+  };
+  assert.deepEqual(gate.peekBufferedAnswer(), expected);
+  assert.deepEqual(gate.peekBufferedAnswer(), expected);
+  assert.deepEqual(gate.takeBufferedAnswer(), expected);
+  assert.equal(gate.peekBufferedAnswer(), null);
+});
+
+test("a late prompt tail cannot answer a newly opened gate", () => {
+  const gate = new SpokenAnswerStreamGate();
+  gate.beginRecognitionSession();
+  gate.beginPrompt("round-1", "eleven minus four?");
+  gate.speechStarted();
+  gate.updateRound("round-1", true);
+  gate.speechEnded();
+
+  const latePromptTail = {
+    resultIndex: 0,
+    results: resultList([
+      result([{ transcript: "four", confidence: 0.98 }]),
+    ]),
+  };
+  assert.equal(gate.read(latePromptTail), null);
+
+  gate.speechStarted();
+  const nextSpeech = {
+    resultIndex: 1,
+    results: resultList([
+      latePromptTail.results.item(0),
+      result([{ transcript: "seven", confidence: 0.93 }], false),
+    ]),
+  };
+  assert.equal(gate.read(nextSpeech)?.answer, 7);
+});
+
+test("the stream submits at most once and cannot leak into the next round", () => {
+  const gate = new SpokenAnswerStreamGate();
+  gate.beginRecognitionSession();
+  gate.updateRound("round-1", true);
+
+  const interim = {
+    resultIndex: 0,
+    results: resultList([
+      result([{ transcript: "six", confidence: 0.88 }], false),
+    ]),
+  };
+  assert.equal(gate.read(interim)?.answer, 6);
+
+  gate.updateRound("round-2", false);
+  gate.updateRound("round-2", true);
+  const lateFinal = {
+    resultIndex: 0,
+    results: resultList([
+      result([{ transcript: "six", confidence: 0.97 }]),
+    ]),
+  };
+  assert.equal(gate.read(lateFinal), null);
+
+  const nextAnswer = {
+    resultIndex: 1,
+    results: resultList([
+      lateFinal.results.item(0),
+      result([{ transcript: "three", confidence: 0.89 }], false),
+    ]),
+  };
+  assert.equal(gate.read(nextAnswer)?.answer, 3);
+});
+
+test("a wrong spoken answer can be retried on the same round", () => {
+  const gate = new SpokenAnswerStreamGate();
+  gate.beginRecognitionSession();
+  gate.updateRound("session-1:round-1", true);
+
+  const firstAttempt = {
+    resultIndex: 0,
+    results: resultList([
+      result([{ transcript: "six", confidence: 0.9 }], false),
+    ]),
+  };
+  assert.equal(gate.read(firstAttempt)?.answer, 6);
+
+  gate.updateRound("session-1:round-1", false);
+  gate.updateRound("session-1:round-1", true);
+  const retry = {
+    resultIndex: 1,
+    results: resultList([
+      result([{ transcript: "six", confidence: 0.96 }]),
+      result([{ transcript: "three", confidence: 0.91 }], false),
+    ]),
+  };
+  assert.equal(gate.read(retry)?.answer, 3);
+});
+
+test("round keys keep reused card ids independent across sessions", () => {
+  const gate = new SpokenAnswerStreamGate();
+  gate.beginRecognitionSession();
+  gate.updateRound("session-1:card-1", true);
+  assert.equal(
+    gate.read({
+      resultIndex: 0,
+      results: resultList([
+        result([{ transcript: "four", confidence: 0.9 }], false),
+      ]),
+    })?.answer,
+    4,
+  );
+
+  gate.beginRecognitionSession();
+  gate.updateRound("session-2:card-1", true);
+  assert.equal(
+    gate.read({
+      resultIndex: 0,
+      results: resultList([
+        result([{ transcript: "seven", confidence: 0.92 }], false),
+      ]),
+    })?.answer,
+    7,
+  );
+});
+
+test("Speak keeps one silent recognition stream across cards", () => {
   assert.doesNotMatch(pageSource, /Tap to speak/);
-  assert.doesNotMatch(pageSource, /onClick=\{startListening\}/);
-  assert.match(pageSource, /const frame = requestAnimationFrame/);
-  assert.match(pageSource, /startListening\(\);/);
-  assert.match(pageSource, /!supported \|\|\s+disabled \|\|/);
+  assert.doesNotMatch(pageSource, /onBeforeListen/);
+  assert.doesNotMatch(pageSource, /recognition\.stop\(\)/);
+  assert.match(pageSource, /key=\{`\$\{sessionProgress\.id\}:\$\{mode\}`\}/);
+  assert.match(
+    pageSource,
+    /active=\{\s*sessionPhase === "playing" &&\s*\(mode !== "listen" \|\| soundEnabled\)\s*\}/,
+  );
+  assert.match(pageSource, /accepting=\{answerReady\}/);
+  assert.doesNotMatch(pageSource, /recognition\.continuous = false/);
+  assert.doesNotMatch(pageSource, /recognition\.interimResults = false/);
+  assert.match(pageSource, /answeredWith === "draw"/);
+  assert.match(pageSource, /answeredWith !== "speak"/);
+  assert.match(pageSource, /answerGate\.speechStarted\(\)/);
+  assert.match(pageSource, /answerGate\.speechEnded\(\)/);
+  assert.match(pageSource, /speechAnswerGate\.beginPrompt\(/);
+  assert.match(pageSource, /speechAnswerGate\.updateRound\(/);
+  assert.match(
+    pageSource,
+    /if \(listeningRound\.startedAt !== null\) \{\s*speechAnswerGate\.updateRound\(roundId, true\);/,
+  );
+  assert.match(
+    pageSource,
+    /active &&\s*speechState\.kind === "listening"/,
+  );
 });
