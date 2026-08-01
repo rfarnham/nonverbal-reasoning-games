@@ -1,0 +1,794 @@
+{
+  "schema_version": "1.0.0",
+  "ontology_id": "math-kangaroo-core-skills",
+  "ontology_version": "0.1.0-proposed.1",
+  "status": "proposed",
+  "review": {
+    "state": "unreviewed",
+    "reviewers": [],
+    "reviewed_at": null,
+    "approved_at": null
+  },
+  "provenance": {
+    "kind": "spec_guided_initial_proposal",
+    "item_annotation_evidence": [],
+    "gold_set_evidence": [],
+    "note": "This proposal has not been validated against the Stage 0 gold set and must not be used as an authoritative Q-matrix or learner model."
+  },
+  "scope": {
+    "contest": "Math Kangaroo",
+    "intended_grade_range": {
+      "min": 1,
+      "max": 6
+    },
+    "skill_count": 52,
+    "mastery_facets": [
+      "mathematical_content",
+      "reasoning_move",
+      "procedure"
+    ],
+    "non_mastery_facets": [
+      "representation",
+      "cognitive_demand",
+      "nuisance_load"
+    ]
+  },
+  "facet_definitions": {
+    "mathematical_content": {
+      "learner_mastery_dimension": true,
+      "description": "The mathematical idea or relation that must be understood, independent of the solution strategy or presentation."
+    },
+    "reasoning_move": {
+      "learner_mastery_dimension": true,
+      "description": "A general-purpose inference or problem-solving move that can transfer across mathematical topics."
+    },
+    "procedure": {
+      "learner_mastery_dimension": true,
+      "description": "An explicit, teachable sequence of actions that produces or organizes part of a solution."
+    },
+    "representation": {
+      "learner_mastery_dimension": false,
+      "description": "How the item presents information. Use for controlled contrasts and retrieval, not as proof of a mathematical weakness."
+    },
+    "cognitive_demand": {
+      "learner_mastery_dimension": false,
+      "description": "How directly or flexibly the item asks the learner to use reviewed skills."
+    },
+    "nuisance_load": {
+      "learner_mastery_dimension": false,
+      "description": "Incidental demand that can affect performance without being the mathematical target."
+    }
+  },
+  "relation_types": {
+    "prerequisite": {
+      "directed": true,
+      "curriculum_gate_candidate": true,
+      "semantics": "from_skill_id should be sufficiently established before instruction on to_skill_id."
+    },
+    "part_of": {
+      "directed": true,
+      "curriculum_gate_candidate": false,
+      "semantics": "from_skill_id is a narrower component or procedure within to_skill_id."
+    },
+    "often_combined_with": {
+      "directed": false,
+      "curriculum_gate_candidate": false,
+      "semantics": "The skills frequently occur in the same reviewed solution path but remain distinct."
+    },
+    "contrasts_with": {
+      "directed": false,
+      "curriculum_gate_candidate": false,
+      "semantics": "The skills have a boundary that reviewers and annotators should explicitly distinguish."
+    },
+    "alternative_to": {
+      "directed": false,
+      "curriculum_gate_candidate": false,
+      "semantics": "The skills may support different legitimate paths to the same result."
+    }
+  },
+  "curriculum_gating": {
+    "eligible_relation_type": "prerequisite",
+    "requires_relation_status": "approved",
+    "requires_two_independent_reviewers": true,
+    "current_eligible_edge_count": 0,
+    "note": "Every relation in this proposal is unreviewed, so none may gate curriculum."
+  },
+  "non_mastery_tag_vocabularies": {
+    "representation": [
+      {
+        "tag_id": "rep_story_text",
+        "name": "Story text",
+        "description": "Quantities and relations are embedded in prose."
+      },
+      {
+        "tag_id": "rep_symbolic_expression",
+        "name": "Symbolic expression",
+        "description": "The main information is given with numerals or mathematical symbols."
+      },
+      {
+        "tag_id": "rep_table",
+        "name": "Table",
+        "description": "Rows and columns organize the relevant information."
+      },
+      {
+        "tag_id": "rep_number_line",
+        "name": "Number line",
+        "description": "Order, distance, or operations are shown on a line."
+      },
+      {
+        "tag_id": "rep_grid",
+        "name": "Grid",
+        "description": "Cells, lattice points, or coordinates carry essential information."
+      },
+      {
+        "tag_id": "rep_clock_or_calendar",
+        "name": "Clock or calendar",
+        "description": "Time is presented on a clock face, schedule, or calendar."
+      },
+      {
+        "tag_id": "rep_geometric_diagram_2d",
+        "name": "Two-dimensional geometric diagram",
+        "description": "A planar diagram is essential to interpreting the item."
+      },
+      {
+        "tag_id": "rep_solid_diagram_3d",
+        "name": "Three-dimensional solid diagram",
+        "description": "A drawing or net represents a three-dimensional object."
+      },
+      {
+        "tag_id": "rep_spatial_transformation",
+        "name": "Spatial transformation",
+        "description": "Before-and-after views or movement cues encode a spatial change."
+      },
+      {
+        "tag_id": "rep_graph_or_network",
+        "name": "Graph or network",
+        "description": "Nodes and connections encode routes or relationships."
+      },
+      {
+        "tag_id": "rep_physical_arrangement",
+        "name": "Physical arrangement",
+        "description": "Objects, people, tokens, or containers are arranged visually."
+      },
+      {
+        "tag_id": "rep_mixed",
+        "name": "Mixed representation",
+        "description": "Two or more representations are jointly essential."
+      }
+    ],
+    "cognitive_demand": [
+      {
+        "tag_id": "demand_direct_application",
+        "name": "Direct application"
+      },
+      {
+        "tag_id": "demand_one_step_inference",
+        "name": "One-step inference"
+      },
+      {
+        "tag_id": "demand_multi_step_integration",
+        "name": "Multi-step integration"
+      },
+      {
+        "tag_id": "demand_strategy_selection",
+        "name": "Strategy selection"
+      },
+      {
+        "tag_id": "demand_near_transfer",
+        "name": "Near transfer"
+      },
+      {
+        "tag_id": "demand_novel_transfer",
+        "name": "Novel transfer"
+      }
+    ],
+    "nuisance_load": [
+      {
+        "tag_id": "load_reading",
+        "name": "Reading load",
+        "allowed_levels": ["low", "medium", "high"]
+      },
+      {
+        "tag_id": "load_vocabulary",
+        "name": "Vocabulary load",
+        "allowed_levels": ["low", "medium", "high"]
+      },
+      {
+        "tag_id": "load_diagram_interpretation",
+        "name": "Diagram interpretation load",
+        "allowed_levels": ["low", "medium", "high"]
+      },
+      {
+        "tag_id": "load_arithmetic_burden",
+        "name": "Arithmetic burden",
+        "allowed_levels": ["low", "medium", "high"]
+      },
+      {
+        "tag_id": "load_working_memory",
+        "name": "Working-memory burden",
+        "allowed_levels": ["low", "medium", "high"]
+      },
+      {
+        "tag_id": "load_visual_discrimination",
+        "name": "Visual discrimination load",
+        "allowed_levels": ["low", "medium", "high"]
+      }
+    ]
+  },
+  "skills": [
+    {
+      "skill_id": "cnt_counting_cardinality",
+      "name": "Counting and cardinality",
+      "description": "Count a finite set once each and understand that the final count names its quantity.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 1, "max": 3},
+      "boundary_note": "Does not include organizing a complex case space; use systematic enumeration for that reasoning move.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_place_value",
+      "name": "Place value",
+      "description": "Interpret, compose, decompose, and compare whole numbers by the value of each digit position.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 1, "max": 4},
+      "boundary_note": "Digit-pattern observations belong to numeric patterns unless positional value is required.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_whole_addition_subtraction",
+      "name": "Whole-number addition and subtraction",
+      "description": "Model and calculate combining, separating, and additive comparison with whole numbers.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 1, "max": 6},
+      "boundary_note": "Regrouping is a procedure; choosing addition or subtraction from constraints is a reasoning decision.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_whole_multiplication_division",
+      "name": "Whole-number multiplication and division",
+      "description": "Model and calculate equal groups, multiplicative comparison, sharing, and grouping with whole numbers.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 2, "max": 6},
+      "boundary_note": "Equal-groups arrays are a procedure and representation of this content skill.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_arithmetic_expressions",
+      "name": "Arithmetic expressions",
+      "description": "Interpret and evaluate grouped or multi-operation arithmetic expressions in the intended order.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 3, "max": 6},
+      "boundary_note": "Simple single-operation calculation should use the corresponding operation skill instead.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_fractions_part_whole",
+      "name": "Fractions as parts and quantities",
+      "description": "Interpret a fraction as equal parts of a whole, a set, or a quantity.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 2, "max": 6},
+      "boundary_note": "Comparing or renaming fractions belongs to fraction equivalence and comparison.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_fraction_equivalence_comparison",
+      "name": "Fraction equivalence and comparison",
+      "description": "Recognize equivalent fractions and order fractions using common references or structure.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 3, "max": 6},
+      "boundary_note": "The common-reference algorithm is modeled separately as a procedure.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_ratio_proportion",
+      "name": "Ratio and proportional reasoning",
+      "description": "Reason about equivalent multiplicative relationships between two quantities.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 4, "max": 6},
+      "boundary_note": "Equal sharing alone is division; a ratio requires relating two varying quantities.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_factors_multiples",
+      "name": "Factors and multiples",
+      "description": "Identify factor pairs, common factors, multiples, and common multiples of whole numbers.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 3, "max": 6},
+      "boundary_note": "Fast rule-based divisibility judgments are tracked separately from the factor relation itself.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_divisibility",
+      "name": "Divisibility reasoning",
+      "description": "Determine whether a whole number is divisible by another using structure or divisibility rules.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 4, "max": 6},
+      "boundary_note": "A remainder or repeating-state question belongs to remainders and cycles when divisibility is not the target.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_remainders_cycles",
+      "name": "Remainders and cycles",
+      "description": "Reason about leftover quantities and repeating states indexed by a whole-number cycle.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 3, "max": 6},
+      "boundary_note": "Merely recognizing a visual repetition belongs to numeric or visual pattern reasoning.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_parity",
+      "name": "Even and odd structure",
+      "description": "Classify quantities by parity and reason about how operations preserve or change evenness.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 2, "max": 6},
+      "boundary_note": "Parity is the mathematical content; invariant reasoning is the transferable move when parity is used to prove impossibility.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_numeric_patterns_sequences",
+      "name": "Numeric patterns and sequences",
+      "description": "Identify, continue, or describe a rule relating ordered numbers or repeated numeric states.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 1, "max": 6},
+      "boundary_note": "Inferring a transferable rule is pattern generalization; the number relation itself is this content skill.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_unknowns_equations",
+      "name": "Unknowns and equations",
+      "description": "Represent and solve equality relationships containing one or more unknown quantities.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 2, "max": 6},
+      "boundary_note": "A missing number found by counting alone should not be labeled as equation solving.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_inequalities_bounds",
+      "name": "Inequalities and bounds",
+      "description": "Interpret and constrain a quantity using greater-than, less-than, minimum, maximum, or interval relations.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 2, "max": 6},
+      "boundary_note": "Estimating a useful bound is a reasoning move; interpreting the bound relation is this content skill.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_length_distance",
+      "name": "Length and distance",
+      "description": "Measure, compare, add, or infer one-dimensional lengths and distances.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 1, "max": 6},
+      "boundary_note": "Converting length units is a procedure; tracing a boundary total is perimeter.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_perimeter",
+      "name": "Perimeter",
+      "description": "Reason about the total boundary length of a two-dimensional figure.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 2, "max": 6},
+      "boundary_note": "Do not infer perimeter mastery from area questions or vice versa.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_area",
+      "name": "Area",
+      "description": "Reason about two-dimensional measure using unit squares, decomposition, or known area relations.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 2, "max": 6},
+      "boundary_note": "Counting visible objects is cardinality unless equal area units are essential.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_time_calendar",
+      "name": "Clock and calendar structure",
+      "description": "Interpret clock faces, schedules, day cycles, weeks, months, and calendar relationships.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 1, "max": 6},
+      "boundary_note": "Computing a duration step by step is the elapsed-time procedure.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_money_value",
+      "name": "Money and value",
+      "description": "Compose, compare, and exchange monetary amounts in a stated currency system.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 1, "max": 5},
+      "boundary_note": "Generic proportional price comparison may also require ratio reasoning; do not merge the two skills.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_measurement_units",
+      "name": "Measurement units",
+      "description": "Understand what standard units measure and the multiplicative relationships among compatible units.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 2, "max": 6},
+      "boundary_note": "Executing a conversion is a procedure; recognizing the unit relationship is this content skill.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_angles_turns",
+      "name": "Angles and turns",
+      "description": "Interpret and compare corners, directions, and full or partial turns.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 2, "max": 6},
+      "boundary_note": "Tracking a whole figure through a turn belongs to geometric transformations as well.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_two_dimensional_shapes",
+      "name": "Two-dimensional shape properties",
+      "description": "Identify and reason from sides, vertices, angles, containment, and adjacency in planar figures.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 1, "max": 6},
+      "boundary_note": "Rearranging pieces into a target uses spatial composition; movement of a shape uses transformations.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_three_dimensional_solids",
+      "name": "Three-dimensional solid properties",
+      "description": "Reason about faces, edges, vertices, visibility, nets, and assembly of solid objects.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 1, "max": 6},
+      "boundary_note": "A diagram of a solid is a representation tag; the structural relationships are this skill.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_symmetry",
+      "name": "Symmetry and reflection structure",
+      "description": "Recognize or construct correspondence across a line or around a center of symmetry.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 1, "max": 6},
+      "boundary_note": "Using symmetry to reduce cases is symmetry exploitation, a reasoning move; carrying out a reflection is also a transformation.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_geometric_transformations",
+      "name": "Geometric transformations",
+      "description": "Track position, orientation, and preserved features under translation, rotation, or reflection.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 1, "max": 6},
+      "boundary_note": "A static symmetry property is not by itself evidence of tracking a transformation.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_spatial_composition",
+      "name": "Spatial composition and dissection",
+      "description": "Compose, partition, fold, unfold, or rearrange parts while preserving their spatial relationships.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 1, "max": 6},
+      "boundary_note": "Area may be supporting content, but visual assembly without measure remains a distinct skill.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_coordinates_grids",
+      "name": "Grid and coordinate location",
+      "description": "Locate and relate positions using rows, columns, ordered moves, or coordinate pairs.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 1, "max": 6},
+      "boundary_note": "Counting all possible routes across a grid is the grid-path procedure and often combinatorial content.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_combinatorial_counting",
+      "name": "Combinatorial counting",
+      "description": "Count distinct arrangements, selections, or routes without omission or double counting.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 2, "max": 6},
+      "boundary_note": "Systematic enumeration is a reasoning move and tables or trees are procedures used to establish the count.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "cnt_elementary_probability",
+      "name": "Elementary probability",
+      "description": "Compare or calculate likelihood from equally likely outcomes in a finite sample space.",
+      "facet": "mathematical_content",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 3, "max": 6},
+      "boundary_note": "Building the sample space may require combinatorial counting, but likelihood is the distinct target here.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "rsn_systematic_enumeration",
+      "name": "Systematic enumeration",
+      "description": "Generate possibilities in an organized order that supports checking completeness and uniqueness.",
+      "facet": "reasoning_move",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 1, "max": 6},
+      "boundary_note": "The resulting number of cases is combinatorial content; the disciplined generation method is this reasoning move.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "rsn_case_analysis",
+      "name": "Case analysis",
+      "description": "Partition a problem into exhaustive, non-overlapping conditions and resolve each condition.",
+      "facet": "reasoning_move",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 2, "max": 6},
+      "boundary_note": "Listing unstructured examples is not sufficient evidence of case analysis.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "rsn_working_backward",
+      "name": "Working backward",
+      "description": "Start from a required final state and reverse valid steps to recover earlier states or choices.",
+      "facet": "reasoning_move",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 1, "max": 6},
+      "boundary_note": "Applying an inverse operation once is not enough unless the solution is organized from the goal backward.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "rsn_constraint_propagation",
+      "name": "Constraint propagation",
+      "description": "Use one restriction to narrow possibilities elsewhere, repeating until the configuration is determined.",
+      "facet": "reasoning_move",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 2, "max": 6},
+      "boundary_note": "Reading a single inequality is content; propagating its consequences through linked choices is this move.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "rsn_invariant_reasoning",
+      "name": "Invariant reasoning",
+      "description": "Identify a property that remains unchanged or follows a fixed cycle across allowed operations.",
+      "facet": "reasoning_move",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 3, "max": 6},
+      "boundary_note": "Parity is one possible invariant but should remain separately tagged as mathematical content when required.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "rsn_decomposition_recomposition",
+      "name": "Decomposition and recomposition",
+      "description": "Break a quantity or structure into useful parts and recombine those parts to simplify the problem.",
+      "facet": "reasoning_move",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 1, "max": 6},
+      "boundary_note": "A memorized regrouping algorithm is a procedure; choosing a useful decomposition is this reasoning move.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "rsn_symmetry_exploitation",
+      "name": "Symmetry exploitation",
+      "description": "Use repeated or mirrored structure to reduce work, pair cases, or infer an unseen relation.",
+      "facet": "reasoning_move",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 2, "max": 6},
+      "boundary_note": "Recognizing a symmetric figure alone is the symmetry content skill, not necessarily this strategy.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "rsn_estimation_bounding",
+      "name": "Estimation and bounding",
+      "description": "Use a justified approximation, lower bound, or upper bound to rule out or select possibilities.",
+      "facet": "reasoning_move",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 2, "max": 6},
+      "boundary_note": "A guess without a defensible bound is not evidence for this skill.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "rsn_pattern_generalization",
+      "name": "Pattern generalization",
+      "description": "Infer a rule from examples and apply it beyond the immediately shown cases.",
+      "facet": "reasoning_move",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 1, "max": 6},
+      "boundary_note": "Continuing a familiar count by rote does not establish generalization.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "rsn_elimination",
+      "name": "Elimination of impossible choices",
+      "description": "Reject candidates by a necessary condition without fully constructing every remaining solution.",
+      "facet": "reasoning_move",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 1, "max": 6},
+      "boundary_note": "Selecting an answer because it looks plausible is not elimination; a stated constraint must rule choices out.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "rsn_counterexample_testing",
+      "name": "Counterexample testing",
+      "description": "Test a claim or candidate by constructing a valid case that would make it fail.",
+      "facet": "reasoning_move",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 3, "max": 6},
+      "boundary_note": "A failed random trial is not sufficient unless it logically refutes the relevant universal claim.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "rsn_representation_translation",
+      "name": "Translation between representations",
+      "description": "Preserve the same mathematical relationships while moving between words, symbols, diagrams, tables, or models.",
+      "facet": "reasoning_move",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 1, "max": 6},
+      "boundary_note": "A representation tag records what the item shows; this skill requires the learner to connect two forms.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "prc_regrouping",
+      "name": "Regrouping whole numbers",
+      "description": "Exchange equivalent place-value units while adding or subtracting whole numbers.",
+      "facet": "procedure",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 1, "max": 4},
+      "boundary_note": "This is the explicit exchange procedure, not all whole-number addition and subtraction.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "prc_equal_groups_arrays",
+      "name": "Equal-groups and array modeling",
+      "description": "Construct equal groups or rectangular arrays to represent multiplication and division.",
+      "facet": "procedure",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 1, "max": 4},
+      "boundary_note": "Fluent multiplication calculation may occur without constructing this model.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "prc_fraction_common_reference",
+      "name": "Common-reference fraction comparison",
+      "description": "Rename or align fractions to a common denominator, numerator, benchmark, or diagram for comparison.",
+      "facet": "procedure",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 3, "max": 6},
+      "boundary_note": "Conceptual recognition of equivalence is content; this is an explicit comparison procedure.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "prc_organize_cases_table",
+      "name": "Organize cases in a table",
+      "description": "Record cases in rows and columns chosen to expose coverage, constraints, or repeated structure.",
+      "facet": "procedure",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 2, "max": 6},
+      "boundary_note": "Reading a provided table is a representation demand; constructing one deliberately is this procedure.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "prc_tree_diagram_enumeration",
+      "name": "Enumerate with a tree diagram",
+      "description": "Branch choices by stage so every outcome appears once along a root-to-leaf path.",
+      "facet": "procedure",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 3, "max": 6},
+      "boundary_note": "A decorative branching picture is not evidence; the branches must encode an exhaustive staged choice.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "prc_grid_path_counting",
+      "name": "Count constrained grid paths",
+      "description": "Count routes on a grid while respecting allowed directions, barriers, or required points.",
+      "facet": "procedure",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 2, "max": 6},
+      "boundary_note": "Following one path tests location or movement; counting the full valid route set is this procedure.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "prc_inclusion_exclusion",
+      "name": "Correct overlap with inclusion-exclusion",
+      "description": "Combine counts while explicitly subtracting or restoring cases counted in multiple groups.",
+      "facet": "procedure",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 4, "max": 6},
+      "boundary_note": "Simple disjoint addition is not inclusion-exclusion because no overlap correction is required.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "prc_elapsed_time",
+      "name": "Calculate elapsed time",
+      "description": "Move between start, duration, and end time across clock or calendar boundaries.",
+      "facet": "procedure",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 2, "max": 6},
+      "boundary_note": "Reading a clock value alone is time content, not this multi-state procedure.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "prc_unit_conversion",
+      "name": "Convert compatible measurement units",
+      "description": "Multiply or divide by a known unit relationship while preserving the measured quantity.",
+      "facet": "procedure",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 3, "max": 6},
+      "boundary_note": "Choosing an appropriate unit is measurement content; executing the conversion is this procedure.",
+      "status": "proposed"
+    },
+    {
+      "skill_id": "prc_partition_or_auxiliary_mark",
+      "name": "Add a useful partition or auxiliary mark",
+      "description": "Introduce a line, region, label, or mark that reveals hidden geometric or counting structure.",
+      "facet": "procedure",
+      "parent_skill_id": null,
+      "typical_grade_range": {"min": 2, "max": 6},
+      "boundary_note": "The added mark must support a valid solution step; arbitrary drawing is not this procedure.",
+      "status": "proposed"
+    }
+  ],
+  "relations": [
+    {"relation_id": "pre_001", "type": "prerequisite", "from_skill_id": "cnt_counting_cardinality", "to_skill_id": "cnt_place_value", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_002", "type": "prerequisite", "from_skill_id": "cnt_counting_cardinality", "to_skill_id": "cnt_whole_addition_subtraction", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_003", "type": "prerequisite", "from_skill_id": "cnt_place_value", "to_skill_id": "cnt_whole_addition_subtraction", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_004", "type": "prerequisite", "from_skill_id": "cnt_whole_addition_subtraction", "to_skill_id": "cnt_whole_multiplication_division", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_005", "type": "prerequisite", "from_skill_id": "cnt_whole_addition_subtraction", "to_skill_id": "cnt_arithmetic_expressions", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_006", "type": "prerequisite", "from_skill_id": "cnt_whole_multiplication_division", "to_skill_id": "cnt_arithmetic_expressions", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_007", "type": "prerequisite", "from_skill_id": "cnt_fractions_part_whole", "to_skill_id": "cnt_fraction_equivalence_comparison", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_008", "type": "prerequisite", "from_skill_id": "cnt_whole_multiplication_division", "to_skill_id": "cnt_ratio_proportion", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_009", "type": "prerequisite", "from_skill_id": "cnt_fraction_equivalence_comparison", "to_skill_id": "cnt_ratio_proportion", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_010", "type": "prerequisite", "from_skill_id": "cnt_whole_multiplication_division", "to_skill_id": "cnt_factors_multiples", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_011", "type": "prerequisite", "from_skill_id": "cnt_factors_multiples", "to_skill_id": "cnt_divisibility", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_012", "type": "prerequisite", "from_skill_id": "cnt_whole_multiplication_division", "to_skill_id": "cnt_remainders_cycles", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_013", "type": "prerequisite", "from_skill_id": "cnt_whole_addition_subtraction", "to_skill_id": "cnt_parity", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_014", "type": "prerequisite", "from_skill_id": "cnt_whole_addition_subtraction", "to_skill_id": "cnt_unknowns_equations", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_015", "type": "prerequisite", "from_skill_id": "cnt_unknowns_equations", "to_skill_id": "cnt_inequalities_bounds", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_016", "type": "prerequisite", "from_skill_id": "cnt_length_distance", "to_skill_id": "cnt_perimeter", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_017", "type": "prerequisite", "from_skill_id": "cnt_whole_multiplication_division", "to_skill_id": "cnt_area", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_018", "type": "prerequisite", "from_skill_id": "cnt_measurement_units", "to_skill_id": "prc_unit_conversion", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_019", "type": "prerequisite", "from_skill_id": "cnt_angles_turns", "to_skill_id": "cnt_geometric_transformations", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_020", "type": "prerequisite", "from_skill_id": "cnt_two_dimensional_shapes", "to_skill_id": "cnt_symmetry", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_021", "type": "prerequisite", "from_skill_id": "cnt_two_dimensional_shapes", "to_skill_id": "cnt_geometric_transformations", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_022", "type": "prerequisite", "from_skill_id": "cnt_two_dimensional_shapes", "to_skill_id": "cnt_spatial_composition", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_023", "type": "prerequisite", "from_skill_id": "cnt_counting_cardinality", "to_skill_id": "cnt_combinatorial_counting", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_024", "type": "prerequisite", "from_skill_id": "rsn_systematic_enumeration", "to_skill_id": "cnt_combinatorial_counting", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_025", "type": "prerequisite", "from_skill_id": "cnt_combinatorial_counting", "to_skill_id": "cnt_elementary_probability", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_026", "type": "prerequisite", "from_skill_id": "rsn_systematic_enumeration", "to_skill_id": "rsn_case_analysis", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_027", "type": "prerequisite", "from_skill_id": "cnt_unknowns_equations", "to_skill_id": "rsn_constraint_propagation", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_028", "type": "prerequisite", "from_skill_id": "cnt_numeric_patterns_sequences", "to_skill_id": "rsn_pattern_generalization", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_029", "type": "prerequisite", "from_skill_id": "rsn_elimination", "to_skill_id": "rsn_counterexample_testing", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_030", "type": "prerequisite", "from_skill_id": "cnt_place_value", "to_skill_id": "prc_regrouping", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_031", "type": "prerequisite", "from_skill_id": "cnt_counting_cardinality", "to_skill_id": "prc_equal_groups_arrays", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_032", "type": "prerequisite", "from_skill_id": "cnt_fractions_part_whole", "to_skill_id": "prc_fraction_common_reference", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_033", "type": "prerequisite", "from_skill_id": "rsn_systematic_enumeration", "to_skill_id": "prc_organize_cases_table", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_034", "type": "prerequisite", "from_skill_id": "rsn_systematic_enumeration", "to_skill_id": "prc_tree_diagram_enumeration", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_035", "type": "prerequisite", "from_skill_id": "cnt_coordinates_grids", "to_skill_id": "prc_grid_path_counting", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_036", "type": "prerequisite", "from_skill_id": "rsn_systematic_enumeration", "to_skill_id": "prc_grid_path_counting", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_037", "type": "prerequisite", "from_skill_id": "rsn_systematic_enumeration", "to_skill_id": "prc_inclusion_exclusion", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_038", "type": "prerequisite", "from_skill_id": "cnt_whole_addition_subtraction", "to_skill_id": "prc_inclusion_exclusion", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_039", "type": "prerequisite", "from_skill_id": "cnt_time_calendar", "to_skill_id": "prc_elapsed_time", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "pre_040", "type": "prerequisite", "from_skill_id": "cnt_two_dimensional_shapes", "to_skill_id": "prc_partition_or_auxiliary_mark", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "part_001", "type": "part_of", "from_skill_id": "prc_regrouping", "to_skill_id": "cnt_whole_addition_subtraction", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "part_002", "type": "part_of", "from_skill_id": "prc_equal_groups_arrays", "to_skill_id": "cnt_whole_multiplication_division", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "part_003", "type": "part_of", "from_skill_id": "prc_fraction_common_reference", "to_skill_id": "cnt_fraction_equivalence_comparison", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "part_004", "type": "part_of", "from_skill_id": "prc_elapsed_time", "to_skill_id": "cnt_time_calendar", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "part_005", "type": "part_of", "from_skill_id": "prc_unit_conversion", "to_skill_id": "cnt_measurement_units", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "combine_001", "type": "often_combined_with", "from_skill_id": "cnt_combinatorial_counting", "to_skill_id": "rsn_systematic_enumeration", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "combine_002", "type": "often_combined_with", "from_skill_id": "cnt_symmetry", "to_skill_id": "rsn_symmetry_exploitation", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "combine_003", "type": "often_combined_with", "from_skill_id": "cnt_parity", "to_skill_id": "rsn_invariant_reasoning", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "contrast_001", "type": "contrasts_with", "from_skill_id": "cnt_perimeter", "to_skill_id": "cnt_area", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "contrast_002", "type": "contrasts_with", "from_skill_id": "cnt_symmetry", "to_skill_id": "cnt_geometric_transformations", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "alternative_001", "type": "alternative_to", "from_skill_id": "prc_organize_cases_table", "to_skill_id": "prc_tree_diagram_enumeration", "status": "proposed", "reviewers": [], "curriculum_gating": false},
+    {"relation_id": "alternative_002", "type": "alternative_to", "from_skill_id": "rsn_working_backward", "to_skill_id": "rsn_constraint_propagation", "status": "proposed", "reviewers": [], "curriculum_gating": false}
+  ]
+}

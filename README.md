@@ -75,6 +75,8 @@ lib/
   progression/        # generic path, attempt, adapter, and storage contracts
 scripts/
   generate-game-registry.mjs
+tools/
+  math_kangaroo_trainer/ # private-data, offline adaptive-core audit tooling
 docs/
   ADDING_A_GAME.md
   PROJECT_DECISIONS.md
@@ -85,7 +87,7 @@ docs/
 
 ## Local development
 
-Use Node.js 22 or newer.
+Use Node.js 22 or newer. The web app setup is unchanged:
 
 ```bash
 npm install
@@ -102,6 +104,26 @@ npm test
 ```
 
 `npm run check` runs the full local validation sequence.
+
+The full check also runs the adaptive core's invented-data tests. Set up its
+Python 3.12 environment once before running `npm test` or `npm run check`:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -e './tools/math_kangaroo_trainer[test]'
+source .venv/bin/activate
+```
+
+The adaptive trainer is currently at its required offline Stage 0 corpus-audit
+gate. Its canonical question bank and generated review material stay under
+ignored `work/`; CI uses only a synthetic corpus. `PASS` requires verified
+source-PDF bytes, two content-bound reviews per sampled item, two agreeing
+adjudications per exact-duplicate group, at least 98% faithful parsing with all
+failures explicit, and a run-bound ontology approved by two reviewers with
+gold-set evidence. Stage 1, bulk LLM annotation, and an adaptive player-facing
+UI remain blocked until then. See
+[the adaptive-core tooling](tools/math_kangaroo_trainer/README.md) and
+[ADR 0001](docs/architecture/adr-0001-math-kangaroo-adaptive-core.md).
 
 ## Add a game
 

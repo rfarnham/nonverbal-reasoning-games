@@ -1,0 +1,12 @@
+"""Immutable identifiers for every Stage 0 transformation."""
+
+CORPUS_ADAPTER_VERSION = "complete-question-bank.sqlite.v1"
+ITEM_SCHEMA_VERSION = "corpus-item.v1"
+SAMPLING_POLICY_VERSION = "stage0-stratified-greedy.v1"
+AUDIT_POLICY_VERSION = "stage0-review-triggers.v1"
+DUPLICATE_ALGORITHM_VERSION = "normalized-content-and-asset-sha256.v1"
+REVIEW_SCHEMA_VERSION = "gold-review.v1"
+DUPLICATE_REVIEW_SCHEMA_VERSION = "duplicate-review.v1"
+QUALITY_REPORT_VERSION = "stage0-quality-report.v1"
+POPULATION_FINDINGS_VERSION = "stage0-population-findings.v1"
+ONTOLOGY_VERSION = "0.1.0-proposed.1"

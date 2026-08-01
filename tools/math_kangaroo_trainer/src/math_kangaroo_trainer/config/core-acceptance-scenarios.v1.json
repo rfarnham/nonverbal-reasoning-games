@@ -1,0 +1,77 @@
+{
+  "schema_version": "1.0.0",
+  "status": "contract_pending_higher_stages",
+  "note": "These executable-contract inputs are frozen before Stage 2/3 policy code is implemented. Stage 0 does not claim they pass yet.",
+  "scenarios": [
+    {
+      "scenario_id": "AC-01",
+      "stage": 2,
+      "title": "Distinct-family parity evidence stays local",
+      "given": "Three correct, unassisted parity items from distinct families",
+      "then": "Parity competence rises and uncertainty narrows without materially raising unrelated geometry skills"
+    },
+    {
+      "scenario_id": "AC-02",
+      "stage": 2,
+      "title": "Confounded error causes modest distributed evidence",
+      "given": "One wrong, language-heavy diagram item",
+      "then": "The update is modest and controlled contrast probes precede any causal label"
+    },
+    {
+      "scenario_id": "AC-03",
+      "stage": 2,
+      "title": "Hinted retry is not independent mastery",
+      "given": "A correct answer after a hint and retry",
+      "then": "Learning activity is recorded but independent mastery evidence is discounted"
+    },
+    {
+      "scenario_id": "AC-04",
+      "stage": 2,
+      "title": "Competence and fluency remain separate",
+      "given": "A slow, unassisted correct answer with valid timing",
+      "then": "Competence rises while fluency receives a separate confirmation signal"
+    },
+    {
+      "scenario_id": "AC-05",
+      "stage": 3,
+      "title": "Missing prerequisite selects the frontier",
+      "given": "A repeatedly weak target with an unresolved prerequisite",
+      "then": "The planner selects the prerequisite frontier rather than another target-level item"
+    },
+    {
+      "scenario_id": "AC-06",
+      "stage": 3,
+      "title": "Review urgency is not competence collapse",
+      "given": "Time passes after a skill met its mastery evidence gate",
+      "then": "Review urgency increases without arbitrarily erasing the competence posterior"
+    },
+    {
+      "scenario_id": "AC-07",
+      "stage": 3,
+      "title": "Repeats do not masquerade as transfer",
+      "given": "An exact repeat and an immediate same-family variant",
+      "then": "Both are excluded from independent transfer evidence"
+    },
+    {
+      "scenario_id": "AC-08",
+      "stage": 3,
+      "title": "Diagnostic and practice policies have different purposes",
+      "given": "The same eligible corpus and learner posterior",
+      "then": "Diagnostic selection favors blueprint-constrained information while practice composes productive difficulty, review, and transfer"
+    },
+    {
+      "scenario_id": "AC-09",
+      "stage": 3,
+      "title": "Unproductive attempts change remediation type",
+      "given": "Two unproductive attempts and no suitable easier instructional item",
+      "then": "The engine selects a worked or faded example, or returns CONTENT_GAP"
+    },
+    {
+      "scenario_id": "AC-10",
+      "stage": 2,
+      "title": "Replay is exact",
+      "given": "The same immutable events, versions, configuration, and seed",
+      "then": "Event replay reconstructs exactly the same learner state and policy decisions"
+    }
+  ]
+}

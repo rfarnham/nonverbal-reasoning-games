@@ -20,8 +20,18 @@ jobs:
           node-version: 24
           cache: npm
 
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/math_kangaroo_trainer/pyproject.toml
+
       - name: Install dependencies
         run: npm ci
+
+      - name: Install adaptive-core test dependencies
+        run: python -m pip install -e 'tools/math_kangaroo_trainer[test]'
 
       - name: Run project checks
         run: npm run check
