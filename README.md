@@ -34,6 +34,18 @@ rounds never alter Journey progress.
 | [Bracelet Search](https://rfarnham.github.io/nonverbal-reasoning-games/games/bracelet-search/) | Sequence search and mental reversal | Playable |
 | [Extra Piece](https://rfarnham.github.io/nonverbal-reasoning-games/games/extra-piece/) | Spatial composition, mental rotation, and pattern matching | Playable |
 
+## Labs
+
+Labs are standalone experiments and do not change Journey progress or XP. Math
+Kangaroo Shuffle saves its current question, filters, totals, and seen-question
+history on the device so a later visit resumes without immediately repeating
+questions.
+
+| Lab | Practice | Status |
+| --- | --- | --- |
+| [Borrow Flash](https://rfarnham.github.io/nonverbal-reasoning-games/lab/subtraction-flash/) | Visual and listening subtraction practice with tap, handwriting, and speech answers | Playable |
+| [Math Kangaroo Shuffle](https://rfarnham.github.io/nonverbal-reasoning-games/lab/math-kangaroo/) | Random spatial questions filtered by grade, point value, and question type | Playable |
+
 ## Project shape
 
 This is one statically exported Next.js project. The home page is a catalog;

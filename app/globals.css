@@ -44,6 +44,7 @@ a {
 .site-header,
 .hero,
 .games-section,
+.labs-section,
 .principles,
 .site-footer {
   width: min(1180px, calc(100% - 48px));
@@ -381,6 +382,11 @@ a {
   border-top: 1px solid var(--line);
 }
 
+.labs-section {
+  padding: 96px 0 110px;
+  border-top: 1px solid var(--line);
+}
+
 .section-heading {
   display: grid;
   grid-template-columns: 1fr minmax(300px, 430px);
@@ -454,6 +460,129 @@ a {
   border-color: #b2c43f;
   background: var(--lime);
   color: var(--ink);
+}
+
+.status-lab {
+  width: fit-content;
+  border-color: #8ab9ee;
+  background: #e9f3ff;
+  color: #245d9d;
+}
+
+.lab-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.lab-card {
+  min-height: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  padding: 22px;
+  overflow: hidden;
+  border: 1px solid var(--ink);
+  border-radius: 18px;
+  background: var(--paper-bright);
+  box-shadow: 7px 7px 0 var(--ink);
+}
+
+.lab-card-copy {
+  flex: 1;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+}
+
+.lab-card h3 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  line-height: 0.95;
+  letter-spacing: -0.065em;
+}
+
+.lab-card p {
+  max-width: 620px;
+  margin: 0;
+  color: var(--muted-ink);
+  line-height: 1.6;
+}
+
+.lab-card .game-link {
+  margin-top: auto;
+}
+
+.lab-card-visual {
+  position: relative;
+  min-height: 190px;
+  border-radius: 13px;
+  background: #e9f3ff;
+}
+
+.lab-card-visual span {
+  position: absolute;
+  width: 112px;
+  height: 132px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ink);
+  border-radius: 22px;
+  background: var(--paper-bright);
+  font-size: 2.6rem;
+  font-weight: 850;
+  box-shadow: 6px 7px 0 var(--ink);
+}
+
+.lab-card-visual span:first-child {
+  left: 9%;
+  top: 51px;
+  color: var(--coral-dark);
+  transform: rotate(-10deg);
+}
+
+.lab-card-visual span:nth-child(2) {
+  left: 37%;
+  top: 12px;
+  z-index: 2;
+  color: #2468b7;
+  transform: rotate(4deg);
+}
+
+.lab-card-visual span:last-child {
+  right: 8%;
+  top: 58px;
+  color: #10705a;
+  transform: rotate(11deg);
+}
+
+.lab-card-equation {
+  min-height: 190px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 2vw, 18px);
+  border-radius: 13px;
+  background: #f5f0e5;
+  color: var(--ink);
+  font-size: clamp(2.7rem, 6vw, 4.5rem);
+  font-weight: 850;
+  letter-spacing: -0.07em;
+}
+
+.lab-card-equation i {
+  color: var(--coral-dark);
+  font-style: normal;
+  font-weight: 600;
+}
+
+.lab-card-equation i:nth-of-type(2) {
+  color: #624fc6;
+}
+
+.lab-card-equation strong {
+  min-width: 1em;
+  color: #10705a;
 }
 
 .game-card-visual {
@@ -630,6 +759,10 @@ a {
     grid-template-columns: 1fr 1fr;
   }
 
+  .lab-grid {
+    grid-template-columns: 1fr;
+  }
+
   .game-card:last-child:nth-child(odd) {
     grid-column: 1 / -1;
   }
@@ -648,6 +781,7 @@ a {
   .site-header,
   .hero,
   .games-section,
+  .labs-section,
   .principles,
   .site-footer {
     width: min(100% - 28px, 1180px);
@@ -703,6 +837,7 @@ a {
   }
 
   .games-section,
+  .labs-section,
   .principles {
     padding-block: 72px;
   }
@@ -717,6 +852,10 @@ a {
 
   .game-card-live {
     grid-column: auto;
+  }
+
+  .lab-card {
+    min-height: 480px;
   }
 
   .site-footer {

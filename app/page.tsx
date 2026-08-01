@@ -152,6 +152,60 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="labs-section" aria-labelledby="labs-title">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">The Lab</p>
+            <h2 id="labs-title">Try a focused experiment.</h2>
+          </div>
+          <p>
+            Lab tools are standalone practice spaces. They never change your
+            Journey, XP, or game progress.
+          </p>
+        </div>
+        <div className="lab-grid">
+          <article className="lab-card">
+            <div className="lab-card-equation" aria-hidden="true">
+              <span>14</span>
+              <i>−</i>
+              <span>7</span>
+              <i>=</i>
+              <strong>?</strong>
+            </div>
+            <div className="lab-card-copy">
+              <span className="status-pill status-lab">Fluency practice</span>
+              <h3>Borrow Flash</h3>
+              <p>
+                Practice subtraction facts by sight or sound using tap,
+                handwriting, or spoken answers.
+              </p>
+              <Link className="game-link" href="/lab/subtraction-flash/">
+                Open the lab <span aria-hidden="true">→</span>
+              </Link>
+            </div>
+          </article>
+
+          <article className="lab-card">
+            <div className="lab-card-visual" aria-hidden="true">
+              <span>A</span>
+              <span>C</span>
+              <span>E</span>
+            </div>
+            <div className="lab-card-copy">
+              <span className="status-pill status-lab">Random practice</span>
+              <h3>Math Kangaroo Shuffle</h3>
+              <p>
+                Draw answer-key-verified spatial questions by grade, point
+                value, and question type. Answer letters reshuffle every time.
+              </p>
+              <Link className="game-link" href="/lab/math-kangaroo/">
+                Open the lab <span aria-hidden="true">→</span>
+              </Link>
+            </div>
+          </article>
+        </div>
+      </section>
+
       <section className="principles" aria-labelledby="principles-title">
         <div className="principles-intro">
           <p className="eyebrow">Built for good practice</p>
