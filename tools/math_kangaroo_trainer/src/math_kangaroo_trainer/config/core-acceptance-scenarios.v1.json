@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0.0",
-  "status": "contract_pending_higher_stages",
-  "note": "These executable-contract inputs are frozen before Stage 2/3 policy code is implemented. Stage 0 does not claim they pass yet.",
+  "status": "synthetic_contracts_in_progress",
+  "note": "These executable-contract inputs remain frozen while synthetic-only Stage 2/3 engineering proceeds. AC-10 now has an immutable event/replay implementation. Stage 0 and the real-corpus higher stages do not claim to pass.",
   "scenarios": [
     {
       "scenario_id": "AC-01",
@@ -71,7 +71,9 @@
       "stage": 2,
       "title": "Replay is exact",
       "given": "The same immutable events, versions, configuration, and seed",
-      "then": "Event replay reconstructs exactly the same learner state and policy decisions"
+      "then": "Event replay reconstructs exactly the same learner state and policy decisions",
+      "implementation_status": "synthetic_contract_implemented",
+      "evidence_test": "tests/synthetic/test_event_replay.py::test_ac10_event_replay_is_exact_and_snapshot_tail_equivalent"
     }
   ]
 }

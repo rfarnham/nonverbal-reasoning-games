@@ -170,6 +170,16 @@ duplicate reviews are bound to the run, group, and duplicate signature. Both
 review streams retain append-only revision history; a latest-state projection
 may aid reporting but never replaces or rewrites its evidence. Stale reviews
 cannot satisfy a gate after source content or a duplicate signature changes.
+Publishing an approved ontology creates a new run identity. Existing human
+reviews may be carried into that run only through the audited, dry-run-first
+workflow: items must match by ID and content version, while duplicates must
+also match signature type, signature, member set, and every member content
+version. The carry event retains source and target run and review-event IDs;
+every referenced target history event is reverified. A newer source revision
+may extend a provenance chain only while the target projection is still its
+preceding carried event; an independent target correction is never overwritten.
+Occupied target slots or unverifiable history block the operation, and report
+generation must succeed before the evidence transaction commits.
 Corrections are appended with provenance. Once response events exist,
 answer-key or annotation corrections are applied by versioned correction
 events and replay, never by silently reinterpreting historical answers.
@@ -189,8 +199,17 @@ application or copied into the static export. It must run without a web server,
 an LLM, a network connection, or the public site. No learner identity or attempt
 data is required for this stage.
 
+Stage 0 may optionally expose its existing human-review workflow through an
+ephemeral, loopback-only helper page. That helper is local development tooling:
+it binds only to `127.0.0.1`, serves one private evidence packet at a time,
+accepts only the fixed reviewer identity and slot chosen at launch, and writes
+through the same validated append-only review repository as the CLI. It is not
+an application API, learner service, remote backend, or public asset. The audit
+and all review imports remain fully operable without it.
+
 The core specification describes a possible minimal HTTP wrapper, but this
-repository does not adopt it in this decision. Adding such a wrapper would
+repository does not adopt that learner-facing wrapper in this decision. Adding
+such a wrapper would
 conflict with the current static-site, no-backend, and no-remote-storage
 contract and would require a separate product, hosting, security, licensing,
 and privacy decision. Until then, any future browser-facing personalization

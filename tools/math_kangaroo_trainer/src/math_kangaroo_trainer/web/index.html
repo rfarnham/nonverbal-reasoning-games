@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self'"
+    />
+    <title>Math Kangaroo · Private Stage 0 Review</title>
+    <link rel="stylesheet" href="./reviewer.css" />
+    <script src="./reviewer.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#review-workspace">Skip to review workspace</a>
+
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Private local tool</p>
+        <h1>Math Kangaroo Stage 0 review</h1>
+      </div>
+      <div class="reviewer-identity" aria-live="polite">
+        <span id="connection-badge" class="connection-badge is-loading">
+          Connecting…
+        </span>
+        <span id="reviewer-name">Reviewer</span>
+        <strong id="reviewer-slot">Slot —</strong>
+      </div>
+    </header>
+
+    <div class="privacy-banner" role="note">
+      <strong>Independent review matters.</strong>
+      <span id="independence-message">
+        This session has one fixed reviewer slot. A different person must
+        complete the other slot independently.
+      </span>
+      <span>Keep question content and screenshots private.</span>
+    </div>
+
+    <nav class="view-tabs" aria-label="Review queues" role="tablist">
+      <button
+        id="overview-tab"
+        class="view-tab is-active"
+        type="button"
+        aria-controls="overview-view"
+        aria-selected="true"
+        role="tab"
+      >
+        Overview
+      </button>
+      <button
+        id="items-tab"
+        class="view-tab"
+        type="button"
+        aria-controls="items-view"
+        aria-selected="false"
+        role="tab"
+        tabindex="-1"
+      >
+        Question reviews
+        <span id="items-tab-count" class="tab-count" aria-hidden="true">—</span>
+      </button>
+      <button
+        id="duplicates-tab"
+        class="view-tab"
+        type="button"
+        aria-controls="duplicates-view"
+        aria-selected="false"
+        role="tab"
+        tabindex="-1"
+      >
+        Duplicate candidates
+        <span id="duplicates-tab-count" class="tab-count" aria-hidden="true">—</span>
+      </button>
+      <button
+        id="status-tab"
+        class="view-tab"
+        type="button"
+        aria-controls="status-view"
+        aria-selected="false"
+        role="tab"
+        tabindex="-1"
+      >
+        Review status
+      </button>
+    </nav>
+
+    <main id="review-workspace" tabindex="-1">
+      <div id="live-message" class="sr-only" role="status" aria-live="polite"></div>
+      <div id="error-banner" class="error-banner" role="alert" hidden>
+        <div>
+          <strong id="error-title">Could not load this review.</strong>
+          <p id="error-message"></p>
+        </div>
+        <button id="retry-request" class="button button-secondary" type="button">
+          Try again
+        </button>
+      </div>
+
+      <section id="overview-view" class="review-view overview-view" role="tabpanel" aria-labelledby="overview-tab">
+        <header class="queue-header overview-hero">
+          <div>
+            <p class="eyebrow">Before you begin</p>
+            <h2>Reviewer slot <span id="overview-slot">—</span></h2>
+            <p>
+              Review the source evidence yourself. A different person must
+              complete the other slot without seeing your decisions or notes.
+            </p>
+          </div>
+          <button id="start-review" class="button button-primary" type="button">
+            Start question review <span aria-hidden="true">→</span>
+          </button>
+        </header>
+
+        <div class="overview-grid">
+          <section class="overview-card" aria-labelledby="overview-checks-title">
+            <p class="eyebrow">Five explicit checks</p>
+            <h3 id="overview-checks-title">What you verify for every item</h3>
+            <ol class="overview-check-list">
+              <li><strong>Question boundary</strong><span>One complete question; nothing clipped or merged.</span></li>
+              <li><strong>Choices</strong><span>Every choice is present, ordered, and faithfully parsed.</span></li>
+              <li><strong>Official answer</strong><span>The answer and status match the cited answer key.</span></li>
+              <li><strong>Diagram and crop</strong><span>All necessary visual information is complete and legible.</span></li>
+              <li><strong>Source metadata</strong><span>Year, grade, question number, page, and source agree.</span></li>
+            </ol>
+          </section>
+
+          <section class="overview-card content-gap-help" aria-labelledby="content-gap-help-title">
+            <p class="eyebrow">Do not fill gaps by guessing</p>
+            <h3 id="content-gap-help-title">Content gaps are not parser repairs</h3>
+            <p>
+              A missing official solution, unavailable OCR confidence, or
+              unknown published point tier must stay recorded as a content gap.
+              Verify what the evidence supports; never invent the missing value.
+            </p>
+            <ul>
+              <li><code>OFFICIAL_SOLUTION_NOT_AVAILABLE</code></li>
+              <li><code>OCR_CONFIDENCE_NOT_AVAILABLE</code></li>
+              <li><code>PUBLISHED_POINT_TIER_UNKNOWN</code></li>
+            </ul>
+          </section>
+
+          <section class="overview-card" aria-labelledby="overview-progress-title">
+            <p class="eyebrow">This reviewer slot</p>
+            <h3 id="overview-progress-title">Progress</h3>
+            <dl id="overview-progress" class="status-grid compact-status-grid">
+              <div><dt>Questions</dt><dd id="overview-item-progress">Loading…</dd></div>
+              <div><dt>Duplicates</dt><dd id="overview-duplicate-progress">Loading…</dd></div>
+            </dl>
+          </section>
+
+          <section class="overview-card ontology-help" aria-labelledby="ontology-help-title">
+            <p class="eyebrow">Later Stage 0 gate</p>
+            <h3 id="ontology-help-title">Ontology review is pending</h3>
+            <p>
+              This quick UI records item and duplicate evidence only. The skill
+              ontology remains a separate, read-only approval gate and is not
+              editable here.
+            </p>
+          </section>
+        </div>
+      </section>
+
+      <section id="items-view" class="review-view" role="tabpanel" aria-labelledby="items-tab" hidden>
+        <header class="queue-header">
+          <div>
+            <p class="eyebrow">Gold-sample item</p>
+            <h2 id="item-position">Loading question…</h2>
+          </div>
+          <div class="queue-progress">
+            <label id="item-progress-label" for="item-progress">Question progress</label>
+            <progress id="item-progress" max="1" value="0">0%</progress>
+          </div>
+        </header>
+
+        <div class="queue-controls" aria-label="Question navigation">
+          <button id="item-previous" class="button button-secondary" type="button">
+            <span aria-hidden="true">←</span> Previous
+          </button>
+          <form id="item-jump-form" class="jump-form">
+            <label for="item-jump">Jump to question</label>
+            <input id="item-jump" type="number" min="1" step="1" inputmode="numeric" />
+            <button class="button button-secondary" type="submit">Go</button>
+          </form>
+          <button id="item-next" class="button button-secondary" type="button">
+            Next <span aria-hidden="true">→</span>
+          </button>
+        </div>
+
+        <details class="jump-list-panel">
+          <summary>Open question jump list</summary>
+          <ol id="item-jump-list" class="jump-list" aria-label="Question positions"></ol>
+        </details>
+
+        <div id="item-loading" class="loading-panel" role="status">
+          Loading one private question…
+        </div>
+
+        <article id="item-content" class="item-workspace" hidden>
+          <section class="evidence-panel" aria-labelledby="question-evidence-heading">
+            <header class="section-heading">
+              <div>
+                <p class="eyebrow">Source evidence</p>
+                <h3 id="question-evidence-heading">Question crop</h3>
+              </div>
+              <div class="source-links" aria-label="Source evidence links">
+                <a id="source-page-link" class="source-link" href="#" target="_blank" rel="noreferrer" hidden>
+                  Source page <span aria-hidden="true">↗</span>
+                </a>
+                <a id="source-pdf-link" class="source-link" href="#" target="_blank" rel="noreferrer" hidden>
+                  Source PDF <span aria-hidden="true">↗</span>
+                </a>
+                <a id="answer-key-link" class="source-link" href="#" target="_blank" rel="noreferrer" hidden>
+                  Answer key <span aria-hidden="true">↗</span>
+                </a>
+              </div>
+            </header>
+            <figure class="question-crop-frame">
+              <img id="question-crop" alt="" />
+              <figcaption id="question-crop-caption">
+                Inspect the complete crop at full size before recording a decision.
+              </figcaption>
+              <div id="question-crop-missing" class="asset-missing" hidden>
+                <strong>Question crop unavailable</strong>
+                <span>Record the missing asset in your notes and choose Needs review.</span>
+              </div>
+            </figure>
+          </section>
+
+          <section class="parsed-panel" aria-labelledby="parsed-heading">
+            <header class="section-heading">
+              <div>
+                <p class="eyebrow">Parsed record</p>
+                <h3 id="parsed-heading">Stem and choices</h3>
+              </div>
+              <code id="item-id" class="record-id"></code>
+            </header>
+            <p id="question-stem" class="question-stem"></p>
+            <ol id="question-choices" class="choice-list" type="A"></ol>
+
+            <div class="protected-answer" aria-labelledby="answer-heading">
+              <div>
+                <p class="eyebrow" id="answer-heading">Protected review evidence</p>
+                <strong id="official-answer">Official answer: —</strong>
+              </div>
+              <div id="answer-source" class="answer-source"></div>
+            </div>
+
+            <dl id="source-metadata" class="metadata-grid"></dl>
+
+            <div class="warnings-block">
+              <h4>Warnings and review triggers</h4>
+              <ul id="warning-list" class="warning-list"></ul>
+            </div>
+            <div class="content-gaps-block">
+              <h4>Content gaps</h4>
+              <p>Keep these explicit. Do not infer or invent a missing value.</p>
+              <ul id="content-gap-list" class="warning-list content-gap-list"></ul>
+            </div>
+          </section>
+
+          <form id="item-review-form" class="review-form" novalidate>
+            <header class="section-heading review-form-heading">
+              <div>
+                <p class="eyebrow">Your independent record</p>
+                <h3>Verify each boundary</h3>
+              </div>
+              <span id="item-saved-state" class="saved-state">Not saved</span>
+            </header>
+
+            <fieldset class="verification-fieldset">
+              <legend>Evidence checks</legend>
+              <label class="check-card">
+                <input name="question_boundary_verified" type="checkbox" />
+                <span>
+                  <strong>Question boundary</strong>
+                  <small>The crop and parsed stem contain one complete question.</small>
+                </span>
+              </label>
+              <label class="check-card">
+                <input name="choices_verified" type="checkbox" />
+                <span>
+                  <strong>Choices</strong>
+                  <small>Every choice is present, ordered, and faithfully parsed.</small>
+                </span>
+              </label>
+              <label class="check-card">
+                <input name="answer_key_verified" type="checkbox" />
+                <span>
+                  <strong>Official answer</strong>
+                  <small>The answer and its status match the cited answer-key evidence.</small>
+                </span>
+              </label>
+              <label class="check-card">
+                <input name="diagram_verified" type="checkbox" />
+                <span>
+                  <strong>Diagram and crop</strong>
+                  <small>All required visual information is present and legible.</small>
+                </span>
+              </label>
+              <label class="check-card">
+                <input name="source_metadata_verified" type="checkbox" />
+                <span>
+                  <strong>Source metadata</strong>
+                  <small>Year, grade, question number, pages, and source match.</small>
+                </span>
+              </label>
+            </fieldset>
+
+            <fieldset class="decision-fieldset">
+              <legend>Disposition</legend>
+              <label class="decision-card decision-faithful">
+                <input name="disposition" type="radio" value="faithful" />
+                <span><strong>Faithful</strong><small>All five checks pass.</small></span>
+              </label>
+              <label class="decision-card decision-review">
+                <input name="disposition" type="radio" value="needs_review" checked />
+                <span><strong>Needs review</strong><small>Evidence is incomplete or ambiguous.</small></span>
+              </label>
+              <label class="decision-card decision-rejected">
+                <input name="disposition" type="radio" value="rejected" />
+                <span><strong>Rejected</strong><small>The parsed record is materially unfaithful.</small></span>
+              </label>
+            </fieldset>
+
+            <label class="notes-field" for="item-notes">
+              <span>Review notes</span>
+              <small>Describe the exact mismatch or evidence still needed. Do not paste local paths.</small>
+              <textarea id="item-notes" name="notes" rows="5" maxlength="4000"></textarea>
+            </label>
+
+            <p id="item-form-error" class="form-error" role="alert" hidden></p>
+            <div class="form-actions">
+              <button id="save-item" class="button button-secondary" type="submit" data-advance="false">
+                Save review
+              </button>
+              <button id="save-next-item" class="button button-primary" type="submit" data-advance="true">
+                Save and next <span aria-hidden="true">→</span>
+              </button>
+            </div>
+            <p class="shortcut-hint">
+              Keyboard: <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>S</kbd> saves;
+              add <kbd>Shift</kbd> to save and move next.
+            </p>
+          </form>
+        </article>
+      </section>
+
+      <section id="duplicates-view" class="review-view" role="tabpanel" aria-labelledby="duplicates-tab" hidden>
+        <header class="queue-header">
+          <div>
+            <p class="eyebrow">Exact-duplicate adjudication</p>
+            <h2 id="duplicate-position">Loading candidate…</h2>
+          </div>
+          <div class="queue-progress">
+            <label id="duplicate-progress-label" for="duplicate-progress">Candidate progress</label>
+            <progress id="duplicate-progress" max="1" value="0">0%</progress>
+          </div>
+        </header>
+
+        <div class="queue-controls" aria-label="Duplicate candidate navigation">
+          <button id="duplicate-previous" class="button button-secondary" type="button">
+            <span aria-hidden="true">←</span> Previous
+          </button>
+          <form id="duplicate-jump-form" class="jump-form">
+            <label for="duplicate-jump">Jump to candidate</label>
+            <input id="duplicate-jump" type="number" min="1" step="1" inputmode="numeric" />
+            <button class="button button-secondary" type="submit">Go</button>
+          </form>
+          <button id="duplicate-next" class="button button-secondary" type="button">
+            Next <span aria-hidden="true">→</span>
+          </button>
+        </div>
+
+        <details class="jump-list-panel">
+          <summary>Open duplicate-candidate jump list</summary>
+          <ol id="duplicate-jump-list" class="jump-list" aria-label="Duplicate candidate positions"></ol>
+        </details>
+
+        <div id="duplicate-loading" class="loading-panel" role="status">
+          Loading one private duplicate group…
+        </div>
+
+        <article id="duplicate-content" class="duplicate-workspace" hidden>
+          <header class="duplicate-heading">
+            <div>
+              <p class="eyebrow">Candidate group</p>
+              <h3 id="duplicate-group-id">—</h3>
+            </div>
+            <dl class="duplicate-signature">
+              <div><dt>Match type</dt><dd id="duplicate-signature-type">—</dd></div>
+              <div><dt>Signature</dt><dd><code id="duplicate-signature">—</code></dd></div>
+            </dl>
+          </header>
+
+          <div id="duplicate-members" class="duplicate-members" aria-label="Duplicate members"></div>
+
+          <form id="duplicate-review-form" class="review-form" novalidate>
+            <header class="section-heading review-form-heading">
+              <div>
+                <p class="eyebrow">Your independent adjudication</p>
+                <h3>Do these records represent the same exact item?</h3>
+              </div>
+              <span id="duplicate-saved-state" class="saved-state">Not saved</span>
+            </header>
+            <fieldset class="decision-fieldset">
+              <legend>Duplicate decision</legend>
+              <label class="decision-card decision-faithful">
+                <input name="decision" type="radio" value="confirmed" />
+                <span><strong>Confirmed</strong><small>These are the same exact question.</small></span>
+              </label>
+              <label class="decision-card decision-rejected">
+                <input name="decision" type="radio" value="rejected" />
+                <span><strong>Rejected</strong><small>The apparent match is not an exact duplicate.</small></span>
+              </label>
+              <label class="decision-card decision-review">
+                <input name="decision" type="radio" value="needs_review" checked />
+                <span><strong>Needs review</strong><small>The available evidence cannot settle it.</small></span>
+              </label>
+            </fieldset>
+
+            <label class="notes-field" for="duplicate-notes">
+              <span>Adjudication notes</span>
+              <small>Compare wording, answer choices, diagrams, and source context. Do not paste local paths.</small>
+              <textarea id="duplicate-notes" name="notes" rows="5" maxlength="4000"></textarea>
+            </label>
+            <p id="duplicate-form-error" class="form-error" role="alert" hidden></p>
+            <div class="form-actions">
+              <button id="save-duplicate" class="button button-secondary" type="submit" data-advance="false">
+                Save decision
+              </button>
+              <button id="save-next-duplicate" class="button button-primary" type="submit" data-advance="true">
+                Save and next <span aria-hidden="true">→</span>
+              </button>
+            </div>
+          </form>
+        </article>
+      </section>
+
+      <section id="status-view" class="review-view status-view" role="tabpanel" aria-labelledby="status-tab" hidden>
+        <header class="queue-header">
+          <div>
+            <p class="eyebrow">Read-only summary</p>
+            <h2>Stage 0 review status</h2>
+          </div>
+          <button id="refresh-status" class="button button-secondary" type="button">
+            Refresh status
+          </button>
+        </header>
+        <p class="status-explanation">
+          Your slot is only one half of each independent decision. Saving here
+          does not reveal or copy the other reviewer’s answers.
+        </p>
+        <div id="status-loading" class="loading-panel" role="status">Loading status…</div>
+        <dl id="status-summary" class="status-grid" hidden></dl>
+      </section>
+    </main>
+
+    <footer>
+      <p>Private, same-origin review tool. No external assets, analytics, or third-party requests.</p>
+    </footer>
+  </body>
+</html>

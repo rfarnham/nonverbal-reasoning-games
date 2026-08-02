@@ -183,3 +183,41 @@ duplicate_review_history = Table(
         name="fk_duplicate_review_history_group",
     ),
 )
+
+review_carry_forward_events = Table(
+    "review_carry_forward_events",
+    metadata,
+    Column("carry_forward_event_id", String(64), primary_key=True),
+    Column("evidence_kind", String, nullable=False),
+    Column("source_run_id", String, ForeignKey("audit_runs.run_id"), nullable=False),
+    Column("target_run_id", String, ForeignKey("audit_runs.run_id"), nullable=False),
+    Column("source_entity_id", String, nullable=False),
+    Column("target_entity_id", String, nullable=False),
+    Column("reviewer_slot", Integer, nullable=False),
+    Column("source_review_event_id", String(64), nullable=False),
+    Column("target_review_event_id", String(64), nullable=False),
+    Column("match_json", Text, nullable=False),
+    Column("carried_at", String, nullable=False),
+    Column("schema_version", String, nullable=False),
+    CheckConstraint(
+        "evidence_kind IN ('item_review', 'duplicate_review')",
+        name="carry_forward_evidence_kind",
+    ),
+    CheckConstraint(
+        "source_run_id <> target_run_id", name="carry_forward_distinct_runs"
+    ),
+    CheckConstraint("reviewer_slot IN (1, 2)", name="carry_forward_reviewer_slot"),
+    UniqueConstraint(
+        "source_run_id",
+        "target_run_id",
+        "evidence_kind",
+        "source_review_event_id",
+        name="uq_carry_forward_source_event",
+    ),
+    UniqueConstraint(
+        "target_run_id",
+        "evidence_kind",
+        "target_review_event_id",
+        name="uq_carry_forward_target_event",
+    ),
+)

@@ -33,8 +33,14 @@ def test_all_spec_acceptance_scenarios_are_frozen_before_policy_code() -> None:
         "core-acceptance-scenarios.v1.json"
     )
     contract = json.loads(path.read_text(encoding="utf-8"))
-    assert contract["status"] == "contract_pending_higher_stages"
+    assert contract["status"] == "synthetic_contracts_in_progress"
     assert [scenario["scenario_id"] for scenario in contract["scenarios"]] == [
         f"AC-{number:02d}" for number in range(1, 11)
     ]
     assert all(scenario["stage"] in {2, 3} for scenario in contract["scenarios"])
+    implemented = [
+        scenario["scenario_id"]
+        for scenario in contract["scenarios"]
+        if scenario.get("implementation_status") == "synthetic_contract_implemented"
+    ]
+    assert implemented == ["AC-10"]

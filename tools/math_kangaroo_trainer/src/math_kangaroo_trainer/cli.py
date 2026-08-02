@@ -5,7 +5,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import shutil
 import sys
+import tempfile
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -47,6 +49,7 @@ from math_kangaroo_trainer.versions import (
 DEFAULT_SAMPLE_SIZE = 180
 DEFAULT_SEED = 20260801
 AUDIT_DATABASE_NAME = "stage0-audit.sqlite3"
+DEFAULT_REVIEW_AUDIT_DIR = Path("work/math-kangaroo-adaptive-engine/stage0")
 
 
 def _repository_root(start: Path) -> Path | None:
@@ -577,6 +580,159 @@ def stage0_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def stage0_carry_forward_reviews(args: argparse.Namespace) -> int:
+    audit_database = args.audit_db.resolve()
+    output_dir = args.output.resolve() if args.output else audit_database.parent
+    _require_private_output(audit_database)
+    _require_private_output(output_dir)
+    if not audit_database.is_file():
+        raise FileNotFoundError(f"audit database not found: {audit_database}")
+    if args.source_run_id == args.target_run_id:
+        raise ValueError("source and target audit runs must be different")
+
+    ontology_path = args.ontology.resolve()
+    ontology = load_ontology(ontology_path) if args.apply else None
+    ontology_sha256 = ontology_checksum(ontology_path) if args.apply else None
+    if args.apply:
+        preflight_repository = AuditRepository(audit_database)
+        try:
+            target_run = preflight_repository.run(args.target_run_id)
+        finally:
+            preflight_repository.close()
+        if (
+            target_run["versions"].get("ontology") != ontology.ontology_version
+            or target_run["versions"].get("ontology_sha256") != ontology_sha256
+        ):
+            raise ValueError(
+                "supplied ontology version/checksum does not match the target run"
+            )
+        migrate_audit_database(audit_database)
+
+    audit_key = hashlib.sha256(
+        f"{args.source_run_id}\0{args.target_run_id}".encode("utf-8")
+    ).hexdigest()[:16]
+    audit_output = (
+        args.audit_output.resolve()
+        if args.audit_output
+        else output_dir / f"review-carry-forward-{audit_key}.json"
+    )
+    _require_private_output(audit_output)
+
+    repository = AuditRepository(audit_database)
+    try:
+        report_state: dict[str, Any] = {}
+        output_dir.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(
+            prefix=".carry-forward-report-", dir=output_dir
+        ) as temporary_directory:
+            transaction_files = Path(temporary_directory)
+            staged_output = transaction_files / "staged"
+            backup_output = transaction_files / "backup"
+            backup_output.mkdir()
+            report_filenames = ("quality-report.json", "quality-summary.md")
+            originals: dict[str, bool] = {}
+            published = False
+
+            def restore_original_reports() -> None:
+                for filename in report_filenames:
+                    destination = output_dir / filename
+                    if originals.get(filename, False):
+                        backup = backup_output / filename
+                        if backup.is_file():
+                            backup.replace(destination)
+                    elif filename in originals:
+                        destination.unlink(missing_ok=True)
+
+            def regenerate_target_report(
+                transaction_repository: AuditRepository,
+            ) -> None:
+                nonlocal published
+                if ontology is None or ontology_sha256 is None:
+                    raise RuntimeError("target report requires a validated ontology")
+                report = build_quality_report(
+                    transaction_repository,
+                    run_id=args.target_run_id,
+                    ontology=ontology,
+                    ontology_sha256=ontology_sha256,
+                )
+                write_quality_reports(report, staged_output)
+                for filename in report_filenames:
+                    destination = output_dir / filename
+                    originals[filename] = destination.is_file()
+                    if originals[filename]:
+                        shutil.copy2(destination, backup_output / filename)
+                try:
+                    for filename in report_filenames:
+                        (staged_output / filename).replace(output_dir / filename)
+                except Exception:
+                    restore_original_reports()
+                    raise
+                published = True
+                report_state.update(
+                    {
+                        "regenerated": True,
+                        "exit_status": report["exit_criterion"]["status"],
+                    }
+                )
+
+            try:
+                result = repository.carry_forward_reviews(
+                    source_run_id=args.source_run_id,
+                    target_run_id=args.target_run_id,
+                    apply=args.apply,
+                    before_commit=regenerate_target_report if args.apply else None,
+                )
+            except Exception:
+                if published:
+                    restore_original_reports()
+                raise
+        if args.apply and result["can_apply"]:
+            result["target_quality_report"] = report_state
+        else:
+            result["target_quality_report"] = {"regenerated": False}
+    finally:
+        repository.close()
+
+    audit_output.parent.mkdir(parents=True, exist_ok=True)
+    audit_output.write_text(
+        json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    if args.apply and not result["can_apply"]:
+        raise ValueError(
+            "review carry-forward blocked; inspect "
+            f"{audit_output} for {result['counts']['blockers']} blocker(s)"
+        )
+    print(
+        _json(
+            {
+                "mode": result["mode"],
+                "source_run_id": args.source_run_id,
+                "target_run_id": args.target_run_id,
+                "counts": result["counts"],
+                "audit_output": str(audit_output),
+            }
+        )
+    )
+    return 0
+
+
+def stage0_review_web(args: argparse.Namespace) -> int:
+    """Serve the private review queues through a loopback-only HTTP endpoint."""
+
+    audit_dir = args.audit_dir.resolve()
+    _require_private_output(audit_dir)
+    from math_kangaroo_trainer.web import serve_review_web
+
+    return serve_review_web(
+        audit_dir=audit_dir,
+        reviewer_id=args.reviewer_id,
+        reviewer_slot=args.reviewer_slot,
+        ontology_path=args.ontology.resolve(),
+        port=args.port,
+    )
+
+
 def validate_ontology(args: argparse.Namespace) -> int:
     ontology = load_ontology(args.ontology.resolve())
     print(_json(ontology.summary()))
@@ -631,6 +787,42 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("--ontology", type=Path, default=default_ontology_path())
     report.set_defaults(handler=stage0_report)
 
+    carry_forward = stage0_commands.add_parser(
+        "carry-forward-reviews",
+        help="strictly carry unchanged review evidence between audit runs",
+    )
+    carry_forward.add_argument("--audit-db", type=Path, required=True)
+    carry_forward.add_argument("--source-run-id", required=True)
+    carry_forward.add_argument("--target-run-id", required=True)
+    carry_forward.add_argument("--output", type=Path)
+    carry_forward.add_argument("--audit-output", type=Path)
+    carry_forward.add_argument(
+        "--ontology", type=Path, default=default_ontology_path()
+    )
+    carry_forward.add_argument(
+        "--apply",
+        action="store_true",
+        help="apply the plan atomically; omission performs a read-only dry run",
+    )
+    carry_forward.set_defaults(handler=stage0_carry_forward_reviews)
+
+    review_web = stage0_commands.add_parser(
+        "review-web",
+        help="serve a private Stage 0 reviewer dashboard on 127.0.0.1",
+    )
+    review_web.add_argument(
+        "--audit-dir", type=Path, default=DEFAULT_REVIEW_AUDIT_DIR
+    )
+    review_web.add_argument("--reviewer-id", required=True)
+    review_web.add_argument(
+        "--reviewer-slot", type=int, choices=(1, 2), required=True
+    )
+    review_web.add_argument("--port", type=int, default=8765)
+    review_web.add_argument(
+        "--ontology", type=Path, default=default_ontology_path()
+    )
+    review_web.set_defaults(handler=stage0_review_web)
+
     ontology = command.add_parser("validate-ontology", help="validate ontology and DAG")
     ontology.add_argument("--ontology", type=Path, default=default_ontology_path())
     ontology.set_defaults(handler=validate_ontology)
@@ -642,7 +834,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return int(args.handler(args))
-    except (FileNotFoundError, ValueError, RuntimeError, ValidationError) as error:
+    except (OSError, ValueError, RuntimeError, ValidationError) as error:
         parser.exit(2, f"error: {error}\n")
 
 
