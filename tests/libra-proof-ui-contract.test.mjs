@@ -43,6 +43,9 @@ test("the teaching proof renders actual scales for every operation", () => {
     "substitution-source",
     "substitution-before",
     "substitution-after",
+    "reorient-before",
+    "reorient-after",
+    "reorient-guide",
     "add-receiver",
     "add-donor",
     "add-result",
@@ -65,12 +68,18 @@ test("the teaching proof renders actual scales for every operation", () => {
   }
 });
 
-test("substitution, adding, and division expose literal visual motion hooks", () => {
+test("substitution, scale turning, adding, and division expose literal visual motion hooks", () => {
   assert.match(visualSource, /data-proof-motion="substitution"/);
   assert.match(visualSource, /data-proof-motion="substitute-load"/);
   assert.match(visualSource, /data-proof-load-state=\{group\.tone \?\? "plain"\}/);
   assert.match(visualSource, /sourceFromSide/);
   assert.match(visualSource, /sourceToSide/);
+
+  assert.match(visualSource, /data-proof-motion="reorient-scale"/);
+  assert.match(visualSource, /beforeRole="reorient-before"/);
+  assert.match(visualSource, /afterRole="reorient-after"/);
+  assert.match(visualSource, /role="reorient-guide"/);
+  assert.match(visualSource, /↔ turn/);
 
   assert.match(visualSource, /data-proof-motion="add-scales"/);
   assert.match(visualSource, /tone: "move" as const/);
@@ -86,6 +95,8 @@ test("the real-scale choreography includes long holds and settled states", () =>
   for (const keyframe of [
     "proofCircleEqualLoads",
     "proofSubstitutionLoadTravel",
+    "proofReorientOut",
+    "proofReorientIn",
     "proofAddCargoTravel",
     "proofRemoveMatchedLoads",
     "proofBundleCircleIn",
@@ -114,9 +125,27 @@ test("the animated proof uses one persistent canvas instead of swapping step car
   assert.match(visualSource, /function ProofScaleRackScene\(/);
   assert.match(visualSource, /displayedProofScaleIndexes\(round\)\.map/);
   assert.match(visualSource, /proofScaleStatesBeforeStep\(/);
+  assert.match(
+    visualSource,
+    /round\.equations\.map\(\(_,[\s\S]*?displayedRoundEquation\(round, equationIndex\)/,
+  );
   assert.doesNotMatch(visualSource, /function TeachingProofSceneCard\(/);
   assert.doesNotMatch(visualSource, /<article\b/);
   assert.doesNotMatch(visualSource, /styles\.proofTeachingScene/);
+});
+
+test("the puzzle and proof start from each clue scale's own displayed direction", () => {
+  assert.match(
+    visualSource,
+    /const equation = displayedRoundEquation\(round, sourceIndex\)/,
+  );
+  assert.match(
+    visualSource,
+    /round\.equations\.map\(\(_,[\s\S]*?displayedRoundEquation\(round, equationIndex\)/,
+  );
+  assert.match(visualSource, /step\.kind === "reorient-scale"/);
+  assert.match(visualSource, /label="Turn"/);
+  assert.match(visualSource, /label="Working"[\s\S]{0,100}role="reorient-guide"/);
 });
 
 test("proofs name the strategy and keep every numbered scale in view", () => {

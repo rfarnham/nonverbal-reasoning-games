@@ -59,6 +59,8 @@ export function proofNarrationCueId(
       return step.sources.length === 1 ? "inspect-one" : "inspect-many";
     case "substitute":
       return "substitute";
+    case "reorient-scale":
+      return "reorient-scale";
     case "add-scales":
       return "add-scales";
     case "subtract-scales":

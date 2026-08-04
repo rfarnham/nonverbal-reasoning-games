@@ -14,6 +14,7 @@ import {
   canonicalEquationKey,
   createSeededRandom,
   describeExpression,
+  displayedRoundEquation,
   expressionItemCount,
   expressionKey,
   generateInfiniteRound,
@@ -35,7 +36,10 @@ import {
   assertSoundTeachingRound,
   buildTeachingProof,
 } from "../app/games/libra/strategy-curriculum.ts";
-import { resolveProgressionQuestion } from "../lib/progression/game-adapter.ts";
+import {
+  journeyQuestionReferences,
+  resolveProgressionQuestion,
+} from "../lib/progression/game-adapter.ts";
 
 const SEEDS_PER_DIFFICULTY = 400;
 
@@ -106,20 +110,46 @@ const GENERATED = Object.fromEntries(
   ]),
 );
 
-test("Libra content v2 and generator v3 safely migrate saved generator v2 questions", () => {
-  assert.equal(progressionMetadata.contentVersion, "2");
-  assert.equal(progressionMetadata.generatorVersion, "3");
+test("Libra v3/v4/v2 safely migrates earlier Campaign, Infinite, and Journey questions", () => {
+  assert.equal(progressionMetadata.contentVersion, "3");
+  assert.equal(progressionMetadata.generatorVersion, "4");
+  assert.equal(progressionMetadata.journeyContentVersion, "2");
+
+  const campaign = resolveProgressionQuestion(progressionAdapter, {
+    source: "campaign",
+    gameSlug: "libra",
+    level: "starter",
+    questionIndex: 0,
+    contentVersion: "2",
+  });
+  assert.equal(campaign.resolution, "campaign-updated");
+  assert.equal(campaign.ref.contentVersion, "3");
+  assert.equal(campaign.round.difficulty, "Starter");
+
   const resolved = resolveProgressionQuestion(progressionAdapter, {
     source: "generated",
     gameSlug: "libra",
     level: "starter",
     seed: "legacy-libra-starter",
-    generatorVersion: "2",
+    generatorVersion: "3",
   });
   assert.equal(resolved.resolution, "generated-fallback");
   assert.equal(resolved.ref.source, "campaign");
+  assert.equal(resolved.ref.contentVersion, "3");
   assert.equal(resolved.round.difficulty, "Starter");
   assert.equal(validateRound(resolved.round).valid, true);
+
+  const currentJourneyRef = journeyQuestionReferences(
+    progressionAdapter,
+    "junior-2",
+  )[0];
+  const journey = resolveProgressionQuestion(progressionAdapter, {
+    ...currentJourneyRef,
+    contentVersion: "1",
+  });
+  assert.equal(journey.resolution, "journey-updated");
+  assert.equal(journey.ref.contentVersion, "2");
+  assert.equal(journey.round.difficulty, "Junior");
 });
 
 function relationExpressions(round) {
@@ -162,6 +192,25 @@ function assertValidRound(round, label) {
     expectedEquationCount(round),
     `${label} relation count`,
   );
+  assert.equal(
+    round.equationOrientations.length,
+    round.equations.length,
+    `${label} orientation count`,
+  );
+  for (const [equationIndex, equation] of round.equations.entries()) {
+    const orientation = round.equationOrientations[equationIndex];
+    assert.ok(
+      orientation === "standard" || orientation === "mirrored",
+      `${label} scale ${equationIndex + 1} orientation`,
+    );
+    assert.deepEqual(
+      displayedRoundEquation(round, equationIndex),
+      orientation === "mirrored"
+        ? { left: equation.right, right: equation.left }
+        : equation,
+      `${label} scale ${equationIndex + 1} display direction`,
+    );
+  }
   assert.equal(
     namedCreatures(round).size,
     EXPECTED_CREATURE_COUNTS[round.difficulty],
@@ -286,6 +335,57 @@ test("each Campaign level balances answer positions without a visible cycle", ()
   }
 });
 
+test("Campaign independently balances clue-scale directions and includes mixed layouts", () => {
+  for (const difficulty of DIFFICULTIES) {
+    const rounds = ROUNDS.filter((round) => round.difficulty === difficulty);
+    assert.deepEqual(
+      ["standard", "mirrored"].map(
+        (orientation) =>
+          rounds.filter(
+            ({ equationOrientations }) =>
+              equationOrientations[0] === orientation,
+          ).length,
+      ),
+      [6, 6],
+      `${difficulty}: first clue scale is balanced over the 12-round level`,
+    );
+
+    const multiScaleRounds = rounds.filter(
+      ({ equations }) => equations.length > 1,
+    );
+    if (multiScaleRounds.length > 0) {
+      assert.deepEqual(
+        new Set(
+          multiScaleRounds.map(({ equationOrientations }) =>
+            equationOrientations.slice(0, 2).join("/"),
+          ),
+        ),
+        new Set([
+          "standard/standard",
+          "standard/mirrored",
+          "mirrored/standard",
+          "mirrored/mirrored",
+        ]),
+        `${difficulty}: the first two clue scales vary independently`,
+      );
+      assert.ok(
+        multiScaleRounds.some(
+          ({ equationOrientations }) =>
+            new Set(equationOrientations).size > 1,
+        ),
+        `${difficulty}: some puzzles turn only one clue scale around`,
+      );
+      assert.ok(
+        multiScaleRounds.some(
+          ({ equationOrientations }) =>
+            new Set(equationOrientations).size === 1,
+        ),
+        `${difficulty}: some puzzles keep clue scales aligned`,
+      );
+    }
+  }
+});
+
 test("Journey-only Libra banks are valid, diverse, disjoint, and never divide by one", () => {
   const expectations = {
     "junior-2": "Junior",
@@ -337,6 +437,24 @@ test("Journey-only Libra banks are valid, diverse, disjoint, and never divide by
         ),
       ).size > 1,
       `${level}: no repeated four-position cycle`,
+    );
+    assert.deepEqual(
+      ["standard", "mirrored"].map(
+        (orientation) =>
+          rounds.filter(
+            ({ equationOrientations }) =>
+              equationOrientations[0] === orientation,
+          ).length,
+      ),
+      [6, 6],
+      `${level}: first clue scale direction balance`,
+    );
+    assert.ok(
+      rounds.some(
+        ({ equationOrientations }) =>
+          new Set(equationOrientations).size > 1,
+      ),
+      `${level}: independently oriented clue scales`,
     );
 
     for (const [index, round] of rounds.entries()) {
@@ -964,6 +1082,41 @@ test("generated Junior includes honest one-scale combo primers", () => {
     assert.deepEqual(round.solutionDerivation.equationMultipliers, [1]);
     assert.ok(round.solutionDerivation.normalizeBy >= 2);
     assert.equal(validateRound(round).freeVariableCount, 1);
+  }
+});
+
+test("Infinite independently randomizes every available clue scale", () => {
+  for (const difficulty of DIFFICULTIES) {
+    const rounds = GENERATED[difficulty];
+    for (let equationIndex = 0; equationIndex < 3; equationIndex += 1) {
+      const available = rounds.filter(
+        ({ equationOrientations }) =>
+          equationOrientations[equationIndex] !== undefined,
+      );
+      if (available.length === 0) continue;
+      const mirrored = available.filter(
+        ({ equationOrientations }) =>
+          equationOrientations[equationIndex] === "mirrored",
+      ).length;
+      assert.ok(
+        mirrored / available.length >= 0.4 &&
+          mirrored / available.length <= 0.6,
+        `${difficulty} scale ${equationIndex + 1}: ${mirrored}/${available.length} mirrored`,
+      );
+    }
+
+    if (difficulty !== "Starter") {
+      const multiScaleRounds = rounds.filter(
+        ({ equations }) => equations.length > 1,
+      );
+      assert.ok(
+        multiScaleRounds.filter(
+          ({ equationOrientations }) =>
+            new Set(equationOrientations).size > 1,
+        ).length >= multiScaleRounds.length * 0.3,
+        `${difficulty}: mixed clue-scale directions are common`,
+      );
+    }
   }
 });
 

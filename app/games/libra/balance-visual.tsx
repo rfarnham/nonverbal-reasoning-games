@@ -22,7 +22,10 @@ import type {
   Expression,
   Round,
 } from "./game-engine";
-import { describeExpression } from "./game-engine";
+import {
+  describeExpression,
+  displayedRoundEquation,
+} from "./game-engine";
 import type { StrategyId, TeachingProofStep } from "./strategy-curriculum";
 import {
   PROOF_STRATEGY_NAMES,
@@ -1438,6 +1441,30 @@ function TeachingProofSceneVisual({
       return <InspectScaleScene step={step} accentMap={accentMap} />;
     case "substitute":
       return <SubstitutionScaleScene step={step} accentMap={accentMap} storyboard={storyboard} />;
+    case "reorient-scale":
+      return (
+        <div
+          className={styles.proofScaleScene}
+          data-proof-motion="reorient-scale"
+        >
+          <ProofMorphingBalanceScale
+            before={step.before}
+            after={step.after}
+            label="Turn the scale around"
+            beforeLabel="Before turning"
+            afterLabel="Trays lined up"
+            beforeRole="reorient-before"
+            afterRole="reorient-after"
+            className={styles.proofSingleScaleMorph}
+            storyboard={storyboard}
+            accentMap={accentMap}
+          >
+            <span className={styles.proofSameChangeBadge} aria-hidden="true">
+              ↔
+            </span>
+          </ProofMorphingBalanceScale>
+        </div>
+      );
     case "add-scales":
       return <AddScalesScene step={step} accentMap={accentMap} storyboard={storyboard} />;
     case "subtract-scales":
@@ -1458,6 +1485,7 @@ function proofStepAfterEquation(
 ): BalanceEquation | null {
   switch (step.kind) {
     case "substitute":
+    case "reorient-scale":
     case "add-scales":
     case "subtract-scales":
     case "cancel-matches":
@@ -1477,7 +1505,9 @@ function proofScaleStatesBeforeStep(
   steps: readonly TeachingProofStep[],
   activeStepIndex: number,
 ): readonly BalanceEquation[] {
-  const states = round.equations.map((equation) => equation);
+  const states = round.equations.map((_, equationIndex) =>
+    displayedRoundEquation(round, equationIndex),
+  );
   for (const step of steps.slice(0, activeStepIndex)) {
     const after = proofStepAfterEquation(step);
     const workingScaleIndex = step.scaleFocus?.workingScaleIndex;
@@ -1585,6 +1615,24 @@ function ProofWorkingScaleForStep({
         />
       );
     }
+    case "reorient-scale":
+      return (
+        <ProofMorphingBalanceScale
+          before={step.before}
+          after={step.after}
+          label="Turn"
+          beforeLabel="Before turning"
+          afterLabel="Trays lined up"
+          beforeRole="reorient-before"
+          afterRole="reorient-after"
+          className={`${styles.proofRackScale} ${styles.proofReorientMorph}`}
+          accentMap={accentMap}
+        >
+          <span className={styles.proofSameChangeBadge} aria-hidden="true">
+            ↔ turn
+          </span>
+        </ProofMorphingBalanceScale>
+      );
     case "add-scales": {
       const receiving = step.before[0];
       return (
@@ -1985,9 +2033,18 @@ function ProofScaleRackScene({
         const isWorking = focus?.workingScaleIndex === sourceIndex;
         const isSource =
           focus?.sourceScaleIndexes.includes(sourceIndex) ?? false;
+        const isReorientation = step.kind === "reorient-scale";
         const source = proofSourceForScale(step, sourceIndex);
         const displayNumber = displayedProofScaleNumber(round, sourceIndex);
-        const state = isWorking ? "working" : isSource ? "source" : "idle";
+        const state = isWorking
+          ? isReorientation
+            ? "source"
+            : "working"
+          : isSource
+            ? isReorientation
+              ? "working"
+              : "source"
+            : "idle";
         return (
           <div
             className={styles.proofScaleLane}
@@ -2001,6 +2058,14 @@ function ProofScaleRackScene({
             <span className={styles.proofScaleLaneBody}>
               {isWorking ? (
                 <ProofWorkingScaleForStep step={step} accentMap={accentMap} />
+              ) : isReorientation && isSource ? (
+                <ProofBalanceScale
+                  equation={states[sourceIndex]}
+                  label="Working"
+                  role="reorient-guide"
+                  className={styles.proofRackScale}
+                  accentMap={accentMap}
+                />
               ) : source ? (
                 <ProofReferenceScale
                   round={round}
@@ -2754,13 +2819,12 @@ export function PuzzleVisual({
         aria-hidden="true"
       >
         {(round.scaffold
-          ? round.scaffold.equationOrder.map(
-              (equationIndex) => round.equations[equationIndex],
-            )
-          : round.equations
-        ).map((equation: BalanceEquation | undefined, equationIndex) =>
-          equation ? (
-          <div className={styles.clueScaleWrap} key={equationIndex}>
+          ? round.scaffold.equationOrder
+          : round.equations.map((_, equationIndex) => equationIndex)
+        ).map((sourceIndex) => {
+          const equation = displayedRoundEquation(round, sourceIndex);
+          return (
+          <div className={styles.clueScaleWrap} key={sourceIndex}>
             <span className={styles.clueNode} />
             <BalanceScale
               left={equation.left}
@@ -2768,8 +2832,8 @@ export function PuzzleVisual({
               accentMap={accentMap}
             />
           </div>
-          ) : null,
-        )}
+          );
+        })}
       </div>
       {resolvedProofState !== "hidden" ? (
         <SolutionProofVisual

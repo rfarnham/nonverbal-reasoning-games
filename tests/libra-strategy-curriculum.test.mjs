@@ -3,8 +3,10 @@ import test from "node:test";
 
 import {
   BALANCE_TOKENS,
+  BALANCE_TOKEN_NAMES,
   ROUNDS,
   SOLUTION_STRATEGIES,
+  displayedRoundEquation,
   generateInfiniteRoundFromSeed,
 } from "../app/games/libra/game-engine.ts";
 import {
@@ -202,6 +204,35 @@ function scaledCounts(expression, multiplier) {
   );
 }
 
+const CAPTION_PLURAL_NAMES = {
+  ...Object.fromEntries(
+    BALANCE_TOKENS.map((token) => [token, `${BALANCE_TOKEN_NAMES[token]}s`]),
+  ),
+  goose: "geese",
+  fox: "foxes",
+  mystery: "sealed loads",
+};
+
+function captionExpressionText(expression) {
+  const parts = expression.map(({ creature, count }) => {
+    if (count > 1) return `${count} ${CAPTION_PLURAL_NAMES[creature]}`;
+    const name = BALANCE_TOKEN_NAMES[creature];
+    return `${/^[aeiou]/i.test(name) ? "an" : "a"} ${name}`;
+  });
+  if (parts.length <= 1) return parts[0] ?? "nothing";
+  if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
+  return `${parts.slice(0, -1).join(", ")}, and ${parts.at(-1)}`;
+}
+
+function captionEquationText(equation) {
+  const left = captionExpressionText(equation.left);
+  const verb =
+    equation.left.length === 1 && equation.left[0].count === 1
+      ? "balances"
+      : "balance";
+  return `${left} ${verb} ${captionExpressionText(equation.right)}`;
+}
+
 function assertProofCertificate(round, label) {
   const proof = buildSolutionProof(round);
   const factor = round.solutionDerivation.normalizeBy;
@@ -312,6 +343,20 @@ function equationMatches(left, right) {
   expressionMatches(left.right, right.right);
 }
 
+function expressionsHaveSameCounts(left, right) {
+  return JSON.stringify(counts(left)) === JSON.stringify(counts(right));
+}
+
+function equationMatchesEitherDirection(left, right, label) {
+  const direct =
+    expressionsHaveSameCounts(left.left, right.left) &&
+    expressionsHaveSameCounts(left.right, right.right);
+  const reversed =
+    expressionsHaveSameCounts(left.left, right.right) &&
+    expressionsHaveSameCounts(left.right, right.left);
+  assert.ok(direct || reversed, label);
+}
+
 function equationChanged(before, after, label) {
   assert.notDeepEqual(
     [counts(before.left), counts(before.right)],
@@ -349,13 +394,21 @@ function assertTeachingPlan(round, label) {
     right: [{ creature: round.question.unit, count: round.answer }],
   };
 
-  equationMatches(plan.finalEquation, expectedGoal);
+  equationMatchesEitherDirection(
+    plan.finalEquation,
+    expectedGoal,
+    `${label}: final scale matches the goal in either balanced direction`,
+  );
   assert.ok(plan.steps.length > 0, `${label}: has a direct operation`);
   assert.ok(
     plan.steps.every(({ kind }) => kind !== "inspect" && kind !== "conclude"),
     `${label}: omits repeated opening and closing boilerplate`,
   );
-  equationMatches(plan.steps.at(-1).after, expectedGoal);
+  equationMatchesEitherDirection(
+    plan.steps.at(-1).after,
+    expectedGoal,
+    `${label}: last operation reaches the goal in either balanced direction`,
+  );
   assert.deepEqual(plan.timeline, teachingProofTimeline(plan.steps));
   assert.equal(plan.timeline.length, plan.steps.length);
   let expectedDelayMs = 0;
@@ -388,7 +441,22 @@ function assertTeachingPlan(round, label) {
     if (step.kind === "substitute" || step.kind === "cancel-matches") {
       equationChanged(step.before, step.after, `${label}: ${step.kind} changes state`);
     }
+    if (step.kind === "reorient-scale") {
+      equationChanged(step.before, step.after, `${label}: reorientation changes sides`);
+      expressionMatches(step.before.left, step.after.right);
+      expressionMatches(step.before.right, step.after.left);
+      assert.match(step.text, /turn it around/i);
+      assert.match(step.text, /trays line up with scale \(\d+\)/i);
+    }
     if (step.kind === "substitute") {
+      assert.match(
+        step.text,
+        new RegExp(
+          `shows that ${captionEquationText(step.source.equation).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
+          "i",
+        ),
+        `${label}: substitution caption follows the displayed source direction`,
+      );
       assert.notEqual(step.replacement.sourceFromSide, step.replacement.sourceToSide);
       assert.deepEqual(
         scaledCounts(
@@ -430,6 +498,14 @@ function assertTeachingPlan(round, label) {
       );
     }
     if (step.kind === "subtract-scales") {
+      assert.match(
+        step.text,
+        new RegExp(
+          captionEquationText(step.after).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+          "i",
+        ),
+        `${label}: subtraction caption follows the displayed result direction`,
+      );
       equationChanged(
         step.before[0].equation,
         step.after,
@@ -452,6 +528,14 @@ function assertTeachingPlan(round, label) {
       );
     }
     if (step.kind === "cancel-matches") {
+      assert.match(
+        step.text,
+        new RegExp(
+          captionEquationText(step.after).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+          "i",
+        ),
+        `${label}: cancellation caption follows the displayed result direction`,
+      );
       assert.deepEqual(
         counts(step.after.left),
         changedExpressionCounts(step.before.left, step.removed),
@@ -472,6 +556,14 @@ function assertTeachingPlan(round, label) {
       );
     }
     if (step.kind === "split-evenly") {
+      assert.match(
+        step.text,
+        new RegExp(
+          captionEquationText(step.after).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+          "i",
+        ),
+        `${label}: division caption follows the displayed result direction`,
+      );
       if ("groupCount" in step.before) {
         assert.equal(step.before.groupCount, step.divisor);
         expressionMatches(step.before.leftBundle, step.after.left);
@@ -501,6 +593,182 @@ test("all 48 authored rounds have direct, non-no-op teaching plans ending at the
   for (const [index, round] of ROUNDS.entries()) {
     assertTeachingPlan(round, `campaign round ${index + 1} (${round.family})`);
   }
+});
+
+test("every authored proof remains exact under every independent scale orientation", () => {
+  for (const [roundIndex, round] of ROUNDS.entries()) {
+    const orientationCount = 2 ** round.equations.length;
+    for (let mask = 0; mask < orientationCount; mask += 1) {
+      const equationOrientations = round.equations.map((_, equationIndex) =>
+        mask & (1 << equationIndex) ? "mirrored" : "standard",
+      );
+      assertTeachingPlan(
+        { ...round, equationOrientations },
+        `campaign round ${roundIndex + 1}, orientation ${mask + 1}/${orientationCount}`,
+      );
+    }
+  }
+});
+
+function substitutionSideCounts(rounds) {
+  const countsByPair = new Map();
+  for (const round of rounds) {
+    for (const step of buildTeachingProof(round).steps) {
+      if (step.kind !== "substitute") continue;
+      const key = `${step.replacement.sourceFromSide}->${step.replacement.side}`;
+      countsByPair.set(key, (countsByPair.get(key) ?? 0) + 1);
+    }
+  }
+  return countsByPair;
+}
+
+test("substitution sources and replacement points appear on both sides independently", () => {
+  const authoredCounts = substitutionSideCounts(ROUNDS);
+  assert.deepEqual(
+    new Set(authoredCounts.keys()),
+    new Set(["left->left", "left->right", "right->left", "right->right"]),
+  );
+  assert.ok(
+    Math.max(...authoredCounts.values()) - Math.min(...authoredCounts.values()) <= 1,
+    `authored substitution side pairs are balanced: ${JSON.stringify(Object.fromEntries(authoredCounts))}`,
+  );
+
+  for (const [difficultyIndex, difficulty] of [
+    "Junior",
+    "Expert",
+    "Wizard",
+  ].entries()) {
+    const generatedCounts = substitutionSideCounts(
+      Array.from({ length: 400 }, (_, sample) =>
+        generateInfiniteRoundFromSeed(
+          difficulty,
+          0x4a20_0000 + difficultyIndex * 0x1_0000 + sample,
+        ),
+      ),
+    );
+    const total = [...generatedCounts.values()].reduce(
+      (sum, count) => sum + count,
+      0,
+    );
+    for (const pair of ["left->left", "left->right", "right->left", "right->right"]) {
+      const share = (generatedCounts.get(pair) ?? 0) / total;
+      assert.ok(
+        share >= 0.2 && share <= 0.3,
+        `${difficulty} ${pair} substitutions are common: ${generatedCounts.get(pair)}/${total}`,
+      );
+    }
+  }
+});
+
+function addedComboSideCounts(rounds) {
+  const result = { left: 0, right: 0 };
+  for (const round of rounds) {
+    const plan = buildTeachingProof(round);
+    if (!plan.steps.some(({ kind }) => kind === "add-scales")) continue;
+    for (const step of plan.steps) {
+      if (step.kind !== "regroup") continue;
+      const targetIsLeft = expressionsHaveSameCounts(
+        step.after.leftBundle,
+        round.question.target,
+      );
+      const targetIsRight = expressionsHaveSameCounts(
+        step.after.rightBundle,
+        round.question.target,
+      );
+      assert.notEqual(
+        targetIsLeft,
+        targetIsRight,
+        `${round.id}: exactly one grouped tray is the requested combo`,
+      );
+      const side = targetIsLeft ? "left" : "right";
+      result[side] += 1;
+    }
+  }
+  return result;
+}
+
+test("adding scales creates combos on both the left and right trays", () => {
+  const authored = addedComboSideCounts(ROUNDS);
+  assert.ok(
+    authored.left >= 3 && authored.right >= 3,
+    `Campaign add-to-combo sides: ${JSON.stringify(authored)}`,
+  );
+
+  for (const [difficultyIndex, difficulty] of [
+    "Junior",
+    "Expert",
+    "Wizard",
+  ].entries()) {
+    const generated = addedComboSideCounts(
+      Array.from({ length: 400 }, (_, sample) =>
+        generateInfiniteRoundFromSeed(
+          difficulty,
+          0x5b20_0000 + difficultyIndex * 0x1_0000 + sample,
+        ),
+      ),
+    );
+    const total = generated.left + generated.right;
+    assert.ok(total >= 50, `${difficulty}: enough add-to-combo proofs sampled`);
+    assert.ok(
+      generated.left / total >= 0.4 && generated.left / total <= 0.6,
+      `${difficulty} add-to-combo sides: ${JSON.stringify(generated)}`,
+    );
+  }
+});
+
+test("mixed-direction add and subtract proofs visibly align scales before combining", () => {
+  let reorientationCount = 0;
+
+  for (const [roundIndex, round] of ROUNDS.entries()) {
+    const currentOrientations = [...round.equationOrientations];
+    const plan = buildTeachingProof(round);
+
+    for (const [stepIndex, step] of plan.steps.entries()) {
+      if (step.kind === "reorient-scale") {
+        reorientationCount += 1;
+        const turnedScaleIndex = step.scaleFocus.workingScaleIndex;
+        const guideScaleIndex = step.scaleFocus.sourceScaleIndexes[0];
+        assert.notEqual(
+          currentOrientations[turnedScaleIndex],
+          currentOrientations[guideScaleIndex],
+          `round ${roundIndex + 1}: only a differently oriented scale is turned`,
+        );
+        currentOrientations[turnedScaleIndex] =
+          currentOrientations[turnedScaleIndex] === "standard"
+            ? "mirrored"
+            : "standard";
+        assert.equal(
+          currentOrientations[turnedScaleIndex],
+          currentOrientations[guideScaleIndex],
+          `round ${roundIndex + 1}: trays line up after the turn`,
+        );
+        assert.equal(
+          plan.steps
+            .slice(stepIndex + 1)
+            .find(({ kind }) => kind !== "reorient-scale")?.kind,
+          step.strategyId,
+          `round ${roundIndex + 1}: turning immediately prepares the named operation`,
+        );
+      }
+
+      if (step.kind === "add-scales" || step.kind === "subtract-scales") {
+        const workingOrientation =
+          currentOrientations[step.scaleFocus.workingScaleIndex];
+        assert.ok(
+          step.before.every(
+            ({ sourceIndex }) =>
+              currentOrientations[sourceIndex] === workingOrientation,
+          ),
+          `round ${roundIndex + 1}: ${step.kind} combines matching tray directions`,
+        );
+      }
+    }
+  }
+
+  assert.ok(
+    reorientationCount >= 8,
+    `the Campaign visibly turns individual scales in ${reorientationCount} proofs`,
+  );
 });
 
 test("substitution replaces loads in place without adding whole scales", () => {
@@ -550,7 +818,7 @@ test("combo primers use one scale before add-scale combos are introduced", () =>
       plan.steps.map(({ kind }) => kind),
       ["regroup", "split-evenly"],
     );
-    equationMatches(plan.steps[0].before, round.equations[0]);
+    equationMatches(plan.steps[0].before, displayedRoundEquation(round, 0));
     assert.ok(!plan.strategyIds.includes("add-scales"));
     assert.ok(!plan.strategyIds.includes("subtract-scales"));
   }
@@ -558,7 +826,9 @@ test("combo primers use one scale before add-scale combos are introduced", () =>
   const addCombo = juniorRounds.find(({ family }) => family === "add-combo");
   assert.equal(juniorRounds.indexOf(addCombo) + 1, 11);
   assert.deepEqual(
-    buildTeachingProof(addCombo).steps.map(({ kind }) => kind),
+    buildTeachingProof(addCombo).steps
+      .map(({ kind }) => kind)
+      .filter((kind) => kind !== "reorient-scale"),
     ["add-scales", "regroup", "split-evenly"],
   );
 });
@@ -580,9 +850,18 @@ test("proof copy explains why each operation helps using the pictured loads", ()
 
   const combo = ROUNDS.find(({ family }) => family === "combo-primer");
   const comboText = buildTeachingProof(combo).steps[0].text;
-  assert.match(comboText, /on scale \(\d+\), the left tray has .+/i);
+  const comboSide = comboText.match(
+    /on scale \(\d+\), the (left|right) tray has .+/i,
+  )?.[1];
+  assert.ok(comboSide, "combo narration identifies the grouped tray");
   assert.match(comboText, /circle \d+ groups, each with .+/i);
-  assert.match(comboText, /split .+ on the right into \d+ equal groups/i);
+  assert.match(
+    comboText,
+    new RegExp(
+      `split .+ on the ${comboSide === "left" ? "right" : "left"} into \\d+ equal groups`,
+      "i",
+    ),
+  );
 
   for (const round of ROUNDS) {
     for (const { kind, text } of buildTeachingProof(round).steps) {
@@ -603,23 +882,29 @@ test("proof copy explains why each operation helps using the pictured loads", ()
         );
         assert.match(
           text,
-          /add (?:\d+ copies of )?scale \(\d+\) to (?:\d+ copies of )?scale \(\d+\): left tray to left tray and right tray to right tray/i,
+          /add (?:\d+ copies of )?scale \(\d+\) to (?:\d+ copies of )?scale \(\d+\): (?:left tray to left tray and right tray to right tray|right tray to right tray and left tray to left tray)/i,
         );
       } else if (kind === "subtract-scales") {
         assert.match(
           text,
           /subtract (?:\d+ copies of )?scale \(\d+\) from (?:\d+ copies of )?scale \(\d+\)/i,
         );
-        assert.match(text, /remove .+ from the left tray and .+ from the right tray/i);
+        assert.match(
+          text,
+          /remove .+ from the (?:left tray and .+ from the right tray|right tray and .+ from the left tray)/i,
+        );
         assert.match(text, /of scale \(\d+\)/i);
         assert.match(text, /\bnow .+ balances? .+\.$/i);
+      } else if (kind === "reorient-scale") {
+        assert.match(text, /^scale \(\d+\) is balanced in either direction/i);
+        assert.match(text, /turn it around so its trays line up with scale \(\d+\)/i);
       } else if (kind === "cancel-matches") {
         assert.match(text, /^on scale \(\d+\),/i);
         assert.match(text, /appear(?:s)? on both trays/i);
         assert.match(text, /remove .+ from each tray/i);
         assert.match(text, /\bnow .+ balances? .+\.$/i);
       } else if (kind === "regroup") {
-        assert.match(text, /^on scale \(\d+\), the left tray has .+/i);
+        assert.match(text, /^on scale \(\d+\), the (?:left|right) tray has .+/i);
         assert.match(text, /circle \d+ groups, each with .+/i);
       } else if (kind === "split-evenly") {
         assert.match(text, /^on scale \(\d+\),/i);
@@ -759,6 +1044,7 @@ test("every authored proof uses only tools available by that point in Campaign",
 test("proof operations linger long enough to inspect the scales and moving loads", () => {
   const minimumMsByKind = {
     substitute: 4_600,
+    "reorient-scale": 4_600,
     "add-scales": 4_600,
     "subtract-scales": 4_400,
     "cancel-matches": 3_600,

@@ -2,10 +2,12 @@ import {
   BALANCE_TOKENS,
   BALANCE_TOKEN_NAMES,
   FOUNDATIONAL_STRATEGIES,
+  orientEquation,
   solutionDerivationMatchesRound,
   type BalanceEquation,
   type BalanceToken,
   type Expression,
+  type EquationOrientation,
   type FoundationalStrategy,
   type Round,
   type SolutionStrategy,
@@ -335,6 +337,13 @@ export type TeachingSubstituteStep = TeachingProofStepBase & {
   replacement: TeachingReplacement;
 };
 
+export type TeachingReorientScaleStep = TeachingProofStepBase & {
+  kind: "reorient-scale";
+  strategyId: "add-scales" | "subtract-scales";
+  before: BalanceEquation;
+  after: BalanceEquation;
+};
+
 export type TeachingAddScalesStep = TeachingProofStepBase & {
   kind: "add-scales";
   strategyId: "add-scales";
@@ -381,6 +390,7 @@ export type TeachingConcludeStep = TeachingProofStepBase & {
 export type TeachingProofStep =
   | TeachingInspectStep
   | TeachingSubstituteStep
+  | TeachingReorientScaleStep
   | TeachingAddScalesStep
   | TeachingSubtractScalesStep
   | TeachingCancelMatchesStep
@@ -411,6 +421,7 @@ const NARRATED_PROOF_STEP_DURATIONS_MS: Readonly<
 > = {
   inspect: 8_550,
   substitute: 9_250,
+  "reorient-scale": 9_250,
   "add-scales": 16_900,
   "subtract-scales": 15_425,
   "cancel-matches": 9_950,
@@ -740,13 +751,216 @@ export function displayedProofScaleNumber(
   return displayedIndex + 1;
 }
 
+function oppositeSide(side: "left" | "right"): "left" | "right" {
+  return side === "left" ? "right" : "left";
+}
+
+function orientSide(
+  side: "left" | "right",
+  orientation: EquationOrientation,
+): "left" | "right" {
+  return orientation === "mirrored" ? oppositeSide(side) : side;
+}
+
+function orientTeachingSource(
+  source: TeachingEquationSource,
+  orientation: EquationOrientation,
+): TeachingEquationSource {
+  return {
+    ...source,
+    equation: orientEquation(source.equation, orientation),
+  };
+}
+
+function orientGroupedEquation(
+  equation: TeachingGroupedEquation,
+  orientation: EquationOrientation,
+): TeachingGroupedEquation {
+  return orientation === "mirrored"
+    ? {
+        ...equation,
+        leftBundle: equation.rightBundle,
+        rightBundle: equation.leftBundle,
+      }
+    : equation;
+}
+
+function orientedScaleLabel(round: Round, sourceIndex: number): string {
+  return `scale (${displayedProofScaleNumber(round, sourceIndex)})`;
+}
+
+function requiredWorkingScaleIndex(step: TeachingProofStepBase): number {
+  if (!step.scaleFocus) {
+    throw new Error("A teaching operation needs a focused scale.");
+  }
+  return step.scaleFocus.workingScaleIndex;
+}
+
+function orientedSourceLabel(
+  round: Round,
+  source: TeachingEquationSource,
+): string {
+  const label = orientedScaleLabel(round, source.sourceIndex);
+  return source.copies === 1 ? label : `${source.copies} copies of ${label}`;
+}
+
+function orientedSubstitutionText(
+  round: Round,
+  step: TeachingSubstituteStep,
+): string {
+  const sourceLabel = orientedScaleLabel(round, step.source.sourceIndex);
+  const workingLabel = orientedScaleLabel(
+    round,
+    requiredWorkingScaleIndex(step),
+  );
+  const sourceFrom = step.source.equation[step.replacement.sourceFromSide];
+  const sourceTo = step.source.equation[step.replacement.sourceToSide];
+  const sourceEquality = equationText(step.source.equation);
+  return step.replacement.copies === 1
+    ? `${sentenceCase(sourceLabel)} shows that ${sourceEquality}. On ${workingLabel}, replace ${expressionText(
+        step.replacement.from,
+      )} on the ${step.replacement.side} tray with ${expressionText(
+        step.replacement.to,
+      )}.`
+    : `${sentenceCase(sourceLabel)} shows that ${sourceEquality}. The ${
+        step.replacement.side
+      } tray of ${workingLabel} has ${expressionText(
+        step.replacement.from,
+      )}. Replace ${expressionText(sourceFrom)} at a time with ${expressionText(
+        sourceTo,
+      )}.`;
+}
+
+function orientedAddScalesText(
+  round: Round,
+  step: TeachingAddScalesStep,
+): string {
+  const removable = commonExpression(step.after.left, step.after.right);
+  const motivation =
+    removable.length > 0
+      ? `Add the scales so ${expressionText(removable)} ${
+          expressionIsSingular(removable) ? "appears" : "appear"
+        } on both trays.`
+      : `Neither scale has ${expressionText(
+          round.question.target,
+        )} together. Add the scales.`;
+  return `${motivation} Add ${orientedSourceLabel(
+    round,
+    step.before[1],
+  )} to ${orientedSourceLabel(
+    round,
+    step.before[0],
+  )}: left tray to left tray and right tray to right tray.`;
+}
+
+function orientedSubtractScalesText(
+  round: Round,
+  step: TeachingSubtractScalesStep,
+): string {
+  const [minuend, subtrahend] = step.before;
+  return `Subtract ${orientedSourceLabel(
+    round,
+    subtrahend,
+  )} from ${orientedSourceLabel(round, minuend)}. Remove ${expressionText(
+    subtrahend.equation.left,
+  )} from the left tray and ${expressionText(
+    subtrahend.equation.right,
+  )} from the right tray of ${orientedScaleLabel(
+    round,
+    minuend.sourceIndex,
+  )}. Now ${equationText(step.after)}.`;
+}
+
+function orientedCancelText(
+  round: Round,
+  step: TeachingCancelMatchesStep,
+): string {
+  const removedIsSingular =
+    step.removed.length === 1 && step.removed[0].count === 1;
+  return `On ${orientedScaleLabel(
+    round,
+    requiredWorkingScaleIndex(step),
+  )}, ${expressionText(step.removed)} ${
+    removedIsSingular ? "appears" : "appear"
+  } on both trays. Remove ${expressionText(
+    step.removed,
+  )} from each tray. Now ${equationText(step.after)}.`;
+}
+
+function oppositeProofSide(side: "left" | "right"): "left" | "right" {
+  return side === "left" ? "right" : "left";
+}
+
+function orientedRegroupText(
+  round: Round,
+  step: TeachingRegroupStep,
+): string {
+  const groupSide = expressionsMatch(
+    step.after.leftBundle,
+    round.question.target,
+  )
+    ? "left"
+    : "right";
+  const otherSide = oppositeProofSide(groupSide);
+  return `On ${orientedScaleLabel(
+    round,
+    requiredWorkingScaleIndex(step),
+  )}, the ${groupSide} tray has ${expressionText(
+    step.before[groupSide],
+  )}. Circle ${step.after.groupCount} groups, each with ${expressionText(
+    step.after[`${groupSide}Bundle`],
+  )}. Split ${expressionText(
+    step.before[otherSide],
+  )} on the ${otherSide} into ${step.after.groupCount} equal groups.`;
+}
+
+function preferredSplitGroupSide(
+  round: Round,
+  after: BalanceEquation,
+): "left" | "right" {
+  if (expressionsMatch(after.left, round.question.target)) return "left";
+  if (expressionsMatch(after.right, round.question.target)) return "right";
+  const leftIsOnlyUnits = after.left.every(
+    ({ creature }) => creature === round.question.unit,
+  );
+  const rightIsOnlyUnits = after.right.every(
+    ({ creature }) => creature === round.question.unit,
+  );
+  return leftIsOnlyUnits && !rightIsOnlyUnits ? "right" : "left";
+}
+
+function orientedSplitText(
+  round: Round,
+  step: TeachingSplitEvenlyStep,
+): string {
+  const scaleLabel = orientedScaleLabel(
+    round,
+    requiredWorkingScaleIndex(step),
+  );
+  if ("groupCount" in step.before) {
+    return `On ${scaleLabel}, each tray now has ${step.divisor} equal groups. Keep one group from each tray: ${equationText(
+      step.after,
+    )}.`;
+  }
+  const groupSide = preferredSplitGroupSide(round, step.after);
+  const otherSide = oppositeProofSide(groupSide);
+  return `On ${scaleLabel}, there are ${repeatedBundleText(
+    step.after[groupSide],
+    step.divisor,
+  )} on the ${groupSide}, so split ${expressionText(
+    step.before[otherSide],
+  )} on the ${otherSide} into ${step.divisor} equal groups. Keep one group from each tray: ${equationText(
+    step.after,
+  )}.`;
+}
+
 /**
  * Builds the shortest curriculum-approved visual path for a round. Unlike the
  * signed certificate, this plan models the order a learner should actually
  * see: replace equal loads in place, remove only visible matches, and combine
  * whole scales only in families that explicitly teach that move.
  */
-export function buildTeachingProof(round: Round): TeachingProofPlan {
+function buildCanonicalTeachingProof(round: Round): TeachingProofPlan {
   if (!solutionDerivationMatchesRound(round)) {
     throw new Error("Cannot teach an invalid solution derivation.");
   }
@@ -1431,6 +1645,211 @@ export function buildTeachingProof(round: Round): TeachingProofPlan {
     // Reduced motion removes travel, not thinking time or narration.
     reducedMotionDurationMs: durationMs,
   };
+}
+
+function orientTeachingProofPlan(
+  round: Round,
+  canonicalPlan: TeachingProofPlan,
+): TeachingProofPlan {
+  const scaleOrientations = round.equationOrientations.map(
+    (orientation) => orientation ?? "standard",
+  );
+  const orientedSteps: TeachingProofStep[] = [];
+  let lastWorkingScaleIndex = 0;
+
+  const orientationForScale = (sourceIndex: number): EquationOrientation =>
+    scaleOrientations[sourceIndex] ?? "standard";
+  const orientEquationForScale = (
+    equation: BalanceEquation,
+    sourceIndex: number,
+  ): BalanceEquation =>
+    orientEquation(equation, orientationForScale(sourceIndex));
+
+  for (const step of canonicalPlan.steps) {
+    const workingScaleIndex = step.scaleFocus?.workingScaleIndex ?? 0;
+    const workingOrientation = orientationForScale(workingScaleIndex);
+    lastWorkingScaleIndex = workingScaleIndex;
+
+    switch (step.kind) {
+      case "inspect": {
+        orientedSteps.push({
+          ...step,
+          sources: step.sources.map((source) =>
+            orientTeachingSource(
+              source,
+              orientationForScale(source.sourceIndex),
+            ),
+          ),
+        });
+        break;
+      }
+      case "substitute": {
+        const sourceOrientation = orientationForScale(
+          step.source.sourceIndex,
+        );
+        const orientedStep: TeachingSubstituteStep = {
+          ...step,
+          text: "",
+          before: orientEquationForScale(step.before, workingScaleIndex),
+          after: orientEquationForScale(step.after, workingScaleIndex),
+          source: orientTeachingSource(step.source, sourceOrientation),
+          replacement: {
+            ...step.replacement,
+            side: orientSide(step.replacement.side, workingOrientation),
+            sourceFromSide: orientSide(
+              step.replacement.sourceFromSide,
+              sourceOrientation,
+            ),
+            sourceToSide: orientSide(
+              step.replacement.sourceToSide,
+              sourceOrientation,
+            ),
+          },
+        };
+        orientedSteps.push({
+          ...orientedStep,
+          text: orientedSubstitutionText(round, orientedStep),
+        });
+        break;
+      }
+      case "add-scales":
+      case "subtract-scales": {
+        for (const source of step.before) {
+          const sourceIndex = source.sourceIndex;
+          const sourceOrientation = orientationForScale(sourceIndex);
+          if (sourceOrientation === workingOrientation) continue;
+          const before = orientEquation(source.equation, sourceOrientation);
+          const after = orientEquation(source.equation, workingOrientation);
+          const workingNumber = displayedProofScaleNumber(
+            round,
+            workingScaleIndex,
+          );
+          const sourceNumber = displayedProofScaleNumber(round, sourceIndex);
+          orientedSteps.push({
+            id: `${step.id}-align-${sourceIndex + 1}`,
+            kind: "reorient-scale",
+            title: `Turn scale (${sourceNumber}) around`,
+            text: `Scale (${sourceNumber}) is balanced in either direction. Turn it around so its trays line up with scale (${workingNumber}).`,
+            strategyId: step.strategyId,
+            scaleFocus: {
+              workingScaleIndex: sourceIndex,
+              sourceScaleIndexes: [workingScaleIndex],
+            },
+            before,
+            after,
+          });
+          scaleOrientations[sourceIndex] = workingOrientation;
+        }
+        if (step.kind === "add-scales") {
+          const orientedStep: TeachingAddScalesStep = {
+            ...step,
+            text: "",
+            before: step.before.map((source) =>
+              orientTeachingSource(source, workingOrientation),
+            ),
+            after: orientEquation(step.after, workingOrientation),
+          };
+          orientedSteps.push({
+            ...orientedStep,
+            text: orientedAddScalesText(round, orientedStep),
+          });
+        } else {
+          const orientedStep: TeachingSubtractScalesStep = {
+            ...step,
+            text: "",
+            before: step.before.map((source) =>
+              orientTeachingSource(source, workingOrientation),
+            ),
+            after: orientEquation(step.after, workingOrientation),
+          };
+          orientedSteps.push({
+            ...orientedStep,
+            text: orientedSubtractScalesText(round, orientedStep),
+          });
+        }
+        break;
+      }
+      case "cancel-matches": {
+        const orientedStep: TeachingCancelMatchesStep = {
+          ...step,
+          text: "",
+          before: orientEquation(step.before, workingOrientation),
+          after: orientEquation(step.after, workingOrientation),
+        };
+        orientedSteps.push({
+          ...orientedStep,
+          text: orientedCancelText(round, orientedStep),
+        });
+        break;
+      }
+      case "regroup": {
+        const orientedStep: TeachingRegroupStep = {
+          ...step,
+          text: "",
+          before: orientEquation(step.before, workingOrientation),
+          after: orientGroupedEquation(step.after, workingOrientation),
+        };
+        orientedSteps.push({
+          ...orientedStep,
+          text: orientedRegroupText(round, orientedStep),
+        });
+        break;
+      }
+      case "split-evenly": {
+        const orientedStep: TeachingSplitEvenlyStep = {
+          ...step,
+          text: "",
+          before:
+            "groupCount" in step.before
+              ? orientGroupedEquation(step.before, workingOrientation)
+              : orientEquation(step.before, workingOrientation),
+          after: orientEquation(step.after, workingOrientation),
+        };
+        orientedSteps.push({
+          ...orientedStep,
+          text: orientedSplitText(round, orientedStep),
+        });
+        break;
+      }
+      case "conclude": {
+        const equation = orientEquation(step.equation, workingOrientation);
+        orientedSteps.push({
+          ...step,
+          text: `The balanced scale shows ${equationText(equation)}.`,
+          equation,
+        });
+        break;
+      }
+      case "reorient-scale": {
+        orientedSteps.push(step);
+        break;
+      }
+    }
+  }
+
+  const timeline = teachingProofTimeline(orientedSteps);
+  const lastScene = timeline.at(-1);
+  const durationMs = lastScene
+    ? lastScene.delayMs + lastScene.durationMs
+    : 0;
+  return {
+    ...canonicalPlan,
+    steps: orientedSteps,
+    timeline,
+    finalEquation: orientEquation(
+      canonicalPlan.finalEquation,
+      orientationForScale(lastWorkingScaleIndex),
+    ),
+    durationMs,
+    reducedMotionDurationMs: durationMs,
+  };
+}
+
+export function buildTeachingProof(round: Round): TeachingProofPlan {
+  return orientTeachingProofPlan(
+    round,
+    buildCanonicalTeachingProof(round),
+  );
 }
 
 /**

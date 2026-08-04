@@ -24,6 +24,7 @@ const outputRoot = new URL(
 
 const activeProofCueIds = [
   "substitute",
+  "reorient-scale",
   "add-scales",
   "subtract-scales",
   "cancel-matches",
@@ -92,6 +93,10 @@ test("proof steps map to finite local cues and use measured timing", () => {
   assert.match(adapterSource, /audioDurationMs: cue\.audioDurationMs/);
   assert.match(adapterSource, /Math\.max\(cue\.audioDurationMs, cue\.minVisualMs\)/);
   assert.match(adapterSource, /count !== 2 && count !== 3 && count !== 4/);
+  assert.match(
+    adapterSource,
+    /case "reorient-scale":[\s\S]{0,80}return "reorient-scale"/,
+  );
   assert.doesNotMatch(adapterSource, /https?:\/\//);
 });
 
@@ -142,4 +147,22 @@ test("multi-scale proof narration follows the persistent Use and Working labels"
   }
   assert.match(manifest.cues["add-scales"].speechText, /\bscale marked Use\b/i);
   assert.match(manifest.cues["subtract-scales"].speechText, /\bgold scale\b/i);
+});
+
+test("regroup and reorientation narration works for either tray direction", () => {
+  for (const cueId of ["regroup-2", "regroup-3", "regroup-4"]) {
+    const cue = manifest.cues[cueId];
+    assert.match(cue.speechText, /\bhighlighted tray\b/i);
+    assert.match(cue.speechText, /\bother tray\b/i);
+    assert.doesNotMatch(
+      `${cue.caption} ${cue.speechText}`,
+      /\b(?:left|right) tray\b/i,
+      `${cueId} follows whichever side is highlighted`,
+    );
+  }
+
+  const reorient = manifest.cues["reorient-scale"];
+  assert.match(reorient.speechText, /balanced in either direction/i);
+  assert.match(reorient.speechText, /turn it around/i);
+  assert.match(reorient.speechText, /trays line up/i);
 });

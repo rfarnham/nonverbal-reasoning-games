@@ -73,6 +73,10 @@ export type BalanceEquation = {
   right: Expression;
 };
 
+export const EQUATION_ORIENTATIONS = ["standard", "mirrored"] as const;
+
+export type EquationOrientation = (typeof EQUATION_ORIENTATIONS)[number];
+
 export type BalanceQuestion = {
   target: Expression;
   unit: Creature;
@@ -160,6 +164,7 @@ export type Round = {
   id: string;
   difficulty: Difficulty;
   family: RuleFamily;
+  equationOrientations: readonly EquationOrientation[];
   equations: readonly BalanceEquation[];
   question: BalanceQuestion;
   options: readonly AnswerOption[];
@@ -1187,6 +1192,36 @@ function makeEquation(
   return { left, right };
 }
 
+export function swapEquationSides(
+  equation: BalanceEquation,
+): BalanceEquation {
+  return {
+    left: equation.right,
+    right: equation.left,
+  };
+}
+
+export function orientEquation(
+  equation: BalanceEquation,
+  orientation: EquationOrientation,
+): BalanceEquation {
+  return orientation === "mirrored"
+    ? swapEquationSides(equation)
+    : equation;
+}
+
+export function displayedRoundEquation(
+  round: Pick<Round, "equations" | "equationOrientations">,
+  equationIndex: number,
+): BalanceEquation {
+  const equation = round.equations[equationIndex];
+  const orientation = round.equationOrientations[equationIndex];
+  if (!equation || !orientation) {
+    throw new RangeError("A displayed equation needs a valid scale index.");
+  }
+  return orientEquation(equation, orientation);
+}
+
 function makeStarterTemplate(spec: StarterSpec): TemplateResult {
   const [target, unit] = spec.creatures;
   const question = {
@@ -2012,6 +2047,34 @@ function hashText(value: string): string {
   return (hash >>> 0).toString(36);
 }
 
+const EQUATION_ORIENTATION_PATTERNS: readonly (
+  readonly [EquationOrientation, EquationOrientation, EquationOrientation]
+)[] = [
+  ["standard", "standard", "standard"],
+  ["mirrored", "mirrored", "mirrored"],
+  ["mirrored", "standard", "standard"],
+  ["standard", "mirrored", "mirrored"],
+  ["standard", "mirrored", "standard"],
+  ["mirrored", "standard", "mirrored"],
+  ["standard", "standard", "mirrored"],
+  ["mirrored", "mirrored", "standard"],
+  ["standard", "standard", "standard"],
+  ["mirrored", "mirrored", "mirrored"],
+  ["mirrored", "standard", "standard"],
+  ["standard", "mirrored", "mirrored"],
+];
+
+function equationOrientationsForSalt(
+  equationCount: number,
+  salt: number,
+): readonly EquationOrientation[] {
+  const pattern =
+    EQUATION_ORIENTATION_PATTERNS[
+      Math.abs(salt) % EQUATION_ORIENTATION_PATTERNS.length
+    ];
+  return pattern.slice(0, equationCount);
+}
+
 function assembleRound(
   difficulty: Difficulty,
   template: TemplateResult,
@@ -2019,6 +2082,10 @@ function assembleRound(
   salt: number,
   idPrefix: string,
 ): Round {
+  const equationOrientations = equationOrientationsForSalt(
+    template.equations.length,
+    salt,
+  );
   const answer = calculateAnswer(template.equations, template.question);
   if (answer === null) {
     throw new Error("The balance equations do not determine one positive integer answer.");
@@ -2034,6 +2101,7 @@ function assembleRound(
     id: "",
     difficulty,
     family: template.family,
+    equationOrientations,
     equations: template.equations,
     question: template.question,
     options,
@@ -2128,6 +2196,15 @@ export function validateRound(round: Round): RoundValidation {
   const errors: string[] = [];
   if (!isDifficulty(round.difficulty)) {
     errors.push(`Unknown difficulty: ${round.difficulty}`);
+  }
+  if (
+    round.equationOrientations.length !== round.equations.length ||
+    round.equationOrientations.some(
+      (orientation) =>
+        !(EQUATION_ORIENTATIONS as readonly string[]).includes(orientation),
+    )
+  ) {
+    errors.push("Every scale needs a known side orientation.");
   }
   const requiredEquationCount = expectedEquationCount(round);
   if (round.equations.length !== requiredEquationCount) {
