@@ -464,6 +464,68 @@ test("the stream submits at most once and cannot leak into the next round", () =
   assert.equal(gate.read(nextAnswer)?.answer, 3);
 });
 
+test("a mutable interim result slot can be reused by the next card", () => {
+  const gate = new SpokenAnswerStreamGate();
+  gate.beginRecognitionSession();
+  gate.updateRound("round-1", true);
+  gate.speechStarted();
+
+  const results = resultList([
+    result([{ transcript: "six", confidence: 0.9 }], false),
+  ]);
+  assert.equal(
+    gate.read({ resultIndex: 0, results })?.answer,
+    6,
+  );
+  gate.speechEnded();
+
+  gate.beginPrompt("round-2", "eleven minus four?");
+  // Echo cancellation can suppress the TTS entirely, leaving no prompt-side
+  // result to replace the mutable slot from the first answer.
+  gate.updateRound("round-2", true);
+  gate.speechStarted();
+
+  results[0] = result(
+    [{ transcript: "seven", confidence: 0.92 }],
+    false,
+  );
+  assert.equal(
+    gate.read({ resultIndex: 0, results })?.answer,
+    7,
+  );
+});
+
+test("a removed interim result releases its slot for another attempt", () => {
+  const gate = new SpokenAnswerStreamGate();
+  gate.beginRecognitionSession();
+  gate.updateRound("round-1", true);
+  gate.speechStarted();
+
+  const results = resultList([
+    result([{ transcript: "six", confidence: 0.9 }], false),
+  ]);
+  assert.equal(
+    gate.read({ resultIndex: 0, results })?.answer,
+    6,
+  );
+  gate.speechEnded();
+
+  results.length = 0;
+  assert.equal(gate.read({ resultIndex: 0, results }), null);
+
+  gate.updateRound("round-1", false);
+  gate.updateRound("round-1", true);
+  gate.speechStarted();
+  results[0] = result(
+    [{ transcript: "seven", confidence: 0.92 }],
+    false,
+  );
+  assert.equal(
+    gate.read({ resultIndex: 0, results })?.answer,
+    7,
+  );
+});
+
 test("a wrong spoken answer can be retried on the same round", () => {
   const gate = new SpokenAnswerStreamGate();
   gate.beginRecognitionSession();

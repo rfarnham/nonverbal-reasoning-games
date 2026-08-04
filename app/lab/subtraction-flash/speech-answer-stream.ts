@@ -17,7 +17,7 @@ type SpeechResultEvent = Pick<
  */
 export function readStreamingSpokenAnswer(
   event: SpeechResultEvent,
-  ignoredResultIndexes?: ReadonlySet<number>,
+  ignoredResultIndexes?: Readonly<{ has(value: number): boolean }>,
   allowRankedFinalAlternatives = true,
 ): SpokenAnswerMatch | null {
   for (
@@ -172,7 +172,13 @@ function matchTranscript(
  * the recognizer considers the prompt and answer one speech segment.
  */
 export class SpokenAnswerStreamGate {
-  readonly #ignoredResultIndexes = new Set<number>();
+  // Final results keep their slot for the life of a recognition session, but
+  // browsers may overwrite or remove interim slots. Remember which round last
+  // owned each ignored slot so a later answer segment can safely reuse it.
+  readonly #ignoredResultIndexes = new Map<
+    number,
+    Readonly<{ isFinal: boolean; roundId: string | null }>
+  >();
   readonly #lastTranscriptByResultIndex = new Map<number, string>();
   #roundId: string | null = null;
   #answerAccepted = false;
@@ -221,8 +227,18 @@ export class SpokenAnswerStreamGate {
   }
 
   speechStarted() {
+    const armed = this.#isArmed();
+    if (armed) {
+      for (const [resultIndex, ignored] of this.#ignoredResultIndexes) {
+        if (ignored.isFinal || ignored.roundId === this.#roundId) continue;
+        // This non-final slot belongs to an older card and the current prompt
+        // did not update it. It is now available to the fresh answer segment.
+        this.#ignoredResultIndexes.delete(resultIndex);
+        this.#lastTranscriptByResultIndex.delete(resultIndex);
+      }
+    }
     this.#speechActive = true;
-    this.#segmentBeganWhileClosed = !this.#isArmed();
+    this.#segmentBeganWhileClosed = !armed;
   }
 
   speechEnded() {
@@ -236,6 +252,7 @@ export class SpokenAnswerStreamGate {
   }
 
   read(event: SpeechResultEvent): SpokenAnswerMatch | null {
+    this.#forgetRemovedResults(event.results.length);
     if (!this.isListeningForAnswer()) {
       this.#observeUpdatedResults(event, true);
       return null;
@@ -369,13 +386,17 @@ export class SpokenAnswerStreamGate {
       resultIndex < event.results.length;
       resultIndex += 1
     ) {
+      const result = event.results.item(resultIndex);
       if (markEveryResultIgnored) {
-        this.#ignoredResultIndexes.add(resultIndex);
+        if (!result) continue;
+        this.#ignoredResultIndexes.set(resultIndex, {
+          isFinal: result.isFinal,
+          roundId: this.#roundId,
+        });
       } else if (!this.#ignoredResultIndexes.has(resultIndex)) {
         continue;
       }
 
-      const result = event.results.item(resultIndex);
       const leading = result?.item(0);
       if (!result || !leading) continue;
       this.#lastTranscriptByResultIndex.set(
@@ -419,7 +440,22 @@ export class SpokenAnswerStreamGate {
       resultIndex < event.results.length;
       resultIndex += 1
     ) {
-      this.#ignoredResultIndexes.add(resultIndex);
+      const result = event.results.item(resultIndex);
+      if (!result) continue;
+      this.#ignoredResultIndexes.set(resultIndex, {
+        isFinal: result.isFinal,
+        roundId: this.#roundId,
+      });
+    }
+  }
+
+  #forgetRemovedResults(resultCount: number) {
+    // The Web Speech API may shrink trailing interim results. A later interim
+    // can then reuse the vacated index within the same recognition session.
+    for (const resultIndex of this.#ignoredResultIndexes.keys()) {
+      if (resultIndex < resultCount) continue;
+      this.#ignoredResultIndexes.delete(resultIndex);
+      this.#lastTranscriptByResultIndex.delete(resultIndex);
     }
   }
 }
