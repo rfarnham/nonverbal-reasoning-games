@@ -1898,6 +1898,9 @@
   .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="add-scales"]
   .proofMorphScale,
 .solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="reorient-scale"]
+  .proofMorphScale,
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
   .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="subtract-scales"]
   .proofMorphScale,
 .solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
@@ -2486,6 +2489,24 @@
 }
 
 .solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="reorient-scale"]
+  .proofMorphBefore {
+  animation-name: proofReorientOut;
+}
+
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="reorient-scale"]
+  .proofMorphAfter {
+  animation-name: proofReorientIn;
+}
+
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
+  .proofPhaseLayer[data-proof-cue-state="active"][data-proof-phase="reorient-scale"]
+  .proofSameChangeBadge {
+  animation-name: proofOperationBadge;
+}
+
+.solutionProof[data-proof-state="animating"][data-proof-playback-started="true"]
   .proofPhaseLayer[data-proof-cue-state="active"]
   .proofScaleTraveler {
   animation-name: proofSubstitutionLoadTravel;
@@ -2583,6 +2604,34 @@
   100% {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+@keyframes proofReorientOut {
+  0%,
+  42% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+
+  58%,
+  100% {
+    opacity: 0;
+    transform: scaleX(0.08);
+  }
+}
+
+@keyframes proofReorientIn {
+  0%,
+  48% {
+    opacity: 0;
+    transform: scaleX(0.08);
+  }
+
+  66%,
+  100% {
+    opacity: 1;
+    transform: scaleX(1);
   }
 }
 

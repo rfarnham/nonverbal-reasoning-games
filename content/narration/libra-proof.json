@@ -35,6 +35,15 @@
       "lingerMs": 1500,
       "sha256": "6f13f10ac9b60bcfc04b3ed5b7e68aa2ce902c78f2c97ff7d78f9308ab235a2b"
     },
+    "reorient-scale": {
+      "caption": "Turn this scale around to line up the trays.",
+      "speechText": "This scale is balanced in either direction. Turn it around so its trays line up with the Working scale.",
+      "file": "reorient-scale.mp3",
+      "audioDurationMs": 6925,
+      "minVisualMs": 6925,
+      "lingerMs": 1500,
+      "sha256": "e78910abe4440fe49631bd31812ab67073942c16ec850659a940f6c7e45f751c"
+    },
     "add-scales": {
       "caption": "Move the Use scale onto the Working scale.",
       "speechText": "Move the loads from the scale marked Use onto the matching trays of the scale marked Working. Left joins left, and right joins right. The Working scale stays balanced.",
@@ -64,30 +73,30 @@
     },
     "regroup-2": {
       "caption": "Circle 2 copies of the group we need.",
-      "speechText": "The left tray contains two copies of the group we need. Circle those groups. Then split the right tray into two equal groups.",
+      "speechText": "The highlighted tray has two copies of the group we need. Circle those groups. Then split the other tray into two equal groups.",
       "file": "regroup-2.mp3",
-      "audioDurationMs": 8675,
-      "minVisualMs": 8675,
+      "audioDurationMs": 8800,
+      "minVisualMs": 8800,
       "lingerMs": 1500,
-      "sha256": "d14441e92fdf24a983a2b85acd6a311bf4efc4dbb5167d175881aa8bd64187ab"
+      "sha256": "7cd9fc811266cc3de726d3f70b4431ad60e9aa1a22158519914b69e220396e91"
     },
     "regroup-3": {
       "caption": "Circle 3 copies of the group we need.",
-      "speechText": "The left tray contains three copies of the group we need. Circle those groups. Then split the right tray into three equal groups.",
+      "speechText": "The highlighted tray has three copies of the group we need. Circle those groups. Then split the other tray into three equal groups.",
       "file": "regroup-3.mp3",
-      "audioDurationMs": 9000,
-      "minVisualMs": 9000,
+      "audioDurationMs": 9075,
+      "minVisualMs": 9075,
       "lingerMs": 1500,
-      "sha256": "963142f25221674792c0a3875a20dfd698489af6ddef2f837cfe0ace3fcc2169"
+      "sha256": "93dc810a59cf0681fd4cd09323421f024e5085a759d71c01fc1ec38e83b7e8f7"
     },
     "regroup-4": {
       "caption": "Circle 4 copies of the group we need.",
-      "speechText": "The left tray contains four copies of the group we need. Circle those groups. Then split the right tray into four equal groups.",
+      "speechText": "The highlighted tray has four copies of the group we need. Circle those groups. Then split the other tray into four equal groups.",
       "file": "regroup-4.mp3",
-      "audioDurationMs": 8825,
-      "minVisualMs": 8825,
+      "audioDurationMs": 8925,
+      "minVisualMs": 8925,
       "lingerMs": 1500,
-      "sha256": "2a3af7d4836d75ce1ac5322b260c184bb845110938d8ec58cc4addc95fd712a1"
+      "sha256": "310826ac765a1251b744882fc7225792d90fdc042e0f2c94dbd8ab87f5eab748"
     },
     "split-2": {
       "caption": "Keep 1 of the 2 equal groups on each tray.",
