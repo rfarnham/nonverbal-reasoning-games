@@ -1,0 +1,240 @@
+.root {
+  --ink: #17213d;
+  --muted: #657087;
+  --paper: #fbf8f0;
+  --panel: #fffdf8;
+  --line: #cfcabd;
+  --focus: #1679d2;
+  width: min(100%, 660px);
+  display: grid;
+  gap: 14px;
+  color: var(--ink);
+}
+
+.headingRow {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.headingRow h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 860;
+  letter-spacing: -0.02em;
+}
+
+.guidance {
+  margin: -5px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 710;
+}
+
+.canvasGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.digitField {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.digitLabel {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 820;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.canvasFrame {
+  position: relative;
+  min-width: 0;
+}
+
+.canvas {
+  width: 100%;
+  height: clamp(148px, 23svh, 210px);
+  display: block;
+  border: 2px solid #bdb7aa;
+  border-radius: 20px;
+  background: var(--panel);
+  cursor: crosshair;
+  touch-action: none;
+  transition: border-color 120ms ease;
+}
+
+.canvas:hover:not([data-disabled="true"]),
+.canvasFrame[data-has-ink="true"] .canvas {
+  border-color: var(--ink);
+}
+
+.canvas[data-disabled="true"] {
+  cursor: default;
+  opacity: 0.62;
+}
+
+.canvasHint {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #8a8f9c;
+  font-size: 1rem;
+  font-weight: 760;
+  pointer-events: none;
+}
+
+.actionRow,
+.confirmationActions,
+.keyboardControls {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.actionRow {
+  justify-content: center;
+}
+
+.primaryButton,
+.secondaryButton {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 830;
+  cursor: pointer;
+  transition: transform 100ms ease, border-color 100ms ease;
+}
+
+.primaryButton {
+  background: var(--ink);
+  color: #fff;
+}
+
+.secondaryButton {
+  border-color: var(--line);
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.primaryButton:hover:not(:disabled),
+.secondaryButton:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.status {
+  min-height: 1.35em;
+  color: var(--muted);
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 720;
+}
+
+.confirmation {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #d6b968;
+  border-radius: 18px;
+  background: #fff8dc;
+  text-align: center;
+}
+
+.confirmation strong {
+  font-size: 1.1rem;
+  font-weight: 860;
+}
+
+.confirmation span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 710;
+}
+
+.keyboardFallback {
+  display: grid;
+  gap: 7px;
+  padding-top: 13px;
+  border-top: 1px solid var(--line);
+}
+
+.keyboardFallback label {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.keyboardControls input {
+  width: 6.5rem;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 2px solid #bdb7aa;
+  border-radius: 13px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1.3rem;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+
+.canvas:focus-visible,
+.primaryButton:focus-visible,
+.secondaryButton:focus-visible,
+.keyboardControls input:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 4px;
+}
+
+@media (max-width: 420px) {
+  .canvasGrid {
+    gap: 8px;
+  }
+
+  .canvas {
+    height: 138px;
+    border-radius: 16px;
+  }
+
+  .actionRow,
+  .confirmationActions,
+  .keyboardControls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .primaryButton,
+  .secondaryButton,
+  .keyboardControls input {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas,
+  .primaryButton,
+  .secondaryButton {
+    transition: none;
+  }
+
+  .primaryButton:hover:not(:disabled),
+  .secondaryButton:hover:not(:disabled) {
+    transform: none;
+  }
+}
