@@ -114,3 +114,34 @@ optional `navigation`. Its POST body is:
 Every API response must be scoped to the configured reviewer slot. It must
 never return the other reviewer's decision, notes, identity, or completion
 state: seeing those would compromise the required independent review.
+
+## Complete-corpus Catalogue QA
+
+`catalogue.html`, `catalogue.css`, and `catalogue.js` are a separate teacher
+workbench served by `catalogue review-web`. It does not replace or enlarge the
+Stage 0 gold sample. Its loopback API is namespaced below `/api/catalogue/` and
+provides summary-only pagination plus one lazy private item detail at a time.
+
+The principal routes are:
+
+```text
+GET  /api/catalogue/summary
+GET  /api/catalogue/items
+GET  /api/catalogue/items/{item_id}
+PUT  /api/catalogue/items/{item_id}/review
+GET  /api/catalogue/taxonomy
+PUT  /api/catalogue/taxonomy/skills/{skill_id}/review
+GET  /api/catalogue/items/{item_id}/neighbors
+PUT  /api/catalogue/items/{item_id}/neighbors/{neighbor_id}/review
+POST /api/catalogue/recommendations/preview
+GET  /api/catalogue/export
+```
+
+Question, neighbor, and skill judgements use optimistic `If-Match` revisions
+and append-only history. The export uses an explicit allowlist and contains no
+prompt, choice, answer, asset, URL, or filesystem-path fields. Similarity and
+recommendation responses are labelled experimental; they cannot approve an
+ontology, infer mastery, or authorize public release. Recommendation evidence
+separately identifies a machine proposal, a teacher classification, and an
+explicit curriculum approval; deterministic rank scores are not reported as
+selection probabilities.

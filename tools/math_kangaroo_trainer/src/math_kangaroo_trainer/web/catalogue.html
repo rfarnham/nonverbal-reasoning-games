@@ -1,0 +1,1143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self'"
+    />
+    <title>Math Kangaroo · Private Corpus QA</title>
+    <link rel="stylesheet" href="./catalogue.css" />
+    <script src="./catalogue.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#catalogue-main">Skip to corpus QA</a>
+
+    <div class="privacy-strip" role="note">
+      <strong>Private local curriculum workspace</strong>
+      <span>Question content, answer evidence, and teacher notes stay on this device.</span>
+    </div>
+
+    <header class="topbar">
+      <div class="brand-lockup">
+        <p class="eyebrow">Math Kangaroo · Grades 1–6</p>
+        <h1>Corpus QA</h1>
+        <p class="topbar-copy">
+          Validate source fidelity, curriculum classification, and promotion readiness
+          across the complete local question bank.
+        </p>
+      </div>
+      <div class="topbar-actions">
+        <span id="connection-badge" class="connection-badge is-loading" role="status">
+          Connecting…
+        </span>
+        <a
+          id="export-reviews"
+          class="button button-secondary"
+          href="/api/catalogue/export"
+          download
+          data-testid="export-reviews"
+        >
+          Export review package
+        </a>
+      </div>
+    </header>
+
+    <nav class="view-tabs" aria-label="Corpus QA sections" role="tablist">
+      <button
+        id="overview-tab"
+        class="view-tab is-active"
+        type="button"
+        role="tab"
+        aria-controls="overview-view"
+        aria-selected="true"
+        data-view="overview"
+      >
+        Overview
+      </button>
+      <button
+        id="taxonomy-tab"
+        class="view-tab"
+        type="button"
+        role="tab"
+        aria-controls="taxonomy-view"
+        aria-selected="false"
+        tabindex="-1"
+        data-view="taxonomy"
+      >
+        Taxonomy
+      </button>
+      <button
+        id="similarity-tab"
+        class="view-tab"
+        type="button"
+        role="tab"
+        aria-controls="similarity-view"
+        aria-selected="false"
+        tabindex="-1"
+        data-view="similarity"
+      >
+        Similarity Lab
+      </button>
+      <button
+        id="curriculum-tab"
+        class="view-tab"
+        type="button"
+        role="tab"
+        aria-controls="curriculum-view"
+        aria-selected="false"
+        tabindex="-1"
+        data-view="curriculum"
+      >
+        Curriculum Lab
+      </button>
+      <button
+        id="questions-tab"
+        class="view-tab"
+        type="button"
+        role="tab"
+        aria-controls="questions-view"
+        aria-selected="false"
+        tabindex="-1"
+        data-view="questions"
+      >
+        Questions
+        <span id="questions-tab-count" class="tab-count" aria-hidden="true">1,833</span>
+      </button>
+      <button
+        id="promotion-tab"
+        class="view-tab"
+        type="button"
+        role="tab"
+        aria-controls="promotion-view"
+        aria-selected="false"
+        tabindex="-1"
+        data-view="promotion"
+      >
+        Promotion
+      </button>
+    </nav>
+
+    <main id="catalogue-main" tabindex="-1">
+      <div id="live-message" class="sr-only" role="status" aria-live="polite"></div>
+
+      <div id="error-banner" class="error-banner" role="alert" hidden>
+        <div>
+          <strong id="error-title">The local corpus service did not respond.</strong>
+          <p id="error-message"></p>
+        </div>
+        <button id="retry-request" class="button button-secondary" type="button">
+          Try again
+        </button>
+      </div>
+
+      <section
+        id="overview-view"
+        class="catalogue-view overview-view"
+        role="tabpanel"
+        aria-labelledby="overview-tab"
+        data-testid="overview-view"
+      >
+        <header class="overview-hero">
+          <div>
+            <p class="eyebrow">Complete local corpus</p>
+            <h2><span id="overview-total">1,833</span> questions, one inspectable queue</h2>
+            <p>
+              Review the source and answer evidence first, then validate the proposed
+              curriculum labels. Nothing becomes curriculum-ready or player-ready merely
+              because it was classified.
+            </p>
+          </div>
+          <button id="continue-review" class="button button-primary" type="button">
+            Continue question review <span aria-hidden="true">→</span>
+          </button>
+        </header>
+
+        <div id="overview-loading" class="loading-panel" role="status">
+          Loading the full-corpus status…
+        </div>
+
+        <div id="overview-content" hidden>
+          <section class="metric-grid" aria-label="Corpus review progress">
+            <article class="metric-card">
+              <p class="metric-label">Source reviewed</p>
+              <strong id="source-reviewed-count">—</strong>
+              <span id="source-reviewed-detail">of 1,833 questions</span>
+              <progress id="source-reviewed-progress" max="1833" value="0">0%</progress>
+            </article>
+            <article class="metric-card">
+              <p class="metric-label">Teacher classified</p>
+              <strong id="classified-count">—</strong>
+              <span id="classified-detail">of 1,833 teacher judgments</span>
+              <span id="proposal-coverage-detail" class="metric-secondary" hidden></span>
+              <progress id="classified-progress" max="1833" value="0">0%</progress>
+            </article>
+            <article class="metric-card">
+              <p class="metric-label">Needs attention</p>
+              <strong id="attention-count">—</strong>
+              <span>source, answer, or taxonomy issue</span>
+            </article>
+            <article class="metric-card metric-card-ready">
+              <p class="metric-label">Curriculum ready</p>
+              <strong id="curriculum-ready-count">—</strong>
+              <span>all current curriculum gates satisfied</span>
+            </article>
+          </section>
+
+          <div class="overview-grid">
+            <section class="panel" aria-labelledby="answer-overview-heading">
+              <header class="panel-heading">
+                <div>
+                  <p class="eyebrow">Answer evidence</p>
+                  <h3 id="answer-overview-heading">Key status</h3>
+                </div>
+              </header>
+              <dl id="answer-status-overview" class="compact-breakdown"></dl>
+            </section>
+
+            <section class="panel" aria-labelledby="modality-overview-heading">
+              <header class="panel-heading">
+                <div>
+                  <p class="eyebrow">Representation</p>
+                  <h3 id="modality-overview-heading">Question modality</h3>
+                </div>
+              </header>
+              <dl id="modality-overview" class="compact-breakdown"></dl>
+            </section>
+
+            <section class="panel overview-blockers" aria-labelledby="overview-blockers-heading">
+              <header class="panel-heading">
+                <div>
+                  <p class="eyebrow">Promotion readiness</p>
+                  <h3 id="overview-blockers-heading">Largest blocker queues</h3>
+                </div>
+                <button id="open-promotion" class="text-button" type="button">
+                  See all gates
+                </button>
+              </header>
+              <ol id="overview-blocker-list" class="ranked-list"></ol>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="questions-view"
+        class="catalogue-view questions-view"
+        role="tabpanel"
+        aria-labelledby="questions-tab"
+        data-testid="questions-view"
+        hidden
+      >
+        <header class="section-intro">
+          <div>
+            <p class="eyebrow">Teacher validation queue</p>
+            <h2>Questions</h2>
+            <p>
+              The crop and official source remain authoritative. Proposed labels are
+              suggestions until you record a curriculum decision.
+            </p>
+          </div>
+          <p class="shortcut-hint">
+            Keyboard: <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>S</kbd> saves; add
+            <kbd>Shift</kbd> to save and move next. Press <kbd>/</kbd> to search.
+          </p>
+        </header>
+
+        <form id="catalogue-filters" class="filter-panel" role="search" data-testid="catalogue-filters">
+          <div class="filter-heading">
+            <div>
+              <p class="eyebrow">Stable corpus queue</p>
+              <h3>Filter questions</h3>
+            </div>
+            <button id="clear-filters" class="text-button" type="button">Clear filters</button>
+          </div>
+          <div class="filter-grid">
+            <label class="filter-search" for="filter-q">
+              <span>Search</span>
+              <input
+                id="filter-q"
+                name="q"
+                type="search"
+                autocomplete="off"
+                placeholder="Prompt, source, year, or stable ID"
+              />
+            </label>
+            <label for="filter-grade">
+              <span>Grade</span>
+              <select id="filter-grade" name="grade">
+                <option value="">All grades</option>
+                <option value="1-2">Grades 1–2</option>
+                <option value="3-4">Grades 3–4</option>
+                <option value="5-6">Grades 5–6</option>
+              </select>
+            </label>
+            <label for="filter-points">
+              <span>Published points</span>
+              <select id="filter-points" name="points">
+                <option value="">All point values</option>
+                <option value="3">3 points</option>
+                <option value="4">4 points</option>
+                <option value="5">5 points</option>
+                <option value="unknown">Unknown</option>
+              </select>
+            </label>
+            <label for="filter-modality">
+              <span>Modality</span>
+              <select id="filter-modality" name="modality">
+                <option value="">All modalities</option>
+                <option value="text_extractable">Text extractable</option>
+                <option value="diagram_dependent">Diagram dependent</option>
+                <option value="diagram_review_required">Visual review required</option>
+              </select>
+            </label>
+            <label for="filter-answer-status">
+              <span>Answer status</span>
+              <select id="filter-answer-status" name="answer_status">
+                <option value="">Any answer status</option>
+                <option value="official-verified">Official single answer</option>
+                <option value="official-multiple">Official multiple answers</option>
+                <option value="official-void">Officially void</option>
+                <option value="unverified-no-published-key">No published key</option>
+              </select>
+            </label>
+            <label for="filter-review-state">
+              <span>Review state</span>
+              <select id="filter-review-state" name="review_state">
+                <option value="">Any review state</option>
+                <option value="unreviewed">Unreviewed</option>
+                <option value="reviewed">Reviewed</option>
+                <option value="needs_attention">Needs attention</option>
+                <option value="excluded">Excluded</option>
+              </select>
+            </label>
+            <label for="filter-promotion-state">
+              <span>Promotion</span>
+              <select id="filter-promotion-state" name="promotion_state">
+                <option value="">Any promotion state</option>
+                <option value="blocked">Blocked</option>
+                <option value="curriculum_ready">Curriculum ready</option>
+                <option value="release_candidate">Release candidate</option>
+                <option value="promoted">Promoted</option>
+                <option value="excluded">Excluded</option>
+              </select>
+            </label>
+            <label for="filter-primary-domain">
+              <span>Primary domain</span>
+              <select id="filter-primary-domain" name="primary_domain">
+                <option value="">All domains</option>
+              </select>
+            </label>
+            <label for="filter-question-type">
+              <span>Question type</span>
+              <select id="filter-question-type" name="question_type">
+                <option value="">All question types</option>
+              </select>
+            </label>
+            <label for="filter-limit">
+              <span>Per page</span>
+              <select id="filter-limit" name="limit">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+              </select>
+            </label>
+          </div>
+        </form>
+
+        <div class="queue-summary">
+          <p id="queue-result-summary" role="status" aria-live="polite">Loading questions…</p>
+          <div class="pager" aria-label="Question pages">
+            <button id="page-previous" class="button button-secondary" type="button">
+              <span aria-hidden="true">←</span> Previous
+            </button>
+            <span id="page-label">Page —</span>
+            <button id="page-next" class="button button-secondary" type="button">
+              Next <span aria-hidden="true">→</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="question-layout">
+          <aside class="queue-panel" aria-labelledby="queue-heading">
+            <header class="queue-panel-heading">
+              <div>
+                <p class="eyebrow">Current page</p>
+                <h3 id="queue-heading">Review queue</h3>
+              </div>
+              <span id="queue-page-count" class="count-pill">—</span>
+            </header>
+            <div id="queue-loading" class="loading-panel compact-loading" role="status">
+              Loading question summaries…
+            </div>
+            <ol id="question-queue" class="question-queue" data-testid="question-queue"></ol>
+            <div id="queue-empty" class="empty-panel" hidden>
+              <strong>No matching questions</strong>
+              <p>Clear or broaden a filter to continue.</p>
+            </div>
+          </aside>
+
+          <section class="detail-panel" aria-labelledby="detail-heading">
+            <div id="detail-placeholder" class="detail-placeholder">
+              <p class="eyebrow">Question evidence</p>
+              <h3 id="detail-heading">Choose a question from the queue</h3>
+              <p>Only one private question record is loaded into this workspace at a time.</p>
+            </div>
+
+            <div id="detail-loading" class="loading-panel detail-loading" role="status" hidden>
+              Loading one private question…
+            </div>
+
+            <article id="question-detail" class="question-detail" data-testid="question-detail" hidden>
+              <header class="detail-header">
+                <div>
+                  <p id="detail-position" class="eyebrow">Question</p>
+                  <h3 id="question-title" tabindex="-1">Question evidence</h3>
+                  <p id="question-source-line" class="detail-source-line"></p>
+                </div>
+                <div class="detail-reference">
+                  <code id="question-id"></code>
+                  <span id="detail-review-state" class="status-badge">Unreviewed</span>
+                  <button id="open-similarity-item" class="text-button" type="button">
+                    Open in Similarity Lab
+                  </button>
+                  <button id="use-curriculum-target" class="text-button" type="button">
+                    Use as curriculum target
+                  </button>
+                </div>
+              </header>
+
+              <section id="promotion-blockers-panel" class="blocker-panel" aria-labelledby="promotion-blockers-heading">
+                <div class="blocker-symbol" aria-hidden="true">!</div>
+                <div>
+                  <h4 id="promotion-blockers-heading">Current blockers</h4>
+                  <ul id="promotion-blocker-list"></ul>
+                </div>
+              </section>
+
+              <div class="evidence-grid">
+                <section class="evidence-card" aria-labelledby="source-crop-heading">
+                  <header class="card-heading">
+                    <div>
+                      <p class="eyebrow">Source authority</p>
+                      <h4 id="source-crop-heading">Question crop</h4>
+                    </div>
+                    <div class="source-links">
+                      <a id="source-pdf-link" href="#" target="_blank" rel="noreferrer" hidden>
+                        Source PDF <span aria-hidden="true">↗</span>
+                      </a>
+                      <a id="key-evidence-link" href="#" target="_blank" rel="noreferrer" hidden>
+                        Answer key <span aria-hidden="true">↗</span>
+                      </a>
+                    </div>
+                  </header>
+                  <figure class="source-crop-frame">
+                    <img id="source-crop" alt="" />
+                    <figcaption>Inspect the complete crop before validating the parsed record.</figcaption>
+                    <div id="source-crop-missing" class="asset-missing" hidden>
+                      <strong>Source crop unavailable</strong>
+                      <span>Keep the visual check clear and record the issue below.</span>
+                    </div>
+                  </figure>
+                </section>
+
+                <section class="evidence-card parsed-card" aria-labelledby="parsed-question-heading">
+                  <header class="card-heading">
+                    <div>
+                      <p class="eyebrow">Parsed record</p>
+                      <h4 id="parsed-question-heading">Prompt and choices</h4>
+                    </div>
+                    <div id="question-metadata-tags" class="metadata-tags"></div>
+                  </header>
+                  <p id="question-prompt" class="question-prompt"></p>
+                  <ol id="question-choices" class="choice-list" type="A"></ol>
+
+                  <section class="answer-evidence" aria-labelledby="answer-evidence-heading">
+                    <div>
+                      <p class="eyebrow">Protected evidence</p>
+                      <h5 id="answer-evidence-heading">Answer record</h5>
+                    </div>
+                    <dl id="answer-evidence-details" class="answer-details"></dl>
+                  </section>
+
+                  <div class="warning-columns">
+                    <section aria-labelledby="warnings-heading">
+                      <h5 id="warnings-heading">Warnings</h5>
+                      <ul id="question-warnings" class="finding-list"></ul>
+                    </section>
+                    <section aria-labelledby="gaps-heading">
+                      <h5 id="gaps-heading">Content gaps</h5>
+                      <ul id="question-gaps" class="finding-list gap-list"></ul>
+                    </section>
+                  </div>
+                </section>
+              </div>
+
+              <section class="proposal-panel" aria-labelledby="proposal-heading">
+                <header class="card-heading">
+                  <div>
+                    <p class="eyebrow">Not yet authoritative</p>
+                    <h4 id="proposal-heading">Proposed curriculum labels</h4>
+                  </div>
+                  <span id="proposal-provenance" class="status-badge status-proposed">Proposal</span>
+                </header>
+                <dl id="proposal-details" class="proposal-details"></dl>
+              </section>
+
+              <form id="teacher-review-form" class="teacher-review-form" novalidate data-testid="teacher-review-form">
+                <header class="review-form-heading">
+                  <div>
+                    <p class="eyebrow">Your version-bound review</p>
+                    <h4>Teacher and curriculum validation</h4>
+                  </div>
+                  <span id="review-saved-state" class="saved-state">Not saved</span>
+                </header>
+
+                <fieldset class="form-section source-checks">
+                  <legend>Source fidelity checks</legend>
+                  <p class="fieldset-help">Check only evidence you personally verified.</p>
+                  <div class="check-grid">
+                    <label class="check-card">
+                      <input name="source_prompt" type="checkbox" />
+                      <span><strong>Prompt</strong><small>Complete and faithfully parsed</small></span>
+                    </label>
+                    <label class="check-card">
+                      <input name="source_choices" type="checkbox" />
+                      <span><strong>Choices</strong><small>Present, ordered, and legible</small></span>
+                    </label>
+                    <label class="check-card">
+                      <input name="source_answer" type="checkbox" />
+                      <span><strong>Answer</strong><small>Matches the cited key evidence</small></span>
+                    </label>
+                    <label class="check-card">
+                      <input name="source_points" type="checkbox" />
+                      <span><strong>Points</strong><small>Published value is supported</small></span>
+                    </label>
+                    <label class="check-card">
+                      <input name="source_visual" type="checkbox" />
+                      <span><strong>Visual</strong><small>Crop contains every required mark</small></span>
+                    </label>
+                  </div>
+                </fieldset>
+
+                <fieldset class="form-section">
+                  <legend>Source disposition</legend>
+                  <div class="decision-grid">
+                    <label class="decision-card decision-positive">
+                      <input name="disposition" type="radio" value="faithful" />
+                      <span><strong>Faithful</strong><small>All source evidence checks pass.</small></span>
+                    </label>
+                    <label class="decision-card decision-attention">
+                      <input name="disposition" type="radio" value="needs_correction" checked />
+                      <span><strong>Needs correction</strong><small>A mismatch or unsupported field remains.</small></span>
+                    </label>
+                    <label class="decision-card decision-exclude">
+                      <input name="disposition" type="radio" value="exclude" />
+                      <span><strong>Exclude</strong><small>Do not use this item in the curriculum.</small></span>
+                    </label>
+                  </div>
+                </fieldset>
+
+                <section class="form-section" aria-labelledby="classification-heading">
+                  <div class="form-section-heading">
+                    <div>
+                      <h5 id="classification-heading">Curriculum classification</h5>
+                      <p>Record the mathematical target separately from visual modality.</p>
+                    </div>
+                    <span class="status-badge status-reviewed">Teacher review</span>
+                  </div>
+                  <div class="classification-grid">
+                    <label for="review-primary-domain">
+                      <span>Primary domain</span>
+                      <select id="review-primary-domain" name="primary_domain">
+                        <option value="">Choose a domain</option>
+                      </select>
+                    </label>
+                    <label for="review-question-type">
+                      <span>Question type</span>
+                      <select id="review-question-type" name="question_type">
+                        <option value="">Choose a question type</option>
+                      </select>
+                    </label>
+                    <label for="review-cognitive-demand">
+                      <span>Cognitive demand</span>
+                      <select id="review-cognitive-demand" name="cognitive_demand">
+                        <option value="">Choose a demand level</option>
+                      </select>
+                    </label>
+                    <label for="review-grade-appropriateness">
+                      <span>Grade appropriateness</span>
+                      <select id="review-grade-appropriateness" name="grade_appropriateness">
+                        <option value="uncertain">Uncertain</option>
+                        <option value="appropriate">Appropriate</option>
+                        <option value="too_easy">Too easy</option>
+                        <option value="too_hard">Too hard</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <fieldset class="tag-fieldset">
+                    <legend>Skills</legend>
+                    <p class="fieldset-help">Select every skill genuinely required by the solution path.</p>
+                    <div id="skill-options" class="tag-option-grid"></div>
+                  </fieldset>
+
+                  <fieldset class="tag-fieldset">
+                    <legend>Representations</legend>
+                    <p class="fieldset-help">Representation describes how information is shown, not what is mastered.</p>
+                    <div id="representation-options" class="tag-option-grid"></div>
+                  </fieldset>
+                </section>
+
+                <fieldset class="form-section">
+                  <legend>Taxonomy decision</legend>
+                  <div class="decision-grid">
+                    <label class="decision-card decision-positive">
+                      <input name="taxonomy_decision" type="radio" value="validated" />
+                      <span><strong>Validated</strong><small>The selected labels accurately describe the item.</small></span>
+                    </label>
+                    <label class="decision-card decision-attention">
+                      <input name="taxonomy_decision" type="radio" value="needs_changes" checked />
+                      <span><strong>Needs changes</strong><small>The proposal or vocabulary needs more work.</small></span>
+                    </label>
+                    <label class="decision-card decision-exclude">
+                      <input name="taxonomy_decision" type="radio" value="exclude" />
+                      <span><strong>Exclude</strong><small>Do not classify this item for curriculum use.</small></span>
+                    </label>
+                  </div>
+                </fieldset>
+
+                <label class="notes-field" for="review-notes">
+                  <span>Teacher notes</span>
+                  <small>Describe exact corrections, boundary judgments, or unresolved evidence.</small>
+                  <textarea id="review-notes" name="notes" rows="6" maxlength="4000"></textarea>
+                </label>
+
+                <p id="review-form-error" class="form-error" role="alert" hidden></p>
+                <div class="review-actions">
+                  <button id="save-review" class="button button-secondary" type="submit" data-advance="false">
+                    Save review
+                  </button>
+                  <button id="save-next-review" class="button button-primary" type="submit" data-advance="true">
+                    Save and next <span aria-hidden="true">→</span>
+                  </button>
+                </div>
+              </form>
+            </article>
+          </section>
+        </div>
+      </section>
+
+      <section
+        id="similarity-view"
+        class="catalogue-view similarity-view"
+        role="tabpanel"
+        aria-labelledby="similarity-tab"
+        data-testid="similarity-view"
+        hidden
+      >
+        <header class="section-intro">
+          <div>
+            <p class="eyebrow">Teacher judgment of corpus neighbors</p>
+            <h2>Similarity Lab</h2>
+            <p>
+              Compare one anchor question with candidate neighbors. Similarity is retrieval
+              evidence only: a close score does not prove a shared skill, strategy, difficulty,
+              or learner state.
+            </p>
+          </div>
+          <span class="experimental-badge">Experimental proposals</span>
+        </header>
+
+        <aside class="experiment-notice" role="note">
+          <strong>Teacher review is the authority.</strong>
+          <span>
+            Surface, tag, and hybrid scores help route candidates for inspection. They never
+            become mastery evidence and never approve a family or duplicate by themselves.
+          </span>
+        </aside>
+
+        <form id="similarity-controls" class="lab-controls" data-testid="similarity-controls">
+          <label class="lab-anchor-field" for="similarity-anchor-id">
+            <span>Anchor question ID</span>
+            <input
+              id="similarity-anchor-id"
+              name="anchor_id"
+              type="text"
+              autocomplete="off"
+              placeholder="Choose a question or paste its stable ID"
+              required
+            />
+          </label>
+          <label for="similarity-view-select">
+            <span>Neighbor view</span>
+            <select id="similarity-view-select" name="view">
+              <option value="hybrid" selected>Hybrid evidence</option>
+              <option value="surface">Surface similarity</option>
+              <option value="tag">Proposed-tag similarity</option>
+            </select>
+          </label>
+          <label for="similarity-limit">
+            <span>Neighbors</span>
+            <select id="similarity-limit" name="limit">
+              <option value="6">6</option>
+              <option value="12" selected>12</option>
+            </select>
+          </label>
+          <button id="load-neighbors" class="button button-primary" type="submit">
+            Compare neighbors
+          </button>
+        </form>
+
+        <div id="similarity-error" class="inline-error" role="alert" hidden></div>
+        <div id="similarity-loading" class="loading-panel" role="status" hidden>
+          Loading candidate neighbors…
+        </div>
+        <div id="similarity-empty" class="empty-panel" hidden>
+          <strong>Choose an anchor question</strong>
+          <p>Start from the Questions tab or enter a stable question ID above.</p>
+        </div>
+
+        <div id="similarity-results" hidden>
+          <section class="similarity-anchor panel" aria-labelledby="similarity-anchor-heading">
+            <header class="panel-heading">
+              <div>
+                <p class="eyebrow">Anchor</p>
+                <h3 id="similarity-anchor-heading">Question reference</h3>
+              </div>
+              <code id="similarity-anchor-reference"></code>
+            </header>
+            <div class="similarity-anchor-body">
+              <p id="similarity-anchor-prompt" class="similarity-prompt"></p>
+              <dl id="similarity-anchor-metadata" class="compact-breakdown"></dl>
+              <div id="similarity-anchor-tags" class="tag-row" aria-label="Anchor proposed tags"></div>
+            </div>
+          </section>
+
+          <div class="lab-results-heading">
+            <div>
+              <p class="eyebrow">Ranked retrieval candidates</p>
+              <h3 id="neighbor-results-heading">Neighbors</h3>
+            </div>
+            <p id="neighbor-results-summary" role="status" aria-live="polite"></p>
+          </div>
+          <ol
+            id="neighbor-cards"
+            class="neighbor-grid"
+            aria-labelledby="neighbor-results-heading"
+            data-testid="neighbor-cards"
+          ></ol>
+          <div id="neighbors-none" class="empty-panel" hidden>
+            <strong>No candidate neighbors returned</strong>
+            <p>Try another evidence view or choose a different anchor.</p>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="curriculum-view"
+        class="catalogue-view curriculum-view"
+        role="tabpanel"
+        aria-labelledby="curriculum-tab"
+        data-testid="curriculum-view"
+        hidden
+      >
+        <header class="section-intro">
+          <div>
+            <p class="eyebrow">Inspectable recommendation preview</p>
+            <h2>Curriculum Lab</h2>
+            <p>
+              Explore how a target skill, grade, uncertainty, and instructional purpose
+              change a proposed slate. This lab previews policy inputs and explanations;
+              it does not update a learner or select production work.
+            </p>
+          </div>
+          <span class="experimental-badge">Experimental · no mastery claims</span>
+        </header>
+
+        <aside class="experiment-notice experiment-notice-strong" role="note">
+          <strong>Proposals, not mastery.</strong>
+          <span>
+            Mastery and uncertainty values below are hypothetical controls for curriculum QA.
+            A preview is never written to learner progress and does not authorize an item.
+            Teacher classification provenance and curriculum approval are shown separately.
+          </span>
+        </aside>
+
+        <form id="recommendation-form" class="recommendation-form" data-testid="recommendation-form">
+          <div class="recommendation-fields">
+            <label for="recommendation-skill">
+              <span>Target skill</span>
+              <select id="recommendation-skill" name="target_skill_id" required>
+                <option value="">Choose a reviewed or proposed skill</option>
+              </select>
+            </label>
+            <label for="recommendation-grade">
+              <span>Grade band</span>
+              <select id="recommendation-grade" name="grade" required>
+                <option value="1-2">Grades 1–2</option>
+                <option value="3-4" selected>Grades 3–4</option>
+                <option value="5-6">Grades 5–6</option>
+              </select>
+            </label>
+            <label for="recommendation-mode">
+              <span>Instructional purpose</span>
+              <select id="recommendation-mode" name="mode">
+                <option value="practice" selected>Practice</option>
+                <option value="diagnostic">Diagnostic probe</option>
+                <option value="remediation">Remediation</option>
+                <option value="transfer">Transfer check</option>
+              </select>
+            </label>
+            <label for="recommendation-target-item" class="target-item-field">
+              <span>Target question ID <small>optional similarity anchor</small></span>
+              <input
+                id="recommendation-target-item"
+                name="target_item_id"
+                type="text"
+                autocomplete="off"
+                placeholder="Use one question as the near/far comparison anchor"
+              />
+            </label>
+            <label for="recommendation-recent-items" class="recent-items-field">
+              <span>Recent item IDs</span>
+              <textarea
+                id="recommendation-recent-items"
+                name="recent_item_ids"
+                rows="3"
+                placeholder="Optional; one stable ID per line or separated by commas"
+              ></textarea>
+            </label>
+          </div>
+
+          <div class="hypothesis-controls">
+            <label for="recommendation-mastery">
+              <span>Hypothetical mastery <output id="mastery-output" for="recommendation-mastery">0.50</output></span>
+              <input id="recommendation-mastery" name="mastery" type="range" min="0" max="1" step="0.05" value="0.5" />
+              <small>Practice-policy input only</small>
+            </label>
+            <label for="recommendation-uncertainty">
+              <span>Hypothetical uncertainty <output id="uncertainty-output" for="recommendation-uncertainty">0.50</output></span>
+              <input id="recommendation-uncertainty" name="uncertainty" type="range" min="0" max="1" step="0.05" value="0.5" />
+              <small>Higher values favor information gathering</small>
+            </label>
+          </div>
+
+          <div class="recommendation-submit-row">
+            <p>Preview results are ephemeral and remain separate from saved teacher reviews.</p>
+            <button id="preview-recommendations" class="button button-primary" type="submit">
+              Preview ranked slate
+            </button>
+          </div>
+        </form>
+
+        <div id="recommendation-error" class="inline-error" role="alert" hidden></div>
+        <div id="recommendation-loading" class="loading-panel" role="status" hidden>
+          Building an inspectable recommendation slate…
+        </div>
+        <div id="recommendation-empty" class="empty-panel">
+          <strong>No recommendation preview yet</strong>
+          <p>Choose a skill and instructional purpose, then preview the ranked slate.</p>
+        </div>
+
+        <section id="recommendation-results" class="recommendation-results" aria-labelledby="recommendation-results-heading" hidden>
+          <header class="lab-results-heading">
+            <div>
+              <p class="eyebrow">Deterministic preview</p>
+              <h3 id="recommendation-results-heading">Ranked slate</h3>
+            </div>
+            <p id="recommendation-summary" role="status" aria-live="polite"></p>
+          </header>
+          <div id="recommendation-context" class="preview-context"></div>
+          <p class="score-formula-note">
+            Component audit: normalized signal × configured weight = contribution to rank score.
+          </p>
+          <ol id="recommendation-cards" class="recommendation-cards" data-testid="recommendation-cards"></ol>
+          <div id="recommendations-none" class="empty-panel" hidden>
+            <strong>No eligible questions</strong>
+            <p>Inspect the reported blockers or adjust the hypothetical inputs.</p>
+          </div>
+        </section>
+      </section>
+
+      <section
+        id="taxonomy-view"
+        class="catalogue-view taxonomy-view"
+        role="tabpanel"
+        aria-labelledby="taxonomy-tab"
+        data-testid="taxonomy-view"
+        hidden
+      >
+        <header class="section-intro taxonomy-intro">
+          <div>
+            <p class="eyebrow">Versioned curriculum vocabulary</p>
+            <h2>Taxonomy</h2>
+            <p>
+              These labels organize teacher review. Proposed skills and relations do not
+              become curriculum gates until their evidence and review requirements pass.
+            </p>
+          </div>
+          <div class="taxonomy-version-card">
+            <span>Loaded ontology</span>
+            <strong id="taxonomy-version">—</strong>
+            <small id="taxonomy-status">Loading…</small>
+          </div>
+        </header>
+
+        <label class="taxonomy-search" for="taxonomy-search">
+          <span>Find a taxonomy label</span>
+          <input id="taxonomy-search" type="search" autocomplete="off" placeholder="Search names and descriptions" />
+        </label>
+
+        <div id="taxonomy-loading" class="loading-panel" role="status">
+          Loading curriculum vocabulary…
+        </div>
+        <div id="taxonomy-content" class="taxonomy-content" hidden>
+          <section class="taxonomy-section skill-inspector" aria-labelledby="skill-inspector-heading" data-testid="skill-inspector">
+            <header class="panel-heading">
+              <div>
+                <p class="eyebrow">Ontology QA workspace</p>
+                <h3 id="skill-inspector-heading">Inspect and adjudicate a skill</h3>
+              </div>
+              <span id="skill-review-saved-state" class="saved-state">No skill selected</span>
+            </header>
+
+            <aside class="experiment-notice skill-authority-notice" role="note">
+              <strong>One judgment is scoped.</strong>
+              <span>
+                Saving this skill review does not approve the ontology, its relations,
+                prerequisites, question classifications, or learner-mastery claims.
+              </span>
+            </aside>
+
+            <label class="skill-inspector-select" for="taxonomy-skill-select">
+              <span>Skill to inspect</span>
+              <select id="taxonomy-skill-select">
+                <option value="">Choose a skill</option>
+              </select>
+            </label>
+
+            <div id="skill-inspector-empty" class="empty-panel">
+              <strong>Select a skill to inspect its boundaries</strong>
+              <p>Coverage and examples are routing evidence, not proof that the skill is well formed.</p>
+            </div>
+
+            <div id="skill-inspector-detail" class="skill-inspector-detail" hidden>
+              <div class="skill-evidence-grid">
+                <section class="skill-definition-card" aria-labelledby="selected-skill-heading">
+                  <p class="eyebrow">Current ontology proposal</p>
+                  <h4 id="selected-skill-heading">Skill definition</h4>
+                  <dl id="selected-skill-details" class="answer-details"></dl>
+                  <div class="skill-boundary-note">
+                    <h5>Boundary note</h5>
+                    <p id="selected-skill-boundary"></p>
+                  </div>
+                </section>
+
+                <section class="skill-definition-card" aria-labelledby="skill-coverage-heading">
+                  <div class="panel-heading">
+                    <div>
+                      <p class="eyebrow">Proposed corpus coverage</p>
+                      <h4 id="skill-coverage-heading">Examples and relations</h4>
+                    </div>
+                    <span id="selected-skill-coverage" class="count-pill">—</span>
+                  </div>
+                  <h5>Example item references</h5>
+                  <ul id="selected-skill-examples" class="skill-example-list"></ul>
+                  <h5>Proposed relations</h5>
+                  <ul id="selected-skill-relations" class="reason-list"></ul>
+                </section>
+              </div>
+
+              <form id="taxonomy-skill-review" class="skill-review-form" novalidate data-testid="taxonomy-skill-review">
+                <fieldset class="form-section">
+                  <legend>Teacher ontology judgment</legend>
+                  <div class="skill-decision-grid">
+                    <label class="decision-card decision-positive"><input name="skill_judgement" type="radio" value="approve" /><span><strong>Approve</strong><small>Definition and boundary are usable.</small></span></label>
+                    <label class="decision-card decision-attention"><input name="skill_judgement" type="radio" value="revise" /><span><strong>Revise</strong><small>Keep the concept; change its wording or boundary.</small></span></label>
+                    <label class="decision-card decision-attention"><input name="skill_judgement" type="radio" value="merge" /><span><strong>Merge</strong><small>This is not meaningfully distinct from another skill.</small></span></label>
+                    <label class="decision-card decision-attention"><input name="skill_judgement" type="radio" value="split" /><span><strong>Split</strong><small>The definition combines distinct mastery targets.</small></span></label>
+                    <label class="decision-card decision-exclude"><input name="skill_judgement" type="radio" value="remove" /><span><strong>Remove</strong><small>Do not retain this as a curriculum skill.</small></span></label>
+                    <label class="decision-card"><input name="skill_judgement" type="radio" value="unsure" checked /><span><strong>Unsure</strong><small>More evidence or domain review is needed.</small></span></label>
+                  </div>
+                </fieldset>
+
+                <div class="skill-revision-fields">
+                  <label for="skill-proposed-name">
+                    <span>Proposed name</span>
+                    <input id="skill-proposed-name" name="proposed_name" type="text" autocomplete="off" />
+                  </label>
+                  <label for="skill-merge-target">
+                    <span>Merge target</span>
+                    <select id="skill-merge-target" name="merge_target_skill_id">
+                      <option value="">Choose only for a merge judgment</option>
+                    </select>
+                  </label>
+                  <label class="skill-description-field" for="skill-proposed-description">
+                    <span>Proposed description or boundary</span>
+                    <textarea id="skill-proposed-description" name="proposed_description" rows="4"></textarea>
+                  </label>
+                  <label class="skill-description-field" for="skill-review-notes">
+                    <span>Review notes</span>
+                    <textarea id="skill-review-notes" name="notes" rows="4"></textarea>
+                  </label>
+                </div>
+                <p id="skill-review-error" class="form-error" role="alert" hidden></p>
+                <div class="review-actions">
+                  <button id="save-skill-review" class="button button-primary" type="submit">
+                    Save scoped skill judgment
+                  </button>
+                </div>
+              </form>
+            </div>
+          </section>
+
+          <section class="taxonomy-section" aria-labelledby="domains-heading">
+            <header class="panel-heading">
+              <div>
+                <p class="eyebrow">Broad organization</p>
+                <h3 id="domains-heading">Primary domains</h3>
+              </div>
+              <span id="domain-count" class="count-pill">—</span>
+            </header>
+            <div id="taxonomy-domains" class="taxonomy-card-grid"></div>
+          </section>
+
+          <section class="taxonomy-section" aria-labelledby="question-types-heading">
+            <header class="panel-heading">
+              <div>
+                <p class="eyebrow">Teacher-facing filter</p>
+                <h3 id="question-types-heading">Question types</h3>
+              </div>
+              <span id="question-type-count" class="count-pill">—</span>
+            </header>
+            <div id="taxonomy-question-types" class="taxonomy-card-grid"></div>
+          </section>
+
+          <section class="taxonomy-section" aria-labelledby="skills-heading">
+            <header class="panel-heading">
+              <div>
+                <p class="eyebrow">Instructional model</p>
+                <h3 id="skills-heading">Skills and reasoning moves</h3>
+              </div>
+              <span id="skill-count" class="count-pill">—</span>
+            </header>
+            <div id="taxonomy-skills" class="taxonomy-card-grid taxonomy-card-grid-wide"></div>
+          </section>
+
+          <section class="taxonomy-section" aria-labelledby="representations-heading">
+            <header class="panel-heading">
+              <div>
+                <p class="eyebrow">Non-mastery facets</p>
+                <h3 id="representations-heading">Representations</h3>
+              </div>
+              <span id="representation-count" class="count-pill">—</span>
+            </header>
+            <div id="taxonomy-representations" class="taxonomy-card-grid"></div>
+          </section>
+
+          <div id="taxonomy-empty" class="empty-panel" hidden>
+            <strong>No matching taxonomy labels</strong>
+            <p>Clear the taxonomy search to see every label.</p>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="promotion-view"
+        class="catalogue-view promotion-view"
+        role="tabpanel"
+        aria-labelledby="promotion-tab"
+        data-testid="promotion-view"
+        hidden
+      >
+        <header class="section-intro">
+          <div>
+            <p class="eyebrow">Computed readiness, not a shortcut</p>
+            <h2>Promotion</h2>
+            <p>
+              Curriculum approval and public release are separate decisions. A private
+              question can be curriculum-validated while remaining blocked from the player bundle.
+            </p>
+          </div>
+          <a class="button button-secondary" href="/api/catalogue/export" download>
+            Export review package
+          </a>
+        </header>
+
+        <div id="promotion-loading" class="loading-panel" role="status">
+          Loading promotion readiness…
+        </div>
+
+        <div id="promotion-content" hidden>
+          <section class="metric-grid promotion-metrics" aria-label="Promotion status">
+            <article class="metric-card">
+              <p class="metric-label">Blocked</p>
+              <strong id="promotion-blocked-count">—</strong>
+              <span>one or more required gates remain</span>
+            </article>
+            <article class="metric-card metric-card-ready">
+              <p class="metric-label">Curriculum ready</p>
+              <strong id="promotion-curriculum-count">—</strong>
+              <span>eligible for approved curriculum modelling</span>
+            </article>
+            <article class="metric-card">
+              <p class="metric-label">Release candidates</p>
+              <strong id="promotion-release-count">—</strong>
+              <span>content and asset release gates satisfied</span>
+            </article>
+            <article class="metric-card">
+              <p class="metric-label">Promoted</p>
+              <strong id="promotion-promoted-count">—</strong>
+              <span>recorded in a versioned promotion manifest</span>
+            </article>
+          </section>
+
+          <div class="promotion-grid">
+            <section class="panel" aria-labelledby="promotion-gates-heading">
+              <header class="panel-heading">
+                <div>
+                  <p class="eyebrow">Required evidence</p>
+                  <h3 id="promotion-gates-heading">Promotion gates</h3>
+                </div>
+              </header>
+              <ol class="gate-list">
+                <li><span aria-hidden="true">1</span><div><strong>Source fidelity</strong><p>Prompt, choices, answer, points, and visual evidence are reviewed.</p></div></li>
+                <li><span aria-hidden="true">2</span><div><strong>Curriculum validity</strong><p>Primary domain, question type, skills, demand, and grade fit are validated.</p></div></li>
+                <li><span aria-hidden="true">3</span><div><strong>Unique grading state</strong><p>The item has one supported answer or an explicit exclusion.</p></div></li>
+                <li><span aria-hidden="true">4</span><div><strong>Duplicate resolution</strong><p>Exact duplicate evidence is independently adjudicated.</p></div></li>
+                <li><span aria-hidden="true">5</span><div><strong>Release authorization</strong><p>Question-scoped content and assets are separately approved for player use.</p></div></li>
+              </ol>
+            </section>
+
+            <section class="panel" aria-labelledby="promotion-queue-heading">
+              <header class="panel-heading">
+                <div>
+                  <p class="eyebrow">Current corpus</p>
+                  <h3 id="promotion-queue-heading">Blocker queues</h3>
+                </div>
+              </header>
+              <ol id="promotion-blocker-breakdown" class="ranked-list"></ol>
+              <div class="promotion-actions">
+                <button id="review-blocked-items" class="button button-secondary" type="button">
+                  Review blocked items
+                </button>
+                <button id="review-ready-items" class="button button-primary" type="button">
+                  Inspect curriculum-ready items
+                </button>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>
+        Private, loopback-only curriculum tool. No analytics, external assets, or third-party requests.
+      </p>
+    </footer>
+  </body>
+</html>

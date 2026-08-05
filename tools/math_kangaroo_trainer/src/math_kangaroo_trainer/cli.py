@@ -50,6 +50,14 @@ DEFAULT_SAMPLE_SIZE = 180
 DEFAULT_SEED = 20260801
 AUDIT_DATABASE_NAME = "stage0-audit.sqlite3"
 DEFAULT_REVIEW_AUDIT_DIR = Path("work/math-kangaroo-adaptive-engine/stage0")
+DEFAULT_CATALOGUE_DIR = Path("work/math-kangaroo-adaptive-engine/catalogue")
+DEFAULT_COMPLETE_BANK = Path(
+    "work/math-kangaroo-complete-question-bank/data/questions.sqlite3"
+)
+DEFAULT_LEGACY_SPATIAL = Path(
+    "work/math-kangaroo-spatial-review/report/ranked_questions.csv"
+)
+CATALOGUE_DATABASE_NAME = "corpus-review.sqlite3"
 
 
 def _repository_root(start: Path) -> Path | None:
@@ -733,6 +741,117 @@ def stage0_review_web(args: argparse.Namespace) -> int:
     )
 
 
+def catalogue_build(args: argparse.Namespace) -> int:
+    """Build or safely resume the private review inventory for every question."""
+
+    from math_kangaroo_trainer.corpus.catalogue import CATALOGUE_CLASSIFIER_VERSION
+    from math_kangaroo_trainer.corpus.catalogue_pipeline import (
+        build_catalogue_inventory,
+    )
+    from math_kangaroo_trainer.retrieval import SemanticDocument, SemanticIndex
+    from math_kangaroo_trainer.storage.catalogue_repository import (
+        CATALOGUE_SQLITE_MODE,
+        CatalogueRepository,
+        migrate_catalogue_database,
+        secure_catalogue_directory,
+    )
+
+    source_path = args.source.resolve()
+    output_dir = args.output.resolve()
+    ontology_path = args.ontology.resolve()
+    legacy_path = args.legacy_spatial.resolve() if args.legacy_spatial else None
+    _require_private_output(output_dir)
+    if not source_path.is_file():
+        raise FileNotFoundError(f"source database not found: {source_path}")
+    if legacy_path is not None and not legacy_path.is_file():
+        raise FileNotFoundError(f"legacy spatial review not found: {legacy_path}")
+
+    run, items, vocabulary = build_catalogue_inventory(
+        source_path=source_path,
+        asset_root=args.asset_root,
+        ontology_path=ontology_path,
+        legacy_spatial_path=legacy_path,
+    )
+    output_dir = secure_catalogue_directory(output_dir)
+    database_path = output_dir / CATALOGUE_DATABASE_NAME
+    if database_path == source_path:
+        raise ValueError("catalogue database must not overwrite the canonical source")
+    migrate_catalogue_database(database_path, allow_create=True)
+    repository = CatalogueRepository(database_path, vocabulary=vocabulary)
+    try:
+        existing = repository.run(run.run_id)
+        if existing is not None:
+            # Run identity is deterministic. Preserve the original creation time
+            # so rebuilding unchanged evidence is a true idempotent resume.
+            run = run.model_copy(update={"created_at": existing.created_at})
+        repository.upsert_run(run)
+        stored = repository.upsert_items(run.run_id, items)
+        summary = repository.summary(run.run_id)
+        if not summary.inventory_complete or summary.inventory_items != len(items):
+            raise RuntimeError("catalogue inventory does not cover the complete source")
+    finally:
+        repository.close()
+
+    documents = tuple(
+        SemanticDocument.from_catalogue_item(item)
+        for item in items
+    )
+    semantic_index = SemanticIndex.build(
+        documents,
+        ontology_version=run.ontology_version,
+        classifier_version=CATALOGUE_CLASSIFIER_VERSION,
+    )
+    artifacts = semantic_index.save(output_dir)
+    report = {
+        "run_id": run.run_id,
+        "source_items": run.source_item_count,
+        "inventory_items": summary.inventory_items,
+        "inventory_complete": summary.inventory_complete,
+        "legacy_spatial_proposals": sum(
+            item.proposal_payload.get("legacy_spatial") is not None for item in items
+        ),
+        "semantic_index": {
+            "views": [view.value for view in semantic_index.available_views],
+            "strategy_available": semantic_index.strategy_available,
+            "algorithm_version": semantic_index.config.algorithm_version,
+            "manifest": artifacts.manifest_path.name,
+            "vectors": artifacts.vectors_path.name,
+        },
+        "proposal_version": CATALOGUE_CLASSIFIER_VERSION,
+        "authoritative": False,
+        "public_content_exported": False,
+    }
+    summary_path = output_dir / "catalogue-build-summary.json"
+    summary_path.write_text(
+        json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    summary_path.chmod(CATALOGUE_SQLITE_MODE)
+    print(_json({**report, "output": str(output_dir), "stored_items": stored}))
+    return 0
+
+
+def catalogue_review_web(args: argparse.Namespace) -> int:
+    """Serve the full-corpus taxonomy, retrieval, and policy QA workbench."""
+
+    catalogue_dir = args.catalogue_dir.resolve()
+    source_path = args.source.resolve()
+    _require_private_output(catalogue_dir)
+    from math_kangaroo_trainer.storage.catalogue_repository import (
+        secure_catalogue_directory,
+    )
+    from math_kangaroo_trainer.web.catalogue_server import serve_catalogue_web
+
+    catalogue_dir = secure_catalogue_directory(catalogue_dir)
+    return serve_catalogue_web(
+        catalogue_dir=catalogue_dir,
+        source_path=source_path,
+        reviewer_id=args.reviewer_id,
+        ontology_path=args.ontology.resolve(),
+        port=args.port,
+    )
+
+
 def validate_ontology(args: argparse.Namespace) -> int:
     ontology = load_ontology(args.ontology.resolve())
     print(_json(ontology.summary()))
@@ -822,6 +941,53 @@ def build_parser() -> argparse.ArgumentParser:
         "--ontology", type=Path, default=default_ontology_path()
     )
     review_web.set_defaults(handler=stage0_review_web)
+
+    catalogue = command.add_parser(
+        "catalogue",
+        help="private whole-corpus taxonomy, retrieval, and curriculum QA",
+    )
+    catalogue_commands = catalogue.add_subparsers(
+        dest="catalogue_command", required=True
+    )
+    catalogue_build_parser = catalogue_commands.add_parser(
+        "build", help="build or resume the complete private corpus catalogue"
+    )
+    catalogue_build_parser.add_argument(
+        "--source", type=Path, default=DEFAULT_COMPLETE_BANK
+    )
+    catalogue_build_parser.add_argument(
+        "--output", type=Path, default=DEFAULT_CATALOGUE_DIR
+    )
+    catalogue_build_parser.add_argument("--asset-root", type=Path)
+    catalogue_build_parser.add_argument(
+        "--legacy-spatial",
+        type=Path,
+        help=(
+            "optional legacy spatial-review CSV to import as non-authoritative "
+            "proposal provenance"
+        ),
+    )
+    catalogue_build_parser.add_argument(
+        "--ontology", type=Path, default=default_ontology_path()
+    )
+    catalogue_build_parser.set_defaults(handler=catalogue_build)
+
+    catalogue_web = catalogue_commands.add_parser(
+        "review-web",
+        help="serve the private whole-corpus QA workbench on 127.0.0.1",
+    )
+    catalogue_web.add_argument(
+        "--catalogue-dir", type=Path, default=DEFAULT_CATALOGUE_DIR
+    )
+    catalogue_web.add_argument(
+        "--source", type=Path, default=DEFAULT_COMPLETE_BANK
+    )
+    catalogue_web.add_argument("--reviewer-id", required=True)
+    catalogue_web.add_argument("--port", type=int, default=8765)
+    catalogue_web.add_argument(
+        "--ontology", type=Path, default=default_ontology_path()
+    )
+    catalogue_web.set_defaults(handler=catalogue_review_web)
 
     ontology = command.add_parser("validate-ontology", help="validate ontology and DAG")
     ontology.add_argument("--ontology", type=Path, default=default_ontology_path())

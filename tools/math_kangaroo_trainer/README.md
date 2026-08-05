@@ -2,17 +2,21 @@
 
 This package is the offline, private-data foundation for the adaptive trainer
 described in `docs/architecture/adr-0001-math-kangaroo-adaptive-core.md`. The
-real-corpus evidence track currently stops at **Stage 0**: it verifies the
-source database and declared PDFs, audits a representative sample, records
-explicit review work, detects and routes exact duplicate candidates, and
-produces reproducible quality reports. Corpus-independent Stage 1 contracts and
-the Stage 2 event/replay spine may be exercised only with invented fixtures as
-described in
+authoritative real-corpus evidence track currently remains at **Stage 0**: it
+verifies the source database and declared PDFs, audits a representative sample,
+records explicit review work, detects and routes exact duplicate candidates,
+and produces reproducible quality reports. A separate, explicitly
+non-authoritative Catalogue QA track now lets a teacher inspect proposals,
+semantic neighbors, and policy previews over all 1,833 private items without
+claiming that Stage 0 or Stage 1 passed. Corpus-independent Stage 1 contracts
+and the Stage 2 event/replay spine are described in
 `docs/architecture/adr-0002-deferred-stage0-review-and-synthetic-engine-development.md`.
 
-It does **not** publish the private question bank, expose answer keys to the
-browser, ship an LLM provider, infer learner mastery, persist child data, or
-alter the existing Journey Math Kangaroo corpus.
+It does **not** publish the private question bank, ship an LLM provider, infer
+learner mastery, persist child data, or alter the existing Journey Math
+Kangaroo corpus. The local QA browser may display private source and answer
+evidence to its fixed teacher reviewer; evidence exports never include that
+content.
 
 ## Deferred-review boundary
 
@@ -27,10 +31,71 @@ The current continuation work is deliberately narrower:
 - Stage 2 defines factual immutable events, idempotent in-memory storage,
   hint-derived assistance, version-correction chains, hash-verified persisted
   snapshots, and exact synthetic replay.
+- Catalogue QA creates deterministic, unapproved lexical taxonomy proposals,
+  a local surface latent-semantic index, a proposed-tag index, append-only
+  teacher judgements, and an explainable policy simulator. These are review
+  instruments, not approved Q-matrix, family, difficulty, or mastery evidence.
 
 These are engineering contracts, not completed Stage 1 or Stage 2 exit gates.
-There is no bulk corpus annotation, embedding/Q-matrix approval, learner model,
-diagnostic policy, practice policy, or learner-facing service yet.
+There is no embedding/Q-matrix approval, reviewed strategy embedding, learner
+model, production diagnostic/practice policy, or learner-facing service yet.
+
+## Build and use the complete-corpus QA workbench
+
+The catalogue is separate from the 180-item Stage 0 gold sample. Build it from
+the complete canonical database and optionally carry the 700 legacy spatial
+labels in as proposal provenance:
+
+```bash
+.venv/bin/math-kangaroo-trainer catalogue build \
+  --source work/math-kangaroo-complete-question-bank/data/questions.sqlite3 \
+  --output work/math-kangaroo-adaptive-engine/catalogue \
+  --legacy-spatial work/math-kangaroo-spatial-review/report/ranked_questions.csv
+```
+
+The command verifies and indexes every source record, writes the separate
+`corpus-review.sqlite3`, and builds two compact, same-device retrieval views:
+
+- `surface`: feature-hashed unigram/bigram TF-IDF followed by deterministic
+  latent semantic analysis;
+- `tag`: normalized proposed taxonomy tags; and
+- `hybrid`: versioned weights renormalized across the available views.
+
+The planned strategy view is intentionally unavailable until reviewed solution
+paths exist. Hybrid results say so. Semantic distance is never stored as
+learner mastery or item difficulty.
+
+Launch the private dashboard for one fixed teacher identity:
+
+```bash
+.venv/bin/math-kangaroo-trainer catalogue review-web \
+  --catalogue-dir work/math-kangaroo-adaptive-engine/catalogue \
+  --source work/math-kangaroo-complete-question-bank/data/questions.sqlite3 \
+  --reviewer-id rfarnham \
+  --port 8765
+```
+
+Open the printed loopback URL. The workbench provides:
+
+- ontology skill inspection and append-only advisory approve/revise/merge/
+  split/remove judgements;
+- Similarity Lab comparisons across surface, tag, and hybrid neighbors with
+  ratings such as same strategy, same skill/different surface, surface only,
+  duplicate, or unrelated;
+- Curriculum Lab policy previews with hard eligibility gates, logged score
+  values, weights, contributions, distinct proposal/teacher-classified/
+  curriculum-approved evidence labels, and explicit content gaps. It never
+  presents a deterministic rank score as a selection probability. An optional target question feeds the
+  surface-similarity proxy used to contrast near remediation with farther
+  transfer, while recent item IDs independently drive repeat and redundancy
+  controls; the preview warns that reviewed strategy similarity is still
+  unavailable;
+- the complete 1,833-question source/curriculum review queue; and
+- an allowlisted evidence-only JSON export.
+
+One teacher judgement does not approve the ontology or prerequisite graph.
+The recommendation preview does not read or update a child profile, and the
+private source assets never enter tracked or public output.
 
 ## Set up
 

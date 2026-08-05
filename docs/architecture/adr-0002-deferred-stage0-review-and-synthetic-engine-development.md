@@ -6,6 +6,13 @@
   gate remains incomplete
 - **Related decisions:** `adr-0001-math-kangaroo-adaptive-core.md`
 
+> **Amendment (2026-08-05):** ADR 0003 permits a deterministic, device-local
+> surface-semantic and proposed-tag index over the private corpus solely for
+> teacher QA. It makes no external model call, cannot grade or diagnose a
+> learner, is not an approved family/Q-matrix, and cannot cross a promotion
+> gate. The prohibition below continues to apply to authoritative bulk model
+> output and production use.
+
 ## Context
 
 The Stage 0 source audit is reproducible and its review evidence is append-only,
@@ -78,7 +85,8 @@ observations, and recorded selection decisions. It must not infer mastery,
 weakness, difficulty, or fluency until reviewed Stage 1 inputs and the relevant
 model tests exist.
 
-While Stage 0 is pending, the engineering track must not:
+While Stage 0 is pending, the engineering track must not (apart from the
+explicitly non-authoritative local QA exception in ADR 0003):
 
 - run bulk LLM or embedding jobs over the private corpus;
 - approve solution paths, item-skill mappings, prerequisites, misconceptions,
