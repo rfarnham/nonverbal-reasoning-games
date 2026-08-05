@@ -15,9 +15,16 @@ import {
   shuffleMkLabAnswers,
 } from "../app/lab/math-kangaroo/engine.ts";
 import {
+  MK_LAB_QA_ISSUES,
   MK_LAB_STORAGE_KEY,
+  captureMkLabQaObservation,
+  hasMkLabQaFeedback,
+  mkLabQaStorageKey,
+  readMkLabQaArchives,
+  readMkLabQaFeedback,
   readMkLabProgress,
   restoreMkLabDraw,
+  writeMkLabQaFeedback,
   writeMkLabProgress,
 } from "../app/lab/math-kangaroo/storage.ts";
 
@@ -32,8 +39,14 @@ function seededRandom(seed) {
 function memoryStorage() {
   const values = new Map();
   return {
+    get length() {
+      return values.size;
+    },
     getItem(key) {
       return values.get(key) ?? null;
+    },
+    key(index) {
+      return [...values.keys()][index] ?? null;
     },
     setItem(key, value) {
       values.set(key, value);
@@ -301,4 +314,160 @@ test("blocked, corrupt, and stale local progress fail safely", () => {
   assert.equal(migrated.current, null);
   assert.deepEqual(migrated.seenIds, [draw.round.id]);
   assert.equal(migrated.solvedCount, 3);
+});
+
+test("QA feedback survives reload and is isolated by content version", () => {
+  const storage = memoryStorage();
+  const round = MK_ROUNDS[0];
+  const feedback = {
+    [round.id]: {
+      verdict: "needs-change",
+      issues: ["image-diagram", "layout-accessibility"],
+      notes: "The lower-left detail is hard to inspect on a phone.",
+      updatedAt: "2026-08-05T18:00:00.000Z",
+      observedSourceIndexes: [4, 0, 2, 1, 3],
+      selectedAnswerLetter: "C",
+    },
+  };
+
+  assert.equal(
+    writeMkLabQaFeedback(storage, feedback, MK_CONTENT_VERSION),
+    true,
+  );
+  assert.deepEqual(
+    readMkLabQaFeedback(storage, MK_ROUNDS, MK_CONTENT_VERSION),
+    feedback,
+  );
+  assert.equal(
+    readMkLabQaFeedback(storage, MK_ROUNDS, "future-content-version"),
+    null,
+  );
+  storage.setItem(mkLabQaStorageKey("broken-content-version"), "{");
+  assert.deepEqual(
+    readMkLabQaArchives(storage, "future-content-version"),
+    [{ contentVersion: MK_CONTENT_VERSION, feedback }],
+    "feedback from the prior catalogue stays exportable after a version bump",
+  );
+  assert.notEqual(
+    mkLabQaStorageKey(MK_CONTENT_VERSION),
+    mkLabQaStorageKey("future-content-version"),
+  );
+  assert.equal(hasMkLabQaFeedback(feedback[round.id]), true);
+});
+
+test("QA answer snapshots preserve the first observed attempt", () => {
+  const initial = {
+    verdict: "needs-change",
+    issues: ["answer-key"],
+    notes: "The answer looked surprising.",
+    updatedAt: "2026-08-05T18:00:00.000Z",
+    observedSourceIndexes: [4, 0, 2, 1, 3],
+    selectedAnswerLetter: null,
+  };
+  const firstAttempt = captureMkLabQaObservation(
+    initial,
+    [4, 0, 2, 1, 3],
+    "B",
+  );
+  assert.equal(firstAttempt.selectedAnswerLetter, "B");
+  assert.notEqual(firstAttempt.updatedAt, initial.updatedAt);
+  assert.equal(
+    captureMkLabQaObservation(firstAttempt, [4, 0, 2, 1, 3], "D"),
+    firstAttempt,
+    "a correct retry must not replace the disputed first answer",
+  );
+  assert.equal(
+    captureMkLabQaObservation(firstAttempt, [0, 1, 2, 3, 4], "A"),
+    firstAttempt,
+    "a later reshuffle must not replace the original observation",
+  );
+});
+
+test("QA feedback salvages valid entries and handles blocked storage", () => {
+  const storage = memoryStorage();
+  const round = MK_ROUNDS[0];
+  const validRound = MK_ROUNDS[1];
+  const invalidOrderRound = MK_ROUNDS[2];
+  const invalidLetterRound = MK_ROUNDS[3];
+  storage.setItem(
+    mkLabQaStorageKey(MK_CONTENT_VERSION),
+    JSON.stringify({
+      schemaVersion: 1,
+      contentVersion: MK_CONTENT_VERSION,
+      feedback: {
+        [round.id]: {
+          verdict: "looks-good",
+          issues: ["not-a-real-category"],
+          notes: "",
+          updatedAt: "2026-08-05T18:00:00.000Z",
+        },
+        [validRound.id]: {
+          verdict: "looks-good",
+          issues: [],
+          notes: "Checked on a phone.",
+          updatedAt: "2026-08-05T18:01:00.000Z",
+          observedSourceIndexes: [1, 3, 0, 4, 2],
+          selectedAnswerLetter: null,
+        },
+        [invalidOrderRound.id]: {
+          verdict: "needs-change",
+          issues: ["answer-key"],
+          notes: "Bad order snapshot.",
+          updatedAt: "2026-08-05T18:02:00.000Z",
+          observedSourceIndexes: [0, 0, 2, 3, 4],
+          selectedAnswerLetter: "A",
+        },
+        [invalidLetterRound.id]: {
+          verdict: "needs-change",
+          issues: ["answer-key"],
+          notes: "Bad answer-letter snapshot.",
+          updatedAt: "2026-08-05T18:03:00.000Z",
+          observedSourceIndexes: [0, 1, 2, 3, 4],
+          selectedAnswerLetter: "Z",
+        },
+      },
+    }),
+  );
+  assert.deepEqual(
+    readMkLabQaFeedback(storage, MK_ROUNDS, MK_CONTENT_VERSION),
+    {
+      [validRound.id]: {
+        verdict: "looks-good",
+        issues: [],
+        notes: "Checked on a phone.",
+        updatedAt: "2026-08-05T18:01:00.000Z",
+        observedSourceIndexes: [1, 3, 0, 4, 2],
+        selectedAnswerLetter: null,
+      },
+    },
+    "one malformed note must not hide valid feedback",
+  );
+  assert.deepEqual(
+    new Set(MK_LAB_QA_ISSUES),
+    new Set([
+      "answer-key",
+      "prompt-wording",
+      "image-diagram",
+      "classification",
+      "layout-accessibility",
+      "other",
+    ]),
+  );
+
+  const blocked = {
+    getItem() {
+      throw new Error("blocked");
+    },
+    setItem() {
+      throw new Error("blocked");
+    },
+  };
+  assert.equal(
+    readMkLabQaFeedback(blocked, MK_ROUNDS, MK_CONTENT_VERSION),
+    null,
+  );
+  assert.equal(
+    writeMkLabQaFeedback(blocked, {}, MK_CONTENT_VERSION),
+    false,
+  );
 });

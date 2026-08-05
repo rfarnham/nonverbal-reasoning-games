@@ -35,11 +35,23 @@ import {
   type MkLabPointFilter,
 } from "./engine";
 import {
+  MK_LAB_QA_ISSUES,
+  captureMkLabQaObservation,
+  emptyMkLabQaEntry,
   emptyMkLabProgress,
+  hasMkLabQaFeedback,
+  readMkLabQaArchives,
+  readMkLabQaFeedback,
   readMkLabProgress,
   restoreMkLabDraw,
+  writeMkLabQaFeedback,
   writeMkLabProgress,
   type MkLabProgress,
+  type MkLabQaArchive,
+  type MkLabQaEntry,
+  type MkLabQaFeedback,
+  type MkLabQaIssue,
+  type MkLabQaVerdict,
 } from "./storage";
 
 import styles from "./math-kangaroo-lab.module.css";
@@ -47,6 +59,16 @@ import styles from "./math-kangaroo-lab.module.css";
 const basePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
 
 type AnswerPhase = "answering" | "reviewing" | "retry" | "solved";
+type PendingQaAction = "reset-progress" | "clear-feedback" | null;
+
+const QA_ISSUE_LABELS: Readonly<Record<MkLabQaIssue, string>> = {
+  "answer-key": "Answer or key",
+  "prompt-wording": "Prompt wording",
+  "image-diagram": "Image or diagram",
+  classification: "Grade, points, or type",
+  "layout-accessibility": "Layout or accessibility",
+  other: "Other",
+};
 
 function isEditableTarget(target: EventTarget | null): boolean {
   return (
@@ -80,16 +102,26 @@ export function MathKangarooLabClient() {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [hydrated, setHydrated] = useState(false);
+  const [qaMode, setQaMode] = useState(false);
+  const [qaFeedback, setQaFeedback] = useState<MkLabQaFeedback>({});
+  const [qaArchives, setQaArchives] = useState<readonly MkLabQaArchive[]>([]);
+  const [qaSaveStatus, setQaSaveStatus] = useState("");
+  const [pendingQaAction, setPendingQaAction] =
+    useState<PendingQaAction>(null);
   const [progress, setProgress] = useState<MkLabProgress>(
     emptyMkLabProgress,
   );
   const progressRef = useRef<MkLabProgress>(emptyMkLabProgress());
+  const qaFeedbackRef = useRef<MkLabQaFeedback>({});
   const currentRoundIdRef = useRef<string | undefined>(undefined);
   const appliedFilterKeyRef = useRef<string | null>(null);
   const focusAnswersRef = useRef(false);
   const answerRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const retryButtonRef = useRef<HTMLButtonElement>(null);
   const nextButtonRef = useRef<HTMLButtonElement>(null);
+  const qaSummaryRef = useRef<HTMLElement>(null);
+  const qaCancelButtonRef = useRef<HTMLButtonElement>(null);
+  const qaConfirmationTriggerRef = useRef<HTMLButtonElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
 
   const matchingRounds = useMemo(
@@ -113,7 +145,7 @@ export function MathKangarooLabClient() {
   const persistProgress = useCallback((next: MkLabProgress) => {
     progressRef.current = next;
     setProgress(next);
-    writeMkLabProgress(deviceStorage(), next, MK_CONTENT_VERSION);
+    return writeMkLabProgress(deviceStorage(), next, MK_CONTENT_VERSION);
   }, []);
 
   const drawQuestion = useCallback(
@@ -128,7 +160,7 @@ export function MathKangarooLabClient() {
       const nextSeenIds = next && !saved.seenIds.includes(next.round.id)
         ? [...saved.seenIds, next.round.id]
         : saved.seenIds;
-      persistProgress({
+      const savedOnDevice = persistProgress({
         ...saved,
         filters: activeFilters,
         seenIds: nextSeenIds,
@@ -146,24 +178,43 @@ export function MathKangarooLabClient() {
       });
       setSelectedIndex(null);
       setPhase("answering");
+      setPendingQaAction(null);
       focusAnswersRef.current = focusAnswer;
       setDraw(next);
       currentRoundIdRef.current = next?.round.id;
+      return savedOnDevice;
     },
     [persistProgress],
   );
 
   useEffect(() => {
+    const storage = deviceStorage();
     const loaded =
       readMkLabProgress(
-        deviceStorage(),
+        storage,
         MK_ROUNDS,
         MK_CONTENT_VERSION,
       ) ?? emptyMkLabProgress();
+    const loadedQa =
+      readMkLabQaFeedback(
+        storage,
+        MK_ROUNDS,
+        MK_CONTENT_VERSION,
+      ) ?? {};
+    const loadedQaArchives = readMkLabQaArchives(
+      storage,
+      MK_CONTENT_VERSION,
+    );
     const restored = restoreMkLabDraw(loaded, MK_ROUNDS);
     const timer = window.setTimeout(() => {
       progressRef.current = loaded;
+      qaFeedbackRef.current = loadedQa;
       setProgress(loaded);
+      setQaFeedback(loadedQa);
+      setQaArchives(loadedQaArchives);
+      setQaMode(
+        new URLSearchParams(window.location.search).get("qa") === "1",
+      );
       setFilters(loaded.filters);
       if (restored && loaded.current) {
         setDraw(restored);
@@ -222,6 +273,14 @@ export function MathKangarooLabClient() {
     return () => window.cancelAnimationFrame(frame);
   }, [phase]);
 
+  useEffect(() => {
+    if (!pendingQaAction) return;
+    const frame = window.requestAnimationFrame(() => {
+      qaCancelButtonRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [pendingQaAction]);
+
   useEffect(
     () => () => {
       const context = audioContextRef.current;
@@ -233,6 +292,35 @@ export function MathKangarooLabClient() {
     [],
   );
 
+  const captureQaObservation = useCallback(
+    (activeDraw: MkLabDraw, answerIndex: number) => {
+      const existing = qaFeedbackRef.current[activeDraw.round.id];
+      if (!existing || !hasMkLabQaFeedback(existing)) return;
+      const observedSourceIndexes = activeDraw.answers.map(
+        ({ sourceIndex }) => sourceIndex,
+      ) as unknown as NonNullable<MkLabQaEntry["observedSourceIndexes"]>;
+      const entry = captureMkLabQaObservation(
+        existing,
+        observedSourceIndexes,
+        activeDraw.answers[answerIndex]?.letter ?? null,
+      );
+      if (entry === existing) return;
+      const next: MkLabQaFeedback = {
+        ...qaFeedbackRef.current,
+        [activeDraw.round.id]: entry,
+      };
+      qaFeedbackRef.current = next;
+      setQaFeedback(next);
+      const saved = writeMkLabQaFeedback(
+        deviceStorage(),
+        next,
+        MK_CONTENT_VERSION,
+      );
+      setQaSaveStatus(saved ? "Saved on this device" : "Could not save locally");
+    },
+    [],
+  );
+
   const chooseAnswer = useCallback(
     (index: number) => {
       if (!draw || phase !== "answering") return;
@@ -240,6 +328,7 @@ export function MathKangarooLabClient() {
       const saved = progressRef.current;
       if (!saved.current || saved.current.roundId !== draw.round.id) return;
       setSelectedIndex(index);
+      captureQaObservation(draw, index);
       if (soundEnabled) {
         const context = ensureAudio();
         if (context) playFeedbackEarcon(context, correct);
@@ -270,7 +359,7 @@ export function MathKangarooLabClient() {
         setPhase("reviewing");
       }
     },
-    [draw, ensureAudio, persistProgress, phase, soundEnabled],
+    [captureQaObservation, draw, ensureAudio, persistProgress, phase, soundEnabled],
   );
 
   useEffect(() => {
@@ -328,6 +417,132 @@ export function MathKangarooLabClient() {
     drawQuestion(filters, true);
   }, [drawQuestion, filters]);
 
+  const resetPlayProgress = useCallback(() => {
+    const fresh: MkLabProgress = {
+      ...emptyMkLabProgress(),
+      filters,
+    };
+    currentRoundIdRef.current = undefined;
+    persistProgress(fresh);
+    qaConfirmationTriggerRef.current = null;
+    const savedOnDevice = drawQuestion(filters, true);
+    setQaSaveStatus(
+      savedOnDevice
+        ? "Play progress started over; QA notes were kept"
+        : "Progress restarted for this tab, but this device could not save it",
+    );
+  }, [drawQuestion, filters, persistProgress]);
+
+  const updateQaEntry = useCallback(
+    (roundId: string, update: Partial<Omit<MkLabQaEntry, "updatedAt">>) => {
+      const current = qaFeedbackRef.current;
+      const existing = current[roundId] ?? emptyMkLabQaEntry();
+      const updatedEntry: MkLabQaEntry = {
+        ...existing,
+        ...update,
+        updatedAt: new Date().toISOString(),
+      };
+      const entry =
+        draw && draw.round.id === roundId
+          ? captureMkLabQaObservation(
+              updatedEntry,
+              draw.answers.map(
+                ({ sourceIndex }) => sourceIndex,
+              ) as unknown as NonNullable<
+                MkLabQaEntry["observedSourceIndexes"]
+              >,
+              selectedIndex === null
+                ? null
+                : draw.answers[selectedIndex]?.letter ?? null,
+            )
+          : updatedEntry;
+      const next: Partial<Record<string, MkLabQaEntry>> = { ...current };
+      if (hasMkLabQaFeedback(entry)) next[roundId] = entry;
+      else delete next[roundId];
+      qaFeedbackRef.current = next;
+      setQaFeedback(next);
+      const saved = writeMkLabQaFeedback(
+        deviceStorage(),
+        next,
+        MK_CONTENT_VERSION,
+      );
+      setQaSaveStatus(saved ? "Saved on this device" : "Could not save locally");
+    },
+    [draw, selectedIndex],
+  );
+
+  const exportQaFeedback = useCallback(() => {
+    const roundsById = new Map(MK_ROUNDS.map((item) => [item.id, item]));
+    const exportItems = (feedbackByRound: MkLabQaFeedback) =>
+      Object.entries(feedbackByRound)
+        .filter(([, entry]) => hasMkLabQaFeedback(entry))
+        .map(([roundId, feedback]) => {
+          const item = roundsById.get(roundId);
+          return {
+            roundId,
+            ...(item
+              ? {
+                  source: {
+                    year: item.source.year,
+                    gradeBand: item.source.gradeBand,
+                    questionNumber: item.source.questionNumber,
+                  },
+                  points: mathKangarooPointValue(item.source.questionNumber),
+                  spatialType: item.mechanic,
+                }
+              : {}),
+            feedback,
+          };
+        })
+        .sort((left, right) => left.roundId.localeCompare(right.roundId));
+    const payload = {
+      schemaVersion: 1,
+      exportedAt: new Date().toISOString(),
+      contentVersion: MK_CONTENT_VERSION,
+      catalogueSize: MK_ROUNDS.length,
+      items: exportItems(qaFeedback),
+      archivedContentVersions: qaArchives.map(
+        ({ contentVersion, feedback }) => ({
+          contentVersion,
+          items: exportItems(feedback),
+        }),
+      ),
+    };
+    const blob = new Blob([`${JSON.stringify(payload, null, 2)}\n`], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `math-kangaroo-qa-${MK_CONTENT_VERSION}.json`;
+    anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }, [qaArchives, qaFeedback]);
+
+  const clearQaFeedback = useCallback(() => {
+    const next: MkLabQaFeedback = {};
+    qaFeedbackRef.current = next;
+    setQaFeedback(next);
+    const saved = writeMkLabQaFeedback(
+      deviceStorage(),
+      next,
+      MK_CONTENT_VERSION,
+    );
+    setQaSaveStatus(
+      saved ? "All QA notes cleared" : "Could not clear saved QA notes",
+    );
+    qaConfirmationTriggerRef.current = null;
+    setPendingQaAction(null);
+    window.requestAnimationFrame(() => qaSummaryRef.current?.focus());
+  }, []);
+
+  const cancelPendingQaAction = useCallback(() => {
+    const trigger = qaConfirmationTriggerRef.current;
+    qaConfirmationTriggerRef.current = null;
+    setPendingQaAction(null);
+    window.requestAnimationFrame(() => trigger?.focus());
+  }, []);
+
   const round = draw?.round ?? null;
   const usesSemanticChoices =
     round?.choices.every(({ displayText }) => displayText !== undefined) ?? false;
@@ -348,6 +563,17 @@ export function MathKangarooLabClient() {
           : {}),
       }
     : undefined;
+  const currentQaEntry = round
+    ? qaFeedback[round.id] ?? emptyMkLabQaEntry()
+    : emptyMkLabQaEntry();
+  const qaFeedbackCount = Object.values(qaFeedback).filter(
+    hasMkLabQaFeedback,
+  ).length;
+  const qaArchiveCount = qaArchives.reduce(
+    (total, archive) =>
+      total + Object.values(archive.feedback).filter(hasMkLabQaFeedback).length,
+    0,
+  );
 
   return (
     <div className={styles.shell}>
@@ -372,11 +598,11 @@ export function MathKangarooLabClient() {
       <main className={styles.main}>
         <section className={styles.labIntro} aria-labelledby="lab-title">
           <div>
-            <p className={styles.kicker}>The Lab</p>
+            <p className={styles.kicker}>{qaMode ? "QA mode" : "The Lab"}</p>
             <h1 id="lab-title">Math Kangaroo shuffle</h1>
             <p>
-              Draw from 168 reviewed spatial questions. Set the mix, then solve
-              at your own pace.
+              Draw from {MK_ROUNDS.length} reviewed spatial questions. Set the
+              mix, then solve at your own pace.
             </p>
             <dl
               className={styles.progressSummary}
@@ -396,6 +622,12 @@ export function MathKangarooLabClient() {
                   {progress.seenIds.length} / {MK_ROUNDS.length}
                 </dd>
               </div>
+              {qaMode ? (
+                <div>
+                  <dt>QA notes</dt>
+                  <dd>{qaFeedbackCount}</dd>
+                </div>
+              ) : null}
             </dl>
             <p className={styles.progressNote}>
               Progress is saved on this device.
@@ -515,6 +747,7 @@ export function MathKangarooLabClient() {
                   {mathKangarooPointValue(round.source.questionNumber)} points
                 </span>
                 <span>{MK_LAB_MECHANIC_LABELS[round.mechanic]}</span>
+                {qaMode ? <span>QA ID: {round.id}</span> : null}
               </div>
               <h2 className={styles.prompt} id="mk-lab-question-title">
                 {round.prompt}
@@ -665,6 +898,183 @@ export function MathKangarooLabClient() {
                 Use A–E or number keys 1–5.
               </p>
             )}
+
+            {qaMode ? (
+              <details className={styles.qaPanel} open>
+                <summary ref={qaSummaryRef}>
+                  <span>
+                    <strong>QA notes</strong>
+                    <small>Saved locally; excluded from your score</small>
+                  </span>
+                  <span className={styles.qaSummaryMeta}>
+                    <span className={styles.qaCount}>
+                      {qaFeedbackCount} saved
+                      {qaArchiveCount > 0
+                        ? ` · ${qaArchiveCount} archived`
+                        : ""}
+                    </span>
+                    <span className={styles.qaChevron} aria-hidden="true">
+                      ▾
+                    </span>
+                  </span>
+                </summary>
+                <div className={styles.qaBody}>
+                  <div className={styles.qaReference}>
+                    <div>
+                      <span>Question ID</span>
+                      <code>{round.id}</code>
+                    </div>
+                    <div>
+                      <span>Content version</span>
+                      <code>{MK_CONTENT_VERSION}</code>
+                    </div>
+                    <div>
+                      <span>Current answer order</span>
+                      <code>
+                        {draw.answers
+                          .map(
+                            ({ letter, sourceIndex }) =>
+                              `${letter}←${sourceIndex + 1}`,
+                          )
+                          .join(" · ")}
+                      </code>
+                    </div>
+                    <div>
+                      <span>Filtered pool</span>
+                      <code>{draw.poolSize} questions</code>
+                    </div>
+                  </div>
+
+                  <label className={styles.qaVerdict}>
+                    <span>Review verdict</span>
+                    <select
+                      value={currentQaEntry.verdict}
+                      onChange={(event) =>
+                        updateQaEntry(round.id, {
+                          verdict: event.target.value as MkLabQaVerdict,
+                        })
+                      }
+                    >
+                      <option value="unreviewed">Not reviewed</option>
+                      <option value="looks-good">Looks good</option>
+                      <option value="needs-change">Needs change</option>
+                    </select>
+                  </label>
+
+                  <fieldset className={styles.qaIssues}>
+                    <legend>What needs attention?</legend>
+                    <div>
+                      {MK_LAB_QA_ISSUES.map((issue) => (
+                        <label key={issue}>
+                          <input
+                            type="checkbox"
+                            checked={currentQaEntry.issues.includes(issue)}
+                            onChange={(event) => {
+                              const issues = event.target.checked
+                                ? [...currentQaEntry.issues, issue]
+                                : currentQaEntry.issues.filter(
+                                    (currentIssue) => currentIssue !== issue,
+                                  );
+                              updateQaEntry(round.id, { issues });
+                            }}
+                          />
+                          <span>{QA_ISSUE_LABELS[issue]}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+
+                  <label className={styles.qaNotes}>
+                    <span>Notes</span>
+                    <textarea
+                      value={currentQaEntry.notes}
+                      maxLength={4_000}
+                      rows={4}
+                      placeholder="Describe what you saw and what you expected."
+                      onChange={(event) =>
+                        updateQaEntry(round.id, { notes: event.target.value })
+                      }
+                    />
+                  </label>
+
+                  <div className={styles.qaActions}>
+                    <p role="status" aria-live="polite">
+                      {qaSaveStatus ||
+                        (qaArchiveCount > 0
+                          ? "Earlier catalogue feedback is preserved and included in downloads."
+                          : "Changes save automatically on this device.")}
+                    </p>
+                    <div>
+                      <button
+                        className={styles.secondaryButton}
+                        type="button"
+                        onClick={(event) => {
+                          qaConfirmationTriggerRef.current = event.currentTarget;
+                          setPendingQaAction("reset-progress");
+                        }}
+                      >
+                        Start play progress over
+                      </button>
+                      <button
+                        className={styles.secondaryButton}
+                        type="button"
+                        onClick={(event) => {
+                          qaConfirmationTriggerRef.current = event.currentTarget;
+                          setPendingQaAction("clear-feedback");
+                        }}
+                        disabled={qaFeedbackCount === 0}
+                      >
+                        Clear QA notes
+                      </button>
+                      <button
+                        className={styles.primaryButton}
+                        type="button"
+                        onClick={exportQaFeedback}
+                        disabled={qaFeedbackCount + qaArchiveCount === 0}
+                      >
+                        Download QA feedback
+                      </button>
+                    </div>
+                  </div>
+                  {pendingQaAction ? (
+                    <div
+                      className={styles.qaConfirm}
+                      role="group"
+                      aria-labelledby="qa-confirm-message"
+                    >
+                      <p id="qa-confirm-message" role="status">
+                        {pendingQaAction === "reset-progress"
+                          ? "Start play progress over? Saved QA notes will be kept."
+                          : "Delete every saved QA note for this content version? This cannot be undone."}
+                      </p>
+                      <div>
+                        <button
+                          className={styles.secondaryButton}
+                          type="button"
+                          onClick={cancelPendingQaAction}
+                          ref={qaCancelButtonRef}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          className={styles.primaryButton}
+                          type="button"
+                          onClick={
+                            pendingQaAction === "reset-progress"
+                              ? resetPlayProgress
+                              : clearQaFeedback
+                          }
+                        >
+                          {pendingQaAction === "reset-progress"
+                            ? "Yes, start over"
+                            : "Yes, clear notes"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </details>
+            ) : null}
           </div>
         ) : !hydrated ? (
           <p className={styles.status} role="status">
