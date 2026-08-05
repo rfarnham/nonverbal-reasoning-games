@@ -57,6 +57,7 @@ import {
   type SessionMode,
 } from "./session-engine";
 import { SpokenAnswerStreamGate } from "./speech-answer-stream";
+import { AdaptiveSubtractionCurriculum } from "./adaptive-curriculum";
 import styles from "./subtraction-flash.module.css";
 
 type AnswerMode = "tap" | "draw" | "speak";
@@ -1028,6 +1029,7 @@ function SpeechAnswer({
 }
 
 export default function SubtractionFlashPage() {
+  const [adaptiveOpen, setAdaptiveOpen] = useState(false);
   const [mode, setMode] = useState<PracticeMode>("visual");
   const [answerMode, setAnswerMode] = useState<AnswerMode>("tap");
   const [rounds, setRounds] = useState<ModeRounds>({
@@ -1797,28 +1799,32 @@ export default function SubtractionFlashPage() {
           <ArrowLeftIcon />
         </Link>
 
-        <nav className={styles.modeSwitch} aria-label="Practice style">
-          <button
-            className={styles.modeButton}
-            type="button"
-            aria-pressed={mode === "visual"}
-            disabled={sessionPhase !== "choosing"}
-            onClick={() => handleModeChange("visual")}
-          >
-            <CardsIcon />
-            Cards
-          </button>
-          <button
-            className={styles.modeButton}
-            type="button"
-            aria-pressed={mode === "listen"}
-            disabled={sessionPhase !== "choosing"}
-            onClick={() => handleModeChange("listen")}
-          >
-            <SpeakerIcon />
-            Listen
-          </button>
-        </nav>
+        {adaptiveOpen ? (
+          <div className={styles.adaptiveModeLabel}>Adaptive practice</div>
+        ) : (
+          <nav className={styles.modeSwitch} aria-label="Practice style">
+            <button
+              className={styles.modeButton}
+              type="button"
+              aria-pressed={mode === "visual"}
+              disabled={sessionPhase !== "choosing"}
+              onClick={() => handleModeChange("visual")}
+            >
+              <CardsIcon />
+              Cards
+            </button>
+            <button
+              className={styles.modeButton}
+              type="button"
+              aria-pressed={mode === "listen"}
+              disabled={sessionPhase !== "choosing"}
+              onClick={() => handleModeChange("listen")}
+            >
+              <SpeakerIcon />
+              Listen
+            </button>
+          </nav>
+        )}
 
         <button
           className={styles.soundButton}
@@ -1840,7 +1846,13 @@ export default function SubtractionFlashPage() {
           <h1 className={styles.visuallyHidden} id="game-heading">
             Borrow Flash
           </h1>
-          {sessionPhase === "choosing" ? (
+          {adaptiveOpen ? (
+            <AdaptiveSubtractionCurriculum
+              soundEnabled={soundEnabled}
+              onFeedback={playEarcon}
+              onExit={() => setAdaptiveOpen(false)}
+            />
+          ) : sessionPhase === "choosing" ? (
             <section
               className={styles.sessionChooser}
               aria-labelledby="session-choice-heading"
@@ -1862,6 +1874,16 @@ export default function SubtractionFlashPage() {
                     <span>{SESSION_DESCRIPTIONS[sessionMode]}</span>
                   </button>
                 ))}
+                <button
+                  className={`${styles.sessionChoice} ${styles.adaptiveSessionChoice}`}
+                  type="button"
+                  onClick={() => setAdaptiveOpen(true)}
+                >
+                  <strong>Adaptive practice</strong>
+                  <span>
+                    A short, finite mix that finds the next useful step
+                  </span>
+                </button>
               </div>
             </section>
           ) : (
