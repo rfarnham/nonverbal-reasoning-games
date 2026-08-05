@@ -36,6 +36,7 @@ from math_kangaroo_trainer.storage.catalogue_repository import (
     CATALOGUE_DATABASE_SCHEMA_VERSION,
     CatalogueRepository,
     _migration_v1,
+    _secure_catalogue_sqlite_files,
     migrate_catalogue_database,
     secure_catalogue_directory,
 )
@@ -257,7 +258,27 @@ def test_catalogue_migration_refuses_stage0_database(tmp_path: Path) -> None:
         )
 
 
-def test_catalogue_migration_restricts_resumed_database_and_wal_sidecars(
+def test_catalogue_sqlite_hardening_restricts_database_and_wal_sidecars(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "catalogue.sqlite3"
+    database.write_bytes(b"invented database")
+    wal = Path(f"{database}-wal")
+    shm = Path(f"{database}-shm")
+    wal.write_bytes(b"invented stale wal")
+    shm.write_bytes(b"invented stale shm")
+    database.chmod(0o644)
+    wal.chmod(0o644)
+    shm.chmod(0o666)
+
+    _secure_catalogue_sqlite_files(database)
+
+    assert stat.S_IMODE(database.stat().st_mode) == 0o600
+    assert stat.S_IMODE(wal.stat().st_mode) == 0o600
+    assert stat.S_IMODE(shm.stat().st_mode) == 0o600
+
+
+def test_catalogue_migration_leaves_no_permissive_sqlite_sidecars(
     tmp_path: Path,
 ) -> None:
     database = tmp_path / "catalogue.sqlite3"
@@ -273,8 +294,10 @@ def test_catalogue_migration_restricts_resumed_database_and_wal_sidecars(
     migrate_catalogue_database(database)
 
     assert stat.S_IMODE(database.stat().st_mode) == 0o600
-    assert stat.S_IMODE(wal.stat().st_mode) == 0o600
-    assert stat.S_IMODE(shm.stat().st_mode) == 0o600
+    for sidecar in (wal, shm):
+        # SQLite may delete invalid stale sidecars while opening the database;
+        # if it retains one, the migration must leave it private.
+        assert not sidecar.exists() or stat.S_IMODE(sidecar.stat().st_mode) == 0o600
 
 
 def test_catalogue_database_symlink_is_rejected_without_chmodding_target(
