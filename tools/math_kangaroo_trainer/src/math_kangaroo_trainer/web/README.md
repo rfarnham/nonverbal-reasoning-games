@@ -133,9 +133,35 @@ GET  /api/catalogue/taxonomy
 PUT  /api/catalogue/taxonomy/skills/{skill_id}/review
 GET  /api/catalogue/items/{item_id}/neighbors
 PUT  /api/catalogue/items/{item_id}/neighbors/{neighbor_id}/review
+GET  /api/catalogue/map?view={surface|tag|hybrid}&item_id={optional_stable_id}
+POST /api/catalogue/explore
 POST /api/catalogue/recommendations/preview
 GET  /api/catalogue/export
 ```
+
+The Problem Space explorer requests a compact, content-minimized two-dimensional
+projection from `map`. Every mapped point supplies a stable item ID, finite `x`
+and `y` coordinates, grade band, published point tier, primary domain, question
+type, and optional cluster and review/proposal state. A tagless item is returned
+as explicitly unmapped in Proposed taxonomy view rather than placed at a fake
+origin. The response identifies its actual projection method, version, measured
+neighbor preservation, and non-authoritative cluster evidence; the UI does not
+infer or rename the method.
+
+Arbitrary pasted question text is sent only in the JSON body of `explore`:
+
+```json
+{ "query": "question ID or pasted text", "view": "hybrid", "limit": 8 }
+```
+
+It is never put into the address bar, browser history, or a GET query. `explore`
+returns a short ranked candidate list with bounded prompt excerpts, allowlisted
+source labels, ranking components, and classification provenance so the teacher
+can disambiguate without loading the whole corpus. Exact IDs resolve through
+the same POST contract. Tag-only pasted-text queries are unavailable because
+text has no proposal-tag vector; Hybrid renormalizes over its available Surface
+evidence. Walking from a resolved question reuses the existing item-neighbor
+route. Unsupported or low-signal pasted text returns no confident matches.
 
 Question, neighbor, and skill judgements use optimistic `If-Match` revisions
 and append-only history. The export uses an explicit allowlist and contains no

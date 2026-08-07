@@ -16,6 +16,10 @@ from math_kangaroo_trainer.cli import main
 from math_kangaroo_trainer.config import default_ontology_path
 from math_kangaroo_trainer.retrieval import StaleSemanticArtifactError
 from math_kangaroo_trainer.web.catalogue_server import (
+    MAX_EXPLORE_PROMPT_EXCERPT_CHARACTERS,
+    MAX_EXPLORE_QUERY_CHARACTERS,
+    MAX_EXPLORE_SOURCE_LABEL_CHARACTERS,
+    MAX_REQUEST_BYTES,
     CatalogueWebApplication,
     create_catalogue_server,
 )
@@ -220,6 +224,67 @@ def test_catalogue_http_exposes_taxonomy_neighbors_and_policy_without_bulk_conte
             summary["semantic_retrieval"]["represents_mastery_or_difficulty"] is False
         )
 
+        status, _, data = request(port, "GET", "/api/catalogue/map?view=hybrid")
+        problem_map = decoded(data)
+        assert status == HTTPStatus.OK
+        assert problem_map["projection"]["exploratory"] is True
+        assert problem_map["projection"]["represents_mastery_or_difficulty"] is False
+        assert "PCA initialization" in problem_map["projection"]["method"]
+        projection = problem_map["projection"]
+        quality = projection["quality"]
+        assert "effective_facets" not in projection
+        assert projection["source_metric"] == quality["source_metric"]
+        assert projection["source_metric"] == (
+            "mean-bidirectional-anchor-renormalized-similarity.v1"
+        )
+        assert projection["configured_weights"] == {
+            "surface": application.semantic_index.config.surface_weight,
+            "tag": application.semantic_index.config.tag_weight,
+            "strategy": application.semantic_index.config.strategy_weight,
+        }
+        assert projection["configured_weight_scope"] == (
+            "semantic_index_configuration_not_pairwise_effective_weights"
+        )
+        assert projection["missing_facet_policy"] == (
+            "anchor_available_facets_renormalized_per_direction_then_mean_bidirectional"
+        )
+        assert quality["candidate_count"] == sum(
+            point["mapped"] for point in problem_map["points"]
+        )
+        assert quality["knn_overlap_improvement"] == round(
+            quality["knn_overlap"] - quality["pca_knn_overlap"], 6
+        )
+        assert len(problem_map["points"]) == 120
+        assert 1 <= len(problem_map["clusters"]) <= 14
+        assert (
+            "EXPLORATORY_PROJECTION_NOT_MASTERY_OR_DIFFICULTY"
+            in (problem_map["warnings"])
+        )
+        map_serialized = data.decode("utf-8")
+        assert "Invented prompt" not in map_serialized
+        assert "official_answer" not in map_serialized
+        assert "local_ref" not in map_serialized
+        assert "notes" not in map_serialized
+
+        status, _, data = request(port, "GET", "/api/catalogue/map?view=surface")
+        surface_map = decoded(data)
+        assert status == HTTPStatus.OK
+        assert surface_map["projection"]["source_metric"] == (
+            "surface-cosine-similarity.v1"
+        )
+        assert surface_map["projection"]["missing_facet_policy"] == (
+            "single_facet_view_items_without_selected_signal_are_unmapped"
+        )
+        hybrid_positions = {
+            point["item_id"]: (point["x"], point["y"])
+            for point in problem_map["points"]
+        }
+        surface_positions = {
+            point["item_id"]: (point["x"], point["y"])
+            for point in surface_map["points"]
+        }
+        assert hybrid_positions != surface_positions
+
         status, _, data = request(port, "GET", "/api/catalogue/items?limit=5")
         listing = decoded(data)
         assert status == HTTPStatus.OK
@@ -227,6 +292,58 @@ def test_catalogue_http_exposes_taxonomy_neighbors_and_policy_without_bulk_conte
         assert len(listing["items"]) == 5
         assert "Invented prompt" not in data.decode("utf-8")
         item_id = listing["items"][0]["item_id"]
+
+        status, _, data = request(
+            port,
+            "POST",
+            "/api/catalogue/explore",
+            {
+                "query": (
+                    "Invented duplicate prompt: arrange the imaginary tokens. "
+                    "Private paste sentinel 79f333a8"
+                ),
+                "view": "hybrid",
+                "limit": 4,
+            },
+            headers={"Origin": f"http://127.0.0.1:{port}"},
+        )
+        exploration = decoded(data)
+        assert status == HTTPStatus.OK
+        assert exploration["query_kind"] == "pasted_text"
+        assert exploration["query_echoed"] is False
+        assert exploration["effective_weights"] == {"surface": 1.0}
+        assert "TEXT_QUERY_HAS_NO_TAG_VECTOR" in exploration["warnings"]
+        assert len(exploration["neighbors"]) == 4
+        assert "Private paste sentinel 79f333a8" not in data.decode("utf-8")
+
+        status, _, data = request(
+            port,
+            "POST",
+            "/api/catalogue/explore",
+            {"query": item_id, "view": "surface", "limit": 3},
+            headers={"Origin": f"http://127.0.0.1:{port}"},
+        )
+        id_exploration = decoded(data)
+        assert status == HTTPStatus.OK
+        assert id_exploration["query_kind"] == "item_id"
+        assert id_exploration["query_item_id"] == item_id
+        assert len(id_exploration["neighbors"]) == 3
+
+        status, _, _ = request(
+            port,
+            "POST",
+            "/api/catalogue/explore",
+            {"query": "pasted text", "view": "tag"},
+            headers={"Origin": f"http://127.0.0.1:{port}"},
+        )
+        assert status == HTTPStatus.UNPROCESSABLE_ENTITY
+
+        status, _, _ = request(
+            port,
+            "GET",
+            f"/api/catalogue/map?view=hybrid&item_id={item_id}",
+        )
+        assert status == HTTPStatus.OK
 
         status, _, data = request(port, "GET", f"/api/catalogue/items/{item_id}")
         detail = decoded(data)
@@ -375,6 +492,275 @@ def test_catalogue_http_exposes_taxonomy_neighbors_and_policy_without_bulk_conte
         assert b"Corpus QA" in page
         status, _, _ = request(port, "GET", "/api/catalogue/items/%2e%2e%2fetc/asset")
         assert status == HTTPStatus.BAD_REQUEST
+
+
+def test_explore_returns_bounded_corpus_context_without_echoing_pasted_text(
+    synthetic_bank: Path, tmp_path: Path
+) -> None:
+    compact = CatalogueWebApplication._compact_text(
+        "  first\nsecond  " + "x" * MAX_EXPLORE_PROMPT_EXCERPT_CHARACTERS,
+        max_characters=MAX_EXPLORE_PROMPT_EXCERPT_CHARACTERS,
+    )
+    assert len(compact) == MAX_EXPLORE_PROMPT_EXCERPT_CHARACTERS
+    assert compact.startswith("first second ")
+    assert compact.endswith("…")
+    assert (
+        CatalogueWebApplication._compact_text(
+            {"unexpected": "private payload"},
+            max_characters=MAX_EXPLORE_PROMPT_EXCERPT_CHARACTERS,
+        )
+        == ""
+    )
+
+    output = tmp_path / "catalogue"
+    build_catalogue(synthetic_bank, output)
+    with running_catalogue(synthetic_bank, output) as (application, port):
+        private_query = (
+            "Invented duplicate prompt: arrange the imaginary tokens. "
+            "Private teacher paste sentinel 4b6f4e16"
+        )
+        status, _, data = request(
+            port,
+            "POST",
+            "/api/catalogue/explore",
+            {"query": private_query, "view": "hybrid", "limit": 4},
+            headers={"Origin": f"http://127.0.0.1:{port}"},
+        )
+        payload = decoded(data)
+        serialized = data.decode("utf-8")
+
+        assert status == HTTPStatus.OK
+        assert payload["query_kind"] == "pasted_text"
+        assert payload["query_item_id"] is None
+        assert payload["query_echoed"] is False
+        assert "query" not in payload
+        assert private_query not in serialized
+        assert str(tmp_path) not in serialized
+        assert "local_ref" not in serialized
+        assert "official_answer" not in serialized
+        assert len(payload["neighbors"]) == 4
+
+        required_keys = {
+            "item_id",
+            "rank",
+            "score",
+            "score_components",
+            "prompt_excerpt",
+            "source_label",
+            "primary_domain",
+            "question_type",
+            "skill_ids",
+            "representation_ids",
+            "cognitive_demand",
+            "classification_source",
+            "classification_content_version",
+            "review_state",
+            "grade_band",
+            "published_point_tier",
+        }
+        for neighbor in payload["neighbors"]:
+            assert required_keys <= set(neighbor)
+            record = application._items[neighbor["item_id"]]
+            expected_prompt = application._compact_text(
+                record.item.learner_payload.get("stem_markdown", ""),
+                max_characters=MAX_EXPLORE_PROMPT_EXCERPT_CHARACTERS,
+            )
+            assert neighbor["prompt_excerpt"] == expected_prompt
+            assert len(neighbor["prompt_excerpt"]) <= (
+                MAX_EXPLORE_PROMPT_EXCERPT_CHARACTERS
+            )
+            assert "\n" not in neighbor["prompt_excerpt"]
+            assert neighbor["source_label"] == application._compact_text(
+                application._source_label(record),
+                max_characters=MAX_EXPLORE_SOURCE_LABEL_CHARACTERS,
+            )
+            assert len(neighbor["source_label"]) <= (
+                MAX_EXPLORE_SOURCE_LABEL_CHARACTERS
+            )
+            assert neighbor["classification_source"] == "proposal"
+            assert neighbor["classification_content_version"] == (
+                record.item.content_version
+            )
+            assert neighbor["review_state"] == "unreviewed"
+
+        unsupported_query = (
+            "zxqv flibbertigibbet private sentinel 831a05f7 with no corpus evidence"
+        )
+        status, _, data = request(
+            port,
+            "POST",
+            "/api/catalogue/explore",
+            {"query": unsupported_query, "view": "hybrid", "limit": 4},
+            headers={"Origin": f"http://127.0.0.1:{port}"},
+        )
+        unsupported = decoded(data)
+        assert status == HTTPStatus.OK
+        assert unsupported["query_kind"] == "pasted_text"
+        assert unsupported["query_item_id"] is None
+        assert unsupported["query_echoed"] is False
+        assert unsupported["neighbors"] == []
+        assert {
+            "TEXT_QUERY_NO_CORPUS_EVIDENCE",
+            "TEXT_QUERY_LOW_CORPUS_EVIDENCE",
+        }.intersection(unsupported["warnings"])
+        assert unsupported_query not in data.decode("utf-8")
+
+
+def test_explore_enforces_query_origin_and_body_bounds(
+    synthetic_bank: Path, tmp_path: Path
+) -> None:
+    output = tmp_path / "catalogue"
+    build_catalogue(synthetic_bank, output)
+    with running_catalogue(synthetic_bank, output) as (_, port):
+        status, _, data = request(
+            port,
+            "POST",
+            "/api/catalogue/explore",
+            {"query": "x" * (MAX_EXPLORE_QUERY_CHARACTERS + 1)},
+            headers={"Origin": f"http://127.0.0.1:{port}"},
+        )
+        assert status == HTTPStatus.REQUEST_ENTITY_TOO_LARGE
+        assert decoded(data)["error"]["code"] == "explore_query_too_large"
+
+        status, _, data = request(
+            port,
+            "POST",
+            "/api/catalogue/explore",
+            {"query": "x" * MAX_REQUEST_BYTES},
+            headers={"Origin": f"http://127.0.0.1:{port}"},
+        )
+        assert status == HTTPStatus.REQUEST_ENTITY_TOO_LARGE
+        assert decoded(data)["error"]["code"] == "request_too_large"
+
+        status, _, data = request(
+            port,
+            "POST",
+            "/api/catalogue/explore",
+            {"query": "private cross-origin paste"},
+            headers={"Origin": "https://attacker.invalid"},
+        )
+        assert status == HTTPStatus.FORBIDDEN
+        assert decoded(data)["error"]["code"] == "invalid_origin"
+
+
+def test_explore_uses_only_content_version_matched_teacher_classification(
+    synthetic_bank: Path, tmp_path: Path
+) -> None:
+    output = tmp_path / "catalogue"
+    build_catalogue(synthetic_bank, output)
+    with running_catalogue(synthetic_bank, output) as (application, port):
+        anchor_id = application._summaries[0].item_id
+        neighbor_id = (
+            application.semantic_index.query(anchor_id, top_k=1, view="hybrid")
+            .neighbors[0]
+            .item_id
+        )
+        taxonomy = application.taxonomy()
+        skill_id = taxonomy["skills"][0]["skill_id"]
+        representation_id = taxonomy["representation_tags"][0]["value"]
+        cognitive_demand = taxonomy["cognitive_demand_tags"][0]["value"]
+        status, _, _ = request(
+            port,
+            "PUT",
+            f"/api/catalogue/items/{neighbor_id}/review",
+            {
+                "source_checks": {
+                    "prompt": True,
+                    "choices": True,
+                    "answer": True,
+                    "points": True,
+                    "visual": True,
+                },
+                "disposition": "faithful",
+                "primary_domain": "probability_data",
+                "question_type": "probability_data",
+                "skill_ids": [skill_id],
+                "representation_ids": [representation_id],
+                "cognitive_demand": cognitive_demand,
+                "grade_appropriateness": "appropriate",
+                "taxonomy_decision": "needs_changes",
+                "notes": "Teacher classification used to verify explore provenance.",
+            },
+            headers={
+                "Origin": f"http://127.0.0.1:{port}",
+                "If-Match": "*",
+            },
+        )
+        assert status == HTTPStatus.OK
+
+        status, _, data = request(
+            port,
+            "POST",
+            "/api/catalogue/explore",
+            {"query": anchor_id, "view": "hybrid", "limit": 8},
+            headers={"Origin": f"http://127.0.0.1:{port}"},
+        )
+        assert status == HTTPStatus.OK
+        explored = next(
+            value
+            for value in decoded(data)["neighbors"]
+            if value["item_id"] == neighbor_id
+        )
+        item_version = application._items[neighbor_id].item.content_version
+        assert explored["classification_source"] == "teacher"
+        assert explored["classification_content_version"] == item_version
+        assert explored["review_state"] == "faithful"
+        assert explored["primary_domain"] == "probability_data"
+        assert explored["question_type"] == "probability_data"
+        assert explored["skill_ids"] == [skill_id]
+        assert explored["representation_ids"] == [representation_id]
+        assert explored["cognitive_demand"] == cognitive_demand
+
+        status, _, data = request(
+            port,
+            "GET",
+            f"/api/catalogue/items/{anchor_id}/neighbors?view=hybrid&limit=8",
+        )
+        assert status == HTTPStatus.OK
+        comparable = next(
+            value
+            for value in decoded(data)["neighbors"]
+            if value["item_id"] == neighbor_id
+        )
+        assert comparable["classification_source"] == "teacher"
+        assert comparable["classification"]["source"] == "teacher"
+        assert comparable["classification_content_version"] == item_version
+        assert comparable["review_state"] == "faithful"
+
+        record = application._items[neighbor_id]
+        assert record.current_review is not None
+        stale_version = "sha256:" + (
+            "0" * 64 if item_version != "sha256:" + "0" * 64 else "1" * 64
+        )
+        stale_review = record.current_review.review.model_copy(
+            update={"content_version": stale_version}
+        )
+        stale_current = record.current_review.model_copy(
+            update={"review": stale_review}
+        )
+        application._items[neighbor_id] = record.model_copy(
+            update={"current_review": stale_current}
+        )
+
+        status, _, data = request(
+            port,
+            "POST",
+            "/api/catalogue/explore",
+            {"query": anchor_id, "view": "hybrid", "limit": 8},
+            headers={"Origin": f"http://127.0.0.1:{port}"},
+        )
+        assert status == HTTPStatus.OK
+        stale = next(
+            value
+            for value in decoded(data)["neighbors"]
+            if value["item_id"] == neighbor_id
+        )
+        proposal = record.item.proposal_payload
+        assert stale["classification_source"] == "proposal"
+        assert stale["classification_content_version"] == item_version
+        assert stale["review_state"] == "stale"
+        assert stale["primary_domain"] == proposal["primary_domain"]
+        assert stale["question_type"] == proposal["question_type"]
 
 
 def test_curriculum_cards_use_the_effective_teacher_classification(

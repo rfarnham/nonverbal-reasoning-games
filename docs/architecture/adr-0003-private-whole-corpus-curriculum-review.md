@@ -53,6 +53,18 @@ answers, crops, PDFs, URLs, and filesystem paths.
 
 The workbench also exposes two explicitly experimental QA surfaces:
 
+- **Problem Space** projects all catalogue questions into separate Surface,
+  proposed-tag, and Hybrid two-dimensional maps. A teacher can begin with a
+  random filtered item, an exact stable ID, or private pasted text and then
+  follow auditable nearest-neighbor steps. The projection is deterministic
+  PCA initialization plus neighbor-graph refinement, and the UI must report
+  its measured neighbor preservation rather than call it UMAP or t-SNE.
+  Cluster names are non-authoritative proposal-derived descriptions ranked by
+  corpus-relative enrichment. Map filters include grade, published point tier,
+  domain, and question type. The bulk map contains no prompt, choice, answer,
+  source URL, asset path, or reviewer note; question content is loaded only for
+  a selected item or a bounded same-origin POST result. Pasted text never enters
+  URLs and is refused when it has no supported corpus signal.
 - **Similarity Lab** compares a local surface-semantic view with a controlled
   tag view and records append-only teacher judgements about proposed neighbors.
   The surface baseline is a deterministic, locally built TF-IDF/latent-semantic
@@ -85,6 +97,9 @@ cannot turn the proposed ontology or prerequisite graph into a gating model.
 - Reviewers can inspect whether retrieval finds same-strategy, transfer,
   surface-only, duplicate, or unrelated neighbors instead of accepting an
   opaque top-k result.
+- Reviewers can inspect cluster boundaries and walk local neighborhoods across
+  the complete corpus while seeing how much high-dimensional neighborhood
+  structure the two-dimensional projection actually preserves.
 - Policy weights and similarity weights remain versioned hypotheses visible in
   the QA output rather than hidden product behavior.
 - The workbench must be launched locally and must never be deployed with the

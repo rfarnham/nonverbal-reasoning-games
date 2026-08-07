@@ -7,12 +7,16 @@
     taxonomy: "/api/catalogue/taxonomy",
     export: "/api/catalogue/export",
     recommendations: "/api/catalogue/recommendations/preview",
+    map: "/api/catalogue/map",
+    explore: "/api/catalogue/explore",
   });
+  const MAP_QUESTION_SCALE = 2.3;
 
   const VIEWS = Object.freeze([
     "overview",
     "taxonomy",
     "similarity",
+    "problem-space",
     "curriculum",
     "questions",
     "promotion",
@@ -72,6 +76,29 @@
       ratings: new Map(),
       etags: new Map(),
     },
+    problemSpace: {
+      query: "",
+      view: "hybrid",
+      anchorId: "",
+      mapPayload: null,
+      mapRequestToken: 0,
+      searchRequestToken: 0,
+      neighborhoodRequestToken: 0,
+      trail: [],
+      trailIndex: -1,
+      filters: { grade: "", points: "", domain: "", questionType: "" },
+      visiblePoints: [],
+      focusedPointId: "",
+      hoveredPointId: "",
+      focusedClusterId: "",
+      hoveredClusterId: "",
+      randomSeenIds: new Set(),
+      scale: 1,
+      panX: 0,
+      panY: 0,
+      drag: null,
+      resizeObserver: null,
+    },
     recommendation: {
       payload: null,
       requestToken: 0,
@@ -107,6 +134,19 @@
     const maximum = firstDefined(range.max, range.maximum, range.to);
     if (minimum !== undefined && maximum !== undefined) return `${minimum}–${maximum}`;
     return "";
+  };
+  const pointTierValue = (value) => {
+    if (typeof value === "string" || typeof value === "number") return integer(value);
+    const tier = asRecord(value);
+    return integer(
+      firstDefined(
+        tier.points,
+        tier.value,
+        tier.tier,
+        tier.point_tier,
+        tier.published_point_tier,
+      ),
+    );
   };
 
   function node(tag, options = {}) {
@@ -226,6 +266,16 @@
     } else {
       url.searchParams.delete("similarity_view");
     }
+    if (state.problemSpace.anchorId) {
+      url.searchParams.set("space_anchor", state.problemSpace.anchorId);
+    } else {
+      url.searchParams.delete("space_anchor");
+    }
+    if (state.problemSpace.view !== "hybrid") {
+      url.searchParams.set("space_view", state.problemSpace.view);
+    } else {
+      url.searchParams.delete("space_view");
+    }
     window.history.replaceState(null, "", url);
   }
 
@@ -245,6 +295,11 @@
     state.similarity.view = ["surface", "tag", "hybrid"].includes(similarityView)
       ? similarityView
       : "hybrid";
+    state.problemSpace.anchorId = params.get("space_anchor") || "";
+    const problemView = params.get("space_view") || "hybrid";
+    state.problemSpace.view = ["surface", "tag", "hybrid"].includes(problemView)
+      ? problemView
+      : "hybrid";
   }
 
   function syncControlsFromState() {
@@ -256,26 +311,39 @@
     byId("similarity-anchor-id").value = state.similarity.anchorId;
     byId("similarity-view-select").value = state.similarity.view;
     byId("similarity-limit").value = String(state.similarity.limit);
+    byId("problem-space-view-select").value = state.problemSpace.view;
   }
 
   function setActiveView(view, { focus = false } = {}) {
     if (!VIEWS.includes(view)) return;
     state.activeView = view;
+    let activeTab = null;
     document.querySelectorAll(".view-tab").forEach((tab) => {
       const active = tab.dataset.view === view;
       tab.classList.toggle("is-active", active);
       tab.setAttribute("aria-selected", String(active));
       tab.tabIndex = active ? 0 : -1;
+      if (active) activeTab = tab;
     });
     VIEWS.forEach((name) => {
       byId(`${name}-view`).hidden = name !== view;
     });
     updateUrl();
     if (focus) byId(`${view}-tab`).focus();
+    window.requestAnimationFrame(() => {
+      activeTab?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
     if (view === "questions" && !state.items.loaded) loadItems();
     if (view === "similarity") {
       if (state.similarity.anchorId && !state.similarity.payload) loadNeighbors();
       else if (!state.similarity.anchorId) byId("similarity-empty").hidden = false;
+    }
+    if (view === "problem-space") {
+      loadProblemMap();
+      if (state.problemSpace.anchorId && state.problemSpace.trailIndex < 0) {
+        exploreProblemQuestion(state.problemSpace.anchorId, { replaceCurrent: true });
+      }
+      window.requestAnimationFrame(drawProblemMap);
     }
   }
 
@@ -1462,9 +1530,1080 @@
       .map((entry) => {
         if (typeof entry === "string") return entry;
         const record = asRecord(entry);
-        return stringValue(firstDefined(record.label, record.name, record.id, record.value, record.tag_id));
+        return stringValue(
+          firstDefined(record.label, record.name, record.id, record.value, record.tag_id, record.tag),
+        );
       })
       .filter(Boolean);
+  }
+
+  function optionalNumber(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  }
+
+  function normalizeMapCluster(value, fallbackId = "") {
+    const positional = Array.isArray(value) ? value : [];
+    const record = asRecord(value);
+    const id = stringValue(firstDefined(record.id, record.cluster_id, positional[0], fallbackId));
+    const dominantTags = asArray(
+      firstDefined(record.dominant_tags, record.tags, record.evidence),
+    )
+      .map((entry) => {
+        if (typeof entry === "string") {
+          return { tag: entry, memberCount: 0, coverage: null };
+        }
+        const tagRecord = asRecord(entry);
+        return {
+          tag: stringValue(
+            firstDefined(tagRecord.tag, tagRecord.label, tagRecord.id, tagRecord.name),
+          ),
+          memberCount: integer(
+            firstDefined(tagRecord.member_count, tagRecord.count, tagRecord.items),
+          ),
+          coverage: optionalNumber(
+            firstDefined(tagRecord.coverage, tagRecord.share, tagRecord.proportion),
+          ),
+        };
+      })
+      .filter((entry) => entry.tag);
+    return {
+      id,
+      label: stringValue(
+        firstDefined(record.label, record.name, record.cluster_label, positional[1], id),
+      ),
+      x: optionalNumber(firstDefined(record.x, record.map_x, positional[2])),
+      y: optionalNumber(firstDefined(record.y, record.map_y, positional[3])),
+      count: integer(
+        firstDefined(record.count, record.item_count, record.member_count, positional[4]),
+      ),
+      dominantTags,
+      evidence: textList(firstDefined(record.evidence, record.reasons)),
+    };
+  }
+
+  function normalizeMapPoint(value, index, clusterById) {
+    const positional = Array.isArray(value) ? value : [];
+    const record = asRecord(value);
+    const coordinates = firstDefined(
+      record.position,
+      record.coordinates,
+      record.point,
+      record.projection,
+    );
+    const coordinateList = Array.isArray(coordinates) ? coordinates : [];
+    const coordinateRecord = asRecord(coordinates);
+    const id = stringValue(
+      firstDefined(record.item_id, record.id, record.stable_id, positional[0]),
+    );
+    const x = optionalNumber(
+      firstDefined(record.x, record.map_x, coordinateRecord.x, coordinateList[0], positional[1]),
+    );
+    const y = optionalNumber(
+      firstDefined(record.y, record.map_y, coordinateRecord.y, coordinateList[1], positional[2]),
+    );
+    const grade = gradeRangeValue(
+      firstDefined(record.grade_band, record.grade, positional[3]),
+    );
+    const domain = stringValue(
+      firstDefined(record.primary_domain, record.domain, positional[4]),
+    );
+    const questionType = stringValue(
+      firstDefined(record.question_type, record.type, positional[5]),
+    );
+    const clusterId = stringValue(
+      firstDefined(record.cluster_id, asRecord(record.cluster).id, positional[6], domain),
+    );
+    const cluster = clusterById.get(clusterId);
+    return {
+      id,
+      x,
+      y,
+      grade,
+      domain,
+      questionType,
+      pointTier: pointTierValue(
+        firstDefined(
+          record.published_point_tier,
+          record.point_tier,
+          record.points,
+          positional[7],
+        ),
+      ),
+      clusterId,
+      clusterLabel: stringValue(
+        firstDefined(
+          record.cluster_label,
+          asRecord(record.cluster).label,
+          cluster?.label,
+          domain,
+          clusterId,
+        ),
+      ),
+      prompt: stringValue(
+        firstDefined(record.prompt_excerpt, record.prompt, record.question_text),
+      ),
+      tags: normalizeTagList(
+        firstDefined(record.proposed_tags, record.tags, record.skill_ids),
+      ),
+      reviewState: stringValue(
+        firstDefined(record.review_state, record.teacher_review_state, record.disposition),
+      ),
+      proposalState: stringValue(
+        firstDefined(
+          record.proposal_state,
+          record.classification_source,
+          record.classification_status,
+        ),
+      ),
+      source: sourceLabel(firstDefined(record.source, record.source_label)),
+      order: index,
+    };
+  }
+
+  function normalizeProblemMapPayload(payload) {
+    const root = asRecord(payload);
+    const rawClusters = firstDefined(root.clusters, root.cluster_labels, root.cluster_evidence, []);
+    const clusterEntries = Array.isArray(rawClusters)
+      ? rawClusters.map((value) => ["", value])
+      : Object.entries(asRecord(rawClusters));
+    const clusters = clusterEntries
+      .map(([id, value]) => normalizeMapCluster(value, id))
+      .filter((cluster) => cluster.id || cluster.label);
+    const clusterById = new Map(clusters.map((cluster) => [cluster.id, cluster]));
+    const rawPoints = Array.isArray(payload)
+      ? payload
+      : asArray(firstDefined(root.points, root.nodes, root.items, root.results, root.data));
+    const points = rawPoints
+      .map((value, index) => normalizeMapPoint(value, index, clusterById))
+      .filter((point) => point.id && point.x !== null && point.y !== null);
+    const projection = asRecord(root.projection);
+    const projectionQuality = asRecord(
+      firstDefined(projection.quality, root.projection_quality),
+    );
+    const rawKnnOverlap = optionalNumber(
+      firstDefined(
+        projectionQuality.knn_overlap,
+        projectionQuality.neighborhood_retention,
+      ),
+    );
+    const xs = points.map((point) => point.x);
+    const ys = points.map((point) => point.y);
+    const minimumX = xs.length ? Math.min(...xs) : -1;
+    const maximumX = xs.length ? Math.max(...xs) : 1;
+    const minimumY = ys.length ? Math.min(...ys) : -1;
+    const maximumY = ys.length ? Math.max(...ys) : 1;
+    return {
+      view: stringValue(root.view, state.problemSpace.view),
+      mapVersion: stringValue(
+        firstDefined(root.map_version, root.projection_version, projection.version),
+      ),
+      projectionMethod: stringValue(
+        firstDefined(
+          root.projection_method,
+          root.method,
+          projection.method,
+          projection.algorithm,
+        ),
+      ),
+      projectionQuality: {
+        neighborK: integer(
+          firstDefined(projectionQuality.neighbor_k, projectionQuality.k),
+        ),
+        sampleSize: integer(
+          firstDefined(projectionQuality.sample_size, projectionQuality.sample_count),
+        ),
+        candidateCount: integer(projectionQuality.candidate_count),
+        exactDuplicateGroupCount: integer(
+          projectionQuality.exact_duplicate_group_count,
+        ),
+        exactDuplicateCandidateCount: integer(
+          projectionQuality.exact_duplicate_candidate_count,
+        ),
+        knnOverlap: rawKnnOverlap === null ? null : score01(rawKnnOverlap),
+        pcaKnnOverlap: optionalNumber(projectionQuality.pca_knn_overlap),
+        knnOverlapImprovement: optionalNumber(
+          projectionQuality.knn_overlap_improvement,
+        ),
+        sourceMetric: stringValue(
+          firstDefined(projectionQuality.source_metric, projection.source_metric),
+        ),
+        qualityCaveat: stringValue(projectionQuality.quality_caveat),
+      },
+      sourceMetric: stringValue(projection.source_metric),
+      configuredWeights: asRecord(projection.configured_weights),
+      configuredWeightScope: stringValue(projection.configured_weight_scope),
+      missingFacetPolicy: stringValue(projection.missing_facet_policy),
+      warnings: textList(firstDefined(root.warnings, projection.warnings)),
+      points,
+      totalItems: integer(
+        firstDefined(root.total_items, root.total, root.corpus_total),
+        rawPoints.length,
+      ),
+      unmappedCount: Math.max(
+        0,
+        integer(firstDefined(root.total_items, root.total, root.corpus_total), rawPoints.length) -
+          points.length,
+      ),
+      clusters,
+      bounds: {
+        minimumX,
+        maximumX: maximumX === minimumX ? minimumX + 1 : maximumX,
+        minimumY,
+        maximumY: maximumY === minimumY ? minimumY + 1 : maximumY,
+      },
+    };
+  }
+
+  function replaceProblemFilterOptions(
+    id,
+    values,
+    firstLabel,
+    selectedValue,
+    formatValue = humanize,
+  ) {
+    const select = byId(id);
+    const options = [node("option", { text: firstLabel, attrs: { value: "" } })];
+    [...new Set(values.filter(Boolean))]
+      .sort((left, right) => humanize(left).localeCompare(humanize(right)))
+      .forEach((value) => {
+        options.push(node("option", { text: formatValue(value), attrs: { value } }));
+      });
+    select.replaceChildren(...options);
+    select.value = options.some((option) => option.value === selectedValue) ? selectedValue : "";
+  }
+
+  function populateProblemMapFilters() {
+    const points = state.problemSpace.mapPayload?.points || [];
+    replaceProblemFilterOptions(
+      "problem-map-grade",
+      points.map((point) => point.grade),
+      "All grades",
+      state.problemSpace.filters.grade,
+    );
+    replaceProblemFilterOptions(
+      "problem-map-points",
+      points.map((point) => point.pointTier).filter(Boolean),
+      "All point tiers",
+      state.problemSpace.filters.points,
+      (value) => `${value} points`,
+    );
+    replaceProblemFilterOptions(
+      "problem-map-domain",
+      points.map((point) => point.domain),
+      "All domains",
+      state.problemSpace.filters.domain,
+    );
+    replaceProblemFilterOptions(
+      "problem-map-type",
+      points.map((point) => point.questionType),
+      "All question types",
+      state.problemSpace.filters.questionType,
+    );
+    state.problemSpace.filters.grade = byId("problem-map-grade").value;
+    state.problemSpace.filters.points = byId("problem-map-points").value;
+    state.problemSpace.filters.domain = byId("problem-map-domain").value;
+    state.problemSpace.filters.questionType = byId("problem-map-type").value;
+  }
+
+  function applyProblemMapFilters({ announceChange = false, refit = true } = {}) {
+    const payload = state.problemSpace.mapPayload;
+    if (!payload) return;
+    hideProblemMapCandidates();
+    const filters = state.problemSpace.filters;
+    state.problemSpace.visiblePoints = payload.points.filter(
+      (point) =>
+        (!filters.grade || point.grade === filters.grade) &&
+        (!filters.points || String(point.pointTier) === filters.points) &&
+        (!filters.domain || point.domain === filters.domain) &&
+        (!filters.questionType || point.questionType === filters.questionType),
+    );
+    const visibleIds = new Set(state.problemSpace.visiblePoints.map((point) => point.id));
+    if (!visibleIds.has(state.problemSpace.focusedPointId)) {
+      state.problemSpace.focusedPointId = visibleIds.has(state.problemSpace.anchorId)
+        ? state.problemSpace.anchorId
+        : state.problemSpace.visiblePoints[0]?.id || "";
+    }
+    const clusters = visibleProblemClusters();
+    if (!clusters.some((cluster) => cluster.id === state.problemSpace.focusedClusterId)) {
+      state.problemSpace.focusedClusterId = clusters[0]?.id || "";
+    }
+    setText(
+      "problem-map-count",
+      `${formatNumber(state.problemSpace.visiblePoints.length)} visible · ${formatNumber(payload.points.length)} mapped of ${formatNumber(payload.totalItems)} items`,
+    );
+    updateProblemMapCenterControl();
+    renderProblemClusterKey();
+    if (refit) fitProblemMapToVisible();
+    else {
+      updateProblemMapMode();
+      drawProblemMap();
+    }
+    if (announceChange) {
+      announce(`${formatNumber(state.problemSpace.visiblePoints.length)} questions visible on the corpus map.`);
+    }
+  }
+
+  function mapGradeStyle(grade) {
+    const normalized = stringValue(grade).toLocaleLowerCase();
+    if (normalized.includes("1") && normalized.includes("2")) {
+      return { color: "#c9574b", shape: "circle", label: "Grades 1–2" };
+    }
+    if (normalized.includes("3") && normalized.includes("4")) {
+      return { color: "#16836b", shape: "square", label: "Grades 3–4" };
+    }
+    if (normalized.includes("5") && normalized.includes("6")) {
+      return { color: "#6655c7", shape: "triangle", label: "Grades 5–6" };
+    }
+    return { color: "#a16d00", shape: "diamond", label: "Unknown grade" };
+  }
+
+  function problemMapSize() {
+    const canvas = byId("problem-map-canvas");
+    return {
+      width: Math.max(300, canvas.clientWidth || 900),
+      height: Math.max(360, canvas.clientHeight || 620),
+    };
+  }
+
+  function problemMapBasePoint(point, width, height) {
+    const bounds = state.problemSpace.mapPayload?.bounds;
+    if (!bounds || point.x === null || point.y === null) return { x: 0, y: 0 };
+    const margin = Math.min(52, Math.max(28, width * 0.06));
+    const baseX =
+      margin +
+      ((point.x - bounds.minimumX) / (bounds.maximumX - bounds.minimumX)) *
+        (width - margin * 2);
+    const baseY =
+      height -
+      margin -
+      ((point.y - bounds.minimumY) / (bounds.maximumY - bounds.minimumY)) *
+        (height - margin * 2);
+    return { x: baseX, y: baseY };
+  }
+
+  function problemMapScreenPoint(point, width, height) {
+    const base = problemMapBasePoint(point, width, height);
+    return {
+      x:
+        width / 2 +
+        (base.x - width / 2) * state.problemSpace.scale +
+        state.problemSpace.panX,
+      y:
+        height / 2 +
+        (base.y - height / 2) * state.problemSpace.scale +
+        state.problemSpace.panY,
+    };
+  }
+
+  function drawProblemMapShape(context, point, x, y, size, emphasized = false) {
+    const style = mapGradeStyle(point.grade);
+    context.beginPath();
+    if (style.shape === "circle") {
+      context.arc(x, y, size, 0, Math.PI * 2);
+    } else if (style.shape === "square") {
+      context.rect(x - size, y - size, size * 2, size * 2);
+    } else if (style.shape === "triangle") {
+      context.moveTo(x, y - size * 1.2);
+      context.lineTo(x + size * 1.1, y + size);
+      context.lineTo(x - size * 1.1, y + size);
+      context.closePath();
+    } else {
+      context.moveTo(x, y - size * 1.2);
+      context.lineTo(x + size * 1.2, y);
+      context.lineTo(x, y + size * 1.2);
+      context.lineTo(x - size * 1.2, y);
+      context.closePath();
+    }
+    context.fillStyle = style.color;
+    context.fill();
+    context.lineWidth = emphasized ? 2.5 : 0.7;
+    context.strokeStyle = emphasized ? "#17213d" : "rgba(23, 33, 61, 0.42)";
+    context.stroke();
+  }
+
+  function visibleProblemClusters() {
+    const groups = new Map();
+    const clusterEvidence = new Map(
+      (state.problemSpace.mapPayload?.clusters || []).map((cluster) => [cluster.id, cluster]),
+    );
+    state.problemSpace.visiblePoints.forEach((point) => {
+      const id = problemPointClusterId(point);
+      const evidence = clusterEvidence.get(id);
+      const group = groups.get(id) || {
+        id,
+        label: evidence?.label || point.clusterLabel || point.domain || "Unclustered",
+        dominantTags: evidence?.dominantTags || [],
+        x: 0,
+        y: 0,
+        count: 0,
+      };
+      group.x += point.x;
+      group.y += point.y;
+      group.count += 1;
+      groups.set(id, group);
+    });
+    return [...groups.values()]
+      .map((group) => ({
+        ...group,
+        x: group.x / group.count,
+        y: group.y / group.count,
+      }))
+      .sort((left, right) => right.count - left.count);
+  }
+
+  function problemPointClusterId(point) {
+    return point.clusterId || point.domain || "unclustered";
+  }
+
+  function problemClusterCode(clusterId) {
+    const allIds = [
+      ...(state.problemSpace.mapPayload?.clusters || []).map((cluster) => cluster.id),
+      ...(state.problemSpace.mapPayload?.points || []).map(problemPointClusterId),
+    ].filter(Boolean);
+    const uniqueIds = [...new Set(allIds)];
+    const index = uniqueIds.indexOf(clusterId);
+    return `C${index >= 0 ? index + 1 : uniqueIds.length + 1}`;
+  }
+
+  function renderProblemClusterKey() {
+    const list = byId("problem-cluster-list");
+    if (!list) return;
+    list.replaceChildren();
+    visibleProblemClusters().forEach((cluster) => {
+      const item = node("li");
+      const button = node("button", {
+        className: "problem-cluster-button",
+        attrs: {
+          type: "button",
+          "data-problem-cluster-id": cluster.id,
+          "aria-label": `${problemClusterCode(cluster.id)}, ${humanize(cluster.label)}, ${formatNumber(cluster.count)} visible questions. Zoom to cluster.`,
+        },
+      });
+      const identity = node("span", { className: "problem-cluster-identity" });
+      identity.append(
+        node("strong", { text: problemClusterCode(cluster.id) }),
+        node("span", { text: humanize(cluster.label) }),
+        node("small", { text: `${formatNumber(cluster.count)} visible` }),
+      );
+      const evidence = cluster.dominantTags
+        .slice(0, 3)
+        .map((entry) => {
+          const coverage = entry.coverage === null
+            ? ""
+            : ` ${Math.round(entry.coverage * 100)}%`;
+          return `${humanize(entry.tag)}${coverage}`;
+        })
+        .join(" · ");
+      if (evidence) button.append(node("span", { className: "problem-cluster-evidence", text: evidence }));
+      button.append(node("span", { className: "problem-cluster-action", text: "Zoom to cluster →" }));
+      item.append(button);
+      list.append(item);
+    });
+  }
+
+  function problemMapShowsQuestions() {
+    return state.problemSpace.scale >= MAP_QUESTION_SCALE;
+  }
+
+  function updateProblemMapMode() {
+    const questionMode = problemMapShowsQuestions();
+    setText(
+      "problem-map-mode",
+      questionMode
+        ? "Question detail. Select a visible point to open its semantic neighborhood."
+        : "Cluster overview. Select a cluster to zoom into individual questions.",
+    );
+    const canvas = byId("problem-map-canvas");
+    const focus = questionMode
+      ? problemMapPointById(state.problemSpace.focusedPointId, { visibleOnly: true })
+      : visibleProblemClusters().find(
+          (cluster) => cluster.id === state.problemSpace.focusedClusterId,
+        );
+    if (questionMode && focus) setProblemMapPointDetail(focus.id);
+    else if (!questionMode && focus) setProblemMapClusterDetail(focus.id);
+    else {
+      canvas.setAttribute(
+        "aria-label",
+        `Corpus map in ${questionMode ? "question detail" : "cluster overview"} mode. Use arrow keys to move, Enter to select, plus or minus to zoom, and zero to fit the visible questions.`,
+      );
+    }
+  }
+
+  function fitProblemMapToVisible() {
+    const points = state.problemSpace.visiblePoints;
+    if (!points.length) {
+      state.problemSpace.scale = 1;
+      state.problemSpace.panX = 0;
+      state.problemSpace.panY = 0;
+      updateProblemMapMode();
+      drawProblemMap();
+      return;
+    }
+    const { width, height } = problemMapSize();
+    const bases = points.map((point) => problemMapBasePoint(point, width, height));
+    const minimumX = Math.min(...bases.map((point) => point.x));
+    const maximumX = Math.max(...bases.map((point) => point.x));
+    const minimumY = Math.min(...bases.map((point) => point.y));
+    const maximumY = Math.max(...bases.map((point) => point.y));
+    const padding = Math.min(76, Math.max(42, width * 0.09));
+    const extentX = Math.max(24, maximumX - minimumX);
+    const extentY = Math.max(24, maximumY - minimumY);
+    state.problemSpace.scale = Math.min(
+      6,
+      Math.max(
+        0.65,
+        Math.min((width - padding * 2) / extentX, (height - padding * 2) / extentY),
+      ),
+    );
+    const centerX = (minimumX + maximumX) / 2;
+    const centerY = (minimumY + maximumY) / 2;
+    state.problemSpace.panX = -(centerX - width / 2) * state.problemSpace.scale;
+    state.problemSpace.panY = -(centerY - height / 2) * state.problemSpace.scale;
+    updateProblemMapMode();
+    drawProblemMap();
+  }
+
+  function drawProblemMap() {
+    const canvas = byId("problem-map-canvas");
+    const payload = state.problemSpace.mapPayload;
+    if (!canvas || !payload || byId("problem-space-view").hidden) return;
+    const { width, height } = problemMapSize();
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+    const targetWidth = Math.round(width * pixelRatio);
+    const targetHeight = Math.round(height * pixelRatio);
+    if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+    }
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    context.clearRect(0, 0, width, height);
+    context.fillStyle = "#fffdf8";
+    context.fillRect(0, 0, width, height);
+
+    const questionMode = problemMapShowsQuestions();
+    context.save();
+    context.globalAlpha = questionMode ? 0.74 : 0.2;
+    state.problemSpace.visiblePoints.forEach((point) => {
+      if (
+        questionMode &&
+        (point.id === state.problemSpace.anchorId ||
+          point.id === state.problemSpace.focusedPointId ||
+          point.id === state.problemSpace.hoveredPointId)
+      ) {
+        return;
+      }
+      const screen = problemMapScreenPoint(point, width, height);
+      if (screen.x < -12 || screen.x > width + 12 || screen.y < -12 || screen.y > height + 12) {
+        return;
+      }
+      drawProblemMapShape(context, point, screen.x, screen.y, questionMode ? 3.4 : 1.35);
+    });
+    context.restore();
+
+    if (!questionMode) {
+      visibleProblemClusters().forEach((cluster) => {
+        const screen = problemMapScreenPoint(cluster, width, height);
+        if (screen.x < -30 || screen.x > width + 30 || screen.y < -30 || screen.y > height + 30) {
+          return;
+        }
+        const radius = Math.min(30, Math.max(17, 13 + Math.sqrt(cluster.count) * 0.65));
+        const emphasized =
+          cluster.id === state.problemSpace.focusedClusterId ||
+          cluster.id === state.problemSpace.hoveredClusterId;
+        context.beginPath();
+        context.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
+        context.fillStyle = emphasized ? "#17213d" : "rgba(255, 253, 248, 0.94)";
+        context.fill();
+        context.strokeStyle = emphasized ? "#1679d2" : "#7767d7";
+        context.lineWidth = emphasized ? 3 : 2;
+        context.stroke();
+        context.fillStyle = emphasized ? "#ffffff" : "#443890";
+        context.font = "900 12px Inter, system-ui, sans-serif";
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillText(problemClusterCode(cluster.id), screen.x, screen.y);
+      });
+    }
+
+    const emphasizedIds = [
+      state.problemSpace.anchorId,
+      state.problemSpace.focusedPointId,
+      state.problemSpace.hoveredPointId,
+    ].filter(Boolean);
+    [...new Set(emphasizedIds)].forEach((id) => {
+      const point = state.problemSpace.visiblePoints.find((entry) => entry.id === id);
+      if (!point || (!questionMode && id !== state.problemSpace.anchorId)) return;
+      const screen = problemMapScreenPoint(point, width, height);
+      drawProblemMapShape(context, point, screen.x, screen.y, questionMode ? 6.2 : 4.5, true);
+      if (id === state.problemSpace.anchorId) {
+        context.beginPath();
+        context.arc(screen.x, screen.y, 10, 0, Math.PI * 2);
+        context.strokeStyle = "#1679d2";
+        context.lineWidth = 2.5;
+        context.stroke();
+      }
+    });
+
+    if (!state.problemSpace.visiblePoints.length) {
+      context.fillStyle = "#657087";
+      context.font = "750 15px Inter, system-ui, sans-serif";
+      context.textAlign = "center";
+      context.fillText("No questions match these filters.", width / 2, height / 2);
+    }
+  }
+
+  function problemMapPointById(id, { visibleOnly = false } = {}) {
+    const points = visibleOnly
+      ? state.problemSpace.visiblePoints
+      : state.problemSpace.mapPayload?.points || [];
+    return points.find((point) => point.id === id) || null;
+  }
+
+  function setProblemMapPointDetail(id, { announceChange = false } = {}) {
+    const point = problemMapPointById(id);
+    if (!point) {
+      setText("map-point-detail-heading", "No question focused");
+      setText(
+        "map-point-detail-prompt",
+        "Hover over a point or focus the map and use the arrow keys.",
+      );
+      setText("map-point-detail-meta", "");
+      byId("problem-map-canvas").setAttribute(
+        "aria-label",
+        "Corpus map. No question is focused. Use arrow keys to move, Enter to select, plus or minus to zoom, and zero to fit the visible questions.",
+      );
+      return;
+    }
+    setText("map-point-detail-heading", point.id);
+    setText(
+      "map-point-detail-prompt",
+      point.prompt || "Prompt excerpt is available after selecting this question.",
+    );
+    const metadata = [
+      point.grade && humanize(point.grade),
+      point.domain && humanize(point.domain),
+      point.questionType && humanize(point.questionType),
+      point.pointTier && `${point.pointTier} published points`,
+      point.clusterLabel && `Cluster: ${humanize(point.clusterLabel)}`,
+      point.reviewState && `Review: ${humanize(point.reviewState)}`,
+      point.proposalState && `Proposal: ${humanize(point.proposalState)}`,
+    ].filter(Boolean);
+    setText("map-point-detail-meta", metadata.join(" · ") || "No facet evidence reported.");
+    const canvas = byId("problem-map-canvas");
+    canvas.setAttribute(
+      "aria-label",
+      `Corpus map. Focused question ${point.id}. ${metadata.join(", ")}. Use arrow keys to move and Enter to explore.`,
+    );
+    if (announceChange) announce(`Map focus: ${point.id}. ${metadata.join(", ")}`);
+  }
+
+  function setProblemMapClusterDetail(id, { announceChange = false } = {}) {
+    const cluster = visibleProblemClusters().find((entry) => entry.id === id);
+    if (!cluster) {
+      setText("map-point-detail-heading", "No cluster focused");
+      setText(
+        "map-point-detail-prompt",
+        "Focus the map and use the arrow keys to move among visible clusters.",
+      );
+      setText("map-point-detail-meta", "");
+      byId("problem-map-canvas").setAttribute(
+        "aria-label",
+        "Corpus map in cluster overview mode. No cluster is focused. Use arrow keys to move, Enter to zoom, plus or minus to change scale, and zero to fit the visible questions.",
+      );
+      return;
+    }
+    const code = problemClusterCode(cluster.id);
+    const evidence = cluster.dominantTags
+      .slice(0, 3)
+      .map((entry) => {
+        const coverage = entry.coverage === null
+          ? ""
+          : ` (${Math.round(entry.coverage * 100)}%)`;
+        return `${humanize(entry.tag)}${coverage}`;
+      });
+    setText("map-point-detail-heading", `${code} · ${humanize(cluster.label)}`);
+    setText(
+      "map-point-detail-prompt",
+      `${formatNumber(cluster.count)} currently visible questions. Select this cluster to zoom into individual questions.`,
+    );
+    setText(
+      "map-point-detail-meta",
+      evidence.length
+        ? `Dominant proposal tags: ${evidence.join(" · ")}`
+        : "No dominant proposal tags reported.",
+    );
+    byId("problem-map-canvas").setAttribute(
+      "aria-label",
+      `Corpus map in cluster overview mode. Focused ${code}, ${humanize(cluster.label)}, ${formatNumber(cluster.count)} visible questions. Use arrow keys to move among clusters and Enter to zoom.`,
+    );
+    if (announceChange) {
+      announce(`${code}, ${humanize(cluster.label)}, ${formatNumber(cluster.count)} visible questions.`);
+    }
+  }
+
+  function nearestProblemMapPoint(clientX, clientY, threshold = 14) {
+    return problemMapPointsNear(clientX, clientY, threshold)[0] || null;
+  }
+
+  function problemMapPointsNear(clientX, clientY, threshold = 14) {
+    const canvas = byId("problem-map-canvas");
+    const rect = canvas.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    const { width, height } = problemMapSize();
+    return state.problemSpace.visiblePoints
+      .map((point) => {
+        const screen = problemMapScreenPoint(point, width, height);
+        return { point, distance: Math.hypot(screen.x - x, screen.y - y) };
+      })
+      .filter((entry) => entry.distance <= threshold)
+      .sort((left, right) => left.distance - right.distance || left.point.order - right.point.order)
+      .map((entry) => entry.point);
+  }
+
+  function hideProblemMapCandidates() {
+    const panel = byId("problem-map-candidates");
+    if (panel) panel.hidden = true;
+  }
+
+  function showProblemMapCandidates(points) {
+    const panel = byId("problem-map-candidates");
+    const list = byId("problem-map-candidate-list");
+    if (!panel || !list || points.length < 2) {
+      hideProblemMapCandidates();
+      return;
+    }
+    const shown = points.slice(0, 8);
+    list.replaceChildren();
+    shown.forEach((point) => {
+      const item = node("li");
+      const button = node("button", {
+        className: "problem-map-candidate-button",
+        attrs: {
+          type: "button",
+          "data-problem-map-candidate-id": point.id,
+        },
+      });
+      const metadata = [
+        point.grade && humanize(point.grade),
+        point.pointTier && `${point.pointTier} points`,
+        point.domain && humanize(point.domain),
+        point.questionType && humanize(point.questionType),
+      ].filter(Boolean);
+      button.append(
+        node("strong", { text: point.id }),
+        node("small", {
+          text: metadata.join(" · ") || "No map facets reported",
+        }),
+      );
+      item.append(button);
+      list.append(item);
+    });
+    setText(
+      "problem-map-candidate-summary",
+      points.length > shown.length
+        ? `${formatNumber(points.length)} questions overlap here. Showing the nearest ${shown.length}; zoom in for a shorter list.`
+        : `${formatNumber(points.length)} questions overlap here. Choose one to explore.`,
+    );
+    panel.hidden = false;
+    announce(`${formatNumber(points.length)} questions overlap at this map location. Choose one from the list.`);
+    window.requestAnimationFrame(() => list.querySelector("button")?.focus());
+  }
+
+  function nearestProblemMapCluster(clientX, clientY) {
+    const canvas = byId("problem-map-canvas");
+    const rect = canvas.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    const { width, height } = problemMapSize();
+    let nearest = null;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    visibleProblemClusters().forEach((cluster) => {
+      const screen = problemMapScreenPoint(cluster, width, height);
+      const distance = Math.hypot(screen.x - x, screen.y - y);
+      const hitRadius = Math.min(38, Math.max(25, 21 + Math.sqrt(cluster.count) * 0.5));
+      if (distance <= hitRadius && distance < nearestDistance) {
+        nearest = cluster;
+        nearestDistance = distance;
+      }
+    });
+    return nearest;
+  }
+
+  function zoomProblemMap(factor, originX, originY) {
+    hideProblemMapCandidates();
+    const { width, height } = problemMapSize();
+    const oldScale = state.problemSpace.scale;
+    const nextScale = Math.min(6, Math.max(0.65, oldScale * factor));
+    if (nextScale === oldScale) return;
+    const ratio = nextScale / oldScale;
+    const x = originX ?? width / 2;
+    const y = originY ?? height / 2;
+    state.problemSpace.panX =
+      x - width / 2 - (x - width / 2 - state.problemSpace.panX) * ratio;
+    state.problemSpace.panY =
+      y - height / 2 - (y - height / 2 - state.problemSpace.panY) * ratio;
+    state.problemSpace.scale = nextScale;
+    updateProblemMapMode();
+    drawProblemMap();
+  }
+
+  function resetProblemMap() {
+    fitProblemMapToVisible();
+  }
+
+  function centerProblemMapOnPoint(id) {
+    const point = problemMapPointById(id, { visibleOnly: true });
+    if (!point) return false;
+    if (!problemMapShowsQuestions()) {
+      state.problemSpace.scale = MAP_QUESTION_SCALE;
+    }
+    const { width, height } = problemMapSize();
+    const screen = problemMapScreenPoint(point, width, height);
+    state.problemSpace.panX += width / 2 - screen.x;
+    state.problemSpace.panY += height / 2 - screen.y;
+    state.problemSpace.focusedPointId = id;
+    setProblemMapPointDetail(id);
+    updateProblemMapMode();
+    drawProblemMap();
+    return true;
+  }
+
+  function centerSelectedProblemMapPoint() {
+    const id = state.problemSpace.anchorId;
+    if (!id) return;
+    if (!problemMapPointById(id, { visibleOnly: true })) {
+      const message =
+        "The selected question is hidden by the current map filters. Clear the map filters to center it.";
+      setText("problem-map-center-note", message);
+      announce(message);
+      return;
+    }
+    setText("problem-map-center-note", "");
+    if (centerProblemMapOnPoint(id)) announce(`Centered the corpus map on ${id}.`);
+  }
+
+  function updateProblemMapCenterControl() {
+    const id = state.problemSpace.anchorId;
+    const selectedMapPoint = id ? problemMapPointById(id) : null;
+    const selectedVisible = id
+      ? problemMapPointById(id, { visibleOnly: true })
+      : null;
+    byId("problem-map-center-selected").disabled = !selectedMapPoint;
+    setText(
+      "problem-map-center-note",
+      !id
+        ? ""
+        : !selectedMapPoint
+          ? "Selected question is not mapped in this evidence view."
+          : selectedVisible
+            ? ""
+            : "Selected question is hidden by the current map filters; clear filters to center it.",
+    );
+  }
+
+  function focusProblemMapCluster(id, { announceChange = true } = {}) {
+    const cluster = visibleProblemClusters().find((entry) => entry.id === id);
+    if (!cluster) return false;
+    hideProblemMapCandidates();
+    state.problemSpace.focusedClusterId = cluster.id;
+    const { width, height } = problemMapSize();
+    if (state.problemSpace.scale < MAP_QUESTION_SCALE) {
+      state.problemSpace.scale = MAP_QUESTION_SCALE;
+    }
+    const screen = problemMapScreenPoint(cluster, width, height);
+    state.problemSpace.panX += width / 2 - screen.x;
+    state.problemSpace.panY += height / 2 - screen.y;
+    const firstPoint = state.problemSpace.visiblePoints.find(
+      (point) => problemPointClusterId(point) === cluster.id,
+    );
+    if (firstPoint) state.problemSpace.focusedPointId = firstPoint.id;
+    updateProblemMapMode();
+    drawProblemMap();
+    if (announceChange) {
+      announce(`Zoomed to ${problemClusterCode(cluster.id)}, ${humanize(cluster.label)}.`);
+    }
+    return true;
+  }
+
+  function moveProblemMapClusterFocus(direction) {
+    const clusters = visibleProblemClusters();
+    if (!clusters.length) return;
+    const current =
+      clusters.find((cluster) => cluster.id === state.problemSpace.focusedClusterId) ||
+      clusters[0];
+    const { width, height } = problemMapSize();
+    const origin = problemMapScreenPoint(current, width, height);
+    let best = null;
+    let bestScore = Number.POSITIVE_INFINITY;
+    clusters.forEach((candidate) => {
+      if (candidate.id === current.id) return;
+      const screen = problemMapScreenPoint(candidate, width, height);
+      const dx = screen.x - origin.x;
+      const dy = screen.y - origin.y;
+      const inDirection =
+        (direction === "left" && dx < -1) ||
+        (direction === "right" && dx > 1) ||
+        (direction === "up" && dy < -1) ||
+        (direction === "down" && dy > 1);
+      if (!inDirection) return;
+      const forward = direction === "left" || direction === "right" ? Math.abs(dx) : Math.abs(dy);
+      const cross = direction === "left" || direction === "right" ? Math.abs(dy) : Math.abs(dx);
+      const score = forward + cross * 2.2;
+      if (score < bestScore) {
+        best = candidate;
+        bestScore = score;
+      }
+    });
+    if (!best) return;
+    state.problemSpace.focusedClusterId = best.id;
+    setProblemMapClusterDetail(best.id, { announceChange: true });
+    drawProblemMap();
+  }
+
+  function moveProblemMapFocus(direction) {
+    const points = state.problemSpace.visiblePoints;
+    if (!points.length) return;
+    let current = problemMapPointById(state.problemSpace.focusedPointId, {
+      visibleOnly: true,
+    });
+    if (!current) current = points[0];
+    const { width, height } = problemMapSize();
+    const origin = problemMapScreenPoint(current, width, height);
+    let best = null;
+    let bestScore = Number.POSITIVE_INFINITY;
+    points.forEach((candidate) => {
+      if (candidate.id === current.id) return;
+      const screen = problemMapScreenPoint(candidate, width, height);
+      const dx = screen.x - origin.x;
+      const dy = screen.y - origin.y;
+      const inDirection =
+        (direction === "left" && dx < -1) ||
+        (direction === "right" && dx > 1) ||
+        (direction === "up" && dy < -1) ||
+        (direction === "down" && dy > 1);
+      if (!inDirection) return;
+      const forward = direction === "left" || direction === "right" ? Math.abs(dx) : Math.abs(dy);
+      const cross = direction === "left" || direction === "right" ? Math.abs(dy) : Math.abs(dx);
+      const score = forward + cross * 2.4;
+      if (score < bestScore) {
+        best = candidate;
+        bestScore = score;
+      }
+    });
+    if (!best) return;
+    state.problemSpace.focusedPointId = best.id;
+    centerProblemMapOnPoint(best.id);
+    setProblemMapPointDetail(best.id, { announceChange: true });
+  }
+
+  async function loadProblemMap({ force = false, preserveError = false } = {}) {
+    if (
+      !force &&
+      state.problemSpace.mapPayload &&
+      state.problemSpace.mapPayload.view === state.problemSpace.view
+    ) {
+      byId("problem-space-map-loading").hidden = true;
+      byId("problem-space-workspace").hidden = false;
+      window.requestAnimationFrame(drawProblemMap);
+      return;
+    }
+    const token = ++state.problemSpace.mapRequestToken;
+    byId("problem-space-map-loading").hidden = false;
+    if (!preserveError) setInlineError("problem-space-error");
+    const url = new URL(API.map, window.location.origin);
+    url.searchParams.set("view", state.problemSpace.view);
+    if (state.problemSpace.anchorId) {
+      url.searchParams.set("item_id", state.problemSpace.anchorId);
+    }
+    try {
+      const { payload } = await requestJson(url);
+      if (token !== state.problemSpace.mapRequestToken) return;
+      state.problemSpace.mapPayload = normalizeProblemMapPayload(payload);
+      byId("problem-space-workspace").hidden = false;
+      populateProblemMapFilters();
+      applyProblemMapFilters();
+      const method = state.problemSpace.mapPayload.projectionMethod;
+      const version = state.problemSpace.mapPayload.mapVersion;
+      const methodText = method
+        ? `Method: ${method} · ${humanize(state.problemSpace.view)} view${version ? ` · ${version}` : ""}`
+        : `Projection method not reported · ${humanize(state.problemSpace.view)} view${version ? ` · ${version}` : ""}`;
+      setText("problem-map-method", methodText);
+      const quality = state.problemSpace.mapPayload.projectionQuality;
+      let preservationSummary = "Neighborhood preservation quality not reported.";
+      if (quality.knnOverlap !== null) {
+        const sample = quality.sampleSize
+          ? ` across ${formatNumber(quality.sampleSize)} sampled questions${quality.candidateCount ? ` of ${formatNumber(quality.candidateCount)} mapped` : ""}`
+          : "";
+        let comparison = "";
+        if (quality.knnOverlapImprovement !== null) {
+          const improvement = quality.knnOverlapImprovement;
+          const percentagePoints =
+            Math.abs(improvement) <= 1 ? improvement * 100 : improvement;
+          comparison = ` (${percentagePoints >= 0 ? "+" : ""}${percentagePoints.toFixed(1)} points vs PCA)`;
+        } else if (quality.pcaKnnOverlap !== null) {
+          comparison = ` (PCA baseline ${qualityPercent(quality.pcaKnnOverlap)})`;
+        }
+        const sourceMetric =
+          quality.sourceMetric || state.problemSpace.mapPayload.sourceMetric;
+        const metricLabel = sourceMetric.includes("mean-bidirectional")
+          ? "bidirectional anchor-renormalized similarity"
+          : sourceMetric
+            ? humanize(sourceMetric)
+            : "source metric not reported";
+        const configuredFacetCount = Object.keys(
+          state.problemSpace.mapPayload.configuredWeights,
+        ).length;
+        const weightScope = state.problemSpace.mapPayload.configuredWeightScope;
+        const weightLabel = configuredFacetCount
+          ? `${configuredFacetCount} configured weights${weightScope.includes("not_pairwise") ? " (not pairwise)" : ""}`
+          : "configured weights not reported";
+        const missingPolicy = state.problemSpace.mapPayload.missingFacetPolicy;
+        const missingLabel = missingPolicy.includes("renormalized_per_direction")
+          ? "missing facets renormalized per direction"
+          : missingPolicy.includes("without_selected_signal_are_unmapped")
+            ? "items without selected-view signal are unmapped"
+            : missingPolicy
+              ? humanize(missingPolicy)
+              : "missing-facet policy not reported";
+        preservationSummary =
+          `2D preservation: ${qualityPercent(quality.knnOverlap)} of ${quality.neighborK || "k"}-neighbor links${sample}${comparison}. ` +
+          `Source: ${metricLabel}; ${weightLabel}; ${missingLabel}.`;
+      }
+      setText("problem-map-quality", preservationSummary);
+      const hasProjectionWarnings = Boolean(
+        state.problemSpace.mapPayload.warnings.length ||
+          (quality.exactDuplicateCandidateCount && quality.qualityCaveat),
+      );
+      setText(
+        "problem-map-warnings",
+        hasProjectionWarnings
+          ? [
+              ...state.problemSpace.mapPayload.warnings.map(humanize),
+              quality.exactDuplicateCandidateCount ? quality.qualityCaveat : "",
+            ]
+              .filter(Boolean)
+              .join(" · ")
+          : "No projection warnings reported.",
+      );
+      byId("problem-map-warnings").classList.toggle(
+        "is-warning",
+        hasProjectionWarnings,
+      );
+      byId("problem-space-map-loading").hidden = true;
+      window.requestAnimationFrame(drawProblemMap);
+      announce(
+        `Loaded ${formatNumber(state.problemSpace.mapPayload.points.length)} mapped corpus questions; ${formatNumber(state.problemSpace.mapPayload.unmappedCount)} are unmapped in this evidence view.`,
+      );
+    } catch (error) {
+      if (token !== state.problemSpace.mapRequestToken) return;
+      byId("problem-space-map-loading").hidden = true;
+      setInlineError("problem-space-error", `Corpus map could not be loaded: ${error.message}`);
+    }
   }
 
   function score01(value) {
@@ -1473,9 +2612,17 @@
     return Math.min(1, Math.max(0, score));
   }
 
+  function qualityPercent(value) {
+    const percentage = score01(value) * 100;
+    return `${percentage.toFixed(1).replace(/\.0$/, "")}%`;
+  }
+
   function normalizeComparable(value) {
     const record = asRecord(value);
     const proposed = asRecord(firstDefined(record.proposal, record.classification_proposal));
+    const facets = asRecord(
+      firstDefined(record.facet_coordinates, record.facets, proposed.facet_coordinates),
+    );
     const tags = normalizeTagList(
       firstDefined(
         record.classification_tags,
@@ -1492,9 +2639,57 @@
         "Prompt excerpt not returned.",
       ),
       source: sourceLabel(firstDefined(record.source, record.source_label)),
-      grade: stringValue(firstDefined(record.grade, record.grade_band)),
-      domain: stringValue(firstDefined(record.primary_domain, proposed.primary_domain)),
-      questionType: stringValue(firstDefined(record.question_type, proposed.question_type)),
+      grade: gradeRangeValue(firstDefined(record.grade, record.grade_band)),
+      pointTier: pointTierValue(
+        firstDefined(
+          record.published_point_tier,
+          record.point_tier,
+          record.points,
+          asRecord(record.source).published_point_tier,
+        ),
+      ),
+      domain: stringValue(
+        firstDefined(record.primary_domain, facets.primary_domain, proposed.primary_domain),
+      ),
+      questionType: stringValue(
+        firstDefined(record.question_type, facets.question_type, proposed.question_type),
+      ),
+      skills: normalizeTagList(
+        firstDefined(record.skill_ids, facets.skill_ids, proposed.skill_ids),
+      ),
+      representations: normalizeTagList(
+        firstDefined(
+          record.representation_ids,
+          facets.representation_ids,
+          proposed.representation_ids,
+          proposed.representation_tags,
+        ),
+      ),
+      cognitiveDemand: stringValue(
+        firstDefined(
+          record.cognitive_demand,
+          facets.cognitive_demand,
+          proposed.cognitive_demand,
+          proposed.cognitive_demand_tag,
+        ),
+      ),
+      reviewState: stringValue(
+        firstDefined(record.review_state, record.teacher_review_state, record.disposition),
+      ),
+      classificationSource: stringValue(
+        firstDefined(
+          record.classification_source,
+          record.proposal_state,
+          proposed.provenance,
+        ),
+      ),
+      classificationContentVersion: stringValue(
+        firstDefined(
+          record.classification_content_version,
+          proposed.classification_content_version,
+          proposed.content_version,
+        ),
+      ),
       tags,
     };
   }
@@ -1536,6 +2731,562 @@
       warnings: textList(root.warnings),
       neighbors: asArray(firstDefined(root.neighbors, root.items, root.results)).map(normalizeNeighbor),
     };
+  }
+
+  function normalizeProblemNeighborhoodPayload(payload, fallbackId = "") {
+    const root = asRecord(payload);
+    const anchorValue = firstDefined(
+      root.anchor,
+      root.anchor_item,
+      root.selected,
+      fallbackId ? { item_id: fallbackId } : null,
+    );
+    const neighborValues = firstDefined(root.neighbors, root.items, root.results, []);
+    return {
+      anchor: normalizeComparable(anchorValue),
+      view: stringValue(root.view, state.problemSpace.view),
+      retrievalVersion: stringValue(
+        firstDefined(root.retrieval_version, root.algorithm_version),
+      ),
+      effectiveWeights: asRecord(root.effective_weights),
+      warnings: textList(root.warnings),
+      neighbors: asArray(neighborValues).map(normalizeNeighbor),
+    };
+  }
+
+  function renderProblemSearchMatches(values, { matchType = "", warnings = [] } = {}) {
+    const matches = values.map(normalizeNeighbor).filter((match) => match.id);
+    const list = byId("problem-search-match-list");
+    list.replaceChildren();
+    matches.forEach((match) => {
+      const item = node("li", { className: "problem-search-match" });
+      const button = node("button", {
+        className: "problem-search-match-button",
+        attrs: {
+          type: "button",
+          "data-problem-item-id": match.id,
+          "aria-label": `Explore match ${match.rank}, ${match.id}, retrieval score ${match.score.toFixed(2)}`,
+        },
+      });
+      const heading = node("span", { className: "problem-search-match-heading" });
+      const identity = node("span");
+      const metadata = [
+        match.source,
+        match.grade && humanize(match.grade),
+        match.pointTier && `${match.pointTier} points`,
+        match.domain && humanize(match.domain),
+        match.questionType && humanize(match.questionType),
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      identity.append(
+        node("strong", { text: `#${match.rank} · ${match.id}` }),
+        node("small", { text: metadata || "Source and proposed facets not reported" }),
+      );
+      heading.append(
+        identity,
+        node("span", {
+          className: "score-badge",
+          text: `Score ${match.score.toFixed(2)}`,
+        }),
+      );
+      const componentEvidence = Object.entries(match.scores)
+        .map(([label, score]) => `${humanize(label)} ${score.toFixed(2)}`)
+        .join(" · ");
+      const facetEvidence = [
+        match.representations.length &&
+          `Representations: ${match.representations.map(humanize).join(", ")}`,
+        match.cognitiveDemand && `Demand: ${humanize(match.cognitiveDemand)}`,
+        match.classificationSource &&
+          `Classification: ${humanize(match.classificationSource)}`,
+        match.classificationContentVersion &&
+          `Content version: ${match.classificationContentVersion}`,
+      ].filter(Boolean);
+      const retrievalEvidence = [
+        ...match.sharedTags.map((tag) => `Shared: ${humanize(tag)}`),
+        ...match.reasons.slice(0, 2).map(humanize),
+      ];
+      button.append(
+        heading,
+        node("span", {
+          className: "problem-search-match-prompt",
+          text: match.prompt,
+        }),
+      );
+      if (componentEvidence) {
+        button.append(
+          node("span", {
+            className: "problem-search-match-components",
+            text: `Score components: ${componentEvidence}`,
+          }),
+        );
+      }
+      if (facetEvidence.length || retrievalEvidence.length) {
+        button.append(
+          node("span", {
+            className: "problem-search-match-evidence",
+            text: [...facetEvidence, ...retrievalEvidence].join(" · "),
+          }),
+        );
+      }
+      button.append(
+        node("span", { className: "problem-search-match-action", text: "Start trail →" }),
+      );
+      item.append(button);
+      list.append(item);
+    });
+    if (!matches.length) {
+      list.append(
+        node("li", {
+          className: "problem-search-no-match",
+          text: "No matching question was returned. Try a stable ID or a more distinctive phrase.",
+        }),
+      );
+    }
+    const summaryParts = [
+      `${formatNumber(matches.length)} ${matches.length === 1 ? "match" : "matches"}`,
+      matchType && humanize(matchType),
+      ...warnings.map((warning) => `Warning: ${humanize(warning)}`),
+    ].filter(Boolean);
+    setText("problem-search-results-summary", summaryParts.join(" · "));
+    byId("problem-space-search-results").hidden = false;
+  }
+
+  function renderProblemTrail() {
+    const list = byId("problem-trail-list");
+    list.replaceChildren();
+    state.problemSpace.trail.forEach((entry, index) => {
+      const item = node("li");
+      const button = node("button", {
+        className: `problem-trail-step${index === state.problemSpace.trailIndex ? " is-current" : ""}`,
+        attrs: {
+          type: "button",
+          "data-problem-trail-index": index,
+          "aria-current": index === state.problemSpace.trailIndex ? "step" : undefined,
+          "aria-label": `Open trail step ${index + 1}: ${entry.id}`,
+        },
+      });
+      button.append(
+        node("span", { className: "problem-trail-number", text: index + 1 }),
+        node("code", { text: entry.id }),
+      );
+      item.append(button);
+      list.append(item);
+    });
+    const hasCurrent = state.problemSpace.trailIndex >= 0;
+    byId("problem-trail-back").disabled = state.problemSpace.trailIndex <= 0;
+    byId("problem-trail-forward").disabled =
+      !hasCurrent || state.problemSpace.trailIndex >= state.problemSpace.trail.length - 1;
+    setText(
+      "problem-trail-position",
+      hasCurrent
+        ? `Step ${state.problemSpace.trailIndex + 1} of ${state.problemSpace.trail.length}`
+        : "No question selected",
+    );
+  }
+
+  function renderProblemNeighborhood() {
+    const entry = state.problemSpace.trail[state.problemSpace.trailIndex];
+    if (!entry) {
+      byId("problem-selected-empty").hidden = false;
+      byId("problem-neighborhood-content").hidden = true;
+      renderProblemTrail();
+      return;
+    }
+    const payload = entry.payload;
+    const anchor = payload.anchor;
+    state.problemSpace.anchorId = anchor.id || entry.id;
+    setText("problem-selected-reference", state.problemSpace.anchorId);
+    setText("problem-selected-prompt", anchor.prompt);
+    renderDefinitionList("problem-selected-metadata", [
+      ["Grade", anchor.grade ? humanize(anchor.grade) : "Not reported"],
+      ["Published points", anchor.pointTier ? String(anchor.pointTier) : "Not reported"],
+      ["Primary domain", anchor.domain ? humanize(anchor.domain) : "Not proposed"],
+      ["Question type", anchor.questionType ? humanize(anchor.questionType) : "Not proposed"],
+      [
+        "Required skills",
+        anchor.skills.length ? anchor.skills.map(humanize).join(", ") : "Not proposed",
+      ],
+      [
+        "Representations",
+        anchor.representations.length
+          ? anchor.representations.map(humanize).join(", ")
+          : "Not proposed",
+      ],
+      [
+        "Cognitive demand",
+        anchor.cognitiveDemand ? humanize(anchor.cognitiveDemand) : "Not proposed",
+      ],
+      ["Teacher review", anchor.reviewState ? humanize(anchor.reviewState) : "Unreviewed"],
+      [
+        "Classification evidence",
+        anchor.classificationSource
+          ? humanize(anchor.classificationSource)
+          : "Proposal provenance not reported",
+      ],
+      [
+        "Classification content version",
+        anchor.classificationContentVersion || "Not reported",
+      ],
+      ["Retrieval version", payload.retrievalVersion || "Not reported"],
+    ]);
+    const selectedTags = [
+      ...anchor.tags,
+      ...anchor.skills.map((value) => `Skill: ${value}`),
+      ...anchor.representations.map((value) => `Representation: ${value}`),
+      ...payload.warnings.map((warning) => `Warning: ${warning}`),
+    ];
+    renderTags(
+      byId("problem-selected-tags"),
+      [...new Set(selectedTags)],
+      "No proposed facet tags returned",
+    );
+
+    const list = byId("problem-neighbor-list");
+    list.replaceChildren();
+    payload.neighbors.forEach((neighbor) => {
+      const item = node("li", { className: "problem-neighbor-item" });
+      const button = node("button", {
+        className: "problem-neighbor-button",
+        attrs: {
+          type: "button",
+          "data-problem-item-id": neighbor.id,
+          "aria-label": `Continue trail to ${neighbor.id}, retrieval score ${neighbor.score.toFixed(2)}`,
+        },
+      });
+      const header = node("span", { className: "problem-neighbor-header" });
+      const identity = node("span");
+      identity.append(
+        node("strong", { text: `#${neighbor.rank} · ${neighbor.id}` }),
+        node("small", {
+          text: [
+            neighbor.source,
+            neighbor.grade && humanize(neighbor.grade),
+            neighbor.pointTier && `${neighbor.pointTier} points`,
+            neighbor.domain && humanize(neighbor.domain),
+            neighbor.questionType && humanize(neighbor.questionType),
+          ]
+            .filter(Boolean)
+            .join(" · "),
+        }),
+      );
+      header.append(
+        identity,
+        node("span", {
+          className: "score-badge",
+          text: `Score ${neighbor.score.toFixed(2)}`,
+        }),
+      );
+      const componentEvidence = Object.entries(neighbor.scores)
+        .map(([label, score]) => `${humanize(label)} ${score.toFixed(2)}`)
+        .join(" · ");
+      const evidence = [
+        ...neighbor.sharedTags.map((value) => `Shared: ${humanize(value)}`),
+        ...neighbor.reasons.slice(0, 2).map(humanize),
+        neighbor.representations.length &&
+          `Representations: ${neighbor.representations.map(humanize).join(", ")}`,
+        neighbor.cognitiveDemand && `Demand: ${humanize(neighbor.cognitiveDemand)}`,
+        neighbor.classificationSource &&
+          `Classification: ${humanize(neighbor.classificationSource)}`,
+        neighbor.classificationContentVersion &&
+          `Content version: ${neighbor.classificationContentVersion}`,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      button.append(
+        header,
+        node("span", { className: "problem-neighbor-prompt", text: neighbor.prompt }),
+      );
+      if (componentEvidence) {
+        button.append(
+          node("span", {
+            className: "problem-neighbor-components",
+            text: `Score components: ${componentEvidence}`,
+          }),
+        );
+      }
+      if (evidence) {
+        button.append(node("span", { className: "problem-neighbor-evidence", text: evidence }));
+      }
+      button.append(node("span", { className: "problem-neighbor-action", text: "Continue trail →" }));
+      item.append(button);
+      list.append(item);
+    });
+    setText(
+      "problem-neighbors-summary",
+      `${formatNumber(payload.neighbors.length)} candidates · ${humanize(payload.view)} view`,
+    );
+    byId("problem-neighbor-loading").hidden = true;
+    byId("problem-selected-empty").hidden = true;
+    byId("problem-neighborhood-content").hidden = false;
+    updateProblemMapCenterControl();
+    state.problemSpace.focusedPointId = state.problemSpace.anchorId;
+    setProblemMapPointDetail(state.problemSpace.anchorId);
+    centerProblemMapOnPoint(state.problemSpace.anchorId);
+    renderProblemTrail();
+    updateUrl();
+  }
+
+  function commitProblemNeighborhood(payload, { replaceCurrent = false } = {}) {
+    const id = payload.anchor.id || state.problemSpace.anchorId;
+    if (!id) return;
+    payload.anchor.id = id;
+    const current = state.problemSpace.trail[state.problemSpace.trailIndex];
+    const entry = { id, payload };
+    if (state.problemSpace.trailIndex >= 0 && (replaceCurrent || current?.id === id)) {
+      state.problemSpace.trail[state.problemSpace.trailIndex] = entry;
+    } else {
+      state.problemSpace.trail = state.problemSpace.trail.slice(
+        0,
+        state.problemSpace.trailIndex + 1,
+      );
+      state.problemSpace.trail.push(entry);
+      state.problemSpace.trailIndex = state.problemSpace.trail.length - 1;
+    }
+    renderProblemNeighborhood();
+    announce(`Exploring ${id} with ${payload.neighbors.length} nearby questions.`);
+  }
+
+  function cancelProblemSearchRequest() {
+    state.problemSpace.searchRequestToken += 1;
+    byId("problem-space-search-loading").hidden = true;
+    byId("problem-space-submit").disabled = false;
+  }
+
+  function restoreCommittedProblemNeighborhood() {
+    byId("problem-neighbor-loading").hidden = true;
+    const entry = state.problemSpace.trail[state.problemSpace.trailIndex];
+    if (entry?.payload?.view === state.problemSpace.view) {
+      renderProblemNeighborhood();
+      return;
+    }
+    byId("problem-neighborhood-content").hidden = true;
+    byId("problem-selected-empty").hidden = false;
+    renderProblemTrail();
+    updateUrl();
+  }
+
+  function navigateProblemTrail(index) {
+    if (index < 0 || index >= state.problemSpace.trail.length) return;
+    cancelProblemSearchRequest();
+    state.problemSpace.neighborhoodRequestToken += 1;
+    const entry = state.problemSpace.trail[index];
+    if (entry.payload?.view !== state.problemSpace.view) {
+      exploreProblemQuestion(entry.id, {
+        replaceCurrent: true,
+        targetTrailIndex: index,
+      });
+      return;
+    }
+    state.problemSpace.trailIndex = index;
+    renderProblemNeighborhood();
+    byId("problem-selected-heading").focus?.();
+  }
+
+  async function exploreProblemQuestion(
+    id,
+    { replaceCurrent = false, targetTrailIndex = null, fromSearch = false } = {},
+  ) {
+    const item = stringValue(id).trim();
+    if (!item) return false;
+    hideProblemMapCandidates();
+    if (!fromSearch) cancelProblemSearchRequest();
+    const committedIndex = state.problemSpace.trailIndex;
+    const committedAnchorId = state.problemSpace.anchorId;
+    const committedEntry = state.problemSpace.trail[committedIndex];
+    const requestedView = byId("problem-space-view-select").value;
+    state.problemSpace.view = requestedView;
+    updateUrl();
+    setInlineError("problem-space-error");
+    byId("problem-space-search-results").hidden = true;
+    byId("problem-selected-empty").hidden = true;
+    byId("problem-neighborhood-content").hidden = true;
+    byId("problem-neighbor-loading").hidden = false;
+    const token = ++state.problemSpace.neighborhoodRequestToken;
+    const url = new URL(
+      `${API.items}/${encodeURIComponent(item)}/neighbors`,
+      window.location.origin,
+    );
+    url.searchParams.set("view", requestedView);
+    url.searchParams.set("limit", "8");
+    try {
+      const { payload } = await requestJson(url);
+      if (token !== state.problemSpace.neighborhoodRequestToken) return null;
+      const normalized = normalizeProblemNeighborhoodPayload(payload, item);
+      if (!normalized.anchor.id) normalized.anchor.id = item;
+      if (normalized.view !== requestedView) {
+        throw new Error(
+          `The service returned ${humanize(normalized.view)} evidence instead of ${humanize(requestedView)} evidence.`,
+        );
+      }
+      if (Number.isInteger(targetTrailIndex)) {
+        state.problemSpace.trailIndex = targetTrailIndex;
+      }
+      commitProblemNeighborhood(normalized, {
+        replaceCurrent: replaceCurrent || Number.isInteger(targetTrailIndex),
+      });
+      if (!state.problemSpace.mapPayload) loadProblemMap();
+      return true;
+    } catch (error) {
+      if (token !== state.problemSpace.neighborhoodRequestToken) return null;
+      state.problemSpace.trailIndex = committedIndex;
+      state.problemSpace.anchorId = committedAnchorId;
+      const committedView = committedEntry?.payload?.view;
+      if (
+        committedView &&
+        committedView !== requestedView &&
+        state.problemSpace.view === requestedView
+      ) {
+        state.problemSpace.view = committedView;
+        byId("problem-space-view-select").value = committedView;
+        state.problemSpace.mapPayload = null;
+        updateUrl();
+        await loadProblemMap({ force: true, preserveError: true });
+      }
+      byId("problem-neighbor-loading").hidden = true;
+      restoreCommittedProblemNeighborhood();
+      setInlineError(
+        "problem-space-error",
+        `This question’s neighborhood could not be loaded: ${error.message}`,
+      );
+      return false;
+    }
+  }
+
+  function looksLikeStableQuestionId(value) {
+    return (
+      value.length >= 6 &&
+      value.length <= 180 &&
+      /[-:]/.test(value) &&
+      /^[a-zA-Z0-9][a-zA-Z0-9._:-]+$/.test(value)
+    );
+  }
+
+  async function exploreProblemQuery() {
+    const query = byId("problem-space-query").value.trim();
+    if (!query) {
+      setInlineError(
+        "problem-space-error",
+        "Enter a stable question ID or paste question text, or choose Random question.",
+      );
+      return;
+    }
+    const stableQuestionId = looksLikeStableQuestionId(query);
+    let requestedView = byId("problem-space-view-select").value;
+    if (requestedView === "tag" && !stableQuestionId) {
+      requestedView = "surface";
+      byId("problem-space-view-select").value = requestedView;
+      state.problemSpace.mapPayload = null;
+      setText(
+        "problem-space-query-note",
+        "Pasted text has no stable proposed tags, so this search and map use Surface similarity.",
+      );
+      announce("Using Surface similarity because pasted text has no stable proposed tags.");
+    } else {
+      setText(
+        "problem-space-query-note",
+        "Pasted text can use Surface or Hybrid evidence. Proposed-tag evidence requires a stable question ID.",
+      );
+    }
+    state.problemSpace.query = query;
+    state.problemSpace.view = requestedView;
+    updateUrl();
+    setInlineError("problem-space-error");
+    state.problemSpace.neighborhoodRequestToken += 1;
+    restoreCommittedProblemNeighborhood();
+    byId("problem-space-search-results").hidden = true;
+    byId("problem-space-search-loading").hidden = false;
+    byId("problem-space-submit").disabled = true;
+    const token = ++state.problemSpace.searchRequestToken;
+    if (
+      !state.problemSpace.mapPayload ||
+      state.problemSpace.mapPayload.view !== requestedView
+    ) {
+      loadProblemMap({ force: true });
+    }
+    try {
+      const { payload } = await requestJson(API.explore, {
+        method: "POST",
+        body: JSON.stringify({ query, view: requestedView, limit: 8 }),
+      });
+      if (token !== state.problemSpace.searchRequestToken) return;
+      const root = asRecord(payload);
+      const resolvedItemId = stringValue(
+        firstDefined(root.query_item_id, root.resolved_item_id),
+      );
+      const anchor = normalizeComparable(
+        firstDefined(
+          root.anchor,
+          root.anchor_item,
+          root.selected,
+          resolvedItemId ? { item_id: resolvedItemId } : null,
+        ),
+      );
+      if (anchor.id) {
+        byId("problem-space-search-loading").hidden = true;
+        byId("problem-space-submit").disabled = false;
+        await exploreProblemQuestion(anchor.id, { fromSearch: true });
+      } else {
+        renderProblemSearchMatches(
+          asArray(firstDefined(root.results, root.matches, root.items, root.neighbors)),
+          {
+            matchType: stringValue(firstDefined(root.match_type, root.query_kind)),
+            warnings: textList(root.warnings),
+          },
+        );
+      }
+    } catch (error) {
+      if (token !== state.problemSpace.searchRequestToken) return;
+      setInlineError(
+        "problem-space-error",
+        `Question search could not be completed: ${error.message}`,
+      );
+    } finally {
+      if (token === state.problemSpace.searchRequestToken) {
+        byId("problem-space-search-loading").hidden = true;
+        byId("problem-space-submit").disabled = false;
+      }
+    }
+  }
+
+  async function exploreRandomProblemQuestion() {
+    setInlineError("problem-space-error");
+    await loadProblemMap();
+    const points = state.problemSpace.visiblePoints;
+    if (!points.length) {
+      setInlineError(
+        "problem-space-error",
+        "No questions match the current map filters. Clear a filter and try again.",
+      );
+      return;
+    }
+    let candidates = points.filter(
+      (point) =>
+        !state.problemSpace.randomSeenIds.has(point.id) &&
+        (points.length === 1 || point.id !== state.problemSpace.anchorId),
+    );
+    let restartedCycle = false;
+    if (!candidates.length) {
+      points.forEach((point) => state.problemSpace.randomSeenIds.delete(point.id));
+      candidates = points.filter(
+        (point) => points.length === 1 || point.id !== state.problemSpace.anchorId,
+      );
+      if (!candidates.length) candidates = points;
+      restartedCycle = true;
+    }
+    let randomValue = Math.floor(Math.random() * candidates.length);
+    if (window.crypto?.getRandomValues) {
+      const values = new Uint32Array(1);
+      window.crypto.getRandomValues(values);
+      randomValue = values[0] % candidates.length;
+    }
+    const point = candidates[randomValue];
+    state.problemSpace.randomSeenIds.add(point.id);
+    byId("problem-space-query").value = point.id;
+    if (restartedCycle) {
+      announce("Every visible question has been sampled once. Starting a new random cycle.");
+    }
+    await exploreProblemQuestion(point.id);
   }
 
   function similarityJudgementKey(anchorId, retrievalVersion, view, neighborId) {
@@ -2033,9 +3784,11 @@
 
   function inspectQuestion(id) {
     if (!id) return;
+    FILTER_KEYS.forEach((key) => (state.filters[key] = ""));
     state.filters.q = id;
     state.items.offset = 0;
     state.items.detailId = id;
+    state.items.loaded = false;
     syncControlsFromState();
     setActiveView("questions", { focus: true });
     loadItems({ preferredId: id, focusDetail: true });
@@ -2047,6 +3800,194 @@
     state.items.detailId = "";
     syncControlsFromState();
     loadItems();
+  }
+
+  function bindProblemMapEvents() {
+    const canvas = byId("problem-map-canvas");
+    if ("ResizeObserver" in window) {
+      state.problemSpace.resizeObserver = new ResizeObserver(() => drawProblemMap());
+      state.problemSpace.resizeObserver.observe(canvas);
+    } else {
+      window.addEventListener("resize", drawProblemMap);
+    }
+
+    canvas.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      hideProblemMapCandidates();
+      canvas.setPointerCapture(event.pointerId);
+      state.problemSpace.drag = {
+        pointerId: event.pointerId,
+        originX: event.clientX,
+        originY: event.clientY,
+        x: event.clientX,
+        y: event.clientY,
+        moved: false,
+      };
+    });
+    canvas.addEventListener("pointermove", (event) => {
+      const drag = state.problemSpace.drag;
+      if (drag?.pointerId === event.pointerId) {
+        const deltaX = event.clientX - drag.x;
+        const deltaY = event.clientY - drag.y;
+        state.problemSpace.panX += deltaX;
+        state.problemSpace.panY += deltaY;
+        drag.x = event.clientX;
+        drag.y = event.clientY;
+        if (Math.hypot(event.clientX - drag.originX, event.clientY - drag.originY) > 6) {
+          drag.moved = true;
+        }
+        drawProblemMap();
+        return;
+      }
+      if (problemMapShowsQuestions()) {
+        const point = nearestProblemMapPoint(event.clientX, event.clientY);
+        const nextId = point?.id || "";
+        if (
+          state.problemSpace.hoveredPointId === nextId &&
+          !state.problemSpace.hoveredClusterId
+        ) {
+          return;
+        }
+        state.problemSpace.hoveredClusterId = "";
+        state.problemSpace.hoveredPointId = nextId;
+        setProblemMapPointDetail(nextId || state.problemSpace.focusedPointId);
+      } else {
+        const cluster = nearestProblemMapCluster(event.clientX, event.clientY);
+        const nextId = cluster?.id || "";
+        if (
+          state.problemSpace.hoveredClusterId === nextId &&
+          !state.problemSpace.hoveredPointId
+        ) {
+          return;
+        }
+        state.problemSpace.hoveredPointId = "";
+        state.problemSpace.hoveredClusterId = nextId;
+        setProblemMapClusterDetail(nextId || state.problemSpace.focusedClusterId);
+      }
+      drawProblemMap();
+    });
+    canvas.addEventListener("pointerup", (event) => {
+      const drag = state.problemSpace.drag;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      state.problemSpace.drag = null;
+      if (canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+      if (drag.moved) return;
+      if (!problemMapShowsQuestions()) {
+        const cluster = nearestProblemMapCluster(event.clientX, event.clientY);
+        if (cluster) focusProblemMapCluster(cluster.id);
+        return;
+      }
+      const candidates = problemMapPointsNear(event.clientX, event.clientY, 18);
+      if (candidates.length > 1) {
+        showProblemMapCandidates(candidates);
+        return;
+      }
+      const point = candidates[0];
+      if (!point) return;
+      state.problemSpace.focusedPointId = point.id;
+      centerProblemMapOnPoint(point.id);
+      exploreProblemQuestion(point.id);
+    });
+    canvas.addEventListener("pointercancel", () => {
+      state.problemSpace.drag = null;
+    });
+    canvas.addEventListener("pointerleave", () => {
+      if (state.problemSpace.drag) return;
+      state.problemSpace.hoveredPointId = "";
+      state.problemSpace.hoveredClusterId = "";
+      if (problemMapShowsQuestions()) {
+        setProblemMapPointDetail(state.problemSpace.focusedPointId);
+      } else {
+        setProblemMapClusterDetail(state.problemSpace.focusedClusterId);
+      }
+      drawProblemMap();
+    });
+    canvas.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        zoomProblemMap(
+          event.deltaY < 0 ? 1.16 : 1 / 1.16,
+          event.clientX - rect.left,
+          event.clientY - rect.top,
+        );
+      },
+      { passive: false },
+    );
+    canvas.addEventListener("focus", () => {
+      if (problemMapShowsQuestions()) {
+        if (!state.problemSpace.focusedPointId) {
+          state.problemSpace.focusedPointId = state.problemSpace.visiblePoints[0]?.id || "";
+        }
+        setProblemMapPointDetail(state.problemSpace.focusedPointId, {
+          announceChange: true,
+        });
+      } else {
+        const clusters = visibleProblemClusters();
+        if (!clusters.some((cluster) => cluster.id === state.problemSpace.focusedClusterId)) {
+          state.problemSpace.focusedClusterId = clusters[0]?.id || "";
+        }
+        setProblemMapClusterDetail(state.problemSpace.focusedClusterId, {
+          announceChange: true,
+        });
+      }
+      drawProblemMap();
+    });
+    canvas.addEventListener("keydown", (event) => {
+      const directions = {
+        ArrowLeft: "left",
+        ArrowRight: "right",
+        ArrowUp: "up",
+        ArrowDown: "down",
+      };
+      if (directions[event.key]) {
+        event.preventDefault();
+        if (problemMapShowsQuestions()) moveProblemMapFocus(directions[event.key]);
+        else moveProblemMapClusterFocus(directions[event.key]);
+        return;
+      }
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        if (!problemMapShowsQuestions() && state.problemSpace.focusedClusterId) {
+          focusProblemMapCluster(state.problemSpace.focusedClusterId);
+        } else if (state.problemSpace.focusedPointId) {
+          exploreProblemQuestion(state.problemSpace.focusedPointId);
+        }
+        return;
+      }
+      if (event.key === "+" || event.key === "=") {
+        event.preventDefault();
+        zoomProblemMap(1.2);
+      } else if (event.key === "-" || event.key === "_") {
+        event.preventDefault();
+        zoomProblemMap(1 / 1.2);
+      } else if (event.key === "0") {
+        event.preventDefault();
+        resetProblemMap();
+      } else if (event.key === "Home" || event.key === "End") {
+        event.preventDefault();
+        if (problemMapShowsQuestions()) {
+          const points = state.problemSpace.visiblePoints;
+          const point = event.key === "Home" ? points[0] : points.at(-1);
+          if (point) {
+            state.problemSpace.focusedPointId = point.id;
+            centerProblemMapOnPoint(point.id);
+            setProblemMapPointDetail(point.id, { announceChange: true });
+          }
+        } else {
+          const clusters = visibleProblemClusters();
+          const cluster = event.key === "Home" ? clusters[0] : clusters.at(-1);
+          if (cluster) {
+            state.problemSpace.focusedClusterId = cluster.id;
+            setProblemMapClusterDetail(cluster.id, { announceChange: true });
+            drawProblemMap();
+          }
+        }
+      }
+    });
   }
 
   function bindEvents() {
@@ -2083,6 +4024,123 @@
       byId("similarity-anchor-id").value = state.items.detailId;
       setActiveView("similarity", { focus: true });
     });
+    byId("problem-space-search").addEventListener("submit", (event) => {
+      event.preventDefault();
+      exploreProblemQuery();
+    });
+    byId("problem-space-random").addEventListener("click", exploreRandomProblemQuestion);
+    byId("problem-space-view-select").addEventListener("change", async (event) => {
+      const requestedView = event.target.value;
+      cancelProblemSearchRequest();
+      state.problemSpace.neighborhoodRequestToken += 1;
+      state.problemSpace.view = requestedView;
+      state.problemSpace.mapPayload = null;
+      setText(
+        "problem-space-query-note",
+        requestedView === "tag"
+          ? "Proposed-tag evidence requires a stable question ID. Pasted text will fall back to Surface similarity."
+          : "Pasted text can use Surface or Hybrid evidence. Proposed-tag evidence requires a stable question ID.",
+      );
+      if (state.problemSpace.anchorId) {
+        byId("problem-neighborhood-content").hidden = true;
+        byId("problem-selected-empty").hidden = true;
+        byId("problem-neighbor-loading").hidden = false;
+      }
+      updateUrl();
+      await loadProblemMap({ force: true });
+      if (state.problemSpace.view !== requestedView) return;
+      if (state.problemSpace.anchorId) {
+        await exploreProblemQuestion(state.problemSpace.anchorId, {
+          replaceCurrent: true,
+        });
+      } else {
+        restoreCommittedProblemNeighborhood();
+      }
+    });
+    [
+      "problem-map-grade",
+      "problem-map-points",
+      "problem-map-domain",
+      "problem-map-type",
+    ].forEach((id) => {
+      byId(id).addEventListener("change", () => {
+        state.problemSpace.filters.grade = byId("problem-map-grade").value;
+        state.problemSpace.filters.points = byId("problem-map-points").value;
+        state.problemSpace.filters.domain = byId("problem-map-domain").value;
+        state.problemSpace.filters.questionType = byId("problem-map-type").value;
+        applyProblemMapFilters({ announceChange: true });
+      });
+    });
+    byId("problem-map-clear-filters").addEventListener("click", () => {
+      state.problemSpace.filters = {
+        grade: "",
+        points: "",
+        domain: "",
+        questionType: "",
+      };
+      byId("problem-map-grade").value = "";
+      byId("problem-map-points").value = "";
+      byId("problem-map-domain").value = "";
+      byId("problem-map-type").value = "";
+      applyProblemMapFilters({ announceChange: true });
+    });
+    byId("problem-space-view").addEventListener("click", (event) => {
+      const mapCandidateButton = event.target.closest(
+        "[data-problem-map-candidate-id]",
+      );
+      if (mapCandidateButton) {
+        const id = mapCandidateButton.dataset.problemMapCandidateId;
+        hideProblemMapCandidates();
+        centerProblemMapOnPoint(id);
+        exploreProblemQuestion(id);
+        return;
+      }
+      const clusterButton = event.target.closest("[data-problem-cluster-id]");
+      if (clusterButton) {
+        focusProblemMapCluster(clusterButton.dataset.problemClusterId);
+        return;
+      }
+      const itemButton = event.target.closest("[data-problem-item-id]");
+      if (itemButton) {
+        exploreProblemQuestion(itemButton.dataset.problemItemId);
+        return;
+      }
+      const trailButton = event.target.closest("[data-problem-trail-index]");
+      if (trailButton) navigateProblemTrail(integer(trailButton.dataset.problemTrailIndex));
+    });
+    byId("problem-trail-back").addEventListener("click", () => {
+      navigateProblemTrail(state.problemSpace.trailIndex - 1);
+    });
+    byId("problem-trail-forward").addEventListener("click", () => {
+      navigateProblemTrail(state.problemSpace.trailIndex + 1);
+    });
+    byId("problem-review-selected").addEventListener("click", () => {
+      if (state.problemSpace.anchorId) inspectQuestion(state.problemSpace.anchorId);
+    });
+    byId("problem-map-center-selected").addEventListener(
+      "click",
+      centerSelectedProblemMapPoint,
+    );
+    byId("problem-map-zoom-out").addEventListener("click", () => zoomProblemMap(1 / 1.2));
+    byId("problem-map-zoom-in").addEventListener("click", () => zoomProblemMap(1.2));
+    byId("problem-map-pan-left").addEventListener("click", () => {
+      state.problemSpace.panX -= 70;
+      drawProblemMap();
+    });
+    byId("problem-map-pan-right").addEventListener("click", () => {
+      state.problemSpace.panX += 70;
+      drawProblemMap();
+    });
+    byId("problem-map-pan-up").addEventListener("click", () => {
+      state.problemSpace.panY -= 70;
+      drawProblemMap();
+    });
+    byId("problem-map-pan-down").addEventListener("click", () => {
+      state.problemSpace.panY += 70;
+      drawProblemMap();
+    });
+    byId("problem-map-reset").addEventListener("click", resetProblemMap);
+    bindProblemMapEvents();
     byId("use-curriculum-target").addEventListener("click", () => {
       if (!state.items.detailId) return;
       byId("recommendation-target-item").value = state.items.detailId;

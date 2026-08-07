@@ -54,7 +54,7 @@ labels in as proposal provenance:
 ```
 
 The command verifies and indexes every source record, writes the separate
-`corpus-review.sqlite3`, and builds two compact, same-device retrieval views:
+`corpus-review.sqlite3`, and builds three compact, same-device retrieval views:
 
 - `surface`: feature-hashed unigram/bigram TF-IDF followed by deterministic
   latent semantic analysis;
@@ -77,6 +77,14 @@ Launch the private dashboard for one fixed teacher identity:
 
 Open the printed loopback URL. The workbench provides:
 
+- a **Problem Space** over all 1,833 questions: start from a random filtered
+  question, an exact stable ID, or pasted question text; walk through nearby
+  questions with Back/Forward history; and pan or zoom a labeled two-dimensional
+  map filtered by grade, published point tier, domain, and question type;
+- separate Surface, Proposed taxonomy, and Hybrid maps. Their deterministic
+  PCA-plus-neighbor refinement is an exploratory navigation aid, not a UMAP,
+  t-SNE, mastery, or difficulty model. The UI reports measured neighbor
+  preservation and labels clusters from enriched unreviewed proposal tags;
 - ontology skill inspection and append-only advisory approve/revise/merge/
   split/remove judgements;
 - Similarity Lab comparisons across surface, tag, and hybrid neighbors with
@@ -92,6 +100,13 @@ Open the printed loopback URL. The workbench provides:
   unavailable;
 - the complete 1,833-question source/curriculum review queue; and
 - an allowlisted evidence-only JSON export.
+
+Pasted text stays in a same-origin POST body and is never copied into the URL.
+Because pasted text has no reviewed taxonomy vector, Proposed taxonomy search
+requires a stable catalogue ID and Hybrid pasted-text search honestly uses only
+its Surface evidence. Queries with no supported corpus vocabulary return no
+confident ranking instead of turning feature-hash collisions into apparent
+matches.
 
 One teacher judgement does not approve the ontology or prerequisite graph.
 The recommendation preview does not read or update a child profile, and the

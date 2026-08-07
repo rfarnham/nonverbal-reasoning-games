@@ -82,6 +82,18 @@
         Similarity Lab
       </button>
       <button
+        id="problem-space-tab"
+        class="view-tab"
+        type="button"
+        role="tab"
+        aria-controls="problem-space-view"
+        aria-selected="false"
+        tabindex="-1"
+        data-view="problem-space"
+      >
+        Problem Space
+      </button>
+      <button
         id="curriculum-tab"
         class="view-tab"
         type="button"
@@ -627,6 +639,266 @@
               </form>
             </article>
           </section>
+        </div>
+      </section>
+
+      <section
+        id="problem-space-view"
+        class="catalogue-view problem-space-view"
+        role="tabpanel"
+        aria-labelledby="problem-space-tab"
+        data-testid="problem-space-view"
+        hidden
+      >
+        <header class="section-intro">
+          <div>
+            <p class="eyebrow">Whole-corpus semantic exploration</p>
+            <h2>Problem Space</h2>
+            <p>
+              Start from any question, then walk its nearby questions one step at a time or
+              inspect where all questions sit on the provisional two-dimensional map.
+            </p>
+          </div>
+          <span class="experimental-badge">Exploratory retrieval · not mastery</span>
+        </header>
+
+        <aside class="experiment-notice" role="note">
+          <strong>Proximity is a review prompt.</strong>
+          <span>
+            The map compresses retrieval evidence into two dimensions. Nearby points may share
+            words, proposed tags, or both; distance does not establish strategy, difficulty, or
+            instructional order. Teacher review remains authoritative.
+          </span>
+        </aside>
+
+        <form id="problem-space-search" class="problem-space-search" role="search">
+          <label class="problem-query-field" for="problem-space-query">
+            <span>Question ID or text</span>
+            <textarea
+              id="problem-space-query"
+              name="q"
+              rows="2"
+              autocomplete="off"
+              placeholder="Paste a stable ID or a distinctive phrase from the question"
+            ></textarea>
+          </label>
+          <label for="problem-space-view-select">
+            <span>Neighbor evidence</span>
+            <select id="problem-space-view-select" name="view">
+              <option value="hybrid" selected>Hybrid evidence</option>
+              <option value="surface">Surface similarity</option>
+              <option value="tag">Proposed-tag similarity</option>
+            </select>
+          </label>
+          <div class="problem-search-actions">
+            <button id="problem-space-random" class="button button-secondary" type="button">
+              Random question
+            </button>
+            <button id="problem-space-submit" class="button button-primary" type="submit">
+              Find and explore
+            </button>
+          </div>
+          <p id="problem-space-query-note" class="problem-query-note" role="status">
+            Pasted text can use Surface or Hybrid evidence. Proposed-tag evidence requires a
+            stable question ID.
+          </p>
+        </form>
+
+        <div id="problem-space-error" class="inline-error" role="alert" hidden></div>
+        <div id="problem-space-search-loading" class="loading-panel" role="status" hidden>
+          Finding matching questions…
+        </div>
+        <section
+          id="problem-space-search-results"
+          class="panel problem-search-results"
+          aria-labelledby="problem-search-results-heading"
+          hidden
+        >
+          <header class="panel-heading">
+            <div>
+              <p class="eyebrow">Search matches</p>
+              <h3 id="problem-search-results-heading">Choose a starting question</h3>
+            </div>
+            <p id="problem-search-results-summary"></p>
+          </header>
+          <ol id="problem-search-match-list" class="problem-search-match-list"></ol>
+        </section>
+
+        <div id="problem-space-map-loading" class="loading-panel" role="status" hidden>
+          Plotting the complete local corpus…
+        </div>
+
+        <div id="problem-space-workspace" class="problem-space-workspace" hidden>
+          <section class="panel problem-trail-panel" aria-labelledby="problem-trail-heading">
+            <header class="problem-trail-header">
+              <div>
+                <p class="eyebrow">Step-by-step path</p>
+                <h3 id="problem-trail-heading">Exploration trail</h3>
+              </div>
+              <div class="problem-trail-actions" aria-label="Trail navigation">
+                <button id="problem-trail-back" class="button button-secondary" type="button" disabled>
+                  ← Back
+                </button>
+                <span id="problem-trail-position" role="status">No question selected</span>
+                <button id="problem-trail-forward" class="button button-secondary" type="button" disabled>
+                  Forward →
+                </button>
+              </div>
+            </header>
+            <ol id="problem-trail-list" class="problem-trail-list" aria-label="Visited questions"></ol>
+          </section>
+
+          <div class="problem-space-grid">
+            <section class="panel corpus-map-panel" aria-labelledby="corpus-map-heading">
+              <header class="panel-heading corpus-map-heading-row">
+                <div>
+                  <p class="eyebrow">Provisional 2D projection</p>
+                  <h3 id="corpus-map-heading">Corpus map</h3>
+                </div>
+                <div class="problem-map-summary">
+                  <p id="problem-map-count" role="status">—</p>
+                  <small id="problem-map-method">Projection method not reported</small>
+                  <small id="problem-map-quality">Neighborhood retention not reported</small>
+                  <small id="problem-map-warnings"></small>
+                </div>
+              </header>
+
+              <div class="problem-map-filters" aria-label="Corpus map filters">
+                <label for="problem-map-grade">
+                  <span>Grade</span>
+                  <select id="problem-map-grade">
+                    <option value="">All grades</option>
+                  </select>
+                </label>
+                <label for="problem-map-points">
+                  <span>Published points</span>
+                  <select id="problem-map-points">
+                    <option value="">All point tiers</option>
+                  </select>
+                </label>
+                <label for="problem-map-domain">
+                  <span>Domain</span>
+                  <select id="problem-map-domain">
+                    <option value="">All domains</option>
+                  </select>
+                </label>
+                <label for="problem-map-type">
+                  <span>Question type</span>
+                  <select id="problem-map-type">
+                    <option value="">All question types</option>
+                  </select>
+                </label>
+                <button id="problem-map-clear-filters" class="text-button" type="button">
+                  Clear map filters
+                </button>
+              </div>
+
+              <div class="problem-map-toolbar" role="group" aria-label="Map controls">
+                <button id="problem-map-zoom-out" type="button" aria-label="Zoom out">−</button>
+                <button id="problem-map-zoom-in" type="button" aria-label="Zoom in">+</button>
+                <button id="problem-map-pan-left" type="button" aria-label="Pan left">←</button>
+                <button id="problem-map-pan-up" type="button" aria-label="Pan up">↑</button>
+                <button id="problem-map-pan-down" type="button" aria-label="Pan down">↓</button>
+                <button id="problem-map-pan-right" type="button" aria-label="Pan right">→</button>
+                <button id="problem-map-reset" type="button">Reset view</button>
+                <button id="problem-map-center-selected" type="button" disabled>
+                  Center selected
+                </button>
+                <span id="problem-map-center-note" class="map-control-note" role="status"></span>
+              </div>
+
+              <div class="problem-map-frame">
+                <canvas
+                  id="problem-map-canvas"
+                  width="1200"
+                  height="700"
+                  tabindex="0"
+                  role="application"
+                  aria-roledescription="interactive corpus map"
+                  aria-label="Corpus map. Use arrow keys to move among visible questions, Enter to explore, plus or minus to zoom, and zero to reset."
+                  aria-describedby="problem-map-mode problem-map-instructions problem-map-legend problem-cluster-key"
+                ></canvas>
+              </div>
+              <p id="problem-map-mode" class="map-mode-note" role="status">
+                Cluster overview. Select a cluster to zoom into individual questions.
+              </p>
+              <p id="problem-map-instructions" class="map-instructions">
+                Drag or use the pan controls to move. Scroll, +, or − to zoom. At overview
+                scale, use arrow keys to move among clusters and Enter to zoom. At question
+                scale, arrows move spatially among questions and Enter adds one to the trail.
+              </p>
+              <ul id="problem-map-legend" class="problem-map-legend" aria-label="Map point legend">
+                <li><span class="map-shape map-shape-circle" aria-hidden="true"></span> Grades 1–2 · circle</li>
+                <li><span class="map-shape map-shape-square" aria-hidden="true"></span> Grades 3–4 · square</li>
+                <li><span class="map-shape map-shape-triangle" aria-hidden="true"></span> Grades 5–6 · triangle</li>
+                <li><span class="map-shape map-shape-diamond" aria-hidden="true"></span> Unknown grade · diamond</li>
+              </ul>
+
+              <details id="problem-cluster-key" class="problem-cluster-key">
+                <summary>Accessible cluster key</summary>
+                <p>
+                  Cluster labels are proposal-derived review aids. Choose one to zoom to its
+                  currently visible questions.
+                </p>
+                <ol id="problem-cluster-list"></ol>
+              </details>
+
+              <aside id="problem-map-point-detail" class="map-point-detail" aria-labelledby="map-point-detail-heading">
+                <p class="eyebrow">Map focus</p>
+                <h4 id="map-point-detail-heading">No question focused</h4>
+                <p id="map-point-detail-prompt">Hover over a point or focus the map and use the arrow keys.</p>
+                <p id="map-point-detail-meta"></p>
+                <div id="problem-map-candidates" class="problem-map-candidates" hidden>
+                  <p id="problem-map-candidate-summary">
+                    <strong>Several questions overlap here.</strong> Choose the one to explore.
+                  </p>
+                  <ol id="problem-map-candidate-list"></ol>
+                </div>
+              </aside>
+            </section>
+
+            <section class="problem-neighborhood" aria-labelledby="problem-selected-heading">
+              <div id="problem-neighbor-loading" class="loading-panel" role="status" hidden>
+                Loading this question’s neighborhood…
+              </div>
+              <div id="problem-selected-empty" class="empty-panel">
+                <strong>Choose a starting question</strong>
+                <p>Search, choose Random question, or select a point on the map.</p>
+              </div>
+              <div id="problem-neighborhood-content" hidden>
+                <article class="panel problem-selected-card">
+                  <header class="panel-heading">
+                    <div>
+                      <p class="eyebrow">Selected question</p>
+                      <h3 id="problem-selected-heading" tabindex="-1">Question reference</h3>
+                    </div>
+                    <div class="problem-selected-actions">
+                      <code id="problem-selected-reference"></code>
+                      <button id="problem-review-selected" class="button button-secondary" type="button">
+                        Review classification
+                      </button>
+                    </div>
+                  </header>
+                  <p id="problem-selected-prompt" class="similarity-prompt"></p>
+                  <dl id="problem-selected-metadata" class="compact-breakdown"></dl>
+                  <div id="problem-selected-tags" class="tag-row" aria-label="Selected question tags"></div>
+                </article>
+
+                <header class="lab-results-heading problem-neighbors-heading">
+                  <div>
+                    <p class="eyebrow">Choose the next step</p>
+                    <h3 id="problem-neighbors-heading">Nearby questions</h3>
+                  </div>
+                  <p id="problem-neighbors-summary" role="status" aria-live="polite"></p>
+                </header>
+                <ol
+                  id="problem-neighbor-list"
+                  class="problem-neighbor-list"
+                  aria-labelledby="problem-neighbors-heading"
+                ></ol>
+              </div>
+            </section>
+          </div>
         </div>
       </section>
 

@@ -16,14 +16,17 @@ are entirely local and perform no network operation.
 from __future__ import annotations
 
 import hashlib
+import io
 import json
+import math
 import os
 import re
+import stat
 import tempfile
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Final, Literal, Sequence
+from typing import Any, Final, Literal, Sequence, cast
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -33,12 +36,23 @@ from math_kangaroo_trainer.domain.catalogue_reviews import CatalogueInventoryIte
 from math_kangaroo_trainer.domain.items import ImportedItem
 
 
-SEMANTIC_INDEX_MANIFEST_VERSION: Final = "semantic-index-manifest.v1"
+SEMANTIC_INDEX_MANIFEST_VERSION: Final = "semantic-index-manifest.v3"
 SEMANTIC_INDEX_ALGORITHM_VERSION: Final = "hashed-tfidf-randomized-lsa.v1"
 SEMANTIC_INDEX_CONFIG_VERSION: Final = "semantic-index-config.v1"
 SEMANTIC_DOCUMENT_SCHEMA_VERSION: Final = "semantic-document.v1"
+SEMANTIC_MAP_PROJECTION_VERSION: Final = "semantic-map-pca-knn-attraction.v2"
+SEMANTIC_MAP_CLUSTER_LABEL_VERSION: Final = "proposal-tag-lift.v1"
+SEMANTIC_MAP_HYBRID_METRIC: Final = (
+    "mean-bidirectional-anchor-renormalized-similarity.v1"
+)
 DEFAULT_ARTIFACT_BASENAME = "math-kangaroo-semantic-index"
 MISSING_STRATEGY_WARNING = "STRATEGY_VIEW_UNAVAILABLE_RENORMALIZED"
+TEXT_QUERY_TAG_WARNING = "TEXT_QUERY_HAS_NO_TAG_VECTOR"
+TEXT_QUERY_NO_CORPUS_EVIDENCE = "TEXT_QUERY_NO_CORPUS_EVIDENCE"
+TEXT_QUERY_LOW_EVIDENCE = "TEXT_QUERY_LOW_CORPUS_EVIDENCE"
+MAX_SEMANTIC_MAP_CLUSTERS: Final = 14
+MAX_SEMANTIC_MANIFEST_BYTES: Final = 16 * 1024 * 1024
+MAX_SEMANTIC_VECTOR_BYTES: Final = 256 * 1024 * 1024
 
 
 class StrictFrozenModel(BaseModel):
@@ -238,12 +252,14 @@ class SemanticManifestItem(StrictFrozenModel):
 
 class SemanticArtifactManifest(StrictFrozenModel):
     manifest_version: Literal[
-        "semantic-index-manifest.v1"
+        "semantic-index-manifest.v3"
     ] = SEMANTIC_INDEX_MANIFEST_VERSION
     algorithm_version: Literal[
         "hashed-tfidf-randomized-lsa.v1"
     ] = SEMANTIC_INDEX_ALGORITHM_VERSION
-    purpose: Literal["local_corpus_retrieval_only"] = "local_corpus_retrieval_only"
+    purpose: Literal[
+        "local_corpus_retrieval_and_exploration_only"
+    ] = "local_corpus_retrieval_and_exploration_only"
     represents_mastery_or_difficulty: Literal[False] = False
     ontology_version: str = Field(min_length=1)
     classifier_version: str = Field(min_length=1)
@@ -252,8 +268,18 @@ class SemanticArtifactManifest(StrictFrozenModel):
     ordered_items_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     tag_vocabulary: tuple[str, ...]
     surface_dimensions: int = Field(ge=1)
+    surface_feature_support_count: int = Field(ge=1)
     tag_dimensions: int = Field(ge=0)
     strategy_available: Literal[False] = False
+    projection_algorithm_version: Literal[
+        "semantic-map-pca-knn-attraction.v2"
+    ] = SEMANTIC_MAP_PROJECTION_VERSION
+    cluster_label_algorithm_version: Literal[
+        "proposal-tag-lift.v1"
+    ] = SEMANTIC_MAP_CLUSTER_LABEL_VERSION
+    projection_is_exploratory: Literal[True] = True
+    projection_dimensions: Literal[2] = 2
+    projection_views: tuple["SemanticMapViewManifest", ...]
     vectors_filename: str = Field(min_length=1)
     vectors_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
@@ -263,12 +289,61 @@ class SemanticArtifactManifest(StrictFrozenModel):
             raise ValueError("ordered item manifest checksum does not match its rows")
         if self.tag_dimensions != len(self.tag_vocabulary):
             raise ValueError("tag dimensions do not match tag vocabulary")
+        if tuple(value.view for value in self.projection_views) != (
+            RetrievalView.SURFACE,
+            RetrievalView.TAG,
+            RetrievalView.HYBRID,
+        ):
+            raise ValueError("projection views must contain surface, tag, and hybrid")
+        for projection in self.projection_views:
+            cluster_ids = tuple(cluster.cluster_id for cluster in projection.clusters)
+            if cluster_ids != tuple(range(len(cluster_ids))):
+                raise ValueError(
+                    "projection cluster IDs must be contiguous and ordered"
+                )
+            if sum(
+                cluster.member_count for cluster in projection.clusters
+            ) + projection.unmapped_count != len(self.ordered_items):
+                raise ValueError(
+                    "projection cluster counts do not cover the item manifest"
+                )
         return self
+
+
+class SemanticMapTagEvidence(StrictFrozenModel):
+    tag: str = Field(min_length=1)
+    member_count: int = Field(ge=1)
+    coverage: float = Field(ge=0, le=1)
+    global_coverage: float = Field(ge=0, le=1)
+    lift: float = Field(gt=0)
+
+
+class SemanticMapCluster(StrictFrozenModel):
+    cluster_id: int = Field(ge=0)
+    label: str = Field(min_length=1)
+    label_tag: str = Field(min_length=1)
+    member_count: int = Field(ge=1)
+    dominant_tags: tuple[SemanticMapTagEvidence, ...]
+    evidence_source: Literal[
+        "unreviewed_catalogue_proposal_tags"
+    ] = "unreviewed_catalogue_proposal_tags"
+    authoritative: Literal[False] = False
+
+
+class SemanticMapViewManifest(StrictFrozenModel):
+    view: Literal[
+        RetrievalView.SURFACE,
+        RetrievalView.TAG,
+        RetrievalView.HYBRID,
+    ]
+    clusters: tuple[SemanticMapCluster, ...]
+    unmapped_count: int = Field(ge=0)
+    projection_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
 class ComponentSimilarities(StrictFrozenModel):
     surface: float
-    tag: float
+    tag: float | None
     strategy: None = None
 
 
@@ -286,6 +361,16 @@ class SemanticNeighbor(StrictFrozenModel):
 class SemanticQueryResult(StrictFrozenModel):
     query_item_id: str
     query_content_version: str
+    view: RetrievalView
+    requested_top_k: int = Field(ge=1)
+    effective_weights: dict[str, float]
+    strategy_available: Literal[False] = False
+    warnings: tuple[str, ...]
+    neighbors: tuple[SemanticNeighbor, ...]
+
+
+class SemanticTextQueryResult(StrictFrozenModel):
+    query_kind: Literal["pasted_text"] = "pasted_text"
     view: RetrievalView
     requested_top_k: int = Field(ge=1)
     effective_weights: dict[str, float]
@@ -334,6 +419,69 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _read_regular_file_snapshot(
+    path: Path,
+    *,
+    max_bytes: int,
+    label: str,
+) -> bytes:
+    """Read one bounded, immutable-by-construction artifact snapshot.
+
+    The vector checksum and ``numpy`` decoder must consume the same bytes.
+    Opening with ``O_NOFOLLOW`` and checking every existing path component
+    prevents a caller-controlled symlink from redirecting either artifact.
+    Before/after ``fstat`` checks reject an in-place writer racing the read.
+    """
+
+    requested = path.absolute()
+    for component in (requested, *requested.parents):
+        try:
+            metadata = os.lstat(component)
+        except FileNotFoundError:
+            continue
+        except OSError as error:
+            raise SemanticArtifactError(f"{label} path cannot be inspected") from error
+        if stat.S_ISLNK(metadata.st_mode):
+            raise SemanticArtifactError(f"{label} cannot be a symlink")
+
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(requested, flags)
+    except OSError as error:
+        raise SemanticArtifactError(f"{label} cannot be opened safely") from error
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode):
+            raise SemanticArtifactError(f"{label} must be a regular file")
+        if before.st_size < 0 or before.st_size > max_bytes:
+            raise SemanticArtifactError(f"{label} exceeds the safe size limit")
+        chunks: list[bytes] = []
+        remaining = before.st_size
+        while remaining:
+            chunk = os.read(descriptor, min(1024 * 1024, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        snapshot = b"".join(chunks)
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+
+    stable_fields = (
+        "st_dev",
+        "st_ino",
+        "st_size",
+        "st_mtime_ns",
+        "st_ctime_ns",
+    )
+    if len(snapshot) != before.st_size or any(
+        getattr(before, field) != getattr(after, field) for field in stable_fields
+    ):
+        raise SemanticArtifactError(f"{label} changed while it was being read")
+    return snapshot
+
+
 def _manifest_items_sha256(items: Sequence[SemanticManifestItem]) -> str:
     payload = [item.model_dump(mode="json") for item in items]
     return hashlib.sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
@@ -348,6 +496,13 @@ def _semantic_identity_sha256(
     tag_vocabulary: Sequence[str],
     surface_vectors: np.ndarray,
     tag_vectors: np.ndarray,
+    surface_idf: np.ndarray,
+    surface_components: np.ndarray,
+    surface_feature_digests: np.ndarray,
+    surface_feature_document_frequencies: np.ndarray,
+    projection_coordinates: dict[RetrievalView, np.ndarray],
+    projection_cluster_ids: dict[RetrievalView, np.ndarray],
+    projection_clusters: dict[RetrievalView, tuple[SemanticMapCluster, ...]],
 ) -> str:
     """Hash all retrieval semantics, including weights and vector contents."""
 
@@ -360,14 +515,60 @@ def _semantic_identity_sha256(
                 "config": config.model_dump(mode="json"),
                 "items": [item.model_dump(mode="json") for item in items],
                 "tag_vocabulary": list(tag_vocabulary),
+                "surface_feature_support_count": len(surface_feature_digests),
+                "projection_algorithm_version": SEMANTIC_MAP_PROJECTION_VERSION,
+                "cluster_label_algorithm_version": (SEMANTIC_MAP_CLUSTER_LABEL_VERSION),
+                "projection_clusters": {
+                    view.value: [
+                        cluster.model_dump(mode="json")
+                        for cluster in projection_clusters[view]
+                    ]
+                    for view in (
+                        RetrievalView.SURFACE,
+                        RetrievalView.TAG,
+                        RetrievalView.HYBRID,
+                    )
+                },
             }
         ).encode("utf-8")
     )
-    for label, values in (
-        ("surface", surface_vectors),
-        ("tag", tag_vectors),
+    for label, values, dtype in (
+        ("surface", surface_vectors, np.float32),
+        ("tag", tag_vectors, np.float32),
+        ("surface_idf", surface_idf, np.float32),
+        ("surface_components", surface_components, np.float32),
+        ("surface_feature_digests", surface_feature_digests, np.uint64),
+        (
+            "surface_feature_document_frequencies",
+            surface_feature_document_frequencies,
+            np.uint32,
+        ),
+        *(
+            (
+                f"{view.value}_projection_coordinates",
+                projection_coordinates[view],
+                np.float32,
+            )
+            for view in (
+                RetrievalView.SURFACE,
+                RetrievalView.TAG,
+                RetrievalView.HYBRID,
+            )
+        ),
+        *(
+            (
+                f"{view.value}_projection_cluster_ids",
+                projection_cluster_ids[view],
+                np.int32,
+            )
+            for view in (
+                RetrievalView.SURFACE,
+                RetrievalView.TAG,
+                RetrievalView.HYBRID,
+            )
+        ),
     ):
-        canonical: Any = np.ascontiguousarray(values, dtype=np.float32)
+        canonical: Any = np.ascontiguousarray(values, dtype=dtype)
         digest.update(label.encode("ascii"))
         digest.update(_canonical_json(list(canonical.shape)).encode("ascii"))
         digest.update(canonical.tobytes(order="C"))
@@ -395,6 +596,45 @@ def _feature_bucket(feature: str, feature_count: int) -> tuple[int, float]:
     return value % feature_count, (-1.0 if value & (1 << 63) else 1.0)
 
 
+def _feature_support_digest(feature: str) -> int:
+    """Return a collision-resistant exact-feature key for query evidence checks."""
+
+    digest = hashlib.blake2b(
+        feature.encode("utf-8"),
+        digest_size=8,
+        person=b"mk-support-v1",
+    ).digest()
+    return int.from_bytes(digest, "big")
+
+
+def _surface_feature_support(
+    documents: Sequence[SemanticDocument],
+) -> tuple[np.ndarray, np.ndarray]:
+    """Persist exact feature document frequencies alongside hashed TF-IDF.
+
+    Feature hashing is intentionally lossy.  This separate representation lets
+    pasted-text retrieval prove that a query contains actual corpus evidence,
+    rather than accepting an unrelated token that merely shares a hash bucket.
+    """
+
+    document_frequencies: dict[int, int] = {}
+    for document in documents:
+        digests = {
+            _feature_support_digest(feature)
+            for feature in _features(document.surface_text)
+        }
+        for digest in digests:
+            document_frequencies[digest] = document_frequencies.get(digest, 0) + 1
+    ordered = sorted(document_frequencies)
+    return (
+        np.asarray(ordered, dtype=np.uint64),
+        np.asarray(
+            [document_frequencies[digest] for digest in ordered],
+            dtype=np.uint32,
+        ),
+    )
+
+
 def _normalize_rows(values: np.ndarray) -> np.ndarray:
     result = np.asarray(values, dtype=np.float64)
     norms = np.linalg.norm(result, axis=1, keepdims=True)
@@ -408,7 +648,7 @@ def _normalize_rows(values: np.ndarray) -> np.ndarray:
 
 def _surface_matrix(
     documents: Sequence[SemanticDocument], config: SemanticIndexConfig
-) -> np.ndarray:
+) -> tuple[np.ndarray, np.ndarray]:
     counts = np.zeros((len(documents), config.feature_count), dtype=np.float64)
     for row, document in enumerate(documents):
         for feature in _features(document.surface_text):
@@ -421,16 +661,21 @@ def _surface_matrix(
         1.0 + np.log(np.maximum(np.abs(counts), 1.0)),
         0.0,
     )
-    return _normalize_rows(tf * idf)
+    return _normalize_rows(tf * idf), np.asarray(idf, dtype=np.float32)
 
 
-def _randomized_lsa(tfidf: np.ndarray, config: SemanticIndexConfig) -> np.ndarray:
+def _randomized_lsa(
+    tfidf: np.ndarray, config: SemanticIndexConfig
+) -> tuple[np.ndarray, np.ndarray]:
     rows, columns = tfidf.shape
     rank = min(config.lsa_dimensions, rows, columns)
     if rank < 1:
         raise ValueError("semantic index requires at least one document")
     if not np.any(tfidf):
-        return np.zeros((rows, rank), dtype=np.float32)
+        return (
+            np.zeros((rows, rank), dtype=np.float32),
+            np.zeros((columns, rank), dtype=np.float32),
+        )
     sample_dimensions = min(columns, rank + config.oversample_dimensions)
     rng = np.random.default_rng(config.random_seed)
     omega = rng.standard_normal((columns, sample_dimensions), dtype=np.float64)
@@ -443,7 +688,10 @@ def _randomized_lsa(tfidf: np.ndarray, config: SemanticIndexConfig) -> np.ndarra
     reduced = basis.T @ source
     _, _, right_vectors = np.linalg.svd(reduced, full_matrices=False)
     components = right_vectors[:rank].T
-    return _normalize_rows(source @ components)
+    return (
+        _normalize_rows(source @ components),
+        np.asarray(components, dtype=np.float32),
+    )
 
 
 def _tag_vectors(
@@ -455,6 +703,537 @@ def _tag_vectors(
         for tag in document.tag_tokens:
             matrix[row, positions[tag]] = 1.0
     return _normalize_rows(matrix)
+
+
+def _combined_exploration_vectors(
+    surface_vectors: np.ndarray,
+    tag_vectors: np.ndarray,
+    config: SemanticIndexConfig,
+) -> np.ndarray:
+    """Return a Euclidean initialization for the symmetric hybrid graph.
+
+    The map's authoritative neighborhood relation is computed separately by
+    :func:`_projection_inputs_for_view`.  These concatenated vectors are only
+    the full-data PCA baseline/initialization for the attraction pass.
+    """
+
+    available: list[tuple[np.ndarray, float]] = []
+    if surface_vectors.shape[1] and config.surface_weight > 0:
+        available.append((surface_vectors, config.surface_weight))
+    if tag_vectors.shape[1] and config.tag_weight > 0:
+        available.append((tag_vectors, config.tag_weight))
+    total = sum(weight for _, weight in available)
+    if total <= 0:
+        raise SemanticArtifactError(
+            "semantic map requires at least one surface or tag vector facet"
+        )
+    scaled = [
+        np.asarray(values, dtype=np.float64) * np.sqrt(weight / total)
+        for values, weight in available
+    ]
+    return _normalize_rows(np.concatenate(scaled, axis=1))
+
+
+def _hybrid_similarity_matrix(
+    surface_vectors: np.ndarray,
+    tag_vectors: np.ndarray,
+    config: SemanticIndexConfig,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Symmetrize the actual anchor-dependent hybrid retrieval similarity.
+
+    Item retrieval renormalizes configured weights around the facets available
+    to the query item.  That relation is directional when, for example, one
+    item is tagged and another is tagless.  An undirected map therefore uses
+    the arithmetic mean of both served directions, not a concatenated-vector
+    cosine that silently applies a different missing-facet rule.
+    """
+
+    surface_available = np.linalg.norm(surface_vectors, axis=1) > 1e-12
+    tag_available = np.linalg.norm(tag_vectors, axis=1) > 1e-12
+    surface_weights: Any = np.asarray(
+        np.where(
+            surface_available,
+            config.surface_weight,
+            0.0,
+        ),
+        dtype=np.float64,
+    )
+    tag_weights: Any = np.asarray(
+        np.where(tag_available, config.tag_weight, 0.0),
+        dtype=np.float64,
+    )
+    totals: Any = surface_weights + tag_weights
+    mapped = totals > 1e-12
+    normalized_surface_weights = np.divide(
+        surface_weights,
+        totals,
+        out=np.zeros_like(surface_weights, dtype=np.float64),
+        where=mapped,
+    )
+    normalized_tag_weights = np.divide(
+        tag_weights,
+        totals,
+        out=np.zeros_like(tag_weights, dtype=np.float64),
+        where=mapped,
+    )
+    surface_scores = np.asarray(surface_vectors @ surface_vectors.T, dtype=np.float64)
+    tag_scores = np.asarray(tag_vectors @ tag_vectors.T, dtype=np.float64)
+    directional = (
+        normalized_surface_weights[:, np.newaxis] * surface_scores
+        + normalized_tag_weights[:, np.newaxis] * tag_scores
+    )
+    return (directional + directional.T) / 2.0, mapped
+
+
+def _projection_inputs_for_view(
+    view: RetrievalView,
+    *,
+    surface_vectors: np.ndarray,
+    tag_vectors: np.ndarray,
+    config: SemanticIndexConfig,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, str]:
+    """Return PCA vectors, served-neighborhood scores, mapping mask, and metric."""
+
+    if view is RetrievalView.SURFACE:
+        vectors = _normalize_rows(surface_vectors)
+        mapped = np.linalg.norm(vectors, axis=1) > 1e-12
+        return (
+            vectors,
+            np.asarray(vectors @ vectors.T, dtype=np.float64),
+            mapped,
+            "surface-cosine-similarity.v1",
+        )
+    if view is RetrievalView.TAG:
+        vectors = _normalize_rows(tag_vectors)
+        mapped = np.linalg.norm(vectors, axis=1) > 1e-12
+        return (
+            vectors,
+            np.asarray(vectors @ vectors.T, dtype=np.float64),
+            mapped,
+            "tag-cosine-similarity.v1",
+        )
+    if view is RetrievalView.HYBRID:
+        similarities, mapped = _hybrid_similarity_matrix(
+            surface_vectors,
+            tag_vectors,
+            config,
+        )
+        return (
+            _combined_exploration_vectors(surface_vectors, tag_vectors, config),
+            similarities,
+            mapped,
+            SEMANTIC_MAP_HYBRID_METRIC,
+        )
+    raise ValueError("semantic map does not support a strategy projection")
+
+
+def _orient_and_scale_projection(values: np.ndarray) -> np.ndarray:
+    coordinates = np.asarray(values, dtype=np.float64).copy()
+    for dimension in range(coordinates.shape[1]):
+        column = coordinates[:, dimension]
+        pivot = int(np.argmax(np.abs(column)))
+        if column[pivot] < 0:
+            coordinates[:, dimension] *= -1
+        extent = float(np.max(np.abs(coordinates[:, dimension])))
+        if extent > 1e-12:
+            coordinates[:, dimension] /= extent
+        else:
+            coordinates[:, dimension] = 0
+    return np.asarray(coordinates, dtype=np.float32)
+
+
+def _pca_projection(vectors: np.ndarray) -> np.ndarray:
+    rows = vectors.shape[0]
+    centered = np.asarray(vectors, dtype=np.float64) - np.mean(vectors, axis=0)
+    coordinates = np.zeros((rows, 2), dtype=np.float64)
+    if rows > 1 and np.any(centered):
+        _, _, right_vectors = np.linalg.svd(centered, full_matrices=False)
+        dimensions = min(2, right_vectors.shape[0])
+        coordinates[:, :dimensions] = centered @ right_vectors[:dimensions].T
+    return _orient_and_scale_projection(coordinates)
+
+
+def _neighbor_graph_projection(
+    vectors: np.ndarray,
+    source_similarities: np.ndarray,
+) -> np.ndarray:
+    """Full-data PCA initialization plus deterministic served-kNN attraction."""
+
+    rows = vectors.shape[0]
+    if source_similarities.shape != (rows, rows):
+        raise ValueError("source similarity matrix must cover all projected rows")
+    coordinates = np.asarray(_pca_projection(vectors), dtype=np.float64)
+    initial = coordinates.copy()
+
+    if rows > 1:
+        neighbor_count = min(10, rows - 1)
+        similarities = np.asarray(source_similarities, dtype=np.float64).copy()
+        np.fill_diagonal(similarities, -np.inf)
+        neighbors = np.argsort(-similarities, axis=1, kind="stable")[:, :neighbor_count]
+        for _ in range(24):
+            neighbor_centers = np.mean(coordinates[neighbors], axis=1)
+            coordinates += 0.12 * (neighbor_centers - coordinates)
+            coordinates += 0.04 * (initial - coordinates)
+    candidate = _orient_and_scale_projection(coordinates)
+    baseline = _orient_and_scale_projection(initial)
+    quality_anchors = (
+        np.linspace(0, rows - 1, num=400, dtype=np.int64)
+        if rows > 400
+        else np.arange(rows, dtype=np.int64)
+    )
+    if _neighbor_overlap_at_k(
+        source_similarities,
+        candidate,
+        anchor_indices=quality_anchors,
+    ) < _neighbor_overlap_at_k(
+        source_similarities,
+        baseline,
+        anchor_indices=quality_anchors,
+    ):
+        return baseline
+    return candidate
+
+
+def _neighbor_overlap_at_k(
+    source_similarities: np.ndarray,
+    coordinates: np.ndarray,
+    *,
+    k: int = 10,
+    anchor_indices: np.ndarray | None = None,
+) -> float:
+    """Compare sampled anchors against every mapped candidate in both spaces."""
+
+    rows = len(source_similarities)
+    if rows <= 1:
+        return 1.0
+    if source_similarities.shape != (rows, rows):
+        raise ValueError("source similarity matrix must be square")
+    if coordinates.shape != (rows, 2):
+        raise ValueError("map coordinates must cover every source candidate")
+    anchors: Any = (
+        np.arange(rows, dtype=np.int64)
+        if anchor_indices is None
+        else np.asarray(anchor_indices, dtype=np.int64)
+    )
+    if np.any(anchors < 0) or np.any(anchors >= rows):
+        raise ValueError("anchor indices must identify source candidates")
+    effective_k = min(k, rows - 1)
+    source_scores: Any = np.asarray(
+        source_similarities,
+        dtype=np.float64,
+    ).copy()
+    np.fill_diagonal(source_scores, -np.inf)
+    source_neighbors = np.argsort(-source_scores[anchors], axis=1, kind="stable")[
+        :, :effective_k
+    ]
+    distances: Any = np.sum(
+        (coordinates[anchors, np.newaxis, :] - coordinates[np.newaxis, :, :]) ** 2,
+        axis=2,
+    )
+    distances[np.arange(len(anchors)), anchors] = np.inf
+    map_neighbors = np.argsort(distances, axis=1, kind="stable")[:, :effective_k]
+    overlap = [
+        len(set(source_neighbors[row]) & set(map_neighbors[row])) / effective_k
+        for row in range(len(anchors))
+    ]
+    return round(float(np.mean(overlap)), 6)
+
+
+def _semantic_map_cluster_count(item_count: int) -> int:
+    return min(
+        MAX_SEMANTIC_MAP_CLUSTERS,
+        max(1, int(np.ceil(np.sqrt(item_count / 4.0)))),
+    )
+
+
+def _cluster_coordinates(
+    coordinates: np.ndarray,
+    items: Sequence[SemanticManifestItem],
+) -> np.ndarray:
+    rows = len(items)
+    cluster_count = _semantic_map_cluster_count(rows)
+    selected = [min(range(rows), key=lambda index: items[index].item_id)]
+    centers = [np.asarray(coordinates[selected[0]], dtype=np.float64)]
+    nearest: Any = np.sum((coordinates - centers[0]) ** 2, axis=1)
+    while len(centers) < cluster_count:
+        remaining = [index for index in range(rows) if index not in selected]
+        next_index = min(
+            remaining,
+            key=lambda index: (-float(nearest[index]), items[index].item_id),
+        )
+        selected.append(next_index)
+        centers.append(np.asarray(coordinates[next_index], dtype=np.float64))
+        candidate_distance = np.sum(
+            (coordinates - centers[-1]) ** 2,
+            axis=1,
+        )
+        nearest = np.minimum(nearest, candidate_distance)
+
+    center_matrix: Any = np.stack(centers)
+    assignments: Any = np.zeros(rows, dtype=np.int32)
+    for _ in range(40):
+        distances = np.sum(
+            (coordinates[:, np.newaxis, :] - center_matrix[np.newaxis, :, :]) ** 2,
+            axis=2,
+        )
+        updated: Any = np.asarray(np.argmin(distances, axis=1), dtype=np.int32)
+        if np.array_equal(updated, assignments):
+            break
+        assignments = updated
+        for cluster_id in range(cluster_count):
+            members = coordinates[assignments == cluster_id]
+            if len(members):
+                center_matrix[cluster_id] = np.mean(members, axis=0)
+
+    populated = sorted(
+        set(int(value) for value in assignments),
+        key=lambda cluster_id: min(
+            items[index].item_id
+            for index in range(rows)
+            if assignments[index] == cluster_id
+        ),
+    )
+    remap = {old: new for new, old in enumerate(populated)}
+    return np.asarray([remap[int(value)] for value in assignments], dtype=np.int32)
+
+
+def _tag_preference(tag: str) -> tuple[int, str]:
+    prefix = tag.split(":", 1)[0]
+    return (
+        {
+            "skill": 0,
+            "type": 1,
+            "domain": 2,
+            "representation": 3,
+            "demand": 4,
+        }.get(prefix, 5),
+        tag,
+    )
+
+
+def _humanize_tag(tag: str) -> str:
+    if tag == "unknown":
+        return "Unclassified questions"
+    value = tag.split(":", 1)[-1]
+    for prefix in ("cnt_", "prc_", "rsn_", "reason_", "rep_", "demand_"):
+        if value.startswith(prefix):
+            value = value.removeprefix(prefix)
+            break
+    return value.replace("_", " ").strip().title()
+
+
+def _cluster_tag_evidence(
+    *,
+    tag: str,
+    member_count: int,
+    cluster_size: int,
+    global_count: int,
+    population_size: int,
+) -> tuple[float, SemanticMapTagEvidence]:
+    """Return a discriminative label score and its auditable evidence.
+
+    Raw frequency made broad tags such as ``rep_story_text`` label many
+    unrelated clusters.  Add-half smoothing keeps small clusters stable while
+    lift identifies tags that are unusually concentrated in this neighborhood.
+    The score still rewards meaningful coverage and support, so a one-item
+    curiosity cannot become the map label.
+    """
+
+    coverage = member_count / cluster_size
+    global_coverage = global_count / population_size
+    smoothed_coverage = (member_count + 0.5) / (cluster_size + 1)
+    smoothed_global = (global_count + 0.5) / (population_size + 1)
+    lift = smoothed_coverage / smoothed_global
+    facet = tag.split(":", 1)[0]
+    facet_weight = {
+        "skill": 1.18,
+        "type": 1.10,
+        "domain": 1.02,
+        "representation": 0.92,
+        "demand": 0.86,
+    }.get(facet, 0.75)
+    score = (
+        math.log2(max(lift, 1.0)) * coverage * math.sqrt(member_count) * facet_weight
+    )
+    return score, SemanticMapTagEvidence(
+        tag=tag,
+        member_count=member_count,
+        coverage=round(coverage, 6),
+        global_coverage=round(global_coverage, 6),
+        lift=round(lift, 6),
+    )
+
+
+def _cluster_label(
+    ordered_evidence: Sequence[tuple[float, SemanticMapTagEvidence]],
+) -> tuple[str, str]:
+    """Choose one or two non-redundant, human-readable cluster descriptors."""
+
+    generic_tags = {
+        "domain:mixed",
+        "type:mixed",
+        "representation:rep_mixed",
+    }
+    useful = [
+        (score, evidence)
+        for score, evidence in ordered_evidence
+        if score > 1e-12 and evidence.tag not in generic_tags
+    ]
+    if not useful:
+        return "Mixed neighborhood", "unknown"
+
+    # Prefer a curriculum-bearing facet for the primary phrase when it carries
+    # a substantial part of the strongest available evidence.  This prevents a
+    # generic representation or demand tag from hiding a useful skill label.
+    best_score = useful[0][0]
+    curriculum_facets = {"skill", "type", "domain"}
+    primary = next(
+        (
+            entry
+            for entry in useful
+            if entry[1].tag.split(":", 1)[0] in curriculum_facets
+            and entry[0] >= best_score * 0.35
+        ),
+        useful[0],
+    )
+    selected = [primary]
+    primary_facet = primary[1].tag.split(":", 1)[0]
+    primary_words = set(_humanize_tag(primary[1].tag).lower().split())
+    for entry in useful:
+        if entry == primary or entry[0] < primary[0] * 0.22:
+            continue
+        facet = entry[1].tag.split(":", 1)[0]
+        words = set(_humanize_tag(entry[1].tag).lower().split())
+        overlap = len(primary_words & words) / max(
+            1, min(len(primary_words), len(words))
+        )
+        if facet != primary_facet and overlap < 0.6:
+            selected.append(entry)
+            break
+
+    tags = [entry[1].tag for entry in selected]
+    return " · ".join(_humanize_tag(tag) for tag in tags), tags[0]
+
+
+def _projection_clusters(
+    items: Sequence[SemanticManifestItem],
+    cluster_ids: np.ndarray,
+) -> tuple[SemanticMapCluster, ...]:
+    clusters: list[SemanticMapCluster] = []
+    global_counts: dict[str, int] = {}
+    for item in items:
+        for tag in item.tags:
+            global_counts[tag] = global_counts.get(tag, 0) + 1
+    for cluster_id in range(int(np.max(cluster_ids)) + 1):
+        members = [
+            item
+            for item, assigned in zip(items, cluster_ids, strict=True)
+            if int(assigned) == cluster_id
+        ]
+        counts: dict[str, int] = {}
+        for item in members:
+            for tag in item.tags:
+                counts[tag] = counts.get(tag, 0) + 1
+        minimum_support = max(2, math.ceil(len(members) * 0.04))
+        evidence_with_scores = [
+            _cluster_tag_evidence(
+                tag=tag,
+                member_count=count,
+                cluster_size=len(members),
+                global_count=global_counts[tag],
+                population_size=len(items),
+            )
+            for tag, count in counts.items()
+            if count >= minimum_support
+        ]
+        evidence_with_scores.sort(
+            key=lambda entry: (
+                -entry[0],
+                *_tag_preference(entry[1].tag),
+            )
+        )
+        label, label_tag = _cluster_label(evidence_with_scores)
+        clusters.append(
+            SemanticMapCluster(
+                cluster_id=cluster_id,
+                label=label,
+                label_tag=label_tag,
+                member_count=len(members),
+                dominant_tags=tuple(
+                    evidence for _, evidence in evidence_with_scores[:5]
+                ),
+            )
+        )
+    return tuple(clusters)
+
+
+def _build_semantic_map(
+    *,
+    items: Sequence[SemanticManifestItem],
+    vectors: np.ndarray,
+    source_similarities: np.ndarray,
+    mapped: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, tuple[SemanticMapCluster, ...]]:
+    if mapped.shape != (len(items),):
+        raise ValueError("semantic map mask must cover all items")
+    if source_similarities.shape != (len(items), len(items)):
+        raise ValueError("semantic map similarity matrix must cover all items")
+    coordinates = np.zeros((len(items), 2), dtype=np.float32)
+    cluster_ids = np.full(len(items), -1, dtype=np.int32)
+    if not np.any(mapped):
+        return coordinates, cluster_ids, ()
+    mapped_items = tuple(
+        item for item, included in zip(items, mapped, strict=True) if bool(included)
+    )
+    mapped_coordinates = _neighbor_graph_projection(
+        vectors[mapped],
+        source_similarities[np.ix_(mapped, mapped)],
+    )
+    mapped_cluster_ids = _cluster_coordinates(mapped_coordinates, mapped_items)
+    coordinates[mapped] = mapped_coordinates
+    cluster_ids[mapped] = mapped_cluster_ids
+    return (
+        coordinates,
+        cluster_ids,
+        _projection_clusters(mapped_items, mapped_cluster_ids),
+    )
+
+
+def _projection_vectors_for_view(
+    view: RetrievalView,
+    *,
+    surface_vectors: np.ndarray,
+    tag_vectors: np.ndarray,
+    config: SemanticIndexConfig,
+) -> np.ndarray:
+    return _projection_inputs_for_view(
+        view,
+        surface_vectors=surface_vectors,
+        tag_vectors=tag_vectors,
+        config=config,
+    )[0]
+
+
+def _projection_sha256(
+    coordinates: np.ndarray,
+    cluster_ids: np.ndarray,
+    clusters: Sequence[SemanticMapCluster],
+) -> str:
+    digest = hashlib.sha256()
+    for label, values, dtype in (
+        ("coordinates", coordinates, np.float32),
+        ("cluster_ids", cluster_ids, np.int32),
+    ):
+        canonical: Any = np.ascontiguousarray(values, dtype=dtype)
+        digest.update(label.encode("ascii"))
+        digest.update(_canonical_json(list(canonical.shape)).encode("ascii"))
+        digest.update(canonical.tobytes(order="C"))
+    digest.update(
+        _canonical_json(
+            [cluster.model_dump(mode="json") for cluster in clusters]
+        ).encode("utf-8")
+    )
+    return digest.hexdigest()
 
 
 class SemanticIndex:
@@ -470,6 +1249,13 @@ class SemanticIndex:
         tag_vocabulary: tuple[str, ...],
         surface_vectors: np.ndarray,
         tag_vectors: np.ndarray,
+        surface_idf: np.ndarray,
+        surface_components: np.ndarray,
+        surface_feature_digests: np.ndarray,
+        surface_feature_document_frequencies: np.ndarray,
+        projection_coordinates: dict[RetrievalView, np.ndarray],
+        projection_cluster_ids: dict[RetrievalView, np.ndarray],
+        projection_clusters: dict[RetrievalView, tuple[SemanticMapCluster, ...]],
     ) -> None:
         self.ontology_version = ontology_version
         self.classifier_version = classifier_version
@@ -478,6 +1264,28 @@ class SemanticIndex:
         self.tag_vocabulary = tag_vocabulary
         self.surface_vectors = np.asarray(surface_vectors, dtype=np.float32)
         self.tag_vectors = np.asarray(tag_vectors, dtype=np.float32)
+        self.surface_idf = np.asarray(surface_idf, dtype=np.float32)
+        self.surface_components = np.asarray(surface_components, dtype=np.float32)
+        self.surface_feature_digests = np.asarray(
+            surface_feature_digests,
+            dtype=np.uint64,
+        )
+        self.surface_feature_document_frequencies = np.asarray(
+            surface_feature_document_frequencies,
+            dtype=np.uint32,
+        )
+        self.projection_coordinates = {
+            view: np.asarray(values, dtype=np.float32)
+            for view, values in projection_coordinates.items()
+        }
+        self.projection_cluster_ids = {
+            view: np.asarray(values, dtype=np.int32)
+            for view, values in projection_cluster_ids.items()
+        }
+        self.projection_clusters = dict(projection_clusters)
+        self._projection_quality_cache: dict[
+            RetrievalView, dict[str, float | int | str]
+        ] = {}
         self.strategy_vectors: None = None
         self._positions = {item.item_id: index for index, item in enumerate(items)}
         if len(self._positions) != len(items):
@@ -491,6 +1299,15 @@ class SemanticIndex:
             tag_vocabulary=self.tag_vocabulary,
             surface_vectors=self.surface_vectors,
             tag_vectors=self.tag_vectors,
+            surface_idf=self.surface_idf,
+            surface_components=self.surface_components,
+            surface_feature_digests=self.surface_feature_digests,
+            surface_feature_document_frequencies=(
+                self.surface_feature_document_frequencies
+            ),
+            projection_coordinates=self.projection_coordinates,
+            projection_cluster_ids=self.projection_cluster_ids,
+            projection_clusters=self.projection_clusters,
         )
 
     @classmethod
@@ -511,8 +1328,12 @@ class SemanticIndex:
         tags = tuple(
             sorted({tag for document in document_list for tag in document.tag_tokens})
         )
-        tfidf = _surface_matrix(document_list, config)
-        surface_vectors = _randomized_lsa(tfidf, config)
+        tfidf, surface_idf = _surface_matrix(document_list, config)
+        surface_vectors, surface_components = _randomized_lsa(tfidf, config)
+        (
+            surface_feature_digests,
+            surface_feature_document_frequencies,
+        ) = _surface_feature_support(document_list)
         tag_vectors = _tag_vectors(document_list, tags)
         items = tuple(
             SemanticManifestItem(
@@ -525,6 +1346,34 @@ class SemanticIndex:
             )
             for document in document_list
         )
+        projection_coordinates: dict[RetrievalView, np.ndarray] = {}
+        projection_cluster_ids: dict[RetrievalView, np.ndarray] = {}
+        projection_clusters: dict[RetrievalView, tuple[SemanticMapCluster, ...]] = {}
+        for view in (
+            RetrievalView.SURFACE,
+            RetrievalView.TAG,
+            RetrievalView.HYBRID,
+        ):
+            (
+                projection_vectors,
+                source_similarities,
+                mapped,
+                _,
+            ) = _projection_inputs_for_view(
+                view,
+                surface_vectors=surface_vectors,
+                tag_vectors=tag_vectors,
+                config=config,
+            )
+            coordinates, cluster_ids, clusters = _build_semantic_map(
+                items=items,
+                vectors=projection_vectors,
+                source_similarities=source_similarities,
+                mapped=mapped,
+            )
+            projection_coordinates[view] = coordinates
+            projection_cluster_ids[view] = cluster_ids
+            projection_clusters[view] = clusters
         return cls(
             ontology_version=ontology_version,
             classifier_version=classifier_version,
@@ -533,6 +1382,13 @@ class SemanticIndex:
             tag_vocabulary=tags,
             surface_vectors=surface_vectors,
             tag_vectors=tag_vectors,
+            surface_idf=surface_idf,
+            surface_components=surface_components,
+            surface_feature_digests=surface_feature_digests,
+            surface_feature_document_frequencies=(surface_feature_document_frequencies),
+            projection_coordinates=projection_coordinates,
+            projection_cluster_ids=projection_cluster_ids,
+            projection_clusters=projection_clusters,
         )
 
     @property
@@ -556,25 +1412,359 @@ class SemanticIndex:
             raise SemanticArtifactError("surface array row count does not match items")
         if self.tag_vectors.shape != (expected_rows, len(self.tag_vocabulary)):
             raise SemanticArtifactError("tag array shape does not match manifest")
+        if self.surface_idf.shape != (self.config.feature_count,):
+            raise SemanticArtifactError("surface IDF shape does not match config")
+        if self.surface_components.shape != (
+            self.config.feature_count,
+            self.surface_vectors.shape[1],
+        ):
+            raise SemanticArtifactError(
+                "surface transform shape does not match vectors and config"
+            )
+        if (
+            self.surface_feature_digests.ndim != 1
+            or self.surface_feature_document_frequencies.shape
+            != self.surface_feature_digests.shape
+            or len(self.surface_feature_digests) == 0
+        ):
+            raise SemanticArtifactError(
+                "surface feature support arrays have invalid dimensions"
+            )
+        if np.any(
+            self.surface_feature_digests[1:] <= self.surface_feature_digests[:-1]
+        ):
+            raise SemanticArtifactError(
+                "surface feature support digests must be sorted and unique"
+            )
+        if np.any(self.surface_feature_document_frequencies < 1) or np.any(
+            self.surface_feature_document_frequencies > expected_rows
+        ):
+            raise SemanticArtifactError(
+                "surface feature support frequencies are outside the corpus"
+            )
         for label, values in (
             ("surface", self.surface_vectors),
             ("tag", self.tag_vectors),
+            ("surface IDF", self.surface_idf),
+            ("surface components", self.surface_components),
         ):
             if not np.isfinite(values).all():
                 raise SemanticArtifactError(
                     f"{label} vectors contain non-finite values"
                 )
+            if label not in {"surface", "tag"}:
+                continue
             norms = np.linalg.norm(values, axis=1)
             normalized_or_empty = np.isclose(norms, 0, atol=1e-5) | np.isclose(
                 norms, 1, atol=1e-5
             )
             if not np.all(normalized_or_empty):
                 raise SemanticArtifactError(f"{label} vectors are not row-normalized")
+        expected_views = {
+            RetrievalView.SURFACE,
+            RetrievalView.TAG,
+            RetrievalView.HYBRID,
+        }
+        if (
+            set(self.projection_coordinates) != expected_views
+            or set(self.projection_cluster_ids) != expected_views
+            or set(self.projection_clusters) != expected_views
+        ):
+            raise SemanticArtifactError(
+                "semantic map must contain surface, tag, and hybrid projections"
+            )
+        for view in sorted(expected_views, key=lambda value: value.value):
+            coordinates = self.projection_coordinates[view]
+            cluster_ids = self.projection_cluster_ids[view]
+            clusters = self.projection_clusters[view]
+            if coordinates.shape != (expected_rows, 2):
+                raise SemanticArtifactError(
+                    f"{view.value} projection coordinates have an invalid shape"
+                )
+            if not np.isfinite(coordinates).all():
+                raise SemanticArtifactError(
+                    f"{view.value} projection contains non-finite coordinates"
+                )
+            if cluster_ids.shape != (expected_rows,):
+                raise SemanticArtifactError(
+                    f"{view.value} projection cluster IDs have an invalid shape"
+                )
+            if np.any(cluster_ids < -1) or np.any(cluster_ids >= len(clusters)):
+                raise SemanticArtifactError(
+                    f"{view.value} projection contains an invalid cluster ID"
+                )
+            mapped_count = int(np.count_nonzero(cluster_ids >= 0))
+            if sum(cluster.member_count for cluster in clusters) != mapped_count:
+                raise SemanticArtifactError(
+                    f"{view.value} projection cluster evidence has invalid counts"
+                )
 
     def _query_components(self, position: int) -> tuple[np.ndarray, np.ndarray]:
         surface = self.surface_vectors @ self.surface_vectors[position]
         tag = self.tag_vectors @ self.tag_vectors[position]
         return surface, tag
+
+    def map_projection(
+        self,
+        view: RetrievalView | str,
+    ) -> tuple[np.ndarray, np.ndarray, tuple[SemanticMapCluster, ...]]:
+        try:
+            resolved = RetrievalView(view)
+        except ValueError as error:
+            raise ValueError(f"unsupported retrieval view {view!r}") from error
+        if resolved is RetrievalView.STRATEGY:
+            raise StrategyViewUnavailableError(
+                "strategy projection is unavailable until reviewed solution paths exist"
+            )
+        return (
+            self.projection_coordinates[resolved],
+            self.projection_cluster_ids[resolved],
+            self.projection_clusters[resolved],
+        )
+
+    def map_quality(
+        self,
+        view: RetrievalView | str,
+    ) -> dict[str, float | int | str]:
+        resolved = RetrievalView(view)
+        if resolved is RetrievalView.STRATEGY:
+            raise StrategyViewUnavailableError(
+                "strategy projection is unavailable until reviewed solution paths exist"
+            )
+        cached = self._projection_quality_cache.get(resolved)
+        if cached is not None:
+            return dict(cached)
+        vectors, similarities, mapped, source_metric = _projection_inputs_for_view(
+            resolved,
+            surface_vectors=self.surface_vectors,
+            tag_vectors=self.tag_vectors,
+            config=self.config,
+        )
+        artifact_mapped = self.projection_cluster_ids[resolved] >= 0
+        if not np.array_equal(mapped, artifact_mapped):
+            raise SemanticArtifactError(
+                f"{resolved.value} projection mapping mask changed"
+            )
+        mapped_values: Any = np.flatnonzero(mapped)
+        mapped_positions = [int(value) for value in mapped_values.tolist()]
+        candidate_count = len(mapped_positions)
+        duplicate_group_counts: dict[str, int] = {}
+        for position in mapped_positions:
+            group_id = self.items[int(position)].exact_duplicate_group_id
+            if group_id is not None:
+                duplicate_group_counts[group_id] = (
+                    duplicate_group_counts.get(group_id, 0) + 1
+                )
+        repeated_duplicate_groups = {
+            group_id: count
+            for group_id, count in duplicate_group_counts.items()
+            if count > 1
+        }
+        duplicate_candidate_count = sum(repeated_duplicate_groups.values())
+        quality_caveat = (
+            "Exact-duplicate candidates are included and can inflate kNN overlap."
+            if duplicate_candidate_count
+            else "No mapped exact-duplicate groups are present."
+        )
+        if candidate_count > 400:
+            anchor_indices = np.linspace(
+                0,
+                candidate_count - 1,
+                num=400,
+                dtype=np.int64,
+            )
+        else:
+            anchor_indices = np.arange(candidate_count, dtype=np.int64)
+        if candidate_count == 0:
+            empty_quality: dict[str, float | int | str] = {
+                "sample_size": 0,
+                "candidate_count": 0,
+                "exact_duplicate_group_count": 0,
+                "exact_duplicate_candidate_count": 0,
+                "neighbor_k": 0,
+                "knn_overlap": 0.0,
+                "pca_knn_overlap": 0.0,
+                "knn_overlap_improvement": 0.0,
+                "source_metric": source_metric,
+                "quality_caveat": quality_caveat,
+            }
+            self._projection_quality_cache[resolved] = empty_quality
+            return dict(empty_quality)
+        mapped_vectors = vectors[mapped]
+        mapped_similarities = similarities[np.ix_(mapped, mapped)]
+        final_coordinates = self.projection_coordinates[resolved][mapped]
+        pca_coordinates = _pca_projection(mapped_vectors)
+        knn_overlap = _neighbor_overlap_at_k(
+            mapped_similarities,
+            final_coordinates,
+            anchor_indices=anchor_indices,
+        )
+        pca_knn_overlap = _neighbor_overlap_at_k(
+            mapped_similarities,
+            pca_coordinates,
+            anchor_indices=anchor_indices,
+        )
+        quality: dict[str, float | int | str] = {
+            "sample_size": int(len(anchor_indices)),
+            "candidate_count": int(candidate_count),
+            "exact_duplicate_group_count": len(repeated_duplicate_groups),
+            "exact_duplicate_candidate_count": duplicate_candidate_count,
+            "neighbor_k": min(10, max(0, candidate_count - 1)),
+            "knn_overlap": knn_overlap,
+            "pca_knn_overlap": pca_knn_overlap,
+            "knn_overlap_improvement": round(knn_overlap - pca_knn_overlap, 6),
+            "source_metric": source_metric,
+            "quality_caveat": quality_caveat,
+        }
+        self._projection_quality_cache[resolved] = quality
+        return dict(quality)
+
+    def _query_has_corpus_evidence(self, normalized: str) -> tuple[bool, str | None]:
+        query_features = tuple(sorted(set(_features(normalized))))
+        supported: list[tuple[str, int]] = []
+        for feature in query_features:
+            digest = np.uint64(_feature_support_digest(feature))
+            position = int(np.searchsorted(self.surface_feature_digests, digest))
+            if (
+                position < len(self.surface_feature_digests)
+                and self.surface_feature_digests[position] == digest
+            ):
+                supported.append(
+                    (
+                        feature,
+                        int(self.surface_feature_document_frequencies[position]),
+                    )
+                )
+        if not supported:
+            return False, TEXT_QUERY_NO_CORPUS_EVIDENCE
+
+        # Terms present throughout the catalogue (for example, question
+        # boilerplate) do not justify a confident semantic ranking.  A floor of
+        # two documents keeps this decision stable for small QA fixtures.
+        common_cutoff = max(2, math.ceil(len(self.items) * 0.35))
+        informative = [
+            feature
+            for feature, document_frequency in supported
+            if document_frequency <= common_cutoff
+        ]
+        informative_unigrams = [
+            feature for feature in informative if feature.startswith("u:")
+        ]
+        if len(informative) < 2 or not informative_unigrams:
+            return False, TEXT_QUERY_LOW_EVIDENCE
+        return True, None
+
+    def _embed_surface_text(
+        self,
+        text: str,
+    ) -> tuple[np.ndarray | None, tuple[str, ...]]:
+        normalized = " ".join(text.split())
+        if not normalized:
+            raise RetrievalViewUnavailableError("pasted-text query cannot be empty")
+        if len(normalized) > 20_000:
+            raise ValueError("pasted-text query cannot exceed 20,000 characters")
+        tokens = _tokens(normalized)
+        if not tokens:
+            raise RetrievalViewUnavailableError(
+                "pasted-text query contains no searchable tokens"
+            )
+        warnings = ["TEXT_QUERY_LOW_SIGNAL"] if len(tokens) < 3 else []
+        has_evidence, evidence_warning = self._query_has_corpus_evidence(normalized)
+        if evidence_warning is not None:
+            warnings.append(evidence_warning)
+        if not has_evidence:
+            return None, tuple(warnings)
+        counts = np.zeros(self.config.feature_count, dtype=np.float64)
+        for feature in _features(f"stem {normalized}"):
+            bucket, sign = _feature_bucket(feature, self.config.feature_count)
+            counts[bucket] += sign
+        tf = np.sign(counts) * np.where(
+            counts != 0,
+            1.0 + np.log(np.maximum(np.abs(counts), 1.0)),
+            0.0,
+        )
+        weighted = tf * self.surface_idf
+        norm = float(np.linalg.norm(weighted))
+        if norm <= 1e-12:
+            raise RetrievalViewUnavailableError(
+                "pasted-text query has no usable surface signal"
+            )
+        projected = (weighted / norm) @ self.surface_components
+        projected_norm = float(np.linalg.norm(projected))
+        if projected_norm <= 1e-12:
+            raise RetrievalViewUnavailableError(
+                "pasted-text query has no usable latent surface signal"
+            )
+        return np.asarray(projected / projected_norm, dtype=np.float32), tuple(warnings)
+
+    def query_text(
+        self,
+        text: str,
+        *,
+        top_k: int = 10,
+        view: RetrievalView | str = RetrievalView.SURFACE,
+    ) -> SemanticTextQueryResult:
+        """Retrieve from ephemeral pasted text without echoing or persisting it."""
+
+        if top_k < 1:
+            raise ValueError("top_k must be at least one")
+        try:
+            resolved_view = RetrievalView(view)
+        except ValueError as error:
+            raise ValueError(f"unsupported retrieval view {view!r}") from error
+        if resolved_view is RetrievalView.STRATEGY:
+            raise StrategyViewUnavailableError(
+                "strategy retrieval is unavailable until reviewed solution paths exist"
+            )
+        if resolved_view is RetrievalView.TAG:
+            raise RetrievalViewUnavailableError(
+                "pasted text has no catalogue tag vector; use surface or hybrid"
+            )
+        query_vector, signal_warnings = self._embed_surface_text(text)
+        warnings = list(signal_warnings)
+        if resolved_view is RetrievalView.HYBRID:
+            warnings.extend((TEXT_QUERY_TAG_WARNING, MISSING_STRATEGY_WARNING))
+        if query_vector is None:
+            return SemanticTextQueryResult(
+                view=resolved_view,
+                requested_top_k=top_k,
+                effective_weights={"surface": 1.0},
+                warnings=tuple(warnings),
+                neighbors=(),
+            )
+        scores = self.surface_vectors @ query_vector
+        candidates = sorted(
+            range(len(self.items)),
+            key=lambda index: (
+                -float(scores[index]),
+                self.items[index].item_id,
+                self.items[index].content_version,
+                index,
+            ),
+        )
+        neighbors = tuple(
+            SemanticNeighbor(
+                rank=rank,
+                item_id=self.items[index].item_id,
+                content_version=self.items[index].content_version,
+                score=round(float(scores[index]), 8),
+                components=ComponentSimilarities(
+                    surface=round(float(scores[index]), 8),
+                    tag=None,
+                ),
+                shared_tags=(),
+                same_family=None,
+                same_exact_duplicate_group=None,
+            )
+            for rank, index in enumerate(candidates[:top_k], start=1)
+        )
+        return SemanticTextQueryResult(
+            view=resolved_view,
+            requested_top_k=top_k,
+            effective_weights={"surface": 1.0},
+            warnings=tuple(warnings),
+            neighbors=neighbors,
+        )
 
     def _effective_weights(
         self, position: int, view: RetrievalView
@@ -772,6 +1962,32 @@ class SemanticIndex:
                     target,
                     surface_vectors=self.surface_vectors,
                     tag_vectors=self.tag_vectors,
+                    surface_idf=self.surface_idf,
+                    surface_components=self.surface_components,
+                    surface_feature_digests=self.surface_feature_digests,
+                    surface_feature_document_frequencies=(
+                        self.surface_feature_document_frequencies
+                    ),
+                    **{
+                        f"{view.value}_projection_coordinates": (
+                            self.projection_coordinates[view]
+                        )
+                        for view in (
+                            RetrievalView.SURFACE,
+                            RetrievalView.TAG,
+                            RetrievalView.HYBRID,
+                        )
+                    },
+                    **{
+                        f"{view.value}_projection_cluster_ids": (
+                            self.projection_cluster_ids[view]
+                        )
+                        for view in (
+                            RetrievalView.SURFACE,
+                            RetrievalView.TAG,
+                            RetrievalView.HYBRID,
+                        )
+                    },
                 )
                 target.flush()
                 os.fsync(target.fileno())
@@ -789,7 +2005,27 @@ class SemanticIndex:
             ordered_items_sha256=_manifest_items_sha256(self.items),
             tag_vocabulary=self.tag_vocabulary,
             surface_dimensions=self.surface_vectors.shape[1],
+            surface_feature_support_count=len(self.surface_feature_digests),
             tag_dimensions=self.tag_vectors.shape[1],
+            projection_views=tuple(
+                SemanticMapViewManifest(
+                    view=cast(Any, view),
+                    clusters=self.projection_clusters[view],
+                    unmapped_count=int(
+                        np.count_nonzero(self.projection_cluster_ids[view] < 0)
+                    ),
+                    projection_sha256=_projection_sha256(
+                        self.projection_coordinates[view],
+                        self.projection_cluster_ids[view],
+                        self.projection_clusters[view],
+                    ),
+                )
+                for view in (
+                    RetrievalView.SURFACE,
+                    RetrievalView.TAG,
+                    RetrievalView.HYBRID,
+                )
+            ),
             vectors_filename=vectors_path.name,
             vectors_sha256=_sha256_file(vectors_path),
         )
@@ -834,16 +2070,32 @@ class SemanticIndex:
         expected_ontology_version: str | None = None,
         expected_classifier_version: str | None = None,
     ) -> "SemanticIndex":
+        if (
+            artifact.manifest_path.absolute().parent
+            != artifact.vectors_path.absolute().parent
+        ):
+            raise SemanticArtifactError(
+                "semantic manifest and vectors must share one artifact directory"
+            )
         try:
-            raw_manifest = artifact.manifest_path.read_text(encoding="utf-8")
-            manifest = SemanticArtifactManifest.model_validate_json(raw_manifest)
-        except (OSError, ValidationError, ValueError) as error:
+            manifest_snapshot = _read_regular_file_snapshot(
+                artifact.manifest_path,
+                max_bytes=MAX_SEMANTIC_MANIFEST_BYTES,
+                label="semantic manifest",
+            )
+            manifest = SemanticArtifactManifest.model_validate_json(manifest_snapshot)
+        except SemanticArtifactError:
+            raise
+        except (ValidationError, ValueError) as error:
             raise SemanticArtifactError("semantic manifest is invalid") from error
         if artifact.vectors_path.name != manifest.vectors_filename:
             raise SemanticArtifactError("manifest references a different vector file")
-        if not artifact.vectors_path.is_file():
-            raise SemanticArtifactError("semantic vector artifact is missing")
-        if _sha256_file(artifact.vectors_path) != manifest.vectors_sha256:
+        vector_snapshot = _read_regular_file_snapshot(
+            artifact.vectors_path,
+            max_bytes=MAX_SEMANTIC_VECTOR_BYTES,
+            label="semantic vector artifact",
+        )
+        if hashlib.sha256(vector_snapshot).hexdigest() != manifest.vectors_sha256:
             raise SemanticArtifactError("semantic vector artifact checksum changed")
         if (
             expected_ontology_version is not None
@@ -874,8 +2126,32 @@ class SemanticIndex:
                     "ordered item IDs, versions, content, or tags do not match artifact"
                 )
         try:
-            with np.load(artifact.vectors_path, allow_pickle=False) as arrays:
-                if set(arrays.files) != {"surface_vectors", "tag_vectors"}:
+            with np.load(io.BytesIO(vector_snapshot), allow_pickle=False) as arrays:
+                expected_arrays = {
+                    "surface_vectors",
+                    "tag_vectors",
+                    "surface_idf",
+                    "surface_components",
+                    "surface_feature_digests",
+                    "surface_feature_document_frequencies",
+                    *(
+                        f"{view.value}_projection_coordinates"
+                        for view in (
+                            RetrievalView.SURFACE,
+                            RetrievalView.TAG,
+                            RetrievalView.HYBRID,
+                        )
+                    ),
+                    *(
+                        f"{view.value}_projection_cluster_ids"
+                        for view in (
+                            RetrievalView.SURFACE,
+                            RetrievalView.TAG,
+                            RetrievalView.HYBRID,
+                        )
+                    ),
+                }
+                if set(arrays.files) != expected_arrays:
                     raise SemanticArtifactError(
                         "semantic vector artifact has unexpected arrays"
                     )
@@ -883,6 +2159,39 @@ class SemanticIndex:
                     arrays["surface_vectors"], dtype=np.float32
                 )
                 tag_vectors = np.asarray(arrays["tag_vectors"], dtype=np.float32)
+                surface_idf = np.asarray(arrays["surface_idf"], dtype=np.float32)
+                surface_components = np.asarray(
+                    arrays["surface_components"], dtype=np.float32
+                )
+                surface_feature_digests = np.asarray(
+                    arrays["surface_feature_digests"], dtype=np.uint64
+                )
+                surface_feature_document_frequencies = np.asarray(
+                    arrays["surface_feature_document_frequencies"],
+                    dtype=np.uint32,
+                )
+                projection_coordinates = {
+                    view: np.asarray(
+                        arrays[f"{view.value}_projection_coordinates"],
+                        dtype=np.float32,
+                    )
+                    for view in (
+                        RetrievalView.SURFACE,
+                        RetrievalView.TAG,
+                        RetrievalView.HYBRID,
+                    )
+                }
+                projection_cluster_ids = {
+                    view: np.asarray(
+                        arrays[f"{view.value}_projection_cluster_ids"],
+                        dtype=np.int32,
+                    )
+                    for view in (
+                        RetrievalView.SURFACE,
+                        RetrievalView.TAG,
+                        RetrievalView.HYBRID,
+                    )
+                }
         except (OSError, ValueError) as error:
             raise SemanticArtifactError(
                 "semantic vector artifact is invalid"
@@ -894,6 +2203,121 @@ class SemanticIndex:
             raise SemanticArtifactError(
                 "surface vector dimensions do not match manifest"
             )
+        if surface_idf.shape != (manifest.config.feature_count,) or (
+            surface_components.shape
+            != (manifest.config.feature_count, manifest.surface_dimensions)
+        ):
+            raise SemanticArtifactError(
+                "persisted surface query transform has invalid dimensions"
+            )
+        if surface_feature_digests.shape != (
+            manifest.surface_feature_support_count,
+        ) or surface_feature_document_frequencies.shape != (
+            manifest.surface_feature_support_count,
+        ):
+            raise SemanticArtifactError(
+                "persisted surface feature support has invalid dimensions"
+            )
+        if expected_documents is not None:
+            expected_tag_vocabulary = tuple(
+                sorted(
+                    {
+                        tag
+                        for document in expected_documents
+                        for tag in document.tag_tokens
+                    }
+                )
+            )
+            if expected_tag_vocabulary != manifest.tag_vocabulary:
+                raise StaleSemanticArtifactError(
+                    "semantic tag vocabulary does not match expected documents"
+                )
+            expected_tfidf, expected_idf = _surface_matrix(
+                expected_documents, manifest.config
+            )
+            expected_surface, expected_components = _randomized_lsa(
+                expected_tfidf, manifest.config
+            )
+            (
+                expected_feature_digests,
+                expected_feature_document_frequencies,
+            ) = _surface_feature_support(expected_documents)
+            expected_tags = _tag_vectors(expected_documents, manifest.tag_vocabulary)
+            if (
+                not np.array_equal(surface_idf, expected_idf)
+                or not np.array_equal(surface_components, expected_components)
+                or not np.array_equal(surface_vectors, expected_surface)
+                or not np.array_equal(tag_vectors, expected_tags)
+                or not np.array_equal(
+                    surface_feature_digests,
+                    expected_feature_digests,
+                )
+                or not np.array_equal(
+                    surface_feature_document_frequencies,
+                    expected_feature_document_frequencies,
+                )
+            ):
+                raise StaleSemanticArtifactError(
+                    "semantic vectors or query transform do not match expected documents"
+                )
+        projection_manifests: dict[RetrievalView, SemanticMapViewManifest] = {
+            RetrievalView(value.view): value for value in manifest.projection_views
+        }
+        projection_clusters = {
+            view: projection_manifests[view].clusters
+            for view in (
+                RetrievalView.SURFACE,
+                RetrievalView.TAG,
+                RetrievalView.HYBRID,
+            )
+        }
+        for view in (
+            RetrievalView.SURFACE,
+            RetrievalView.TAG,
+            RetrievalView.HYBRID,
+        ):
+            if (
+                _projection_sha256(
+                    projection_coordinates[view],
+                    projection_cluster_ids[view],
+                    projection_clusters[view],
+                )
+                != projection_manifests[view].projection_sha256
+            ):
+                raise SemanticArtifactError(
+                    f"{view.value} semantic projection checksum changed"
+                )
+            (
+                projection_vectors,
+                source_similarities,
+                mapped,
+                _,
+            ) = _projection_inputs_for_view(
+                view,
+                surface_vectors=surface_vectors,
+                tag_vectors=tag_vectors,
+                config=manifest.config,
+            )
+            (
+                expected_coordinates,
+                expected_cluster_ids,
+                expected_clusters,
+            ) = _build_semantic_map(
+                items=manifest.ordered_items,
+                vectors=projection_vectors,
+                source_similarities=source_similarities,
+                mapped=mapped,
+            )
+            if (
+                not np.array_equal(projection_coordinates[view], expected_coordinates)
+                or not np.array_equal(
+                    projection_cluster_ids[view], expected_cluster_ids
+                )
+                or projection_clusters[view] != expected_clusters
+            ):
+                raise SemanticArtifactError(
+                    f"{view.value} semantic projection does not match indexed vectors"
+                )
         return cls(
             ontology_version=manifest.ontology_version,
             classifier_version=manifest.classifier_version,
@@ -902,6 +2326,13 @@ class SemanticIndex:
             tag_vocabulary=manifest.tag_vocabulary,
             surface_vectors=surface_vectors,
             tag_vectors=tag_vectors,
+            surface_idf=surface_idf,
+            surface_components=surface_components,
+            surface_feature_digests=surface_feature_digests,
+            surface_feature_document_frequencies=(surface_feature_document_frequencies),
+            projection_coordinates=projection_coordinates,
+            projection_cluster_ids=projection_cluster_ids,
+            projection_clusters=projection_clusters,
         )
 
 
@@ -912,6 +2343,12 @@ __all__ = [
     "SEMANTIC_INDEX_ALGORITHM_VERSION",
     "SEMANTIC_INDEX_CONFIG_VERSION",
     "SEMANTIC_INDEX_MANIFEST_VERSION",
+    "SEMANTIC_MAP_CLUSTER_LABEL_VERSION",
+    "SEMANTIC_MAP_HYBRID_METRIC",
+    "SEMANTIC_MAP_PROJECTION_VERSION",
+    "TEXT_QUERY_LOW_EVIDENCE",
+    "TEXT_QUERY_NO_CORPUS_EVIDENCE",
+    "TEXT_QUERY_TAG_WARNING",
     "ComponentSimilarities",
     "MutualKnnEdge",
     "RetrievalView",
@@ -923,8 +2360,12 @@ __all__ = [
     "SemanticIndex",
     "SemanticIndexConfig",
     "SemanticIndexError",
+    "SemanticMapCluster",
+    "SemanticMapTagEvidence",
+    "SemanticMapViewManifest",
     "SemanticNeighbor",
     "SemanticQueryResult",
+    "SemanticTextQueryResult",
     "StaleSemanticArtifactError",
     "StrategyViewUnavailableError",
 ]

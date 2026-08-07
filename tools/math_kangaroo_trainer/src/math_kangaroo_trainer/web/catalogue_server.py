@@ -53,11 +53,14 @@ from math_kangaroo_trainer.domain.catalogue_reviews import (
 from math_kangaroo_trainer.domain.skills import load_ontology, ontology_checksum
 from math_kangaroo_trainer.retrieval import (
     DEFAULT_ARTIFACT_BASENAME,
+    SEMANTIC_MAP_PROJECTION_VERSION,
     RetrievalView,
     SemanticArtifactPaths,
     SemanticDocument,
     SemanticIndex,
     SemanticIndexError,
+    SemanticQueryResult,
+    SemanticTextQueryResult,
 )
 from math_kangaroo_trainer.storage.catalogue_repository import (
     CatalogueRepository,
@@ -68,6 +71,9 @@ from math_kangaroo_trainer.storage.catalogue_repository import (
 
 CATALOGUE_DATABASE_NAME = "corpus-review.sqlite3"
 MAX_REQUEST_BYTES = 128 * 1024
+MAX_EXPLORE_QUERY_CHARACTERS = 8_000
+MAX_EXPLORE_PROMPT_EXCERPT_CHARACTERS = 320
+MAX_EXPLORE_SOURCE_LABEL_CHARACTERS = 180
 IMAGE_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
 STATIC_SUFFIXES = frozenset(
     {".html", ".css", ".js", ".json", ".png", ".jpg", ".webp", ".ico", ".woff2"}
@@ -363,12 +369,70 @@ class CatalogueWebApplication:
             f"· Q{source.question_number}"
         )
 
+    @staticmethod
+    def _compact_text(value: Any, *, max_characters: int) -> str:
+        """Return one bounded display line without exposing adjacent item payload."""
+
+        if not isinstance(value, str):
+            return ""
+        normalized = " ".join(value.split())
+        if len(normalized) <= max_characters:
+            return normalized
+        return normalized[: max_characters - 1].rstrip() + "…"
+
+    def _effective_classification(self, record: Any) -> dict[str, Any]:
+        """Select a current teacher classification or an explicit proposal fallback."""
+
+        item = record.item
+        current = record.current_review
+        if (
+            current is not None
+            and current.review.content_version == item.content_version
+        ):
+            review = current.review
+            classification = review.classification
+            return {
+                "source": "teacher",
+                "content_version": review.content_version,
+                "review_state": review.disposition.value,
+                "primary_domain": classification.primary_domain.value,
+                "question_type": classification.question_type.value,
+                "skill_ids": sorted(
+                    {
+                        *classification.content_skill_ids,
+                        *classification.reasoning_move_ids,
+                        *classification.procedure_ids,
+                    }
+                ),
+                "representation_ids": list(classification.representation_ids),
+                "cognitive_demand": classification.cognitive_demand_id,
+            }
+
+        proposal = self._proposal(record)
+        return {
+            "source": "proposal",
+            "content_version": item.content_version,
+            "review_state": "stale" if current is not None else "unreviewed",
+            "primary_domain": str(proposal.get("primary_domain", "unknown")),
+            "question_type": str(proposal.get("question_type", "unknown")),
+            "skill_ids": sorted(str(value) for value in proposal.get("skill_ids", [])),
+            "representation_ids": sorted(
+                str(value) for value in proposal.get("representation_tags", [])
+            ),
+            "cognitive_demand": (
+                str(proposal["cognitive_demand_tag"])
+                if proposal.get("cognitive_demand_tag") is not None
+                else None
+            ),
+        }
+
     def _comparable(
         self, item_id: str, *, include_prompt: bool = True
     ) -> dict[str, Any]:
         record = self._items[item_id]
         item = record.item
         proposal = self._proposal(record)
+        classification = self._effective_classification(record)
         learner = item.learner_payload
         return {
             "item_id": item_id,
@@ -378,8 +442,19 @@ class CatalogueWebApplication:
             },
             "grade_band": item.source_metadata.grade_band,
             "prompt": str(learner.get("stem_markdown", "")) if include_prompt else "",
-            "primary_domain": proposal.get("primary_domain", "unknown"),
-            "question_type": proposal.get("question_type", "unknown"),
+            "primary_domain": classification["primary_domain"],
+            "question_type": classification["question_type"],
+            "skill_ids": classification["skill_ids"],
+            "representation_ids": classification["representation_ids"],
+            "cognitive_demand": classification["cognitive_demand"],
+            "classification_source": classification["source"],
+            "classification_content_version": classification["content_version"],
+            "review_state": classification["review_state"],
+            "classification_tags": [
+                *classification["skill_ids"],
+                *classification["representation_ids"],
+            ],
+            "classification": classification,
             "proposed_tags": [
                 *proposal.get("skill_ids", []),
                 *proposal.get("representation_tags", []),
@@ -390,51 +465,7 @@ class CatalogueWebApplication:
     def _curriculum_comparable(self, item_id: str) -> dict[str, Any]:
         """Return card metadata from the classification the policy actually used."""
 
-        record = self._items[item_id]
-        comparable = self._comparable(item_id)
-        current = record.current_review
-        if (
-            current is not None
-            and current.review.content_version == record.item.content_version
-        ):
-            classification = current.review.classification
-            skill_ids = sorted(
-                {
-                    *classification.content_skill_ids,
-                    *classification.reasoning_move_ids,
-                    *classification.procedure_ids,
-                }
-            )
-            representation_ids = list(classification.representation_ids)
-            return {
-                **comparable,
-                "primary_domain": classification.primary_domain.value,
-                "question_type": classification.question_type.value,
-                "classification_tags": [*skill_ids, *representation_ids],
-                "classification": {
-                    "source": "teacher",
-                    "primary_domain": classification.primary_domain.value,
-                    "question_type": classification.question_type.value,
-                    "skill_ids": skill_ids,
-                    "representation_ids": representation_ids,
-                },
-            }
-        proposal = self._proposal(record)
-        proposal_skills = sorted(str(value) for value in proposal.get("skill_ids", []))
-        proposal_representations = sorted(
-            str(value) for value in proposal.get("representation_tags", [])
-        )
-        return {
-            **comparable,
-            "classification_tags": [*proposal_skills, *proposal_representations],
-            "classification": {
-                "source": "proposal",
-                "primary_domain": str(proposal.get("primary_domain", "unknown")),
-                "question_type": str(proposal.get("question_type", "unknown")),
-                "skill_ids": proposal_skills,
-                "representation_ids": proposal_representations,
-            },
-        }
+        return self._comparable(item_id)
 
     def summary(self) -> dict[str, Any]:
         with self._lock:
@@ -490,6 +521,11 @@ class CatalogueWebApplication:
                     ],
                     "strategy_available": self.semantic_index.strategy_available,
                     "algorithm_version": self.semantic_index.config.algorithm_version,
+                    "map_views": ["surface", "tag", "hybrid"],
+                    "map_projection_algorithm_version": (
+                        SEMANTIC_MAP_PROJECTION_VERSION
+                    ),
+                    "map_is_exploratory": True,
                     "represents_mastery_or_difficulty": False,
                 },
             }
@@ -825,6 +861,224 @@ class CatalogueWebApplication:
             f"{self.semantic_index.config.algorithm_version}:"
             f"{self.semantic_index.identity_sha256[:16]}"
         )
+
+    def problem_map(self, query: dict[str, list[str]]) -> dict[str, Any]:
+        view_value = query.get("view", ["hybrid"])[0]
+        focus_item_id = query.get("item_id", [""])[0].strip() or None
+        if focus_item_id is not None and focus_item_id not in self._items:
+            raise CatalogueApiProblem(
+                HTTPStatus.NOT_FOUND,
+                "not_found",
+                "Unknown map focus item",
+            )
+        try:
+            view = RetrievalView(view_value)
+            coordinates, cluster_ids, clusters = self.semantic_index.map_projection(
+                view
+            )
+            quality = self.semantic_index.map_quality(view)
+        except (ValueError, SemanticIndexError) as error:
+            raise CatalogueApiProblem(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "invalid_map_view",
+                str(error),
+            ) from error
+
+        cluster_by_id = {cluster.cluster_id: cluster for cluster in clusters}
+        points = []
+        for position, indexed in enumerate(self.semantic_index.items):
+            record = self._items[indexed.item_id]
+            source = record.item.source_metadata
+            domain = next(
+                (
+                    tag.removeprefix("domain:")
+                    for tag in indexed.tags
+                    if tag.startswith("domain:")
+                ),
+                "unknown",
+            )
+            question_type = next(
+                (
+                    tag.removeprefix("type:")
+                    for tag in indexed.tags
+                    if tag.startswith("type:")
+                ),
+                "unknown",
+            )
+            skill_ids = sorted(
+                tag.removeprefix("skill:")
+                for tag in indexed.tags
+                if tag.startswith("skill:")
+            )
+            cluster_id = int(cluster_ids[position])
+            cluster = cluster_by_id.get(cluster_id)
+            mapped = cluster is not None
+            points.append(
+                {
+                    "item_id": indexed.item_id,
+                    "x": round(float(coordinates[position, 0]), 6) if mapped else None,
+                    "y": round(float(coordinates[position, 1]), 6) if mapped else None,
+                    "mapped": mapped,
+                    "cluster_id": cluster_id if mapped else None,
+                    "cluster_label": (
+                        cluster.label
+                        if cluster is not None
+                        else "No signal in this view"
+                    ),
+                    "primary_domain": domain,
+                    "question_type": question_type,
+                    "skill_ids": skill_ids,
+                    "grade_band": source.grade_band,
+                    "published_point_tier": source.published_point_tier,
+                }
+            )
+        warnings = [
+            "EXPLORATORY_PROJECTION_NOT_MASTERY_OR_DIFFICULTY",
+            "CLUSTER_LABELS_ARE_PROPOSAL_DERIVED_AND_NON_AUTHORITATIVE",
+            "CLUSTER_LABELS_REUSE_TAG_EVIDENCE_USED_BY_TAG_AND_HYBRID_VIEWS",
+        ]
+        if any(not point["mapped"] for point in points):
+            warnings.append("ITEMS_WITHOUT_VIEW_SIGNAL_ARE_UNMAPPED")
+        return {
+            "run_id": self.run_id,
+            "map_version": (
+                f"{self.semantic_index.identity_sha256[:16]}:" f"{view.value}"
+            ),
+            "view": view.value,
+            "focus_item_id": focus_item_id,
+            "projection": {
+                "algorithm_version": SEMANTIC_MAP_PROJECTION_VERSION,
+                "method": (
+                    "PCA initialization with deterministic k-nearest-neighbor "
+                    "attractive-force refinement"
+                ),
+                "dimensions": 2,
+                "exploratory": True,
+                "represents_mastery_or_difficulty": False,
+                "classification_evidence": (
+                    "unreviewed catalogue proposal tags at index build"
+                ),
+                "source_metric": quality["source_metric"],
+                "configured_weights": {
+                    "surface": self.semantic_index.config.surface_weight,
+                    "tag": self.semantic_index.config.tag_weight,
+                    "strategy": self.semantic_index.config.strategy_weight,
+                },
+                "configured_weight_scope": (
+                    "semantic_index_configuration_not_pairwise_effective_weights"
+                ),
+                "missing_facet_policy": (
+                    "anchor_available_facets_renormalized_per_direction_then_"
+                    "mean_bidirectional"
+                    if view is RetrievalView.HYBRID
+                    else "single_facet_view_items_without_selected_signal_are_unmapped"
+                ),
+                "quality": quality,
+            },
+            "warnings": warnings,
+            "clusters": [cluster.model_dump(mode="json") for cluster in clusters],
+            "points": points,
+        }
+
+    def explore(self, body: Any) -> dict[str, Any]:
+        if not isinstance(body, dict):
+            raise CatalogueApiProblem(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "invalid_explore_query",
+                "Explore query must be an object",
+            )
+        raw_query = body.get("query")
+        if not isinstance(raw_query, str):
+            raise CatalogueApiProblem(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "invalid_explore_query",
+                "Explore query must be text or an exact item ID",
+            )
+        if len(raw_query) > MAX_EXPLORE_QUERY_CHARACTERS:
+            raise CatalogueApiProblem(
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                "explore_query_too_large",
+                (
+                    "Explore query cannot exceed "
+                    f"{MAX_EXPLORE_QUERY_CHARACTERS:,} characters"
+                ),
+            )
+        normalized_query = " ".join(raw_query.split())
+        if not normalized_query:
+            raise CatalogueApiProblem(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "empty_explore_query",
+                "Explore query cannot be empty",
+            )
+        try:
+            limit = min(50, max(1, int(body.get("limit", 12))))
+            view = RetrievalView(str(body.get("view", "hybrid")))
+            result: SemanticQueryResult | SemanticTextQueryResult
+            if normalized_query in self._items:
+                result = self.semantic_index.query(
+                    normalized_query,
+                    top_k=limit,
+                    view=view,
+                )
+                query_kind = "item_id"
+                query_item_id: str | None = normalized_query
+            else:
+                result = self.semantic_index.query_text(
+                    normalized_query,
+                    top_k=limit,
+                    view=view,
+                )
+                query_kind = "pasted_text"
+                query_item_id = None
+        except (ValueError, KeyError, SemanticIndexError) as error:
+            raise CatalogueApiProblem(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "invalid_explore_query",
+                str(error),
+            ) from error
+
+        neighbors = []
+        for neighbor in result.neighbors:
+            record = self._items[neighbor.item_id]
+            item = record.item
+            source = record.item.source_metadata
+            classification = self._effective_classification(record)
+            neighbors.append(
+                {
+                    "item_id": neighbor.item_id,
+                    "rank": neighbor.rank,
+                    "score": neighbor.score,
+                    "score_components": neighbor.components.model_dump(mode="json"),
+                    "prompt_excerpt": self._compact_text(
+                        item.learner_payload.get("stem_markdown", ""),
+                        max_characters=MAX_EXPLORE_PROMPT_EXCERPT_CHARACTERS,
+                    ),
+                    "source_label": self._compact_text(
+                        self._source_label(record),
+                        max_characters=MAX_EXPLORE_SOURCE_LABEL_CHARACTERS,
+                    ),
+                    "primary_domain": classification["primary_domain"],
+                    "question_type": classification["question_type"],
+                    "skill_ids": classification["skill_ids"],
+                    "representation_ids": classification["representation_ids"],
+                    "cognitive_demand": classification["cognitive_demand"],
+                    "classification_source": classification["source"],
+                    "classification_content_version": classification["content_version"],
+                    "review_state": classification["review_state"],
+                    "grade_band": source.grade_band,
+                    "published_point_tier": source.published_point_tier,
+                }
+            )
+        return {
+            "query_kind": query_kind,
+            "query_item_id": query_item_id,
+            "query_echoed": False,
+            "view": result.view.value,
+            "retrieval_version": self.retrieval_version,
+            "effective_weights": result.effective_weights,
+            "warnings": result.warnings,
+            "neighbors": neighbors,
+        }
 
     def neighbors(self, item_id: str, query: dict[str, list[str]]) -> dict[str, Any]:
         if item_id not in self._items:
@@ -1503,6 +1757,9 @@ def _handler_class(
                 if segments == ("api", "catalogue", "taxonomy"):
                     self._send_json(HTTPStatus.OK, application.taxonomy())
                     return
+                if segments == ("api", "catalogue", "map"):
+                    self._send_json(HTTPStatus.OK, application.problem_map(query))
+                    return
                 if segments == ("api", "catalogue", "export"):
                     self._send_json(HTTPStatus.OK, application.export_evidence())
                     return
@@ -1614,6 +1871,9 @@ def _handler_class(
                 self._validate_origin()
                 segments = self._segments(urlsplit(self.path).path)
                 body = self._read_json()
+                if segments == ("api", "catalogue", "explore"):
+                    self._send_json(HTTPStatus.OK, application.explore(body))
+                    return
                 if segments == ("api", "catalogue", "recommendations", "preview"):
                     self._send_json(
                         HTTPStatus.OK, application.recommendation_preview(body)
