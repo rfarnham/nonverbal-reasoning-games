@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  DEFAULT_TRACE_QUALITY_OPTIONS,
   DIGIT_REFERENCE_PATHS,
+  isGoodFaithDigitTraceAttempt,
   isAcceptableDigitTrace,
   resamplePolyline,
+  resolveDigitTraceAttempt,
   scoreDigitTrace,
   traceBounds,
   tracePathLength,
@@ -71,6 +74,43 @@ test("close forward and reverse traces survive sparse sampling and modest noise"
   }
 });
 
+test("finger-sized drift, rotation, and short endpoints remain acceptable", () => {
+  for (const digit of DIGITS) {
+    const source = resamplePolyline(DIGIT_REFERENCE_PATHS[digit], 35);
+    const angle = (3 * Math.PI) / 180;
+    const transformed = source.slice(2, -2).map((point, index) => {
+      const centeredX = (point.x - 0.5) * 0.88;
+      const centeredY = (point.y - 0.5) * 0.93;
+      return {
+        x:
+          0.5 +
+          centeredX * Math.cos(angle) -
+          centeredY * Math.sin(angle) +
+          0.025 +
+          Math.sin(index * 1.71 + digit) * 0.025,
+        y:
+          0.5 +
+          centeredX * Math.sin(angle) +
+          centeredY * Math.cos(angle) -
+          0.018 +
+          Math.cos(index * 1.39 + digit) * 0.025,
+      };
+    });
+    assert.equal(
+      isAcceptableDigitTrace(transformed, digit),
+      true,
+      `${digit}: ordinary finger drift should pass`,
+    );
+  }
+});
+
+test("quality defaults are deliberately forgiving without weakening completion", () => {
+  assert.ok(DEFAULT_TRACE_QUALITY_OPTIONS.maximumOrderedRmsError >= 0.18);
+  assert.ok(DEFAULT_TRACE_QUALITY_OPTIONS.maximumCenterError >= 0.18);
+  assert.ok(DEFAULT_TRACE_QUALITY_OPTIONS.maximumMeanPathError >= 0.12);
+  assert.ok(DEFAULT_TRACE_QUALITY_OPTIONS.minimumLengthRatio >= 0.7);
+});
+
 test("each reference stroke is accepted only for its own numeral", () => {
   for (const drawnDigit of DIGITS) {
     for (const candidateDigit of DIGITS) {
@@ -81,6 +121,33 @@ test("each reference stroke is accepted only for its own numeral", () => {
         ),
         drawnDigit === candidateDigit,
         `${drawnDigit} is not mistaken for ${candidateDigit}`,
+      );
+    }
+  }
+});
+
+test("forgiving thresholds still separate mildly imperfect wrong numerals", () => {
+  for (const drawnDigit of DIGITS) {
+    const drawn = resamplePolyline(DIGIT_REFERENCE_PATHS[drawnDigit], 29).map(
+      (point, index) => ({
+        x:
+          0.5 +
+          (point.x - 0.5) * 0.94 +
+          0.02 +
+          Math.sin(index * 1.7 + drawnDigit) * 0.018,
+        y:
+          0.5 +
+          (point.y - 0.5) * 0.96 -
+          0.01 +
+          Math.cos(index * 1.3 + drawnDigit) * 0.018,
+      }),
+    );
+    for (const candidateDigit of DIGITS) {
+      if (candidateDigit === drawnDigit) continue;
+      assert.equal(
+        isAcceptableDigitTrace(drawn, candidateDigit),
+        false,
+        `${drawnDigit} is not mistaken for ${candidateDigit} after finger drift`,
       );
     }
   }
@@ -97,6 +164,11 @@ test("taps and tiny gestures are rejected before shape scoring", () => {
     assert.ok(
       score.rejectionReason === "tap" || score.rejectionReason === "too_small",
       `${digit}: degenerate reason`,
+    );
+    assert.equal(
+      isGoodFaithDigitTraceAttempt(score),
+      false,
+      `${digit}: a tap never earns retry grace`,
     );
   }
 });
@@ -127,6 +199,11 @@ test("wild scribbles and repeated backtracking are rejected", () => {
         score.rejectionReason === "off_path",
       `${digit}: scribble geometry reason`,
     );
+    assert.equal(
+      isGoodFaithDigitTraceAttempt(score),
+      false,
+      `${digit}: scribble never earns retry grace`,
+    );
 
     const reference = DIGIT_REFERENCE_PATHS[digit];
     const backtracking = [
@@ -140,6 +217,59 @@ test("wild scribbles and repeated backtracking are rejected", () => {
       `${digit}: repeated path is not a valid single trace`,
     );
   }
+});
+
+test("a substantial near miss can earn one answer-neutral retry grace", () => {
+  for (const digit of DIGITS) {
+    const partial = resamplePolyline(DIGIT_REFERENCE_PATHS[digit], 41).slice(
+      0,
+      32,
+    );
+    const score = scoreDigitTrace(partial, digit);
+    assert.equal(score.accepted, false, `${digit}: fixture is a near miss`);
+    assert.equal(
+      isGoodFaithDigitTraceAttempt(score),
+      true,
+      `${digit}: substantial near miss can express a deliberate choice`,
+    );
+    assert.deepEqual(
+      resolveDigitTraceAttempt(score, digit, null),
+      { disposition: "retry", nextRetryDigit: digit },
+      `${digit}: first near miss asks only once`,
+    );
+    assert.deepEqual(
+      resolveDigitTraceAttempt(score, digit, digit),
+      { disposition: "submit", nextRetryDigit: null },
+      `${digit}: second near miss submits the expressed choice`,
+    );
+  }
+});
+
+test("retry grace is tile-specific and never turns taps into answers", () => {
+  const nearMiss = scoreDigitTrace(
+    resamplePolyline(DIGIT_REFERENCE_PATHS[6], 41).slice(0, 32),
+    6,
+  );
+  const tap = scoreDigitTrace(
+    Array.from({ length: 8 }, (_, index) => ({
+      x: 0.5 + index * 0.001,
+      y: 0.5 + index * 0.001,
+    })),
+    6,
+  );
+
+  assert.deepEqual(resolveDigitTraceAttempt(nearMiss, 6, 5), {
+    disposition: "retry",
+    nextRetryDigit: 6,
+  });
+  assert.deepEqual(resolveDigitTraceAttempt(tap, 6, null), {
+    disposition: "reject",
+    nextRetryDigit: null,
+  });
+  assert.deepEqual(resolveDigitTraceAttempt(tap, 6, 6), {
+    disposition: "reject",
+    nextRetryDigit: 6,
+  });
 });
 
 test("materially shifted and unrelated full-size paths are rejected", () => {

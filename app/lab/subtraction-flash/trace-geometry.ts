@@ -67,23 +67,82 @@ export interface DigitTraceScore {
   readonly endpointError: number;
 }
 
+export interface DigitTraceAttemptDecision {
+  readonly disposition: "submit" | "retry" | "reject";
+  readonly nextRetryDigit: TraceDigit | null;
+}
+
 export const DEFAULT_TRACE_QUALITY_OPTIONS: Readonly<TraceQualityOptions> =
   Object.freeze({
     sampleCount: 64,
     minimumPointCount: 4,
     minimumPathLength: 0.42,
-    minimumSpanRatio: 0.62,
-    maximumSpanRatio: 1.38,
-    minimumLengthRatio: 0.62,
-    maximumLengthRatio: 1.62,
-    maximumRawLengthRatio: 2.65,
-    maximumCenterError: 0.14,
-    maximumOrderedRmsError: 0.125,
-    maximumMeanPathError: 0.082,
-    maximumCoverageError: 0.1,
-    maximumPathError90: 0.16,
-    maximumEndpointError: 0.19,
+    minimumSpanRatio: 0.58,
+    maximumSpanRatio: 1.5,
+    minimumLengthRatio: 0.7,
+    maximumLengthRatio: 2.1,
+    maximumRawLengthRatio: 3.2,
+    maximumCenterError: 0.18,
+    maximumOrderedRmsError: 0.18,
+    maximumMeanPathError: 0.12,
+    maximumCoverageError: 0.135,
+    maximumPathError90: 0.22,
+    maximumEndpointError: 0.25,
   });
+
+/**
+ * A substantial attempt that was recognizable enough to express a choice,
+ * even though it missed the normal quality gate. This deliberately excludes
+ * taps, tiny marks, and runaway scribbles so retry grace cannot become a
+ * hidden double-tap input mode.
+ */
+export function isGoodFaithDigitTraceAttempt(
+  score: DigitTraceScore,
+): boolean {
+  if (
+    score.accepted ||
+    (score.rejectionReason !== "too_small" &&
+      score.rejectionReason !== "incomplete" &&
+      score.rejectionReason !== "off_path")
+  ) {
+    return false;
+  }
+
+  return (
+    score.distinctPointCount >= 8 &&
+    score.rawLengthRatio >= 0.65 &&
+    score.rawLengthRatio <= 2.25 &&
+    score.widthRatio >= 0.48 &&
+    score.heightRatio >= 0.48 &&
+    score.centerError <= 0.25 &&
+    score.coverageError <= 0.2 &&
+    score.pathError90 <= 0.35
+  );
+}
+
+/** Resolve the finite retry policy without using the mathematical answer. */
+export function resolveDigitTraceAttempt(
+  score: DigitTraceScore,
+  digit: TraceDigit,
+  retryDigit: TraceDigit | null,
+): DigitTraceAttemptDecision {
+  if (score.accepted) {
+    return { disposition: "submit", nextRetryDigit: null };
+  }
+
+  if (!isGoodFaithDigitTraceAttempt(score)) {
+    return {
+      disposition: "reject",
+      nextRetryDigit: retryDigit === digit ? retryDigit : null,
+    };
+  }
+
+  if (retryDigit === digit) {
+    return { disposition: "submit", nextRetryDigit: null };
+  }
+
+  return { disposition: "retry", nextRetryDigit: digit };
+}
 
 function referencePath(
   coordinates: readonly (readonly [number, number])[],

@@ -112,10 +112,10 @@ test("pointer traces require quality while keyboard activation remains available
   assert.match(traceSource, /!event\.isPrimary/);
   assert.match(traceSource, /event\.button\s*!==\s*0/);
   assert.match(traceSource, /scoreDigitTrace\(/);
-  assert.ok(
-    /isAcceptableDigitTrace\(/.test(traceSource) ||
-      /\bresult\.accepted\b/.test(traceSource),
-    "trace score gates acceptance",
+  assert.match(
+    traceSource,
+    /resolveDigitTraceAttempt\(/,
+    "trace score and finite retry policy gate submission",
   );
 
   const finishTrace = sourceSection(
@@ -123,16 +123,13 @@ test("pointer traces require quality while keyboard activation remains available
     "const finishTrace",
     "const cancelTrace",
   );
-  const qualityGate = Math.max(
-    finishTrace.indexOf("isAcceptableDigitTrace"),
-    finishTrace.indexOf("result.accepted"),
-  );
+  const qualityGate = finishTrace.indexOf("resolveDigitTraceAttempt");
   const acceptedSubmission = finishTrace.indexOf("onAnswer(", qualityGate);
   const rejectedFeedback = finishTrace.indexOf("setFeedback(", acceptedSubmission);
   assert.ok(qualityGate >= 0, "finished gestures pass through the quality gate");
   assert.ok(
     acceptedSubmission > qualityGate,
-    "only a quality-accepted trace reaches answer submission",
+    "only a policy-submitted trace reaches answer submission",
   );
   assert.ok(
     rejectedFeedback > acceptedSubmission,
@@ -143,10 +140,20 @@ test("pointer traces require quality while keyboard activation remains available
     /return;/,
     "accepted submission exits before retry feedback",
   );
-  assert.equal(
-    finishTrace.indexOf("onAnswer(", acceptedSubmission + 1),
-    -1,
-    "a rejected trace never becomes a math attempt",
+  assert.match(
+    finishTrace,
+    /resolveDigitTraceAttempt\([\s\S]*result,[\s\S]*answer,[\s\S]*retryAnswerRef\.current/,
+    "the finite answer-neutral retry policy receives the trace and numeral",
+  );
+  assert.match(
+    finishTrace,
+    /if \(decision\.disposition === ["']submit["']\)/,
+    "a second good-faith trace cannot trap the player in an endless retry",
+  );
+  assert.match(
+    traceSource,
+    /retryAnswerRef\.current\s*!==\s*answer[\s\S]*retryAnswerRef\.current\s*=\s*null/,
+    "moving to another numeral resets the retry grace",
   );
 
   assert.match(
@@ -174,7 +181,8 @@ test("rejected traces use one answer-neutral amber retry state", () => {
     /correctAnswer|correctChoice/,
     "low-quality gestures cannot probe which candidate is mathematically correct",
   );
-  assert.match(finishTrace, /Stay on the full line/i);
+  assert.match(finishTrace, /Your next close trace will count/i);
+  assert.match(finishTrace, /switch to Tap above/i);
 
   const almostRule = cssRule(
     String.raw`\.traceButton\[data-state=["']almost["']\]`,

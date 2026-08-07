@@ -13,6 +13,7 @@ import {
 import type { AnswerValue } from "./game-engine";
 import {
   DIGIT_REFERENCE_PATHS,
+  resolveDigitTraceAttempt,
   scoreDigitTrace,
   type TracePoint,
 } from "./trace-geometry";
@@ -101,11 +102,13 @@ export function TraceAnswerGrid({
   const svgRefs = useRef<
     Partial<Record<AnswerValue, SVGSVGElement | null>>
   >({});
+  const retryAnswerRef = useRef<AnswerValue | null>(null);
   const [visibleTrace, setVisibleTrace] = useState<VisibleTrace | null>(null);
   const [feedback, setFeedback] = useState<TraceFeedback | null>(null);
 
   useEffect(() => {
     if (!disabled) return;
+    retryAnswerRef.current = null;
     const active = activeTraceRef.current;
     if (!active) return;
     activeTraceRef.current = null;
@@ -153,6 +156,12 @@ export function TraceAnswerGrid({
     if (!point) return;
 
     event.preventDefault();
+    if (
+      retryAnswerRef.current !== null &&
+      retryAnswerRef.current !== answer
+    ) {
+      retryAnswerRef.current = null;
+    }
     event.currentTarget.setPointerCapture(event.pointerId);
     const active: ActiveTrace = {
       answer,
@@ -212,7 +221,13 @@ export function TraceAnswerGrid({
     }
 
     const result = scoreDigitTrace(active.points, answer);
-    if (result.accepted) {
+    const decision = resolveDigitTraceAttempt(
+      result,
+      answer,
+      retryAnswerRef.current,
+    );
+    retryAnswerRef.current = decision.nextRetryDigit;
+    if (decision.disposition === "submit") {
       setFeedback(null);
       setVisibleTrace({
         answer,
@@ -223,6 +238,8 @@ export function TraceAnswerGrid({
       return;
     }
 
+    const goodFaithAttempt = decision.disposition === "retry";
+
     setVisibleTrace({
       answer,
       points: [...active.points],
@@ -230,7 +247,9 @@ export function TraceAnswerGrid({
     });
     setFeedback({
       answer,
-      message: "Stay on the full line.",
+      message: goodFaithAttempt
+        ? "Close — trace this number once more. Your next close trace will count."
+        : "Draw along most of the number. You can also switch to Tap above.",
     });
   };
 
