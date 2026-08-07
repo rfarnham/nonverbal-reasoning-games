@@ -32,9 +32,10 @@ The current continuation work is deliberately narrower:
   hint-derived assistance, version-correction chains, hash-verified persisted
   snapshots, and exact synthetic replay.
 - Catalogue QA creates deterministic, unapproved lexical taxonomy proposals,
-  a local surface latent-semantic index, a proposed-tag index, append-only
-  teacher judgements, and an explainable policy simulator. These are review
-  instruments, not approved Q-matrix, family, difficulty, or mastery evidence.
+  a curated six-realm Grades 1–2 world, a local surface latent-semantic index,
+  a proposed-tag index, append-only teacher judgements, and an explainable
+  policy simulator. These are review instruments, not approved Q-matrix,
+  family, difficulty, or mastery evidence.
 
 These are engineering contracts, not completed Stage 1 or Stage 2 exit gates.
 There is no embedding/Q-matrix approval, reviewed strategy embedding, learner
@@ -77,16 +78,28 @@ Launch the private dashboard for one fixed teacher identity:
 
 Open the printed loopback URL. The workbench provides:
 
-- a **Problem Space** over all 1,833 questions: start from a random filtered
-  question, an exact stable ID, or pasted question text; walk through nearby
-  questions with Back/Forward history; and pan or zoom a labeled two-dimensional
-  map filtered by grade, published point tier, domain, and question type;
-- separate Surface, Proposed taxonomy, and Hybrid maps. Their fixed-seed,
-  single-worker UMAP projection consumes a precomputed distance matrix derived
-  from the exact similarity relation served by each view. It remains an
-  exploratory navigation aid, not a mastery or difficulty model. The UI reports
-  its versioned parameters, measured neighbor preservation against a PCA
-  baseline, and cluster labels from enriched unreviewed proposal tags;
+- a **World / Play QA** view for eligible Grades 1–2 questions. Six curated
+  realms lead to smaller districts; the central Crossroads launches random,
+  exact-ID, or pasted-text exploration; and presentation-only **Question
+  Heaven** keeps unresolved or source-order questions playable without
+  pretending they already have a curricular home;
+- a compact answer-and-placement loop. Structured four- or five-choice
+  questions receive a saved random answer permutation and fresh displayed
+  A–E letters. Questions whose graphical choices are still embedded in the
+  source crop keep their original A–E order. After answering, the teacher can
+  confirm the proposed district, choose another realm and district, mark the
+  placement unsure, or skip it;
+- device-local resume state for the current question, answer permutation,
+  attempts, route, and play-QA progress. Placement judgements remain in the
+  private catalogue database as versioned, append-only evidence, so an approval
+  can be revised later without erasing its history;
+- Surface, Proposed taxonomy, and Hybrid UMAP diagnostics beneath the world.
+  Their fixed-seed, single-worker projection consumes a precomputed distance
+  matrix derived from the exact similarity relation served by each view. It
+  remains an exploratory navigation aid, not a mastery or difficulty model.
+  The UI reports its versioned parameters, measured neighbor preservation
+  against a PCA baseline, and cluster labels from enriched unreviewed proposal
+  tags;
 - ontology skill inspection and append-only advisory approve/revise/merge/
   split/remove judgements;
 - Similarity Lab comparisons across surface, tag, and hybrid neighbors with

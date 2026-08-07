@@ -29,7 +29,8 @@ CATALOGUE_ITEM_SCHEMA_VERSION = "catalogue-inventory-item.v2"
 CATALOGUE_REVIEW_SCHEMA_VERSION = "catalogue-teacher-review.v1"
 CATALOGUE_NEIGHBOR_SCHEMA_VERSION = "catalogue-neighbor-judgement.v1"
 CATALOGUE_SKILL_JUDGEMENT_SCHEMA_VERSION = "catalogue-skill-judgement.v1"
-CATALOGUE_EVIDENCE_EXPORT_VERSION = "catalogue-evidence-export.v1"
+CATALOGUE_WORLD_PLACEMENT_SCHEMA_VERSION = "catalogue-world-placement-judgement.v1"
+CATALOGUE_EVIDENCE_EXPORT_VERSION = "catalogue-evidence-export.v2"
 
 CONTENT_VERSION_PATTERN = r"^sha256:[0-9a-f]{64}$"
 SHA256_PATTERN = r"^[0-9a-f]{64}$"
@@ -126,6 +127,13 @@ class TaxonomySkillDecision(StrEnum):
     SPLIT = "split"
     REMOVE = "remove"
     UNSURE = "unsure"
+
+
+class WorldPlacementVerdict(StrEnum):
+    FITS = "fits"
+    CHANGE = "change"
+    UNSURE = "unsure"
+    SKIP = "skip"
 
 
 class CatalogueRun(StrictFrozenModel):
@@ -686,6 +694,106 @@ class CatalogueSkillJudgementRecord(StrictFrozenModel):
     judgement: CatalogueSkillJudgement
 
 
+class CatalogueWorldPlacementJudgement(StrictFrozenModel):
+    """Reversible teacher evidence about one Grades 1–2 world location.
+
+    This is intentionally advisory and separate from the comprehensive item
+    review.  A null presented pair represents the UI's unplaced/Heaven queue;
+    presentation-only region names are never curriculum identifiers.
+    """
+
+    run_id: str = Field(min_length=1)
+    item_id: str = Field(min_length=1)
+    content_version: str = Field(pattern=CONTENT_VERSION_PATTERN)
+    ontology_version: str = Field(min_length=1)
+    ontology_sha256: str = Field(pattern=SHA256_PATTERN)
+    layout_version: str = Field(min_length=1)
+    presented_realm_id: str | None = None
+    presented_district_id: str | None = None
+    selected_realm_id: str | None = None
+    selected_district_id: str | None = None
+    verdict: WorldPlacementVerdict
+    reviewer_id: str = Field(min_length=1)
+    prior_event_id: str | None = Field(default=None, pattern=SHA256_PATTERN)
+    notes: str = Field(default="", max_length=4000)
+    reviewed_at: datetime
+    schema_version: str = CATALOGUE_WORLD_PLACEMENT_SCHEMA_VERSION
+
+    @field_validator(
+        "run_id",
+        "item_id",
+        "ontology_version",
+        "layout_version",
+        "reviewer_id",
+    )
+    @classmethod
+    def exact_identifiers(cls, value: str, info: Any) -> str:
+        return _exact_nonblank(value, label=info.field_name)
+
+    @field_validator(
+        "presented_realm_id",
+        "presented_district_id",
+        "selected_realm_id",
+        "selected_district_id",
+    )
+    @classmethod
+    def exact_optional_identifiers(cls, value: str | None, info: Any) -> str | None:
+        if value is not None:
+            _exact_nonblank(value, label=info.field_name)
+        return value
+
+    @field_validator("reviewed_at")
+    @classmethod
+    def aware_review_time(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("reviewed_at requires an explicit timezone")
+        return value
+
+    @model_validator(mode="after")
+    def coherent_placement(self) -> "CatalogueWorldPlacementJudgement":
+        if self.schema_version != CATALOGUE_WORLD_PLACEMENT_SCHEMA_VERSION:
+            raise ValueError("unsupported world-placement judgement schema")
+        presented_complete = (
+            self.presented_realm_id is not None
+            and self.presented_district_id is not None
+        )
+        if presented_complete != (
+            self.presented_realm_id is not None
+            or self.presented_district_id is not None
+        ):
+            raise ValueError("presented realm and district must be set as a pair")
+        selected_complete = (
+            self.selected_realm_id is not None and self.selected_district_id is not None
+        )
+        if selected_complete != (
+            self.selected_realm_id is not None or self.selected_district_id is not None
+        ):
+            raise ValueError("selected realm and district must be set as a pair")
+
+        presented = (self.presented_realm_id, self.presented_district_id)
+        selected = (self.selected_realm_id, self.selected_district_id)
+        if self.verdict is WorldPlacementVerdict.FITS:
+            if not presented_complete:
+                raise ValueError("fits requires a presented curricular location")
+            if not selected_complete or selected != presented:
+                raise ValueError("fits must select the presented location")
+        elif self.verdict is WorldPlacementVerdict.CHANGE:
+            if not selected_complete:
+                raise ValueError("change requires a selected curricular location")
+            if presented_complete and selected == presented:
+                raise ValueError("change must select a different location")
+        elif selected_complete:
+            raise ValueError("unsure and skip cannot select a curricular location")
+        return self
+
+
+class CatalogueWorldPlacementRecord(StrictFrozenModel):
+    revision: int = Field(ge=1)
+    etag: str = Field(pattern=ETAG_PATTERN)
+    event_id: str = Field(pattern=SHA256_PATTERN)
+    judgement: CatalogueWorldPlacementJudgement
+
+
 class CatalogueFilters(StrictFrozenModel):
     source_family: str | None = None
     grade_band: str | None = None
@@ -909,6 +1017,26 @@ class CatalogueSkillJudgementEvidence(StrictFrozenModel):
     schema_version: str
 
 
+class CatalogueWorldPlacementEvidence(StrictFrozenModel):
+    item_id: str
+    content_version: str
+    ontology_version: str
+    ontology_sha256: str
+    layout_version: str
+    presented_realm_id: str | None
+    presented_district_id: str | None
+    selected_realm_id: str | None
+    selected_district_id: str | None
+    verdict: WorldPlacementVerdict
+    revision: int
+    etag: str
+    event_id: str
+    prior_event_id: str | None
+    reviewer_id: str
+    reviewed_at: datetime
+    schema_version: str
+
+
 class CatalogueEvidenceExport(StrictFrozenModel):
     schema_version: str = CATALOGUE_EVIDENCE_EXPORT_VERSION
     generated_at: datetime
@@ -917,6 +1045,7 @@ class CatalogueEvidenceExport(StrictFrozenModel):
     reviews: tuple[CatalogueReviewEvidence, ...]
     neighbor_judgements: tuple[CatalogueNeighborEvidence, ...]
     skill_judgements: tuple[CatalogueSkillJudgementEvidence, ...]
+    world_placement_judgements: tuple[CatalogueWorldPlacementEvidence, ...]
 
     @field_validator("generated_at")
     @classmethod

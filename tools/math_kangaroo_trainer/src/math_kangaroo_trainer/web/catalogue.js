@@ -16,7 +16,7 @@
     "overview",
     "taxonomy",
     "similarity",
-    "problem-space",
+    "world",
     "curriculum",
     "questions",
     "promotion",
@@ -78,7 +78,7 @@
     },
     problemSpace: {
       query: "",
-      view: "hybrid",
+      view: "surface",
       anchorId: "",
       mapPayload: null,
       mapRequestToken: 0,
@@ -281,7 +281,7 @@
     } else {
       url.searchParams.delete("space_anchor");
     }
-    if (state.problemSpace.view !== "hybrid") {
+    if (state.problemSpace.view !== "surface") {
       url.searchParams.set("space_view", state.problemSpace.view);
     } else {
       url.searchParams.delete("space_view");
@@ -291,7 +291,8 @@
 
   function readUrlState() {
     const params = new URL(window.location.href).searchParams;
-    const view = params.get("view");
+    const requestedView = params.get("view");
+    const view = requestedView === "problem-space" ? "world" : requestedView;
     state.activeView = VIEWS.includes(view) ? view : "overview";
     FILTER_KEYS.forEach((key) => {
       state.filters[key] = params.get(key) || "";
@@ -306,7 +307,7 @@
       ? similarityView
       : "hybrid";
     state.problemSpace.anchorId = params.get("space_anchor") || "";
-    const problemView = params.get("space_view") || "hybrid";
+    const problemView = params.get("space_view") || "surface";
     state.problemSpace.view = ["surface", "tag", "hybrid"].includes(problemView)
       ? problemView
       : "hybrid";
@@ -348,12 +349,12 @@
       if (state.similarity.anchorId && !state.similarity.payload) loadNeighbors();
       else if (!state.similarity.anchorId) byId("similarity-empty").hidden = false;
     }
-    if (view === "problem-space") {
+    if (view === "world") {
+      window.CatalogueWorldQA?.activate();
       loadProblemMap();
-      if (state.problemSpace.anchorId && state.problemSpace.trailIndex < 0) {
-        exploreProblemQuestion(state.problemSpace.anchorId, { replaceCurrent: true });
-      }
       window.requestAnimationFrame(drawProblemMap);
+    } else {
+      window.CatalogueWorldQA?.deactivate();
     }
   }
 
@@ -3485,6 +3486,9 @@
   ) {
     const item = stringValue(id).trim();
     if (!item) return false;
+    if (state.activeView === "world" && window.CatalogueWorldQA?.openItem) {
+      return window.CatalogueWorldQA.openItem(item);
+    }
     hideProblemMapCandidates();
     if (!fromSearch) cancelProblemSearchRequest();
     const committedIndex = state.problemSpace.trailIndex;
@@ -4511,7 +4515,11 @@
       navigateProblemTrail(state.problemSpace.trailIndex + 1);
     });
     byId("problem-review-selected").addEventListener("click", () => {
-      if (state.problemSpace.anchorId) inspectQuestion(state.problemSpace.anchorId);
+      const selectedId =
+        state.activeView === "world"
+          ? window.CatalogueWorldQA?.currentItemId?.()
+          : state.problemSpace.anchorId;
+      if (selectedId) inspectQuestion(selectedId);
     });
     byId("problem-map-center-selected").addEventListener(
       "click",

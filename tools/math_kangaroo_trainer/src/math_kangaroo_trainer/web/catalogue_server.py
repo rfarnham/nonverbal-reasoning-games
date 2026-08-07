@@ -34,6 +34,14 @@ from math_kangaroo_trainer.curriculum import (
     RecommendationMode,
     preview_recommendations,
 )
+from math_kangaroo_trainer.curriculum.grade12_world import (
+    GRADE12_DISTRICT_TO_REALM,
+    GRADE12_WORLD,
+    GRADE12_WORLD_LAYOUT_VERSION,
+    GRADE12_WORLD_ONTOLOGY_VERSION,
+    grade12_world_ontology_checksum,
+    propose_grade12_world_location,
+)
 from math_kangaroo_trainer.domain.catalogue_reviews import (
     CatalogueClassification,
     CatalogueDisposition,
@@ -44,11 +52,13 @@ from math_kangaroo_trainer.domain.catalogue_reviews import (
     CatalogueSkillJudgement,
     CatalogueSourceChecks,
     CatalogueTeacherReview,
+    CatalogueWorldPlacementJudgement,
     GradeAppropriateness,
     NeighborJudgementValue,
     PrimaryDomain,
     QuestionType,
     TaxonomySkillDecision,
+    WorldPlacementVerdict,
 )
 from math_kangaroo_trainer.domain.skills import load_ontology, ontology_checksum
 from math_kangaroo_trainer.retrieval import (
@@ -704,6 +714,481 @@ class CatalogueWebApplication:
                 else None
             ),
         }
+
+    @staticmethod
+    def _world_choice_mode(record: Any) -> Literal["structured", "source_order"]:
+        choices = record.item.learner_payload.get("choices")
+        if (
+            isinstance(choices, list)
+            and len(choices) in {4, 5}
+            and all(isinstance(choice, str) and choice.strip() for choice in choices)
+        ):
+            return "structured"
+        return "source_order"
+
+    @staticmethod
+    def _grade12_point_tier(record: Any) -> tuple[int, str]:
+        published = record.item.source_metadata.published_point_tier
+        if published in {3, 4, 5}:
+            return int(published), "published"
+        question_number = record.item.source_metadata.question_number
+        if question_number <= 8:
+            return 3, "inferred_grade12_question_band"
+        if question_number <= 16:
+            return 4, "inferred_grade12_question_band"
+        return 5, "inferred_grade12_question_band"
+
+    def _grade12_world_proposal(self, record: Any) -> dict[str, Any]:
+        item = record.item
+        classification = self._effective_classification(record)
+        current_review = record.current_review
+        faithful_review = bool(
+            current_review is not None
+            and current_review.review.content_version == item.content_version
+            and current_review.review.disposition is CatalogueDisposition.FAITHFUL
+        )
+        structured = self._world_choice_mode(record) == "structured"
+        answer = str(item.protected_payload.get("official_answer") or "").upper()
+        source_order_playable = bool(
+            answer in {"A", "B", "C", "D", "E"}
+            and any(asset.status == "available" for asset in item.asset_refs)
+        )
+        proposal = propose_grade12_world_location(
+            classification["primary_domain"],
+            skill_ids=classification["skill_ids"],
+            playable=(
+                item.answer_status == "official-verified"
+                and (structured or source_order_playable)
+            ),
+            unresolved=bool(
+                not structured
+                or (
+                    current_review is not None
+                    and current_review.review.content_version == item.content_version
+                    and not faithful_review
+                )
+            ),
+            reviewed_mixed=bool(
+                faithful_review and classification["primary_domain"] == "mixed"
+            ),
+        )
+        return proposal.model_dump(mode="json")
+
+    @staticmethod
+    def _world_judgement_payload(
+        current: Any,
+        *,
+        include_notes: bool,
+    ) -> dict[str, Any] | None:
+        if current is None:
+            return None
+        judgement = current.judgement
+        payload = {
+            "status": judgement.verdict.value,
+            "verdict": judgement.verdict.value,
+            "presented_realm_id": judgement.presented_realm_id,
+            "presented_district_id": judgement.presented_district_id,
+            "selected_realm_id": judgement.selected_realm_id,
+            "selected_district_id": judgement.selected_district_id,
+            "revision": current.revision,
+            "etag": _http_etag(current.etag),
+            "event_id": current.event_id,
+            "prior_event_id": judgement.prior_event_id,
+            "content_version": judgement.content_version,
+            "ontology_version": judgement.ontology_version,
+            "ontology_sha256": judgement.ontology_sha256,
+            "layout_version": judgement.layout_version,
+            "reviewer_id": judgement.reviewer_id,
+            "reviewed_at": judgement.reviewed_at.isoformat(),
+            "schema_version": judgement.schema_version,
+        }
+        if include_notes:
+            payload["notes"] = judgement.notes
+        return payload
+
+    @staticmethod
+    def _world_placement_matches_current_world(current: Any) -> bool:
+        if current is None:
+            return False
+        judgement = current.judgement
+        return (
+            judgement.ontology_version == GRADE12_WORLD_ONTOLOGY_VERSION
+            and judgement.ontology_sha256 == grade12_world_ontology_checksum()
+            and judgement.layout_version == GRADE12_WORLD_LAYOUT_VERSION
+        )
+
+    @classmethod
+    def _effective_world_placement(
+        cls,
+        proposal: dict[str, Any],
+        current: Any,
+    ) -> dict[str, Any]:
+        if not cls._world_placement_matches_current_world(current):
+            current = None
+        if current is not None and current.judgement.verdict in {
+            WorldPlacementVerdict.FITS,
+            WorldPlacementVerdict.CHANGE,
+        }:
+            judgement = current.judgement
+            return {
+                "status": (
+                    "teacher_confirmed"
+                    if judgement.verdict is WorldPlacementVerdict.FITS
+                    else "teacher_changed"
+                ),
+                "source": "teacher_judgement",
+                "placement_kind": "district",
+                "region_id": judgement.selected_realm_id,
+                "realm_id": judgement.selected_realm_id,
+                "district_id": judgement.selected_district_id,
+            }
+        if (
+            current is not None
+            and current.judgement.verdict is WorldPlacementVerdict.UNSURE
+        ):
+            return {
+                "status": "teacher_unsure",
+                "source": "teacher_judgement",
+                "placement_kind": "heaven",
+                "region_id": "heaven",
+                "realm_id": None,
+                "district_id": None,
+            }
+
+        placement_kind = str(proposal["placement_kind"])
+        realm_id = proposal.get("realm_id")
+        return {
+            "status": (
+                "teacher_skipped_proposal"
+                if current is not None
+                else f"proposed_{placement_kind}"
+            ),
+            "source": "proposal",
+            "placement_kind": placement_kind,
+            "region_id": realm_id if realm_id is not None else placement_kind,
+            "realm_id": realm_id,
+            "district_id": proposal.get("district_id"),
+        }
+
+    @staticmethod
+    def _empty_world_progress() -> dict[str, int]:
+        return {
+            "total": 0,
+            "judged": 0,
+            "decided": 0,
+            "remaining": 0,
+            "fits": 0,
+            "change": 0,
+            "unsure": 0,
+            "skip": 0,
+        }
+
+    @staticmethod
+    def _increment_world_progress(stats: dict[str, int], current: Any) -> None:
+        stats["total"] += 1
+        if current is None:
+            return
+        verdict = current.judgement.verdict.value
+        stats["judged"] += 1
+        stats[verdict] += 1
+        if verdict != WorldPlacementVerdict.SKIP.value:
+            stats["decided"] += 1
+
+    @staticmethod
+    def _finish_world_progress(stats: dict[str, int]) -> None:
+        stats["remaining"] = stats["total"] - stats["decided"]
+
+    def world_layout(self) -> dict[str, Any]:
+        grade12_records = tuple(
+            sorted(
+                (
+                    record
+                    for record in self._items.values()
+                    if record.item.source_metadata.grade_band == "1-2"
+                ),
+                key=lambda record: record.item.inventory_order,
+            )
+        )
+        included = tuple(
+            record
+            for record in grade12_records
+            if record.item.answer_status == "official-verified"
+        )
+        excluded = tuple(
+            record
+            for record in grade12_records
+            if record.item.answer_status != "official-verified"
+        )
+
+        realm_progress: dict[str, dict[str, Any]] = {}
+        for realm in GRADE12_WORLD.realms:
+            realm_progress[realm.realm_id] = {
+                **self._empty_world_progress(),
+                "districts": {
+                    district.district_id: self._empty_world_progress()
+                    for district in realm.districts
+                },
+            }
+        special_progress = {
+            "crossroads": self._empty_world_progress(),
+            "heaven": self._empty_world_progress(),
+        }
+        total_progress = self._empty_world_progress()
+
+        inventory = []
+        for record in included:
+            item = record.item
+            proposal = self._grade12_world_proposal(record)
+            stored_current = self.repository.current_world_placement_judgement(
+                self.run_id,
+                item.item_id,
+            )
+            current = (
+                stored_current
+                if self._world_placement_matches_current_world(stored_current)
+                else None
+            )
+            effective = self._effective_world_placement(proposal, current)
+            point_tier, point_tier_source = self._grade12_point_tier(record)
+            inventory.append(
+                {
+                    "item_id": item.item_id,
+                    "content_version": item.content_version,
+                    "source": {
+                        "label": self._source_label(record),
+                        "source_family": item.source_metadata.source_family,
+                        "year": item.source_metadata.year,
+                        "question_number": item.source_metadata.question_number,
+                    },
+                    "point_tier": point_tier,
+                    "point_tier_source": point_tier_source,
+                    "choice_mode": self._world_choice_mode(record),
+                    "option_count": item.option_count,
+                    "proposal": proposal,
+                    "placement_status": (
+                        "stale"
+                        if stored_current is not None and current is None
+                        else (
+                            "unreviewed"
+                            if current is None
+                            else current.judgement.verdict.value
+                        )
+                    ),
+                    "current_placement": self._world_judgement_payload(
+                        current,
+                        include_notes=False,
+                    ),
+                    "effective_placement": effective,
+                }
+            )
+
+            self._increment_world_progress(total_progress, current)
+            realm_id = effective["realm_id"]
+            district_id = effective["district_id"]
+            if (
+                isinstance(realm_id, str)
+                and isinstance(district_id, str)
+                and GRADE12_DISTRICT_TO_REALM.get(district_id) == realm_id
+            ):
+                self._increment_world_progress(realm_progress[realm_id], current)
+                self._increment_world_progress(
+                    realm_progress[realm_id]["districts"][district_id], current
+                )
+            else:
+                region_id = str(effective["region_id"])
+                self._increment_world_progress(special_progress[region_id], current)
+
+        self._finish_world_progress(total_progress)
+        for realm in realm_progress.values():
+            self._finish_world_progress(realm)
+            for district in realm["districts"].values():
+                self._finish_world_progress(district)
+        for stats in special_progress.values():
+            self._finish_world_progress(stats)
+
+        return {
+            "run_id": self.run_id,
+            "world": GRADE12_WORLD.model_dump(mode="json"),
+            "ontology_sha256": grade12_world_ontology_checksum(),
+            "inventory": inventory,
+            "inventory_count": len(inventory),
+            "excluded": {
+                "count": len(excluded),
+                "reason_counts": dict(
+                    sorted(Counter(row.item.answer_status for row in excluded).items())
+                ),
+            },
+            "progress": {
+                **total_progress,
+                "realms": realm_progress,
+                "special_regions": special_progress,
+            },
+        }
+
+    def world_placement(self, item_id: str) -> tuple[dict[str, Any], str | None]:
+        record = self._items.get(item_id)
+        if record is None:
+            raise CatalogueApiProblem(HTTPStatus.NOT_FOUND, "not_found", "Unknown item")
+        if record.item.source_metadata.grade_band != "1-2":
+            raise CatalogueApiProblem(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "grade_not_supported",
+                "World placement is available only for Grades 1–2 items",
+            )
+        proposal = self._grade12_world_proposal(record)
+        stored_current = self.repository.current_world_placement_judgement(
+            self.run_id,
+            item_id,
+        )
+        current = (
+            stored_current
+            if self._world_placement_matches_current_world(stored_current)
+            else None
+        )
+        point_tier, point_tier_source = self._grade12_point_tier(record)
+        return {
+            "run_id": self.run_id,
+            "item_id": item_id,
+            "content_version": record.item.content_version,
+            "ontology_version": GRADE12_WORLD_ONTOLOGY_VERSION,
+            "ontology_sha256": grade12_world_ontology_checksum(),
+            "layout_version": GRADE12_WORLD_LAYOUT_VERSION,
+            "point_tier": point_tier,
+            "point_tier_source": point_tier_source,
+            "choice_mode": self._world_choice_mode(record),
+            "proposal": proposal,
+            "placement_status": (
+                "stale"
+                if stored_current is not None and current is None
+                else (
+                    "unreviewed"
+                    if current is None
+                    else current.judgement.verdict.value
+                )
+            ),
+            "current_placement": self._world_judgement_payload(
+                current,
+                include_notes=True,
+            ),
+            "effective_placement": self._effective_world_placement(
+                proposal,
+                current,
+            ),
+        }, None if current is None else _http_etag(current.etag)
+
+    def save_world_placement(
+        self,
+        item_id: str,
+        body: Any,
+        *,
+        if_match: str | None,
+    ) -> tuple[dict[str, Any], str]:
+        record = self._items.get(item_id)
+        if record is None:
+            raise CatalogueApiProblem(HTTPStatus.NOT_FOUND, "not_found", "Unknown item")
+        if record.item.source_metadata.grade_band != "1-2":
+            raise CatalogueApiProblem(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "grade_not_supported",
+                "World placement is available only for Grades 1–2 items",
+            )
+        if not isinstance(body, dict):
+            raise CatalogueApiProblem(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "invalid_world_placement",
+                "World placement must be an object",
+            )
+        if body.get("content_version") != record.item.content_version:
+            raise CatalogueApiProblem(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "stale_content_version",
+                "World placement content version is stale or missing",
+            )
+        if body.get("layout_version") != GRADE12_WORLD_LAYOUT_VERSION:
+            raise CatalogueApiProblem(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "stale_layout_version",
+                "World placement layout version is stale or missing",
+            )
+
+        current = self.repository.current_world_placement_judgement(
+            self.run_id,
+            item_id,
+        )
+        prior_event_id = None if current is None else current.event_id
+        supplied_prior = body.get("prior_event_id")
+        if supplied_prior is not None and supplied_prior != prior_event_id:
+            raise CatalogueApiProblem(
+                HTTPStatus.PRECONDITION_FAILED,
+                "stale_world_placement",
+                "World placement changed; reload",
+            )
+        verdict = WorldPlacementVerdict(str(body.get("verdict", "unsure")))
+        presented_realm_id = body.get("presented_realm_id")
+        presented_district_id = body.get("presented_district_id")
+        selected_realm_id = body.get("selected_realm_id")
+        selected_district_id = body.get("selected_district_id")
+        if verdict is WorldPlacementVerdict.FITS:
+            if selected_realm_id is None and selected_district_id is None:
+                selected_realm_id = presented_realm_id
+                selected_district_id = presented_district_id
+        notes = body.get("notes", "")
+        if not isinstance(notes, str):
+            raise CatalogueApiProblem(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "invalid_world_placement",
+                "World placement notes must be text",
+            )
+        judgement = CatalogueWorldPlacementJudgement(
+            run_id=self.run_id,
+            item_id=item_id,
+            content_version=record.item.content_version,
+            ontology_version=GRADE12_WORLD_ONTOLOGY_VERSION,
+            ontology_sha256=grade12_world_ontology_checksum(),
+            layout_version=GRADE12_WORLD_LAYOUT_VERSION,
+            presented_realm_id=presented_realm_id,
+            presented_district_id=presented_district_id,
+            selected_realm_id=selected_realm_id,
+            selected_district_id=selected_district_id,
+            verdict=verdict,
+            reviewer_id=self.reviewer_id,
+            prior_event_id=prior_event_id,
+            notes=notes,
+            reviewed_at=datetime.now(timezone.utc),
+        )
+        supplied_etag = _if_match_value(if_match)
+        if if_match not in {None, "*"} and current is None:
+            raise CatalogueApiProblem(
+                HTTPStatus.PRECONDITION_FAILED,
+                "stale_world_placement",
+                "World placement changed; reload",
+            )
+        try:
+            saved = self.repository.save_world_placement_judgement(
+                judgement,
+                0 if current is None else current.revision,
+                expected_etag=supplied_etag,
+            )
+        except CatalogueReviewConflict as error:
+            raise CatalogueApiProblem(
+                HTTPStatus.PRECONDITION_FAILED,
+                "stale_world_placement",
+                "World placement changed; reload",
+            ) from error
+        proposal = self._grade12_world_proposal(record)
+        placement_payload = self._world_judgement_payload(
+            saved,
+            include_notes=True,
+        )
+        return {
+            "saved": True,
+            "placement": placement_payload,
+            "current_placement": placement_payload,
+            "effective_placement": self._effective_world_placement(
+                proposal,
+                saved,
+            ),
+        }, _http_etag(saved.etag)
 
     @staticmethod
     def _resource_url(item_id: str, resource: str, *, fragment: str = "") -> str:
@@ -1825,6 +2310,9 @@ def _handler_class(
                 if segments == ("api", "catalogue", "taxonomy"):
                     self._send_json(HTTPStatus.OK, application.taxonomy())
                     return
+                if segments == ("api", "catalogue", "world-layout"):
+                    self._send_json(HTTPStatus.OK, application.world_layout())
+                    return
                 if segments == ("api", "catalogue", "map"):
                     self._send_json(HTTPStatus.OK, application.problem_map(query))
                     return
@@ -1838,6 +2326,14 @@ def _handler_class(
                     if record is not None:
                         etag = _http_etag(record.etag)
                     self._send_json(HTTPStatus.OK, detail, etag=etag)
+                    return
+                if (
+                    len(segments) == 5
+                    and segments[:3] == ("api", "catalogue", "items")
+                    and segments[4] == "world-placement"
+                ):
+                    payload, etag = application.world_placement(segments[3])
+                    self._send_json(HTTPStatus.OK, payload, etag=etag)
                     return
                 if (
                     len(segments) == 5
@@ -1904,6 +2400,16 @@ def _handler_class(
                     and segments[4] == "review"
                 ):
                     payload, etag = application.save_item_review(
+                        segments[3], body, if_match=if_match
+                    )
+                    self._send_json(HTTPStatus.OK, payload, etag=etag)
+                    return
+                if (
+                    len(segments) == 5
+                    and segments[:3] == ("api", "catalogue", "items")
+                    and segments[4] == "world-placement"
+                ):
+                    payload, etag = application.save_world_placement(
                         segments[3], body, if_match=if_match
                     )
                     self._send_json(HTTPStatus.OK, payload, etag=etag)

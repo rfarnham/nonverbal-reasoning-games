@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import http.client
 import json
 import sqlite3
@@ -14,6 +15,11 @@ import pytest
 
 from math_kangaroo_trainer.cli import main
 from math_kangaroo_trainer.config import default_ontology_path
+from math_kangaroo_trainer.curriculum.grade12_world import (
+    GRADE12_WORLD_LAYOUT_VERSION,
+    GRADE12_WORLD_ONTOLOGY_VERSION,
+    grade12_world_ontology_checksum,
+)
 from math_kangaroo_trainer.retrieval import StaleSemanticArtifactError
 from math_kangaroo_trainer.web.catalogue_server import (
     MAX_EXPLORE_PROMPT_EXCERPT_CHARACTERS,
@@ -985,3 +991,384 @@ def test_catalogue_http_saves_append_only_taxonomy_and_neighbor_evidence(
         assert len(export["reviews"]) == 1
         assert len(export["skill_judgements"]) == 1
         assert len(export["neighbor_judgements"]) == 1
+
+
+def test_catalogue_http_world_layout_and_reversible_placement_evidence(
+    synthetic_bank: Path, tmp_path: Path
+) -> None:
+    output = tmp_path / "catalogue"
+    build_catalogue(synthetic_bank, output)
+    with running_catalogue(synthetic_bank, output) as (application, port):
+        status, _, data = request(port, "GET", "/api/catalogue/world-layout")
+        assert status == HTTPStatus.OK
+        layout = decoded(data)
+        assert layout["world"]["layout"]["layout_version"] == (
+            GRADE12_WORLD_LAYOUT_VERSION
+        )
+        assert layout["world"]["ontology_version"] == (GRADE12_WORLD_ONTOLOGY_VERSION)
+        assert layout["ontology_sha256"] == grade12_world_ontology_checksum()
+        assert {realm["realm_id"] for realm in layout["world"]["realms"]}.isdisjoint(
+            {"heaven", "crossroads"}
+        )
+        assert layout["inventory_count"] == len(layout["inventory"])
+        assert layout["inventory_count"] + layout["excluded"]["count"] == sum(
+            value.item.source_metadata.grade_band == "1-2"
+            for value in application._items.values()
+        )
+        assert layout["progress"]["total"] == layout["inventory_count"]
+        assert set(layout["progress"]["special_regions"]) == {
+            "crossroads",
+            "heaven",
+        }
+        bulk_encoded = data.decode("utf-8")
+        for forbidden in (
+            "Invented prompt",
+            "choice 1 for item",
+            "official_answer",
+            "local_ref",
+            "PRIVATE WORLD PLACEMENT NOTE",
+        ):
+            assert forbidden not in bulk_encoded
+
+        entry = layout["inventory"][0]
+        assert entry["point_tier"] in {3, 4, 5}
+        assert entry["choice_mode"] in {"structured", "source_order"}
+        item_id = entry["item_id"]
+        content_version = entry["content_version"]
+
+        status, headers, data = request(
+            port,
+            "GET",
+            f"/api/catalogue/items/{item_id}/world-placement",
+        )
+        placement = decoded(data)
+        assert status == HTTPStatus.OK
+        assert "etag" not in headers
+        assert placement["current_placement"] is None
+
+        status, first_headers, data = request(
+            port,
+            "PUT",
+            f"/api/catalogue/items/{item_id}/world-placement",
+            {
+                "content_version": content_version,
+                "layout_version": GRADE12_WORLD_LAYOUT_VERSION,
+                "presented_realm_id": None,
+                "presented_district_id": None,
+                "selected_realm_id": "geometry_spatial",
+                "selected_district_id": "position_direction",
+                "verdict": "change",
+                "notes": "PRIVATE WORLD PLACEMENT NOTE HTTP SENTINEL",
+            },
+            headers={
+                "Origin": f"http://127.0.0.1:{port}",
+                "If-Match": "*",
+            },
+        )
+        assert status == HTTPStatus.OK
+        first = decoded(data)["current_placement"]
+        assert first["revision"] == 1
+        assert first["prior_event_id"] is None
+        assert first["selected_district_id"] == "position_direction"
+        assert first_headers["etag"] == first["etag"]
+
+        status, second_headers, data = request(
+            port,
+            "PUT",
+            f"/api/catalogue/items/{item_id}/world-placement",
+            {
+                "content_version": content_version,
+                "layout_version": GRADE12_WORLD_LAYOUT_VERSION,
+                "presented_realm_id": "geometry_spatial",
+                "presented_district_id": "position_direction",
+                "selected_realm_id": None,
+                "selected_district_id": None,
+                "verdict": "unsure",
+                "prior_event_id": first["event_id"],
+            },
+            headers={
+                "Origin": f"http://127.0.0.1:{port}",
+                "If-Match": first_headers["etag"],
+            },
+        )
+        assert status == HTTPStatus.OK
+        second_payload = decoded(data)
+        second = second_payload["current_placement"]
+        assert second["revision"] == 2
+        assert second["prior_event_id"] == first["event_id"]
+        assert second_payload["effective_placement"]["region_id"] == "heaven"
+
+        status, _, _ = request(
+            port,
+            "PUT",
+            f"/api/catalogue/items/{item_id}/world-placement",
+            {
+                "content_version": content_version,
+                "layout_version": GRADE12_WORLD_LAYOUT_VERSION,
+                "presented_realm_id": None,
+                "presented_district_id": None,
+                "selected_realm_id": "number_arithmetic",
+                "selected_district_id": "count_compare",
+                "verdict": "change",
+                "prior_event_id": first["event_id"],
+            },
+            headers={
+                "Origin": f"http://127.0.0.1:{port}",
+                "If-Match": first_headers["etag"],
+            },
+        )
+        assert status == HTTPStatus.PRECONDITION_FAILED
+
+        status, _, _ = request(
+            port,
+            "PUT",
+            f"/api/catalogue/items/{item_id}/world-placement",
+            {
+                "content_version": content_version,
+                "layout_version": GRADE12_WORLD_LAYOUT_VERSION,
+                "presented_realm_id": "heaven",
+                "presented_district_id": "count_compare",
+                "selected_realm_id": "heaven",
+                "selected_district_id": "count_compare",
+                "verdict": "fits",
+                "prior_event_id": second["event_id"],
+            },
+            headers={
+                "Origin": f"http://127.0.0.1:{port}",
+                "If-Match": second_headers["etag"],
+            },
+        )
+        assert status == HTTPStatus.UNPROCESSABLE_ENTITY
+
+        status, _, data = request(
+            port,
+            "PUT",
+            f"/api/catalogue/items/{item_id}/world-placement",
+            {
+                "content_version": content_version,
+                "layout_version": GRADE12_WORLD_LAYOUT_VERSION,
+                "presented_realm_id": None,
+                "presented_district_id": None,
+                "selected_realm_id": None,
+                "selected_district_id": None,
+                "verdict": "invented-invalid-verdict",
+                "prior_event_id": second["event_id"],
+            },
+            headers={
+                "Origin": f"http://127.0.0.1:{port}",
+                "If-Match": second_headers["etag"],
+            },
+        )
+        assert status == HTTPStatus.UNPROCESSABLE_ENTITY
+        assert decoded(data)["error"]["code"] == "invalid_request"
+
+        non_grade12 = next(
+            value.item.item_id
+            for value in application._items.values()
+            if value.item.source_metadata.grade_band != "1-2"
+        )
+        status, _, _ = request(
+            port,
+            "GET",
+            f"/api/catalogue/items/{non_grade12}/world-placement",
+        )
+        assert status == HTTPStatus.UNPROCESSABLE_ENTITY
+
+        item_record = application.repository.item(application.run_id, item_id)
+        assert item_record is not None
+        assert item_record.current_review is None
+        assert "TEACHER_REVIEW_MISSING" in (item_record.promotion.curriculum_blockers)
+
+        export = application.export_evidence()
+        assert export["schema_version"] == "catalogue-evidence-export.v2"
+        assert len(export["world_placement_judgements"]) == 1
+        exported = export["world_placement_judgements"][0]
+        assert exported["verdict"] == "unsure"
+        assert exported["prior_event_id"] == first["event_id"]
+        assert "notes" not in exported
+        assert "PRIVATE WORLD PLACEMENT NOTE" not in json.dumps(export)
+
+
+def test_catalogue_world_ignores_stale_ontology_placement_but_preserves_chain(
+    synthetic_bank: Path, tmp_path: Path
+) -> None:
+    output = tmp_path / "catalogue"
+    build_catalogue(synthetic_bank, output)
+    with running_catalogue(synthetic_bank, output) as (application, port):
+        status, _, data = request(port, "GET", "/api/catalogue/world-layout")
+        assert status == HTTPStatus.OK
+        entry = decoded(data)["inventory"][0]
+        item_id = entry["item_id"]
+        content_version = entry["content_version"]
+
+        status, _, data = request(
+            port,
+            "PUT",
+            f"/api/catalogue/items/{item_id}/world-placement",
+            {
+                "content_version": content_version,
+                "layout_version": GRADE12_WORLD_LAYOUT_VERSION,
+                "presented_realm_id": None,
+                "presented_district_id": None,
+                "selected_realm_id": "geometry_spatial",
+                "selected_district_id": "position_direction",
+                "verdict": "change",
+            },
+            headers={
+                "Origin": f"http://127.0.0.1:{port}",
+                "If-Match": "*",
+            },
+        )
+        assert status == HTTPStatus.OK
+        first = decoded(data)["current_placement"]
+
+        # Model a projection written by a prior ontology whose curricular IDs
+        # were later retired while the authored hex layout stayed unchanged.
+        stored = application.repository.current_world_placement_judgement(
+            application.run_id,
+            item_id,
+        )
+        assert stored is not None
+        stale_judgement = stored.judgement.model_copy(
+            update={
+                "ontology_version": "grade12-six-realm-ontology.retired",
+                "ontology_sha256": "f" * 64,
+                "selected_realm_id": "retired_realm",
+                "selected_district_id": "retired_district",
+            }
+        )
+        stale_json = json.dumps(
+            stale_judgement.model_dump(mode="json"),
+            allow_nan=False,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+
+        def digest(value: Any) -> str:
+            encoded = json.dumps(
+                value,
+                allow_nan=False,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            ).encode("utf-8")
+            return hashlib.sha256(encoded).hexdigest()
+
+        stale_event_id = digest(
+            {
+                "kind": "catalogue_world_placement_judgement",
+                "revision": stored.revision,
+                "judgement": json.loads(stale_json),
+            }
+        )
+        stale_etag = digest(
+            {"event_id": stale_event_id, "revision": stored.revision}
+        )
+        with application.repository._lock:
+            connection = application.repository._connection
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                connection.execute("PRAGMA defer_foreign_keys=ON")
+                connection.execute(
+                    """
+                    UPDATE catalogue_world_placement_history
+                    SET event_id=?, etag=?, ontology_version=?, ontology_sha256=?,
+                        selected_realm_id=?, selected_district_id=?, judgement_json=?
+                    WHERE event_id=?
+                    """,
+                    (
+                        stale_event_id,
+                        stale_etag,
+                        stale_judgement.ontology_version,
+                        stale_judgement.ontology_sha256,
+                        stale_judgement.selected_realm_id,
+                        stale_judgement.selected_district_id,
+                        stale_json,
+                        stored.event_id,
+                    ),
+                )
+                connection.execute(
+                    """
+                    UPDATE catalogue_world_placement_judgements
+                    SET event_id=?, etag=?, ontology_version=?, ontology_sha256=?,
+                        selected_realm_id=?, selected_district_id=?, judgement_json=?
+                    WHERE run_id=? AND item_id=? AND layout_version=?
+                    """,
+                    (
+                        stale_event_id,
+                        stale_etag,
+                        stale_judgement.ontology_version,
+                        stale_judgement.ontology_sha256,
+                        stale_judgement.selected_realm_id,
+                        stale_judgement.selected_district_id,
+                        stale_json,
+                        application.run_id,
+                        item_id,
+                        GRADE12_WORLD_LAYOUT_VERSION,
+                    ),
+                )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+
+        status, _, data = request(port, "GET", "/api/catalogue/world-layout")
+        assert status == HTTPStatus.OK
+        world = decoded(data)
+        refreshed = next(
+            value for value in world["inventory"] if value["item_id"] == item_id
+        )
+        assert refreshed["placement_status"] == "stale"
+        assert refreshed["current_placement"] is None
+        assert refreshed["effective_placement"]["source"] == "proposal"
+        assert world["progress"]["judged"] == 0
+
+        status, placement_headers, data = request(
+            port,
+            "GET",
+            f"/api/catalogue/items/{item_id}/world-placement",
+        )
+        assert status == HTTPStatus.OK
+        placement_detail = decoded(data)
+        assert "etag" not in placement_headers
+        assert placement_detail["placement_status"] == "stale"
+        assert placement_detail["current_placement"] is None
+        assert placement_detail["effective_placement"]["source"] == "proposal"
+
+        # The UI deliberately receives no stale ETag in the bulk layout and
+        # starts this ontology's replacement with `*`. The server still reads
+        # the raw projection so the append-only revision/event chain continues.
+        status, _, data = request(
+            port,
+            "PUT",
+            f"/api/catalogue/items/{item_id}/world-placement",
+            {
+                "content_version": content_version,
+                "layout_version": GRADE12_WORLD_LAYOUT_VERSION,
+                "presented_realm_id": None,
+                "presented_district_id": None,
+                "selected_realm_id": None,
+                "selected_district_id": None,
+                "verdict": "unsure",
+            },
+            headers={
+                "Origin": f"http://127.0.0.1:{port}",
+                "If-Match": "*",
+            },
+        )
+        assert status == HTTPStatus.OK
+        replacement = decoded(data)["current_placement"]
+        assert replacement["revision"] == 2
+        assert replacement["prior_event_id"] == stale_event_id
+        assert replacement["ontology_version"] == GRADE12_WORLD_ONTOLOGY_VERSION
+        assert replacement["ontology_sha256"] == grade12_world_ontology_checksum()
+        assert first["event_id"] != stale_event_id
+
+        history = application.repository.world_placement_judgement_history(
+            application.run_id,
+            item_id,
+        )
+        assert [record.revision for record in history] == [1, 2]
+        assert history[0].event_id == stale_event_id
+        assert history[1].judgement.prior_event_id == stale_event_id

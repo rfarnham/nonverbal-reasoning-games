@@ -24,6 +24,12 @@ from urllib.parse import quote
 from pydantic import BaseModel
 from pydantic_core import to_jsonable_python
 
+from math_kangaroo_trainer.curriculum.grade12_world import (
+    GRADE12_WORLD_LAYOUT_VERSION,
+    GRADE12_WORLD_ONTOLOGY_VERSION,
+    grade12_world_ontology_checksum,
+    is_grade12_curricular_location,
+)
 from math_kangaroo_trainer.domain.catalogue_reviews import (
     CATALOGUE_EVIDENCE_EXPORT_VERSION,
     CatalogueEvidenceExport,
@@ -46,6 +52,9 @@ from math_kangaroo_trainer.domain.catalogue_reviews import (
     CatalogueSummary,
     CatalogueTeacherReview,
     CatalogueVocabulary,
+    CatalogueWorldPlacementEvidence,
+    CatalogueWorldPlacementJudgement,
+    CatalogueWorldPlacementRecord,
     PrimaryDomain,
     QuestionType,
     catalogue_inventory_snapshot_sha256,
@@ -54,7 +63,7 @@ from math_kangaroo_trainer.domain.catalogue_reviews import (
 )
 
 
-CATALOGUE_DATABASE_SCHEMA_VERSION = 2
+CATALOGUE_DATABASE_SCHEMA_VERSION = 3
 CATALOGUE_SCHEMA_MARKER = "catalogue_schema"
 CATALOGUE_DIRECTORY_MODE = 0o700
 CATALOGUE_SQLITE_MODE = 0o600
@@ -68,6 +77,8 @@ CATALOGUE_REQUIRED_TABLES = {
     "catalogue_neighbor_history",
     "catalogue_skill_judgements",
     "catalogue_skill_judgement_history",
+    "catalogue_world_placement_judgements",
+    "catalogue_world_placement_history",
 }
 
 DatabaseRow: TypeAlias = Mapping[str, Any] | sqlite3.Row
@@ -420,6 +431,62 @@ def _migration_v1(connection: sqlite3.Connection) -> None:
           UNIQUE (run_id, skill_id, revision),
           FOREIGN KEY (run_id) REFERENCES catalogue_runs(run_id)
         );
+
+        CREATE TABLE IF NOT EXISTS catalogue_world_placement_history (
+          event_id TEXT PRIMARY KEY,
+          run_id TEXT NOT NULL,
+          item_id TEXT NOT NULL,
+          content_version TEXT NOT NULL,
+          ontology_version TEXT NOT NULL,
+          ontology_sha256 TEXT NOT NULL,
+          layout_version TEXT NOT NULL,
+          presented_realm_id TEXT,
+          presented_district_id TEXT,
+          selected_realm_id TEXT,
+          selected_district_id TEXT,
+          verdict TEXT NOT NULL,
+          revision INTEGER NOT NULL CHECK (revision >= 1),
+          etag TEXT NOT NULL UNIQUE,
+          prior_event_id TEXT,
+          reviewer_id TEXT NOT NULL,
+          reviewed_at TEXT NOT NULL,
+          schema_version TEXT NOT NULL,
+          judgement_json TEXT NOT NULL,
+          UNIQUE (run_id, item_id, layout_version, revision),
+          FOREIGN KEY (run_id, item_id)
+            REFERENCES catalogue_items(run_id, item_id),
+          FOREIGN KEY (prior_event_id)
+            REFERENCES catalogue_world_placement_history(event_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS catalogue_world_placement_judgements (
+          run_id TEXT NOT NULL,
+          item_id TEXT NOT NULL,
+          content_version TEXT NOT NULL,
+          ontology_version TEXT NOT NULL,
+          ontology_sha256 TEXT NOT NULL,
+          layout_version TEXT NOT NULL,
+          presented_realm_id TEXT,
+          presented_district_id TEXT,
+          selected_realm_id TEXT,
+          selected_district_id TEXT,
+          verdict TEXT NOT NULL,
+          revision INTEGER NOT NULL CHECK (revision >= 1),
+          etag TEXT NOT NULL UNIQUE,
+          event_id TEXT NOT NULL UNIQUE,
+          prior_event_id TEXT,
+          reviewer_id TEXT NOT NULL,
+          reviewed_at TEXT NOT NULL,
+          schema_version TEXT NOT NULL,
+          judgement_json TEXT NOT NULL,
+          PRIMARY KEY (run_id, item_id, layout_version),
+          FOREIGN KEY (run_id, item_id)
+            REFERENCES catalogue_items(run_id, item_id),
+          FOREIGN KEY (event_id)
+            REFERENCES catalogue_world_placement_history(event_id),
+          FOREIGN KEY (prior_event_id)
+            REFERENCES catalogue_world_placement_history(event_id)
+        );
         """
     )
     connection.execute(
@@ -435,7 +502,75 @@ def _migration_v2(connection: sqlite3.Connection) -> None:
     )
     connection.execute(
         "UPDATE catalogue_schema SET version=?, applied_at=? WHERE singleton=1",
-        (CATALOGUE_DATABASE_SCHEMA_VERSION, _utc_text(datetime.now(timezone.utc))),
+        (2, _utc_text(datetime.now(timezone.utc))),
+    )
+
+
+def _migration_v3(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        BEGIN IMMEDIATE;
+
+        CREATE TABLE IF NOT EXISTS catalogue_world_placement_history (
+          event_id TEXT PRIMARY KEY,
+          run_id TEXT NOT NULL,
+          item_id TEXT NOT NULL,
+          content_version TEXT NOT NULL,
+          ontology_version TEXT NOT NULL,
+          ontology_sha256 TEXT NOT NULL,
+          layout_version TEXT NOT NULL,
+          presented_realm_id TEXT,
+          presented_district_id TEXT,
+          selected_realm_id TEXT,
+          selected_district_id TEXT,
+          verdict TEXT NOT NULL,
+          revision INTEGER NOT NULL CHECK (revision >= 1),
+          etag TEXT NOT NULL UNIQUE,
+          prior_event_id TEXT,
+          reviewer_id TEXT NOT NULL,
+          reviewed_at TEXT NOT NULL,
+          schema_version TEXT NOT NULL,
+          judgement_json TEXT NOT NULL,
+          UNIQUE (run_id, item_id, layout_version, revision),
+          FOREIGN KEY (run_id, item_id)
+            REFERENCES catalogue_items(run_id, item_id),
+          FOREIGN KEY (prior_event_id)
+            REFERENCES catalogue_world_placement_history(event_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS catalogue_world_placement_judgements (
+          run_id TEXT NOT NULL,
+          item_id TEXT NOT NULL,
+          content_version TEXT NOT NULL,
+          ontology_version TEXT NOT NULL,
+          ontology_sha256 TEXT NOT NULL,
+          layout_version TEXT NOT NULL,
+          presented_realm_id TEXT,
+          presented_district_id TEXT,
+          selected_realm_id TEXT,
+          selected_district_id TEXT,
+          verdict TEXT NOT NULL,
+          revision INTEGER NOT NULL CHECK (revision >= 1),
+          etag TEXT NOT NULL UNIQUE,
+          event_id TEXT NOT NULL UNIQUE,
+          prior_event_id TEXT,
+          reviewer_id TEXT NOT NULL,
+          reviewed_at TEXT NOT NULL,
+          schema_version TEXT NOT NULL,
+          judgement_json TEXT NOT NULL,
+          PRIMARY KEY (run_id, item_id, layout_version),
+          FOREIGN KEY (run_id, item_id)
+            REFERENCES catalogue_items(run_id, item_id),
+          FOREIGN KEY (event_id)
+            REFERENCES catalogue_world_placement_history(event_id),
+          FOREIGN KEY (prior_event_id)
+            REFERENCES catalogue_world_placement_history(event_id)
+        );
+        """
+    )
+    connection.execute(
+        "UPDATE catalogue_schema SET version=?, applied_at=? WHERE singleton=1",
+        (3, _utc_text(datetime.now(timezone.utc))),
     )
 
 
@@ -512,11 +647,26 @@ def migrate_catalogue_database(
                 except Exception:
                     connection.rollback()
                     raise
-                version = CATALOGUE_DATABASE_SCHEMA_VERSION
+                version = 2
+            if version == 2:
+                try:
+                    _migration_v3(connection)
+                    connection.commit()
+                except Exception:
+                    connection.rollback()
+                    raise
+                version = 3
             if version < CATALOGUE_DATABASE_SCHEMA_VERSION:
                 raise ValueError(
                     f"no migration path from catalogue schema {version} is available"
                 )
+            tables = {
+                str(table[0])
+                for table in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+                if not str(table[0]).startswith("sqlite_")
+            }
             missing = CATALOGUE_REQUIRED_TABLES - tables
             if missing:
                 raise ValueError(
@@ -836,6 +986,19 @@ class CatalogueRepository:
             etag=str(row["etag"]),
             event_id=str(row["event_id"]),
             judgement=CatalogueSkillJudgement.model_validate(
+                json.loads(row["judgement_json"])
+            ),
+        )
+
+    @staticmethod
+    def _world_placement_from_row(
+        row: DatabaseRow,
+    ) -> CatalogueWorldPlacementRecord:
+        return CatalogueWorldPlacementRecord(
+            revision=int(row["revision"]),
+            etag=str(row["etag"]),
+            event_id=str(row["event_id"]),
+            judgement=CatalogueWorldPlacementJudgement.model_validate(
                 json.loads(row["judgement_json"])
             ),
         )
@@ -1366,6 +1529,262 @@ class CatalogueRepository:
             judgement=judgement,
         )
 
+    def current_world_placement_judgement(
+        self,
+        run_id: str,
+        item_id: str,
+        layout_version: str = GRADE12_WORLD_LAYOUT_VERSION,
+    ) -> CatalogueWorldPlacementRecord | None:
+        with self._lock:
+            row = self._connection.execute(
+                """
+                SELECT * FROM catalogue_world_placement_judgements
+                WHERE run_id=? AND item_id=? AND layout_version=?
+                """,
+                (run_id, item_id, layout_version),
+            ).fetchone()
+        return None if row is None else self._world_placement_from_row(row)
+
+    def list_world_placement_judgements(
+        self,
+        run_id: str,
+        *,
+        layout_version: str | None = None,
+    ) -> tuple[CatalogueWorldPlacementRecord, ...]:
+        values: tuple[str, ...]
+        if layout_version is None:
+            clause = ""
+            values = (run_id,)
+        else:
+            clause = " AND layout_version=?"
+            values = (run_id, layout_version)
+        with self._lock:
+            rows = self._connection.execute(
+                """
+                SELECT * FROM catalogue_world_placement_judgements
+                WHERE run_id=?
+                """
+                + clause
+                + " ORDER BY item_id, layout_version",
+                values,
+            ).fetchall()
+        return tuple(self._world_placement_from_row(row) for row in rows)
+
+    def world_placement_judgement_history(
+        self,
+        run_id: str,
+        item_id: str,
+        layout_version: str = GRADE12_WORLD_LAYOUT_VERSION,
+    ) -> tuple[CatalogueWorldPlacementRecord, ...]:
+        with self._lock:
+            rows = self._connection.execute(
+                """
+                SELECT * FROM catalogue_world_placement_history
+                WHERE run_id=? AND item_id=? AND layout_version=?
+                ORDER BY revision
+                """,
+                (run_id, item_id, layout_version),
+            ).fetchall()
+        return tuple(self._world_placement_from_row(row) for row in rows)
+
+    @staticmethod
+    def _validate_world_location(
+        realm_id: str | None,
+        district_id: str | None,
+        *,
+        label: str,
+    ) -> None:
+        if realm_id is None and district_id is None:
+            return
+        if realm_id is None or district_id is None:
+            raise ValueError(f"{label} realm and district must be set as a pair")
+        if not is_grade12_curricular_location(realm_id, district_id):
+            raise ValueError(f"invalid Grades 1–2 {label} curricular location")
+
+    def save_world_placement_judgement(
+        self,
+        judgement: CatalogueWorldPlacementJudgement,
+        expected_revision: int,
+        *,
+        expected_etag: str | None = None,
+    ) -> CatalogueWorldPlacementRecord:
+        if expected_revision < 0:
+            raise ValueError("expected_revision cannot be negative")
+        if (
+            judgement.ontology_version != GRADE12_WORLD_ONTOLOGY_VERSION
+            or judgement.ontology_sha256 != grade12_world_ontology_checksum()
+        ):
+            raise ValueError(
+                "world placement does not match the current Grades 1–2 ontology"
+            )
+        if judgement.layout_version != GRADE12_WORLD_LAYOUT_VERSION:
+            raise ValueError(
+                "world placement does not match the current Grades 1–2 layout"
+            )
+        self._validate_world_location(
+            judgement.presented_realm_id,
+            judgement.presented_district_id,
+            label="presented",
+        )
+        self._validate_world_location(
+            judgement.selected_realm_id,
+            judgement.selected_district_id,
+            label="selected",
+        )
+
+        key = (judgement.run_id, judgement.item_id, judgement.layout_version)
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                item = self._connection.execute(
+                    """
+                    SELECT content_version, grade_band FROM catalogue_items
+                    WHERE run_id=? AND item_id=?
+                    """,
+                    (judgement.run_id, judgement.item_id),
+                ).fetchone()
+                if item is None:
+                    raise ValueError("world placement references an unknown item")
+                if str(item["content_version"]) != judgement.content_version:
+                    raise ValueError(
+                        "world-placement content version is stale or incorrect"
+                    )
+                if str(item["grade_band"]) != "1-2":
+                    raise ValueError(
+                        "world placement is available only for Grades 1–2 items"
+                    )
+
+                current = self._connection.execute(
+                    """
+                    SELECT revision, etag, event_id
+                    FROM catalogue_world_placement_judgements
+                    WHERE run_id=? AND item_id=? AND layout_version=?
+                    """,
+                    key,
+                ).fetchone()
+                current_revision = 0 if current is None else int(current["revision"])
+                if current_revision != expected_revision:
+                    raise CatalogueReviewConflict(
+                        f"expected revision {expected_revision}, current revision is "
+                        f"{current_revision}"
+                    )
+                current_etag = None if current is None else str(current["etag"])
+                if expected_etag is not None and expected_etag != current_etag:
+                    raise CatalogueReviewConflict(
+                        "world-placement judgement ETag does not match"
+                    )
+                current_event_id = None if current is None else str(current["event_id"])
+                if judgement.prior_event_id != current_event_id:
+                    raise CatalogueReviewConflict(
+                        "world-placement prior event does not match"
+                    )
+
+                revision = current_revision + 1
+                judgement_json = _canonical_json(judgement)
+                event_payload = {
+                    "kind": "catalogue_world_placement_judgement",
+                    "revision": revision,
+                    "judgement": json.loads(judgement_json),
+                }
+                event_id = _sha256_json(event_payload)
+                etag = _sha256_json({"event_id": event_id, "revision": revision})
+                reviewed_at = _utc_text(judgement.reviewed_at)
+                history_values = (
+                    event_id,
+                    judgement.run_id,
+                    judgement.item_id,
+                    judgement.content_version,
+                    judgement.ontology_version,
+                    judgement.ontology_sha256,
+                    judgement.layout_version,
+                    judgement.presented_realm_id,
+                    judgement.presented_district_id,
+                    judgement.selected_realm_id,
+                    judgement.selected_district_id,
+                    judgement.verdict.value,
+                    revision,
+                    etag,
+                    judgement.prior_event_id,
+                    judgement.reviewer_id,
+                    reviewed_at,
+                    judgement.schema_version,
+                    judgement_json,
+                )
+                self._connection.execute(
+                    """
+                    INSERT INTO catalogue_world_placement_history(
+                      event_id, run_id, item_id, content_version,
+                      ontology_version, ontology_sha256, layout_version,
+                      presented_realm_id, presented_district_id,
+                      selected_realm_id, selected_district_id, verdict,
+                      revision, etag, prior_event_id, reviewer_id, reviewed_at,
+                      schema_version, judgement_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    history_values,
+                )
+                projection_values = (
+                    judgement.run_id,
+                    judgement.item_id,
+                    judgement.content_version,
+                    judgement.ontology_version,
+                    judgement.ontology_sha256,
+                    judgement.layout_version,
+                    judgement.presented_realm_id,
+                    judgement.presented_district_id,
+                    judgement.selected_realm_id,
+                    judgement.selected_district_id,
+                    judgement.verdict.value,
+                    revision,
+                    etag,
+                    event_id,
+                    judgement.prior_event_id,
+                    judgement.reviewer_id,
+                    reviewed_at,
+                    judgement.schema_version,
+                    judgement_json,
+                )
+                self._connection.execute(
+                    """
+                    INSERT INTO catalogue_world_placement_judgements(
+                      run_id, item_id, content_version, ontology_version,
+                      ontology_sha256, layout_version, presented_realm_id,
+                      presented_district_id, selected_realm_id,
+                      selected_district_id, verdict, revision, etag, event_id,
+                      prior_event_id, reviewer_id, reviewed_at, schema_version,
+                      judgement_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(run_id, item_id, layout_version) DO UPDATE SET
+                      content_version=excluded.content_version,
+                      ontology_version=excluded.ontology_version,
+                      ontology_sha256=excluded.ontology_sha256,
+                      presented_realm_id=excluded.presented_realm_id,
+                      presented_district_id=excluded.presented_district_id,
+                      selected_realm_id=excluded.selected_realm_id,
+                      selected_district_id=excluded.selected_district_id,
+                      verdict=excluded.verdict,
+                      revision=excluded.revision,
+                      etag=excluded.etag,
+                      event_id=excluded.event_id,
+                      prior_event_id=excluded.prior_event_id,
+                      reviewer_id=excluded.reviewer_id,
+                      reviewed_at=excluded.reviewed_at,
+                      schema_version=excluded.schema_version,
+                      judgement_json=excluded.judgement_json
+                    """,
+                    projection_values,
+                )
+                self._connection.commit()
+            except Exception:
+                self._connection.rollback()
+                raise
+        return CatalogueWorldPlacementRecord(
+            revision=revision,
+            etag=etag,
+            event_id=event_id,
+            judgement=judgement,
+        )
+
     def _all_joined_rows(self, run_id: str) -> list[sqlite3.Row]:
         with self._lock:
             return self._connection.execute(
@@ -1783,6 +2202,31 @@ class CatalogueRepository:
                 )
             )
 
+        world_placement_evidence = []
+        for placement_record in self.list_world_placement_judgements(run_id):
+            placement = placement_record.judgement
+            world_placement_evidence.append(
+                CatalogueWorldPlacementEvidence(
+                    item_id=placement.item_id,
+                    content_version=placement.content_version,
+                    ontology_version=placement.ontology_version,
+                    ontology_sha256=placement.ontology_sha256,
+                    layout_version=placement.layout_version,
+                    presented_realm_id=placement.presented_realm_id,
+                    presented_district_id=placement.presented_district_id,
+                    selected_realm_id=placement.selected_realm_id,
+                    selected_district_id=placement.selected_district_id,
+                    verdict=placement.verdict,
+                    revision=placement_record.revision,
+                    etag=placement_record.etag,
+                    event_id=placement_record.event_id,
+                    prior_event_id=placement.prior_event_id,
+                    reviewer_id=placement.reviewer_id,
+                    reviewed_at=placement.reviewed_at,
+                    schema_version=placement.schema_version,
+                )
+            )
+
         payload = CatalogueEvidenceExport(
             schema_version=CATALOGUE_EVIDENCE_EXPORT_VERSION,
             generated_at=datetime.now(timezone.utc),
@@ -1791,5 +2235,6 @@ class CatalogueRepository:
             reviews=tuple(reviews),
             neighbor_judgements=tuple(neighbor_evidence),
             skill_judgements=tuple(skill_evidence),
+            world_placement_judgements=tuple(world_placement_evidence),
         )
         return payload.model_dump(mode="json")

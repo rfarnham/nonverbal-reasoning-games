@@ -133,20 +133,53 @@ GET  /api/catalogue/taxonomy
 PUT  /api/catalogue/taxonomy/skills/{skill_id}/review
 GET  /api/catalogue/items/{item_id}/neighbors
 PUT  /api/catalogue/items/{item_id}/neighbors/{neighbor_id}/review
+GET  /api/catalogue/world-layout
+GET  /api/catalogue/items/{item_id}/world-placement
+PUT  /api/catalogue/items/{item_id}/world-placement
 GET  /api/catalogue/map?view={surface|tag|hybrid}&item_id={optional_stable_id}
 POST /api/catalogue/explore
 POST /api/catalogue/recommendations/preview
 GET  /api/catalogue/export
 ```
 
-The Problem Space explorer requests a compact, content-minimized two-dimensional
-projection from `map`. Every mapped point supplies a stable item ID, finite `x`
-and `y` coordinates, grade band, published point tier, primary domain, question
-type, and optional cluster and review/proposal state. A tagless item is returned
-as explicitly unmapped in Proposed taxonomy view rather than placed at a fake
-origin. The response identifies its actual projection method, version, measured
-neighbor preservation, and non-authoritative cluster evidence; the UI does not
-infer or rename the method.
+### Grades 1–2 World / Play QA
+
+`world-layout` returns the versioned six-realm hex layout and a content-minimized
+inventory of eligible Grades 1–2 questions. Realm and district coordinates are
+authored curriculum navigation; semantic distance does not position them. The
+realms are Number & Operations, Patterns & Relationships, Logic & Constraints,
+Possibilities & Combinatorics, Shape & Space, and Measurement & Time. Crossroads
+is the search and random-question launch point. Question Heaven is a
+presentation-only queue for unresolved or not-yet-structured questions and can
+never be saved as a curricular realm or district.
+
+The play view lazy-loads the ordinary item detail route so it can render the
+complete prompt, question-scoped images, and answer choices. For a structured
+four- or five-choice item, it randomizes the answer order and relabels the
+displayed choices A–E; the permutation is saved with local progress so reloads
+resume the same question exactly. If choices are only available inside the
+source image, the fallback renders the complete crop and keeps the source A–E
+order. Local storage also retains seen and solved IDs, first-try results, realm
+and district selection, and semantic-walk state. A blocked or corrupt local
+store does not prevent the current tab from working.
+
+World-placement writes use optimistic `If-Match` revisions and include the
+item `content_version`, world `layout_version`, the presented proposal, one of
+`fits`, `change`, `unsure`, or `skip`, and any selected curricular realm and
+district. `fits` and `change` establish the effective district; `unsure` routes
+the item back to Heaven; `skip` leaves the proposal available for a later pass.
+Every write appends immutable evidence while updating the current projection,
+so a teacher can change an approval later without rewriting its history.
+
+The Surface, Proposed taxonomy, and Hybrid UMAP views remain available as
+diagnostics beneath the authored world. The `map` endpoint returns a compact,
+content-minimized two-dimensional projection. Every mapped point supplies a
+stable item ID, finite `x` and `y` coordinates, grade band, published point
+tier, primary domain, question type, and optional cluster and review/proposal
+state. A tagless item is returned as explicitly unmapped in Proposed taxonomy
+view rather than placed at a fake origin. The response identifies its actual
+projection method, version, measured neighbor preservation, and
+non-authoritative cluster evidence; the UI does not infer or rename the method.
 
 Arbitrary pasted question text is sent only in the JSON body of `explore`:
 
@@ -163,11 +196,11 @@ text has no proposal-tag vector; Hybrid renormalizes over its available Surface
 evidence. Walking from a resolved question reuses the existing item-neighbor
 route. Unsupported or low-signal pasted text returns no confident matches.
 
-Question, neighbor, and skill judgements use optimistic `If-Match` revisions
-and append-only history. The export uses an explicit allowlist and contains no
-prompt, choice, answer, asset, URL, or filesystem-path fields. Similarity and
-recommendation responses are labelled experimental; they cannot approve an
-ontology, infer mastery, or authorize public release. Recommendation evidence
-separately identifies a machine proposal, a teacher classification, and an
-explicit curriculum approval; deterministic rank scores are not reported as
-selection probabilities.
+Question, world-placement, neighbor, and skill judgements use optimistic
+`If-Match` revisions and append-only history. The export uses an explicit
+allowlist and contains no prompt, choice, answer, asset, URL, or filesystem-path
+fields. Similarity and recommendation responses are labelled experimental;
+they cannot approve an ontology, infer mastery, or authorize public release.
+Recommendation evidence separately identifies a machine proposal, a teacher
+classification, and an explicit curriculum approval; deterministic rank scores
+are not reported as selection probabilities.

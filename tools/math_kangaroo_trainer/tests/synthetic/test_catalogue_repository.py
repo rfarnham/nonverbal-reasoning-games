@@ -10,6 +10,11 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from math_kangaroo_trainer.curriculum.grade12_world import (
+    GRADE12_WORLD_LAYOUT_VERSION,
+    GRADE12_WORLD_ONTOLOGY_VERSION,
+    grade12_world_ontology_checksum,
+)
 from math_kangaroo_trainer.domain.catalogue_reviews import (
     CatalogueAssetReference,
     CatalogueClassification,
@@ -24,12 +29,14 @@ from math_kangaroo_trainer.domain.catalogue_reviews import (
     CatalogueSourceMetadata,
     CatalogueTeacherReview,
     CatalogueVocabulary,
+    CatalogueWorldPlacementJudgement,
     GradeAppropriateness,
     NeighborJudgementValue,
     PrimaryDomain,
     QuestionType,
     TaxonomySkillDecision,
     TeacherDifficulty,
+    WorldPlacementVerdict,
     catalogue_inventory_snapshot_sha256,
 )
 from math_kangaroo_trainer.storage.catalogue_repository import (
@@ -220,6 +227,37 @@ def review(
         curriculum_approved=True,
         release_asset_approved=True,
         duplicate_resolved=True,
+        notes=notes,
+        reviewed_at=reviewed_at,
+    )
+
+
+def world_placement(
+    *,
+    item_record: CatalogueInventoryItem,
+    verdict: WorldPlacementVerdict = WorldPlacementVerdict.FITS,
+    presented_realm_id: str | None = "number_arithmetic",
+    presented_district_id: str | None = "count_compare",
+    selected_realm_id: str | None = "number_arithmetic",
+    selected_district_id: str | None = "count_compare",
+    prior_event_id: str | None = None,
+    reviewed_at: datetime = NOW,
+    notes: str = "PRIVATE WORLD PLACEMENT NOTE SENTINEL",
+) -> CatalogueWorldPlacementJudgement:
+    return CatalogueWorldPlacementJudgement(
+        run_id="catalogue-test-run",
+        item_id=item_record.item_id,
+        content_version=item_record.content_version,
+        ontology_version=GRADE12_WORLD_ONTOLOGY_VERSION,
+        ontology_sha256=grade12_world_ontology_checksum(),
+        layout_version=GRADE12_WORLD_LAYOUT_VERSION,
+        presented_realm_id=presented_realm_id,
+        presented_district_id=presented_district_id,
+        selected_realm_id=selected_realm_id,
+        selected_district_id=selected_district_id,
+        verdict=verdict,
+        reviewer_id="teacher-one",
+        prior_event_id=prior_event_id,
         notes=notes,
         reviewed_at=reviewed_at,
     )
@@ -439,6 +477,32 @@ def test_catalogue_schema_one_migrates_answer_key_integrity_column(
         }
     assert version == CATALOGUE_DATABASE_SCHEMA_VERSION
     assert "answer_key_ref_json" in columns
+
+
+def test_catalogue_schema_two_migrates_world_placement_history(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "catalogue-v2.sqlite3"
+    migrate_catalogue_database(database, allow_create=True)
+    with sqlite3.connect(database) as connection:
+        connection.execute("DROP TABLE catalogue_world_placement_judgements")
+        connection.execute("DROP TABLE catalogue_world_placement_history")
+        connection.execute("UPDATE catalogue_schema SET version=2 WHERE singleton=1")
+
+    migrate_catalogue_database(database)
+    with sqlite3.connect(database) as connection:
+        version = connection.execute(
+            "SELECT version FROM catalogue_schema WHERE singleton=1"
+        ).fetchone()[0]
+        tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+    assert version == CATALOGUE_DATABASE_SCHEMA_VERSION
+    assert "catalogue_world_placement_judgements" in tables
+    assert "catalogue_world_placement_history" in tables
 
 
 def test_complete_inventory_must_match_run_snapshot(tmp_path: Path) -> None:
@@ -883,6 +947,113 @@ def test_neighbor_and_skill_judgements_are_append_only_and_advisory(
     assert not hasattr(saved_skill.judgement, "ontology_approved")
 
 
+def test_world_placement_judgements_are_reversible_versioned_advisory_evidence(
+    repository: tuple[CatalogueRepository, tuple[CatalogueInventoryItem, ...]],
+) -> None:
+    repo, records = repository
+    first = repo.save_world_placement_judgement(
+        world_placement(item_record=records[0]),
+        expected_revision=0,
+    )
+    assert first.revision == 1
+    assert (
+        repo.current_world_placement_judgement("catalogue-test-run", records[0].item_id)
+        == first
+    )
+
+    with pytest.raises(CatalogueReviewConflict, match="current revision is 1"):
+        repo.save_world_placement_judgement(
+            world_placement(item_record=records[0]),
+            expected_revision=0,
+        )
+
+    changed_judgement = world_placement(
+        item_record=records[0],
+        verdict=WorldPlacementVerdict.CHANGE,
+        selected_district_id="join_separate",
+        prior_event_id=first.event_id,
+        reviewed_at=NOW + timedelta(minutes=1),
+    )
+    changed = repo.save_world_placement_judgement(
+        changed_judgement,
+        expected_revision=1,
+        expected_etag=first.etag,
+    )
+    assert changed.revision == 2
+
+    unsure_judgement = world_placement(
+        item_record=records[0],
+        verdict=WorldPlacementVerdict.UNSURE,
+        selected_realm_id=None,
+        selected_district_id=None,
+        prior_event_id=changed.event_id,
+        reviewed_at=NOW + timedelta(minutes=2),
+    )
+    unsure = repo.save_world_placement_judgement(
+        unsure_judgement,
+        expected_revision=2,
+        expected_etag=changed.etag,
+    )
+    assert unsure.revision == 3
+    history = repo.world_placement_judgement_history(
+        "catalogue-test-run", records[0].item_id
+    )
+    assert [entry.judgement.verdict for entry in history] == [
+        WorldPlacementVerdict.FITS,
+        WorldPlacementVerdict.CHANGE,
+        WorldPlacementVerdict.UNSURE,
+    ]
+    assert [entry.judgement.prior_event_id for entry in history] == [
+        None,
+        first.event_id,
+        changed.event_id,
+    ]
+
+    # The UI's Heaven queue is represented by a null presented pair. A teacher
+    # can move that item only to a real, validated curricular location.
+    from_heaven = world_placement(
+        item_record=records[1],
+        verdict=WorldPlacementVerdict.CHANGE,
+        presented_realm_id=None,
+        presented_district_id=None,
+        selected_realm_id="geometry_spatial",
+        selected_district_id="position_direction",
+    )
+    saved_from_heaven = repo.save_world_placement_judgement(
+        from_heaven,
+        expected_revision=0,
+    )
+    assert saved_from_heaven.judgement.presented_realm_id is None
+    assert saved_from_heaven.judgement.selected_realm_id == "geometry_spatial"
+
+    detail = repo.item("catalogue-test-run", records[0].item_id)
+    assert detail is not None
+    assert detail.current_review is None
+    assert "TEACHER_REVIEW_MISSING" in detail.promotion.curriculum_blockers
+
+    invalid_heaven = world_placement(
+        item_record=records[1],
+        presented_realm_id="heaven",
+        presented_district_id="count_compare",
+        selected_realm_id="heaven",
+        selected_district_id="count_compare",
+    )
+    with pytest.raises(ValueError, match="invalid Grades 1–2 presented"):
+        repo.save_world_placement_judgement(invalid_heaven, expected_revision=1)
+
+    with pytest.raises(ValueError, match="only for Grades 1–2"):
+        repo.save_world_placement_judgement(
+            world_placement(item_record=records[2]),
+            expected_revision=0,
+        )
+
+    stale = world_placement(item_record=records[1]).model_copy(
+        update={"content_version": content_version("f")}
+    )
+    with pytest.raises(ValueError, match="content version is stale"):
+        repo.save_world_placement_judgement(stale, expected_revision=1)
+
+
 def test_evidence_export_is_structurally_unable_to_emit_private_content(
     repository: tuple[CatalogueRepository, tuple[CatalogueInventoryItem, ...]],
 ) -> None:
@@ -916,6 +1087,8 @@ def test_evidence_export_is_structurally_unable_to_emit_private_content(
         reviewed_at=NOW,
     )
     repo.save_skill_judgement(skill, expected_revision=0)
+    placement = world_placement(item_record=records[0])
+    repo.save_world_placement_judgement(placement, expected_revision=0)
 
     payload = repo.export_evidence("catalogue-test-run")
     encoded = json.dumps(payload, sort_keys=True)
@@ -923,6 +1096,12 @@ def test_evidence_export_is_structurally_unable_to_emit_private_content(
     assert len(payload["reviews"]) == 1
     assert len(payload["neighbor_judgements"]) == 1
     assert len(payload["skill_judgements"]) == 1
+    assert len(payload["world_placement_judgements"]) == 1
+    assert payload["schema_version"] == "catalogue-evidence-export.v2"
+    assert payload["world_placement_judgements"][0]["verdict"] == "fits"
+    assert payload["world_placement_judgements"][0]["selected_district_id"] == (
+        "count_compare"
+    )
     for forbidden in (
         "PRIVATE STEM SENTINEL",
         "PRIVATE CHOICE SENTINEL",
@@ -933,6 +1112,7 @@ def test_evidence_export_is_structurally_unable_to_emit_private_content(
         "PRIVATE NEIGHBOR NOTE SENTINEL",
         "PRIVATE SKILL NOTE SENTINEL",
         "PRIVATE SKILL PROPOSAL SENTINEL",
+        "PRIVATE WORLD PLACEMENT NOTE SENTINEL",
         "source_payload",
         "learner_payload",
         "protected_payload",

@@ -10,6 +10,7 @@
     />
     <title>Math Kangaroo · Private Corpus QA</title>
     <link rel="stylesheet" href="./catalogue.css" />
+    <script src="./world-qa.js" defer></script>
     <script src="./catalogue.js" defer></script>
   </head>
   <body>
@@ -82,16 +83,16 @@
         Similarity Lab
       </button>
       <button
-        id="problem-space-tab"
+        id="world-tab"
         class="view-tab"
         type="button"
         role="tab"
-        aria-controls="problem-space-view"
+        aria-controls="world-view"
         aria-selected="false"
         tabindex="-1"
-        data-view="problem-space"
+        data-view="world"
       >
-        Problem Space
+        World / Play QA
       </button>
       <button
         id="curriculum-tab"
@@ -643,65 +644,104 @@
       </section>
 
       <section
-        id="problem-space-view"
-        class="catalogue-view problem-space-view"
+        id="world-view"
+        class="catalogue-view problem-space-view world-qa-view"
         role="tabpanel"
-        aria-labelledby="problem-space-tab"
-        data-testid="problem-space-view"
+        aria-labelledby="world-tab"
+        data-testid="world-view"
         hidden
       >
-        <header class="section-intro">
+        <div id="problem-space-view" class="world-qa-legacy-surface">
+        <header class="section-intro world-qa-intro">
           <div>
-            <p class="eyebrow">Whole-corpus semantic exploration</p>
-            <h2>Problem Space</h2>
+            <p class="eyebrow">Grades 1–2 · teacher play test</p>
+            <h2>Walk the problem world</h2>
             <p>
-              Start from any question, then walk its nearby questions one step at a time or
-              inspect where all questions sit on the provisional two-dimensional map.
+              Choose a realm, play one complete question, then make one quick curriculum
+              judgment. Exact semantic neighbors remain available as trails between realms.
             </p>
           </div>
-          <span class="experimental-badge">Exploratory retrieval · not mastery</span>
+          <div class="world-qa-intro-actions">
+            <button
+              id="world-sound-toggle"
+              class="world-sound-toggle"
+              type="button"
+              aria-pressed="true"
+              aria-label="Turn sound off"
+              data-storage-key="spatial-gym-sound"
+            >
+              <span class="world-sound-icon" aria-hidden="true">♪</span>
+              <span id="world-sound-label">Sound on</span>
+            </button>
+            <span class="experimental-badge">Private QA · proposals are provisional</span>
+          </div>
         </header>
 
-        <aside class="experiment-notice" role="note">
-          <strong>Proximity is a review prompt.</strong>
-          <span>
-            The map compresses retrieval evidence into two dimensions. Nearby points may share
-            words, proposed tags, or both; distance does not establish strategy, difficulty, or
-            instructional order. Teacher review remains authoritative.
-          </span>
-        </aside>
+        <section class="world-qa-progress" aria-labelledby="world-qa-progress-heading">
+          <div>
+            <p class="eyebrow">This pass</p>
+            <h3 id="world-qa-progress-heading">
+              <span id="world-qa-progress-count">0</span>
+              <span class="sr-only">of</span>
+              <span aria-hidden="true">/</span>
+              <span id="world-qa-progress-total">381</span>
+              <span>checked</span>
+            </h3>
+          </div>
+          <progress
+            id="world-qa-progress-bar"
+            max="381"
+            value="0"
+            aria-label="Grades 1–2 play QA progress"
+          >
+            0 of 381
+          </progress>
+          <p id="world-qa-progress-label" role="status" aria-live="polite">
+            Choose any realm or let Crossroads pick a question.
+          </p>
+          <p id="world-qa-storage-status" class="world-qa-storage-status" role="status">
+            Checking local resume…
+          </p>
+        </section>
 
-        <form id="problem-space-search" class="problem-space-search" role="search">
+        <form
+          id="problem-space-search"
+          class="problem-space-search world-qa-launcher"
+          role="search"
+        >
           <label class="problem-query-field" for="problem-space-query">
-            <span>Question ID or text</span>
+            <span>Jump to a question</span>
             <textarea
               id="problem-space-query"
               name="q"
               rows="2"
               autocomplete="off"
-              placeholder="Paste a stable ID or a distinctive phrase from the question"
+              placeholder="Paste a question ID or a distinctive phrase"
             ></textarea>
-          </label>
-          <label for="problem-space-view-select">
-            <span>Neighbor evidence</span>
-            <select id="problem-space-view-select" name="view">
-              <option value="hybrid" selected>Hybrid evidence</option>
-              <option value="surface">Surface similarity</option>
-              <option value="tag">Proposed-tag similarity</option>
-            </select>
           </label>
           <div class="problem-search-actions">
             <button id="problem-space-random" class="button button-secondary" type="button">
-              Random question
+              Surprise me
             </button>
             <button id="problem-space-submit" class="button button-primary" type="submit">
-              Find and explore
+              Open question
             </button>
           </div>
-          <p id="problem-space-query-note" class="problem-query-note" role="status">
-            Pasted text can use Surface or Hybrid evidence. Proposed-tag evidence requires a
-            stable question ID.
-          </p>
+          <details id="world-qa-search-details" class="world-qa-details world-qa-search-details">
+            <summary>Search and neighbor settings</summary>
+            <label for="problem-space-view-select">
+              <span>Neighbor evidence</span>
+              <select id="problem-space-view-select" name="view">
+                <option value="hybrid">Hybrid evidence</option>
+                <option value="surface" selected>Surface similarity</option>
+                <option value="tag">Proposed-tag similarity</option>
+              </select>
+            </label>
+            <p id="problem-space-query-note" class="problem-query-note" role="status">
+              Pasted text can use Surface or Hybrid evidence. Proposed-tag evidence requires a
+              stable question ID.
+            </p>
+          </details>
         </form>
 
         <div id="problem-space-error" class="inline-error" role="alert" hidden></div>
@@ -725,35 +765,397 @@
         </section>
 
         <div id="problem-space-map-loading" class="loading-panel" role="status" hidden>
-          Plotting the complete local corpus…
+          Preparing the Grades 1–2 world…
         </div>
 
-        <div id="problem-space-workspace" class="problem-space-workspace" hidden>
-          <section class="panel problem-trail-panel" aria-labelledby="problem-trail-heading">
-            <header class="problem-trail-header">
-              <div>
-                <p class="eyebrow">Step-by-step path</p>
-                <h3 id="problem-trail-heading">Exploration trail</h3>
-              </div>
-              <div class="problem-trail-actions" aria-label="Trail navigation">
-                <button id="problem-trail-back" class="button button-secondary" type="button" disabled>
-                  ← Back
-                </button>
-                <span id="problem-trail-position" role="status">No question selected</span>
-                <button id="problem-trail-forward" class="button button-secondary" type="button" disabled>
-                  Forward →
-                </button>
-              </div>
-            </header>
-            <ol id="problem-trail-list" class="problem-trail-list" aria-label="Visited questions"></ol>
-          </section>
+        <div
+          id="problem-space-workspace"
+          class="problem-space-workspace world-qa-workspace"
+          hidden
+        >
+          <div class="world-play-layout">
+            <section class="world-map-shell" aria-labelledby="world-map-heading">
+              <header class="world-map-heading-row">
+                <div>
+                  <p class="eyebrow">Curriculum geography</p>
+                  <h3 id="world-map-heading">Grades 1–2 world</h3>
+                </div>
+                <p id="world-map-selection" role="status" aria-live="polite">
+                  All realms
+                </p>
+              </header>
 
-          <div class="problem-space-grid">
-            <section class="panel corpus-map-panel" aria-labelledby="corpus-map-heading">
+              <aside id="world-heaven" class="world-heaven" aria-labelledby="world-heaven-heading">
+                <div aria-hidden="true" class="world-heaven-mark">?</div>
+                <div>
+                  <p class="eyebrow">Question Heaven</p>
+                  <h4 id="world-heaven-heading">Questions waiting for a home</h4>
+                  <p>Review unresolved, unplaced, or source-order questions before they enter a realm.</p>
+                </div>
+                <button id="world-heaven-open" class="button button-secondary" type="button">
+                  Open Heaven
+                  <span id="world-heaven-count" class="world-count" aria-label="0 questions">0</span>
+                </button>
+              </aside>
+
+              <div
+                id="world-realm-map"
+                class="world-realm-map"
+                role="group"
+                aria-label="Choose one of six Grades 1–2 curriculum realms or Crossroads"
+              >
+                <button
+                  id="world-realm-number"
+                  class="world-realm world-realm-number"
+                  type="button"
+                  data-world-realm="number_arithmetic"
+                  aria-pressed="false"
+                  aria-describedby="world-realm-number-description"
+                >
+                  <span class="world-realm-content">
+                    <strong>Number</strong>
+                    <small id="world-realm-number-description">Counting & operations</small>
+                    <span id="world-realm-number-count" class="world-count">—</span>
+                  </span>
+                </button>
+                <button
+                  id="world-realm-patterns"
+                  class="world-realm world-realm-patterns"
+                  type="button"
+                  data-world-realm="patterns_algebra"
+                  aria-pressed="false"
+                  aria-describedby="world-realm-patterns-description"
+                >
+                  <span class="world-realm-content">
+                    <strong>Patterns</strong>
+                    <small id="world-realm-patterns-description">Rules & relationships</small>
+                    <span id="world-realm-patterns-count" class="world-count">—</span>
+                  </span>
+                </button>
+                <button
+                  id="world-realm-logic"
+                  class="world-realm world-realm-logic"
+                  type="button"
+                  data-world-realm="logic_constraints"
+                  aria-pressed="false"
+                  aria-describedby="world-realm-logic-description"
+                >
+                  <span class="world-realm-content">
+                    <strong>Logic</strong>
+                    <small id="world-realm-logic-description">Clues & constraints</small>
+                    <span id="world-realm-logic-count" class="world-count">—</span>
+                  </span>
+                </button>
+                <button
+                  id="world-realm-possibilities"
+                  class="world-realm world-realm-possibilities"
+                  type="button"
+                  data-world-realm="counting_combinatorics"
+                  aria-pressed="false"
+                  aria-describedby="world-realm-possibilities-description"
+                >
+                  <span class="world-realm-content">
+                    <strong>Possibilities</strong>
+                    <small id="world-realm-possibilities-description">Ways, routes & chance</small>
+                    <span id="world-realm-possibilities-count" class="world-count">—</span>
+                  </span>
+                </button>
+                <button
+                  id="world-realm-geometry"
+                  class="world-realm world-realm-geometry"
+                  type="button"
+                  data-world-realm="geometry_spatial"
+                  aria-pressed="false"
+                  aria-describedby="world-realm-geometry-description"
+                >
+                  <span class="world-realm-content">
+                    <strong>Geometry</strong>
+                    <small id="world-realm-geometry-description">Shape & space</small>
+                    <span id="world-realm-geometry-count" class="world-count">—</span>
+                  </span>
+                </button>
+                <button
+                  id="world-realm-measurement"
+                  class="world-realm world-realm-measurement"
+                  type="button"
+                  data-world-realm="measurement_time"
+                  aria-pressed="false"
+                  aria-describedby="world-realm-measurement-description"
+                >
+                  <span class="world-realm-content">
+                    <strong>Measure</strong>
+                    <small id="world-realm-measurement-description">Length, value & time</small>
+                    <span id="world-realm-measurement-count" class="world-count">—</span>
+                  </span>
+                </button>
+                <button
+                  id="world-crossroads"
+                  class="world-crossroads"
+                  type="button"
+                  data-world-action="random"
+                  aria-describedby="world-crossroads-description"
+                >
+                  <span class="world-realm-content">
+                    <strong>Crossroads</strong>
+                    <small id="world-crossroads-description">Navigate or draw a surprise</small>
+                    <span id="world-crossroads-count" class="world-count">—</span>
+                  </span>
+                </button>
+              </div>
+
+              <p id="world-map-status" class="world-map-status" role="status" aria-live="polite">
+                Choose a realm to draw a playable question from its proposed curriculum district.
+              </p>
+              <ul class="world-map-key" aria-label="World map status key">
+                <li><span class="world-key-mark is-proposed" aria-hidden="true"></span> Proposed</li>
+                <li><span class="world-key-mark is-reviewed" aria-hidden="true">✓</span> Teacher checked</li>
+                <li><span class="world-key-mark is-unknown" aria-hidden="true">?</span> Uncharted</li>
+              </ul>
+            </section>
+
+            <section class="problem-neighborhood world-play-panel" aria-label="Problem play and QA">
+              <div id="problem-neighbor-loading" class="loading-panel" role="status" hidden>
+                Loading the complete question…
+              </div>
+              <div id="problem-selected-empty" class="empty-panel world-play-empty">
+                <span class="world-play-empty-mark" aria-hidden="true">?</span>
+                <strong>Choose where to begin</strong>
+                <p>Select a realm, use Crossroads, or choose Surprise me above.</p>
+              </div>
+              <div id="problem-neighborhood-content" hidden>
+                <article class="panel problem-selected-card world-play-card">
+                  <header class="panel-heading world-play-card-heading">
+                    <div>
+                      <p class="eyebrow">Play this problem</p>
+                      <h3 id="problem-selected-heading" tabindex="-1">Question reference</h3>
+                    </div>
+                    <code id="problem-selected-reference"></code>
+                  </header>
+                  <div
+                    id="problem-selected-question-loading"
+                    class="problem-selected-question-loading"
+                    role="status"
+                    hidden
+                  >
+                    Loading the complete question…
+                  </div>
+                  <p
+                    id="problem-selected-question-error"
+                    class="inline-error problem-selected-question-error"
+                    role="alert"
+                    hidden
+                  ></p>
+                  <div id="problem-selected-question" class="problem-selected-question" hidden>
+                    <p id="problem-selected-source" class="problem-selected-source"></p>
+                    <section aria-labelledby="problem-selected-prompt-heading">
+                      <h4 id="problem-selected-prompt-heading">Complete prompt</h4>
+                      <p id="problem-selected-prompt" class="problem-selected-prompt"></p>
+                    </section>
+                    <section
+                      id="problem-selected-assets-section"
+                      class="problem-selected-assets-section"
+                      aria-labelledby="problem-selected-assets-heading"
+                    >
+                      <h4 id="problem-selected-assets-heading">Question artwork</h4>
+                      <div id="problem-selected-assets" class="problem-selected-assets"></div>
+                    </section>
+                    <form id="world-play-answer-form" class="world-play-answer-form">
+                      <section
+                        id="problem-selected-choices-section"
+                        class="problem-selected-choices-section"
+                        aria-labelledby="problem-selected-choices-heading"
+                      >
+                        <h4 id="problem-selected-choices-heading">Choose one answer</h4>
+                        <ol
+                          id="problem-selected-choices"
+                          class="problem-selected-choices world-play-choice-list"
+                          type="A"
+                          aria-describedby="world-play-feedback"
+                        ></ol>
+                        <p
+                          id="problem-selected-choices-note"
+                          class="problem-selected-choices-note"
+                          hidden
+                        ></p>
+                      </section>
+                    </form>
+                  </div>
+
+                  <section
+                    id="world-play-feedback"
+                    class="world-play-feedback"
+                    aria-labelledby="world-play-feedback-heading"
+                    role="status"
+                    aria-live="polite"
+                    hidden
+                  >
+                    <span id="world-play-feedback-symbol" class="world-play-feedback-symbol" aria-hidden="true"></span>
+                    <div>
+                      <h4 id="world-play-feedback-heading">Answer feedback</h4>
+                      <p id="world-play-feedback-copy"></p>
+                    </div>
+                    <button id="world-play-next" class="button button-primary" type="button" hidden>
+                      Next problem <span aria-hidden="true">→</span>
+                    </button>
+                  </section>
+
+                  <details id="world-play-qa-card" class="world-play-qa-card" hidden>
+                    <summary>
+                      <span>
+                        <small>After solving</small>
+                        Does this problem fit its place in the world?
+                      </span>
+                      <span aria-hidden="true">Review</span>
+                    </summary>
+                    <div class="world-play-qa-body">
+                      <p>
+                        Judge the curriculum placement, not whether you personally liked the problem.
+                      </p>
+                      <div class="world-play-qa-actions" role="group" aria-label="Curriculum placement judgment">
+                        <button id="world-play-qa-fits" type="button" data-world-qa-decision="fits">
+                          ✓ Fits
+                        </button>
+                        <button id="world-play-qa-change" type="button" data-world-qa-decision="change">
+                          ↗ Change
+                        </button>
+                        <button id="world-play-qa-unsure" type="button" data-world-qa-decision="unsure">
+                          ? Unsure
+                        </button>
+                        <button id="world-play-qa-skip" type="button" data-world-qa-decision="skip">
+                          Skip
+                        </button>
+                      </div>
+                      <div id="world-play-qa-change-controls" class="world-play-qa-change-controls" hidden>
+                        <label for="world-play-qa-realm">
+                          <span>Better realm</span>
+                          <select id="world-play-qa-realm" name="realm">
+                            <option value="">Choose a realm</option>
+                            <option value="number_arithmetic">Number</option>
+                            <option value="patterns_algebra">Patterns</option>
+                            <option value="logic_constraints">Logic</option>
+                            <option value="counting_combinatorics">Possibilities</option>
+                            <option value="geometry_spatial">Geometry</option>
+                            <option value="measurement_time">Measure</option>
+                          </select>
+                        </label>
+                        <label for="world-play-qa-district">
+                          <span>Better district</span>
+                          <select id="world-play-qa-district" name="district" disabled>
+                            <option value="">Choose a realm first</option>
+                          </select>
+                        </label>
+                        <label for="world-play-qa-note">
+                          <span>Short reason</span>
+                          <textarea id="world-play-qa-note" name="note" rows="2" maxlength="500"></textarea>
+                        </label>
+                        <button id="world-play-qa-save-change" class="button button-primary" type="button" disabled>
+                          Save change
+                        </button>
+                      </div>
+                      <p id="world-play-qa-status" role="status" aria-live="polite"></p>
+                    </div>
+                  </details>
+
+                  <details id="world-play-question-details" class="world-qa-details world-play-question-details">
+                    <summary>Question evidence and classification</summary>
+                    <div class="problem-selected-actions">
+                      <button id="problem-review-selected" class="button button-secondary" type="button">
+                        Open full classification review
+                      </button>
+                    </div>
+                    <section
+                      id="problem-selected-language-helper"
+                      class="problem-selected-language-helper"
+                      aria-labelledby="problem-selected-language-heading"
+                      hidden
+                    >
+                      <div class="problem-selected-language-heading-row">
+                        <div>
+                          <p class="eyebrow">Translation evidence</p>
+                          <h4 id="problem-selected-language-heading">Source-language transcription</h4>
+                        </div>
+                        <span id="problem-selected-language-label" class="status-badge"></span>
+                      </div>
+                      <p class="problem-selected-language-note">
+                        The English helper appears above. Compare this transcription with the
+                        audited source image before treating it as authoritative.
+                      </p>
+                      <p id="problem-selected-source-prompt" class="problem-selected-source-prompt"></p>
+                      <ol
+                        id="problem-selected-source-choices"
+                        class="problem-selected-choices problem-selected-source-choices"
+                        type="A"
+                      ></ol>
+                      <p
+                        id="problem-selected-source-choices-note"
+                        class="problem-selected-choices-note"
+                        hidden
+                      ></p>
+                      <dl id="problem-selected-language-status" class="compact-breakdown"></dl>
+                    </section>
+                    <dl id="problem-selected-metadata" class="compact-breakdown"></dl>
+                    <div id="problem-selected-tags" class="tag-row" aria-label="Selected question tags"></div>
+                    <a
+                      id="problem-selected-source-pdf"
+                      class="problem-selected-source-pdf"
+                      href="#"
+                      target="_blank"
+                      rel="noreferrer"
+                      hidden
+                    >
+                      Inspect source PDF <span aria-hidden="true">↗</span>
+                    </a>
+                  </details>
+                </article>
+
+                <details id="world-play-neighbors-details" class="world-qa-details world-play-neighbors-details">
+                  <summary>
+                    <span>Walk to a similar problem</span>
+                    <span id="problem-neighbors-summary" role="status" aria-live="polite"></span>
+                  </summary>
+                  <header class="lab-results-heading problem-neighbors-heading">
+                    <div>
+                      <p class="eyebrow">Exact retrieval graph</p>
+                      <h3 id="problem-neighbors-heading">Nearby questions</h3>
+                    </div>
+                  </header>
+                  <ol
+                    id="problem-neighbor-list"
+                    class="problem-neighbor-list"
+                    aria-labelledby="problem-neighbors-heading"
+                  ></ol>
+                </details>
+              </div>
+            </section>
+          </div>
+
+          <details id="world-play-exploration-details" class="world-qa-details world-play-exploration-details">
+            <summary>Map and retrieval details</summary>
+            <div class="world-play-exploration-body">
+              <section class="panel problem-trail-panel" aria-labelledby="problem-trail-heading">
+                <header class="problem-trail-header">
+                  <div>
+                    <p class="eyebrow">Step-by-step path</p>
+                    <h3 id="problem-trail-heading">Exploration trail</h3>
+                  </div>
+                  <div class="problem-trail-actions" aria-label="Trail navigation">
+                    <button id="problem-trail-back" class="button button-secondary" type="button" disabled>
+                      ← Back
+                    </button>
+                    <span id="problem-trail-position" role="status">No question selected</span>
+                    <button id="problem-trail-forward" class="button button-secondary" type="button" disabled>
+                      Forward →
+                    </button>
+                  </div>
+                </header>
+                <ol id="problem-trail-list" class="problem-trail-list" aria-label="Visited questions"></ol>
+              </section>
+
+              <section class="panel corpus-map-panel" aria-labelledby="corpus-map-heading">
               <header class="panel-heading corpus-map-heading-row">
                 <div>
-                  <p class="eyebrow">Provisional 2D projection</p>
-                  <h3 id="corpus-map-heading">Corpus map</h3>
+                    <p class="eyebrow">Diagnostic projection</p>
+                    <h3 id="corpus-map-heading">Semantic evidence map</h3>
                 </div>
                 <div class="problem-map-summary">
                   <p id="problem-map-count" role="status">—</p>
@@ -856,126 +1258,9 @@
                 </div>
               </aside>
             </section>
-
-            <section class="problem-neighborhood" aria-labelledby="problem-selected-heading">
-              <div id="problem-neighbor-loading" class="loading-panel" role="status" hidden>
-                Loading this question’s neighborhood…
-              </div>
-              <div id="problem-selected-empty" class="empty-panel">
-                <strong>Choose a starting question</strong>
-                <p>Search, choose Random question, or select a point on the map.</p>
-              </div>
-              <div id="problem-neighborhood-content" hidden>
-                <article class="panel problem-selected-card">
-                  <header class="panel-heading">
-                    <div>
-                      <p class="eyebrow">Selected question</p>
-                      <h3 id="problem-selected-heading" tabindex="-1">Question reference</h3>
-                    </div>
-                    <div class="problem-selected-actions">
-                      <code id="problem-selected-reference"></code>
-                      <button id="problem-review-selected" class="button button-secondary" type="button">
-                        Review classification
-                      </button>
-                    </div>
-                  </header>
-                  <div
-                    id="problem-selected-question-loading"
-                    class="problem-selected-question-loading"
-                    role="status"
-                    hidden
-                  >
-                    Loading the complete question…
-                  </div>
-                  <p
-                    id="problem-selected-question-error"
-                    class="inline-error problem-selected-question-error"
-                    role="alert"
-                    hidden
-                  ></p>
-                  <div id="problem-selected-question" class="problem-selected-question" hidden>
-                    <p id="problem-selected-source" class="problem-selected-source"></p>
-                    <section aria-labelledby="problem-selected-prompt-heading">
-                      <h4 id="problem-selected-prompt-heading">Complete prompt</h4>
-                      <p id="problem-selected-prompt" class="problem-selected-prompt"></p>
-                    </section>
-                    <section
-                      id="problem-selected-assets-section"
-                      class="problem-selected-assets-section"
-                      aria-labelledby="problem-selected-assets-heading"
-                    >
-                      <h4 id="problem-selected-assets-heading">Question artwork</h4>
-                      <div id="problem-selected-assets" class="problem-selected-assets"></div>
-                    </section>
-                    <section
-                      id="problem-selected-choices-section"
-                      class="problem-selected-choices-section"
-                      aria-labelledby="problem-selected-choices-heading"
-                    >
-                      <h4 id="problem-selected-choices-heading">Answer choices</h4>
-                      <ol id="problem-selected-choices" class="problem-selected-choices" type="A"></ol>
-                      <p id="problem-selected-choices-note" class="problem-selected-choices-note" hidden></p>
-                    </section>
-                    <section
-                      id="problem-selected-language-helper"
-                      class="problem-selected-language-helper"
-                      aria-labelledby="problem-selected-language-heading"
-                      hidden
-                    >
-                      <div class="problem-selected-language-heading-row">
-                        <div>
-                          <p class="eyebrow">Translation evidence</p>
-                          <h4 id="problem-selected-language-heading">Source-language transcription</h4>
-                        </div>
-                        <span id="problem-selected-language-label" class="status-badge"></span>
-                      </div>
-                      <p class="problem-selected-language-note">
-                        The English helper appears above. Compare this transcription with the
-                        audited source image before treating it as authoritative.
-                      </p>
-                      <p id="problem-selected-source-prompt" class="problem-selected-source-prompt"></p>
-                      <ol
-                        id="problem-selected-source-choices"
-                        class="problem-selected-choices problem-selected-source-choices"
-                        type="A"
-                      ></ol>
-                      <p
-                        id="problem-selected-source-choices-note"
-                        class="problem-selected-choices-note"
-                        hidden
-                      ></p>
-                      <dl id="problem-selected-language-status" class="compact-breakdown"></dl>
-                    </section>
-                    <a
-                      id="problem-selected-source-pdf"
-                      class="problem-selected-source-pdf"
-                      href="#"
-                      target="_blank"
-                      rel="noreferrer"
-                      hidden
-                    >
-                      Inspect source PDF <span aria-hidden="true">↗</span>
-                    </a>
-                  </div>
-                  <dl id="problem-selected-metadata" class="compact-breakdown"></dl>
-                  <div id="problem-selected-tags" class="tag-row" aria-label="Selected question tags"></div>
-                </article>
-
-                <header class="lab-results-heading problem-neighbors-heading">
-                  <div>
-                    <p class="eyebrow">Choose the next step</p>
-                    <h3 id="problem-neighbors-heading">Nearby questions</h3>
-                  </div>
-                  <p id="problem-neighbors-summary" role="status" aria-live="polite"></p>
-                </header>
-                <ol
-                  id="problem-neighbor-list"
-                  class="problem-neighbor-list"
-                  aria-labelledby="problem-neighbors-heading"
-                ></ol>
-              </div>
-            </section>
-          </div>
+            </div>
+          </details>
+        </div>
         </div>
       </section>
 
