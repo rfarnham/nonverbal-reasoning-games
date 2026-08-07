@@ -360,6 +360,7 @@
 }
 
 .questionCard {
+  container-type: inline-size;
   display: grid;
   place-items: center;
 }
@@ -423,6 +424,20 @@
   margin-top: 16px;
   border-radius: 999px;
   background: var(--ink);
+}
+
+/* Trace deliberately shrinks the prompt to keep the large 3×3 grid visible.
+   Size the equation from that card, not from the viewport, so it cannot spill
+   out at portrait-tablet and phone breakpoints. */
+.board[data-answer-mode="trace"] .questionCard .horizontalProblem {
+  gap: min(17px, 3cqi);
+  font-size: min(7.2rem, 26cqi);
+}
+
+.board[data-answer-mode="trace"] .questionCard .verticalProblem {
+  width: min(190px, 80cqi);
+  grid-template-columns: 25% 1fr;
+  font-size: min(6.7rem, 38cqi);
 }
 
 .listeningCard {
@@ -817,6 +832,12 @@
   background: #fff5cc;
   visibility: visible;
   opacity: 1;
+}
+
+.traceFeedback[data-kind="continue"] {
+  border-color: #8cbce6;
+  background: #eef7ff;
+  color: #15558d;
 }
 
 .traceFeedbackSymbol {

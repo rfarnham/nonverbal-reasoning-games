@@ -166,9 +166,9 @@ before starting a larger game or architectural change.
 
 ## License
 
-Source code and original project assets are [MIT licensed](LICENSE), with two
-exceptions. Selected Math Kangaroo question illustrations are included with
+Source code and original project assets are [MIT licensed](LICENSE), with one
+exception. Selected Math Kangaroo question illustrations are included with
 authorization and are not granted under the repository’s MIT license. The
-`DIGIT_REFERENCE_PATHS` tracing-coordinate subset in
-`app/lab/subtraction-flash/trace-geometry.ts` is adapted from EMS Readability
-and remains under the [SIL Open Font License 1.1](public/licenses/EMS-Readability-OFL.txt).
+Subtraction Flash tracing guides adapt public-domain NIST Hershey font data;
+their source and provenance are recorded in
+[`public/licenses/Hershey-NIST-Public-Domain.txt`](public/licenses/Hershey-NIST-Public-Domain.txt).

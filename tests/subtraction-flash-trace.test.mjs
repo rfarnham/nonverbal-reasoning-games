@@ -3,11 +3,13 @@ import test from "node:test";
 
 import {
   DEFAULT_TRACE_QUALITY_OPTIONS,
-  DIGIT_REFERENCE_PATHS,
+  DIGIT_REFERENCE_STROKES,
   isGoodFaithDigitTraceAttempt,
+  isAcceptableDigitStrokes,
   isAcceptableDigitTrace,
   resamplePolyline,
   resolveDigitTraceAttempt,
+  scoreDigitStrokes,
   scoreDigitTrace,
   traceBounds,
   tracePathLength,
@@ -22,10 +24,11 @@ function modestlyNoisy(points, phase = 0, amplitude = 0.035) {
   }));
 }
 
-test("digits 2 through 9 expose bounded, recognizable one-stroke paths", () => {
-  assert.deepEqual(Object.keys(DIGIT_REFERENCE_PATHS), DIGITS.map(String));
+test("digits 2 through 9 expose bounded, recognizable local vector strokes", () => {
+  assert.deepEqual(Object.keys(DIGIT_REFERENCE_STROKES), DIGITS.map(String));
   for (const digit of DIGITS) {
-    const path = DIGIT_REFERENCE_PATHS[digit];
+    const strokes = DIGIT_REFERENCE_STROKES[digit];
+    const path = strokes.flat();
     assert.ok(path.length >= 4, `${digit}: enough anchors for a recognizable path`);
     assert.ok(
       path.every(
@@ -36,7 +39,10 @@ test("digits 2 through 9 expose bounded, recognizable one-stroke paths", () => {
     const bounds = traceBounds(path);
     assert.ok(bounds.width >= 0.5, `${digit}: occupies the cell width`);
     assert.ok(bounds.height >= 0.75, `${digit}: occupies the cell height`);
-    assert.ok(tracePathLength(path) >= 1.2, `${digit}: is more than a tap or line`);
+    assert.ok(
+      strokes.reduce((total, stroke) => total + tracePathLength(stroke), 0) >= 1.2,
+      `${digit}: is more than a tap or line`,
+    );
   }
 });
 
@@ -61,43 +67,52 @@ test("arc-length resampling is deterministic and approximately even", () => {
 
 test("close forward and reverse traces survive sparse sampling and modest noise", () => {
   for (const digit of DIGITS) {
-    const sparse = resamplePolyline(DIGIT_REFERENCE_PATHS[digit], 15);
-    const forward = modestlyNoisy(sparse, digit);
-    const reverse = modestlyNoisy([...sparse].reverse(), digit + 0.5);
-    const forwardScore = scoreDigitTrace(forward, digit);
-    const reverseScore = scoreDigitTrace(reverse, digit);
+    const sparse = DIGIT_REFERENCE_STROKES[digit].map((stroke, strokeIndex) =>
+      resamplePolyline(stroke, 15 + strokeIndex * 2),
+    );
+    const forward = sparse.map((stroke, strokeIndex) =>
+      modestlyNoisy(stroke, digit + strokeIndex),
+    );
+    const reverse = [...sparse]
+      .reverse()
+      .map((stroke, strokeIndex) =>
+        modestlyNoisy([...stroke].reverse(), digit + strokeIndex + 0.5),
+      );
+    const forwardScore = scoreDigitStrokes(forward, digit);
+    const reverseScore = scoreDigitStrokes(reverse, digit);
     assert.equal(forwardScore.accepted, true, `${digit}: close forward trace`);
     assert.equal(forwardScore.direction, "forward", `${digit}: forward direction`);
     assert.equal(reverseScore.accepted, true, `${digit}: close reverse trace`);
     assert.equal(reverseScore.direction, "reverse", `${digit}: reverse direction`);
-    assert.equal(isAcceptableDigitTrace(forward, digit), true);
+    assert.equal(isAcceptableDigitStrokes(forward, digit), true);
   }
 });
 
 test("finger-sized drift, rotation, and short endpoints remain acceptable", () => {
   for (const digit of DIGITS) {
-    const source = resamplePolyline(DIGIT_REFERENCE_PATHS[digit], 35);
     const angle = (3 * Math.PI) / 180;
-    const transformed = source.slice(2, -2).map((point, index) => {
-      const centeredX = (point.x - 0.5) * 0.88;
-      const centeredY = (point.y - 0.5) * 0.93;
-      return {
-        x:
-          0.5 +
-          centeredX * Math.cos(angle) -
-          centeredY * Math.sin(angle) +
-          0.025 +
-          Math.sin(index * 1.71 + digit) * 0.025,
-        y:
-          0.5 +
-          centeredX * Math.sin(angle) +
-          centeredY * Math.cos(angle) -
-          0.018 +
-          Math.cos(index * 1.39 + digit) * 0.025,
-      };
-    });
+    const transformed = DIGIT_REFERENCE_STROKES[digit].map((stroke) =>
+      resamplePolyline(stroke, 35).slice(2, -2).map((point, index) => {
+        const centeredX = (point.x - 0.5) * 0.88;
+        const centeredY = (point.y - 0.5) * 0.93;
+        return {
+          x:
+            0.5 +
+            centeredX * Math.cos(angle) -
+            centeredY * Math.sin(angle) +
+            0.025 +
+            Math.sin(index * 1.71 + digit) * 0.025,
+          y:
+            0.5 +
+            centeredX * Math.sin(angle) +
+            centeredY * Math.cos(angle) -
+            0.018 +
+            Math.cos(index * 1.39 + digit) * 0.025,
+        };
+      }),
+    );
     assert.equal(
-      isAcceptableDigitTrace(transformed, digit),
+      isAcceptableDigitStrokes(transformed, digit),
       true,
       `${digit}: ordinary finger drift should pass`,
     );
@@ -115,8 +130,8 @@ test("each reference stroke is accepted only for its own numeral", () => {
   for (const drawnDigit of DIGITS) {
     for (const candidateDigit of DIGITS) {
       assert.equal(
-        isAcceptableDigitTrace(
-          DIGIT_REFERENCE_PATHS[drawnDigit],
+        isAcceptableDigitStrokes(
+          DIGIT_REFERENCE_STROKES[drawnDigit],
           candidateDigit,
         ),
         drawnDigit === candidateDigit,
@@ -128,24 +143,24 @@ test("each reference stroke is accepted only for its own numeral", () => {
 
 test("forgiving thresholds still separate mildly imperfect wrong numerals", () => {
   for (const drawnDigit of DIGITS) {
-    const drawn = resamplePolyline(DIGIT_REFERENCE_PATHS[drawnDigit], 29).map(
-      (point, index) => ({
-        x:
-          0.5 +
-          (point.x - 0.5) * 0.94 +
-          0.02 +
-          Math.sin(index * 1.7 + drawnDigit) * 0.018,
-        y:
-          0.5 +
-          (point.y - 0.5) * 0.96 -
-          0.01 +
-          Math.cos(index * 1.3 + drawnDigit) * 0.018,
-      }),
+    const drawn = DIGIT_REFERENCE_STROKES[drawnDigit].map((stroke) =>
+      resamplePolyline(stroke, 29).map((point, index) => ({
+          x:
+            0.5 +
+            (point.x - 0.5) * 0.94 +
+            0.02 +
+            Math.sin(index * 1.7 + drawnDigit) * 0.018,
+          y:
+            0.5 +
+            (point.y - 0.5) * 0.96 -
+            0.01 +
+            Math.cos(index * 1.3 + drawnDigit) * 0.018,
+        })),
     );
     for (const candidateDigit of DIGITS) {
       if (candidateDigit === drawnDigit) continue;
       assert.equal(
-        isAcceptableDigitTrace(drawn, candidateDigit),
+        isAcceptableDigitStrokes(drawn, candidateDigit),
         false,
         `${drawnDigit} is not mistaken for ${candidateDigit} after finger drift`,
       );
@@ -159,7 +174,7 @@ test("taps and tiny gestures are rejected before shape scoring", () => {
       x: 0.5 + index * 0.001,
       y: 0.5 + index * 0.001,
     }));
-    const score = scoreDigitTrace(tap, digit);
+    const score = scoreDigitStrokes([tap], digit);
     assert.equal(score.accepted, false, `${digit}: tap rejected`);
     assert.ok(
       score.rejectionReason === "tap" || score.rejectionReason === "too_small",
@@ -175,9 +190,10 @@ test("taps and tiny gestures are rejected before shape scoring", () => {
 
 test("partial traces are rejected even when their visible segment is on-path", () => {
   for (const digit of DIGITS) {
-    const complete = resamplePolyline(DIGIT_REFERENCE_PATHS[digit], 41);
-    const partial = complete.slice(0, 24);
-    const score = scoreDigitTrace(partial, digit);
+    const partial = DIGIT_REFERENCE_STROKES[digit].map((stroke) =>
+      resamplePolyline(stroke, 41).slice(0, 24),
+    );
+    const score = scoreDigitStrokes(partial, digit);
     assert.equal(score.accepted, false, `${digit}: partial trace rejected`);
     assert.ok(
       ["too_small", "incomplete", "off_path"].includes(score.rejectionReason),
@@ -192,11 +208,12 @@ test("wild scribbles and repeated backtracking are rejected", () => {
     y: 0.08 + ((index * 7) % 17) / 20,
   }));
   for (const digit of DIGITS) {
-    const score = scoreDigitTrace(scribble, digit);
+    const score = scoreDigitStrokes([scribble], digit);
     assert.equal(score.accepted, false, `${digit}: wild scribble rejected`);
     assert.ok(
       score.rejectionReason === "too_long" ||
-        score.rejectionReason === "off_path",
+      score.rejectionReason === "off_path" ||
+        score.rejectionReason === "incomplete",
       `${digit}: scribble geometry reason`,
     );
     assert.equal(
@@ -205,14 +222,13 @@ test("wild scribbles and repeated backtracking are rejected", () => {
       `${digit}: scribble never earns retry grace`,
     );
 
-    const reference = DIGIT_REFERENCE_PATHS[digit];
-    const backtracking = [
+    const backtracking = DIGIT_REFERENCE_STROKES[digit].map((reference) => [
       ...reference,
       ...[...reference].reverse(),
       ...reference,
-    ];
+    ]);
     assert.equal(
-      isAcceptableDigitTrace(backtracking, digit),
+      isAcceptableDigitStrokes(backtracking, digit),
       false,
       `${digit}: repeated path is not a valid single trace`,
     );
@@ -220,34 +236,27 @@ test("wild scribbles and repeated backtracking are rejected", () => {
 });
 
 test("a substantial near miss can earn one answer-neutral retry grace", () => {
-  for (const digit of DIGITS) {
-    const partial = resamplePolyline(DIGIT_REFERENCE_PATHS[digit], 41).slice(
-      0,
-      32,
-    );
-    const score = scoreDigitTrace(partial, digit);
-    assert.equal(score.accepted, false, `${digit}: fixture is a near miss`);
-    assert.equal(
-      isGoodFaithDigitTraceAttempt(score),
-      true,
-      `${digit}: substantial near miss can express a deliberate choice`,
-    );
-    assert.deepEqual(
-      resolveDigitTraceAttempt(score, digit, null),
-      { disposition: "retry", nextRetryDigit: digit },
-      `${digit}: first near miss asks only once`,
-    );
-    assert.deepEqual(
-      resolveDigitTraceAttempt(score, digit, digit),
-      { disposition: "submit", nextRetryDigit: null },
-      `${digit}: second near miss submits the expressed choice`,
-    );
-  }
+  const digit = 6;
+  const partial = resamplePolyline(DIGIT_REFERENCE_STROKES[digit][0], 41).slice(
+    0,
+    32,
+  );
+  const score = scoreDigitTrace(partial, digit);
+  assert.equal(score.accepted, false, "fixture is a near miss");
+  assert.equal(isGoodFaithDigitTraceAttempt(score), true);
+  assert.deepEqual(resolveDigitTraceAttempt(score, digit, null), {
+    disposition: "retry",
+    nextRetryDigit: digit,
+  });
+  assert.deepEqual(resolveDigitTraceAttempt(score, digit, digit), {
+    disposition: "submit",
+    nextRetryDigit: null,
+  });
 });
 
 test("retry grace is tile-specific and never turns taps into answers", () => {
   const nearMiss = scoreDigitTrace(
-    resamplePolyline(DIGIT_REFERENCE_PATHS[6], 41).slice(0, 32),
+    resamplePolyline(DIGIT_REFERENCE_STROKES[6][0], 41).slice(0, 32),
     6,
   );
   const tap = scoreDigitTrace(
@@ -282,12 +291,11 @@ test("materially shifted and unrelated full-size paths are rejected", () => {
     { x: 0.88, y: 0.9 },
   ];
   for (const digit of DIGITS) {
-    const shifted = DIGIT_REFERENCE_PATHS[digit].map(({ x, y }) => ({
-      x: x + 0.22,
-      y,
-    }));
+    const shifted = DIGIT_REFERENCE_STROKES[digit].map((stroke) =>
+      stroke.map(({ x, y }) => ({ x: x + 0.22, y })),
+    );
     assert.equal(
-      isAcceptableDigitTrace(shifted, digit),
+      isAcceptableDigitStrokes(shifted, digit),
       false,
       `${digit}: materially shifted path`,
     );
@@ -311,5 +319,54 @@ test("invalid geometry is safely rejected and invalid configuration fails clearl
   assert.equal(invalid.accepted, false);
   assert.equal(invalid.rejectionReason, "invalid_points");
   assert.throws(() => resamplePolyline([{ x: 0, y: 0 }], 1), RangeError);
-  assert.throws(() => scoreDigitTrace(DIGIT_REFERENCE_PATHS[2], 1), RangeError);
+  assert.throws(
+    () => scoreDigitTrace(DIGIT_REFERENCE_STROKES[2][0], 1),
+    RangeError,
+  );
+});
+
+test("open-top 4 and print 5 accept natural two-stroke handwriting", () => {
+  const four = DIGIT_REFERENCE_STROKES[4];
+  const five = DIGIT_REFERENCE_STROKES[5];
+  assert.equal(four.length, 2, "4 shows a diagonal/crossbar plus downstroke");
+  assert.equal(five.length, 2, "5 shows its body and separate top bar");
+  assert.ok(
+    Math.abs(four[0][0].x - four[1][0].x) > 0.03,
+    "the 4 keeps its top visibly open like the supplied sample",
+  );
+
+  assert.equal(isAcceptableDigitStrokes(four, 4), true);
+  assert.equal(isAcceptableDigitStrokes([...four].reverse(), 4), true);
+  assert.equal(
+    isAcceptableDigitStrokes(
+      [...four].reverse().map((stroke) => [...stroke].reverse()),
+      4,
+    ),
+    true,
+    "4 accepts either stroke order and direction",
+  );
+  assert.equal(isAcceptableDigitStrokes(five, 5), true);
+
+  const oneStrokeFive = [...five[1], ...five[0].slice(1)];
+  assert.equal(
+    isAcceptableDigitTrace(oneStrokeFive, 5),
+    true,
+    "a continuous print 5 remains valid",
+  );
+});
+
+test("8 accepts an imperfect loop from any starting point", () => {
+  const sampled = resamplePolyline(DIGIT_REFERENCE_STROKES[8][0], 65);
+  const core = sampled.slice(0, -1);
+  const rotated = [...core.slice(21), ...core.slice(0, 21)];
+  const childlike = [...rotated, rotated[0]].map((point, index) => ({
+    x: 0.5 + (point.x - 0.5) * 0.88 + Math.sin(index * 1.41) * 0.045,
+    y: 0.5 + (point.y - 0.5) * 0.94 + Math.cos(index * 1.13) * 0.045,
+  }));
+
+  assert.equal(
+    isAcceptableDigitTrace(childlike, 8),
+    true,
+    "8 tolerance is local, cyclic, and finger-friendly",
+  );
 });

@@ -1,0 +1,23 @@
+SUBTRACTION FLASH TRACE NUMERALS — SOURCE AND PUBLIC-DOMAIN NOTICE
+
+The normalized single-line coordinates for digits 2–9 in
+app/lab/subtraction-flash/trace-geometry.ts are adapted from the plain print
+row of “Hershey fonts, digits.svg” on Wikimedia Commons:
+
+https://commons.wikimedia.org/wiki/File:Hershey_fonts,_digits.svg
+
+Pinned page revision:
+https://commons.wikimedia.org/w/index.php?title=File:Hershey_fonts,_digits.svg&oldid=1225175617
+
+Original SVG:
+https://upload.wikimedia.org/wikipedia/commons/9/94/Hershey_fonts%2C_digits.svg
+
+Retrieved 2026-08-07. The paths were normalized to the game’s tracing surface;
+the 4 was opened slightly to match the supplied child-handwriting sample, and
+the 5 was split at its natural pen lift so one- and two-stroke forms work.
+
+The Wikimedia file page identifies the Hershey font data as public domain in
+the United States because it is a work of a United States Federal Government
+employee, specifically the National Institute of Standards and Technology,
+under 17 U.S.C. § 105. The browser uses only the locally bundled normalized
+coordinates and makes no request to Wikimedia or any other font service.

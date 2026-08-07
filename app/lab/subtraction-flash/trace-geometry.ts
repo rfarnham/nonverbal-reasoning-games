@@ -4,6 +4,10 @@ export interface TracePoint {
   readonly y: number;
 }
 
+export type TraceStroke = readonly TracePoint[];
+
+export type DigitTraceTemplate = readonly TraceStroke[];
+
 export type TraceDigit = 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
 export type TraceDirection = "forward" | "reverse";
@@ -153,203 +157,114 @@ function referencePath(
 }
 
 /**
- * Map the source font's 1000-unit, bottom-up coordinates into this game's
- * normalized 100 × 140 tracing surface.
- *
- * Digit coordinates are adapted from EMS Readability at pinned commit
- * 068fdaab668007da7ecd768540cb10ab8ae39bac. The font is a single-line
- * Source Sans Pro Light derivative distributed under SIL OFL 1.1. See
- * public/licenses/EMS-Readability-OFL.txt for provenance and license.
+ * Fit one glyph from the public-domain Hershey digit SVG into this game's
+ * normalized 100 × 140 tracing surface while preserving its separate strokes.
+ * The source paths are the plain print row in Wikimedia Commons revision
+ * 1225175617. See public/licenses/Hershey-NIST-Public-Domain.txt.
  */
-function emsReadabilityPath(
-  coordinates: readonly (readonly [number, number])[],
-): readonly TracePoint[] {
-  return referencePath(
-    coordinates.map(
-      ([sourceX, sourceY]) =>
-        [
-          (7 + sourceX * 0.17) / 100,
-          (124 - sourceY * 0.172) / 140,
-        ] as const,
+function hersheyGlyph(
+  strokes: readonly (readonly (readonly [number, number])[])[],
+): DigitTraceTemplate {
+  const allPoints = strokes.flat();
+  const xs = allPoints.map(([x]) => x);
+  const ys = allPoints.map(([, y]) => y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const width = maxX - minX;
+  const height = maxY - minY;
+
+  return Object.freeze(
+    strokes.map((stroke) =>
+      referencePath(
+        stroke.map(
+          ([x, y]) =>
+            [
+              0.17 + ((x - minX) / width) * 0.66,
+              0.08 + ((y - minY) / height) * 0.84,
+            ] as const,
+        ),
+      ),
     ),
   );
 }
 
 /**
- * Natural one-stroke teaching paths. Either drawing direction is accepted.
+ * Large single-line teaching glyphs. The open 4 and print 5 intentionally
+ * expose their pen lifts; either stroke order and either direction are valid.
  */
-export const DIGIT_REFERENCE_PATHS: Readonly<
-  Record<TraceDigit, readonly TracePoint[]>
+export const DIGIT_REFERENCE_STROKES: Readonly<
+  Record<TraceDigit, DigitTraceTemplate>
 > = Object.freeze({
-  2: emsReadabilityPath([
-    [75.6, 558],
-    [117, 598],
-    [167, 630],
-    [230, 646],
-    [284, 636],
-    [340, 608],
-    [375, 561],
-    [391, 491],
-    [387, 432],
-    [356, 359],
-    [299, 277],
-    [230, 192],
-    [167, 126],
-    [110, 63],
-    [81.9, 31.5],
-    [438, 31.5],
+  2: hersheyGlyph([[
+    [188, 186], [188, 184], [190, 180], [192, 178], [196, 176],
+    [204, 176], [208, 178], [210, 180], [212, 184], [212, 188],
+    [210, 192], [206, 198], [186, 218], [214, 218],
+  ]]),
+  3: hersheyGlyph([[
+    [230, 176], [252, 176], [240, 192], [246, 192], [250, 194],
+    [252, 196], [254, 202], [254, 206], [252, 212], [248, 216],
+    [242, 218], [236, 218], [230, 216], [228, 214], [226, 210],
+  ]]),
+  4: hersheyGlyph([
+    [[286, 176], [266, 204], [296, 204]],
+    [[290, 176], [286, 218]],
   ]),
-  3: emsReadabilityPath([
-    [88.2, 576],
-    [139, 614],
-    [205, 643],
-    [258, 643],
-    [315, 627],
-    [362, 589],
-    [384, 539],
-    [394, 479],
-    [378, 425],
-    [324, 384],
-    [265, 353],
-    [214, 343],
-    [176, 343],
-    [224, 343],
-    [274, 337],
-    [324, 318],
-    [378, 277],
-    [403, 239],
-    [413, 195],
-    [410, 148],
-    [400, 110],
-    [369, 66.1],
-    [324, 37.8],
-    [268, 22.1],
-    [208, 22.1],
-    [151, 37.8],
-    [94.5, 69.3],
-    [59.9, 101],
+  5: hersheyGlyph([
+    [
+      [310, 176], [308, 194], [310, 192], [316, 190], [322, 190],
+      [328, 192], [332, 196], [334, 202], [334, 206], [332, 212],
+      [328, 216], [322, 218], [316, 218], [310, 216], [308, 214],
+      [306, 210],
+    ],
+    [[330, 176], [310, 176]],
   ]),
-  4: emsReadabilityPath([
-    [340, 15.8],
-    [340, 630],
-    [47.2, 220],
-    [444, 220],
-  ]),
-  5: emsReadabilityPath([
-    [59.9, 97.6],
-    [101, 63],
-    [145, 37.8],
-    [195, 18.9],
-    [243, 15.8],
-    [315, 34.6],
-    [365, 75.6],
-    [406, 135],
-    [422, 205],
-    [413, 287],
-    [378, 350],
-    [306, 391],
-    [233, 397],
-    [180, 384],
-    [126, 356],
-    [120, 365],
-    [139, 630],
-    [397, 630],
-  ]),
-  6: emsReadabilityPath([
-    [85, 265],
-    [132, 315],
-    [189, 359],
-    [246, 378],
-    [309, 378],
-    [356, 356],
-    [391, 324],
-    [416, 265],
-    [425, 195],
-    [410, 123],
-    [375, 63],
-    [321, 25.2],
-    [258, 15.8],
-    [202, 34.6],
-    [151, 72.4],
-    [110, 135],
-    [91.4, 224],
-    [85, 318],
-    [97.6, 438],
-    [120, 510],
-    [148, 567],
-    [195, 614],
-    [255, 639],
-    [315, 643],
-    [372, 624],
-    [413, 589],
-  ]),
-  7: emsReadabilityPath([
-    [224, 18.9],
-    [236, 186],
-    [261, 306],
-    [296, 410],
-    [340, 491],
-    [387, 567],
-    [435, 633],
-    [72.5, 633],
-  ]),
-  8: emsReadabilityPath([
-    [296, 321],
-    [359, 372],
-    [397, 428],
-    [406, 482],
-    [403, 539],
-    [362, 605],
-    [299, 639],
-    [249, 643],
-    [173, 621],
-    [123, 570],
-    [110, 513],
-    [126, 435],
-    [176, 387],
-    [265, 340],
-    [346, 296],
-    [400, 255],
-    [425, 198],
-    [419, 129],
-    [400, 78.8],
-    [340, 31.5],
-    [265, 15.8],
-    [205, 25.2],
-    [142, 53.6],
-    [94.5, 104],
-    [78.8, 158],
-    [85, 236],
-    [135, 306],
-    [176, 334],
-    [230, 359],
-  ]),
-  9: emsReadabilityPath([
-    [88.2, 75.6],
-    [123, 40.9],
-    [180, 22.1],
-    [239, 15.8],
-    [302, 47.2],
-    [362, 107],
-    [397, 198],
-    [413, 309],
-    [413, 413],
-    [391, 510],
-    [353, 586],
-    [293, 630],
-    [224, 643],
-    [151, 617],
-    [107, 573],
-    [81.9, 517],
-    [75.6, 460],
-    [78.8, 397],
-    [113, 331],
-    [176, 290],
-    [252, 280],
-    [334, 315],
-    [384, 362],
-    [416, 403],
-  ]),
+  6: hersheyGlyph([[
+    [372, 182], [370, 178], [364, 176], [360, 176], [354, 178],
+    [350, 184], [348, 194], [348, 204], [350, 212], [354, 216],
+    [360, 218], [362, 218], [368, 216], [372, 212], [374, 206],
+    [374, 204], [372, 198], [368, 194], [362, 192], [360, 192],
+    [354, 194], [350, 198], [348, 204],
+  ]]),
+  7: hersheyGlyph([[
+    [386, 176], [414, 176], [404, 197], [394, 218],
+  ]]),
+  8: hersheyGlyph([[
+    [436, 176], [430, 178], [428, 182], [428, 186], [430, 190],
+    [434, 192], [442, 194], [448, 196], [452, 200], [454, 204],
+    [454, 210], [452, 214], [450, 216], [444, 218], [436, 218],
+    [430, 216], [428, 214], [426, 210], [426, 204], [428, 200],
+    [432, 196], [438, 194], [446, 192], [450, 190], [452, 186],
+    [452, 182], [450, 178], [444, 176], [436, 176],
+  ]]),
+  9: hersheyGlyph([[
+    [492, 190], [490, 196], [486, 200], [480, 202], [478, 202],
+    [472, 200], [468, 196], [466, 190], [466, 188], [468, 182],
+    [472, 178], [478, 176], [480, 176], [486, 178], [490, 182],
+    [492, 190], [492, 200], [490, 210], [486, 216], [480, 218],
+    [476, 218], [470, 216], [468, 212],
+  ]]),
+});
+
+const FIVE_ONE_STROKE = hersheyGlyph([[
+  [330, 176], [310, 176], [308, 194], [310, 192], [316, 190],
+  [322, 190], [328, 192], [332, 196], [334, 202], [334, 206],
+  [332, 212], [328, 216], [322, 218], [316, 218], [310, 216],
+  [308, 214], [306, 210],
+]]);
+
+const DIGIT_TRACE_TEMPLATES: Readonly<
+  Record<TraceDigit, readonly DigitTraceTemplate[]>
+> = Object.freeze({
+  2: [DIGIT_REFERENCE_STROKES[2]],
+  3: [DIGIT_REFERENCE_STROKES[3]],
+  4: [DIGIT_REFERENCE_STROKES[4]],
+  5: [DIGIT_REFERENCE_STROKES[5], FIVE_ONE_STROKE],
+  6: [DIGIT_REFERENCE_STROKES[6]],
+  7: [DIGIT_REFERENCE_STROKES[7]],
+  8: [DIGIT_REFERENCE_STROKES[8]],
+  9: [DIGIT_REFERENCE_STROKES[9]],
 });
 
 const EPSILON = 1e-9;
@@ -520,15 +435,40 @@ function percentile90(values: readonly number[]): number {
 }
 
 function assertTraceDigit(digit: TraceDigit): void {
-  if (!Object.hasOwn(DIGIT_REFERENCE_PATHS, digit)) {
+  if (!Object.hasOwn(DIGIT_REFERENCE_STROKES, digit)) {
     throw new RangeError("Trace scoring supports only the digits 2 through 9.");
   }
 }
 
+const DIGIT_QUALITY_OVERRIDES: Readonly<
+  Partial<Record<TraceDigit, Partial<TraceQualityOptions>>>
+> = Object.freeze({
+  // Eight is a closed, self-crossing path. It is the hardest glyph to follow
+  // under a finger, so allow more size, path, and closure drift without
+  // weakening any other numeral.
+  8: {
+    minimumSpanRatio: 0.5,
+    minimumLengthRatio: 0.58,
+    maximumLengthRatio: 2.45,
+    maximumRawLengthRatio: 3.6,
+    maximumCenterError: 0.2,
+    maximumOrderedRmsError: 0.24,
+    maximumMeanPathError: 0.16,
+    maximumCoverageError: 0.18,
+    maximumPathError90: 0.3,
+    maximumEndpointError: 0.34,
+  },
+});
+
 function resolveOptions(
+  digit: TraceDigit,
   overrides: Partial<TraceQualityOptions>,
 ): TraceQualityOptions {
-  const options = { ...DEFAULT_TRACE_QUALITY_OPTIONS, ...overrides };
+  const options = {
+    ...DEFAULT_TRACE_QUALITY_OPTIONS,
+    ...DIGIT_QUALITY_OVERRIDES[digit],
+    ...overrides,
+  };
   if (!Number.isSafeInteger(options.sampleCount) || options.sampleCount < 8) {
     throw new RangeError("Trace scoring sampleCount must be an integer of at least 8.");
   }
@@ -566,44 +506,119 @@ function rejectedEmptyScore(
   };
 }
 
-/** Score a normalized one-stroke trace against a digit teaching path. */
-export function scoreDigitTrace(
+type StrokeAlignment = Readonly<{
+  direction: TraceDirection;
+  orderedRmsError: number;
+  endpointError: number;
+}>;
+
+function rotatePoints(
   points: readonly TracePoint[],
-  digit: TraceDigit,
-  optionOverrides: Partial<TraceQualityOptions> = {},
+  offset: number,
+): TracePoint[] {
+  return [...points.slice(offset), ...points.slice(0, offset)];
+}
+
+function alignStroke(
+  trace: readonly TracePoint[],
+  reference: readonly TracePoint[],
+): StrokeAlignment {
+  const isClosed =
+    reference.length > 2 && distance(reference[0]!, reference.at(-1)!) <= 0.04;
+  let bestDirection: TraceDirection = "forward";
+  let bestError = Number.POSITIVE_INFINITY;
+
+  for (const direction of ["forward", "reverse"] as const) {
+    const oriented =
+      direction === "forward" ? [...reference] : [...reference].reverse();
+    const offsets = isClosed
+      ? Array.from({ length: oriented.length }, (_, index) => index)
+      : [0];
+    for (const offset of offsets) {
+      const candidate = isClosed ? rotatePoints(oriented, offset) : oriented;
+      const error = meanSquaredOrderedError(trace, candidate);
+      if (error < bestError) {
+        bestError = error;
+        bestDirection = direction;
+      }
+    }
+  }
+
+  const forwardReference =
+    bestDirection === "forward" ? reference : [...reference].reverse();
+  return {
+    direction: bestDirection,
+    orderedRmsError: bestError,
+    endpointError: isClosed
+      ? distance(trace[0]!, trace.at(-1)!)
+      : (distance(trace[0]!, forwardReference[0]!) +
+          distance(trace.at(-1)!, forwardReference.at(-1)!)) /
+        2,
+  };
+}
+
+function scoreAgainstTemplate(
+  strokes: readonly (readonly TracePoint[])[],
+  template: DigitTraceTemplate,
+  options: TraceQualityOptions,
 ): DigitTraceScore {
-  assertTraceDigit(digit);
-  const options = resolveOptions(optionOverrides);
-  if (points.some((point) => !isFinitePoint(point))) {
-    return rejectedEmptyScore(points.length, "invalid_points");
-  }
-  const collapsed = collapseConsecutivePoints(points);
-  if (collapsed.length < options.minimumPointCount) {
-    return {
-      ...rejectedEmptyScore(points.length, "tap"),
-      distinctPointCount: collapsed.length,
-      rawPathLength: tracePathLength(collapsed),
-    };
+  const pairings =
+    strokes.length === 2
+      ? ([
+          [0, 1],
+          [1, 0],
+        ] as const)
+      : ([strokes.map((_, index) => index)] as const);
+
+  let best:
+    | Readonly<{
+        alignments: readonly StrokeAlignment[];
+        references: readonly (readonly TracePoint[])[];
+        orderedRmsError: number;
+      }>
+    | null = null;
+
+  for (const pairing of pairings) {
+    const references = pairing.map((index) => template[index]!);
+    const alignments: StrokeAlignment[] = [];
+    let squaredError = 0;
+    for (let index = 0; index < strokes.length; index += 1) {
+      const traceSamples = smoothPolyline(
+        resamplePolyline(strokes[index]!, options.sampleCount),
+      );
+      const referenceSamples = smoothPolyline(
+        resamplePolyline(references[index]!, options.sampleCount),
+      );
+      const alignment = alignStroke(traceSamples, referenceSamples);
+      alignments.push(alignment);
+      squaredError += alignment.orderedRmsError ** 2;
+    }
+    const orderedRmsError = Math.sqrt(squaredError / strokes.length);
+    if (!best || orderedRmsError < best.orderedRmsError) {
+      best = { alignments, references, orderedRmsError };
+    }
   }
 
-  const reference = DIGIT_REFERENCE_PATHS[digit];
-  const traceSamples = smoothPolyline(
-    resamplePolyline(collapsed, options.sampleCount),
+  const traceStrokeSamples = strokes.map((stroke) =>
+    smoothPolyline(resamplePolyline(stroke, options.sampleCount)),
   );
-  const referenceSamples = smoothPolyline(
-    resamplePolyline(reference, options.sampleCount),
+  const referenceStrokeSamples = best!.references.map((stroke) =>
+    smoothPolyline(resamplePolyline(stroke, options.sampleCount)),
   );
-  const reversedReference = [...referenceSamples].reverse();
-  const forwardError = meanSquaredOrderedError(traceSamples, referenceSamples);
-  const reverseError = meanSquaredOrderedError(traceSamples, reversedReference);
-  const direction: TraceDirection =
-    reverseError < forwardError ? "reverse" : "forward";
-  const orientedReference =
-    direction === "forward" ? referenceSamples : reversedReference;
-
-  const rawPathLength = tracePathLength(collapsed);
-  const pathLength = tracePathLength(traceSamples);
-  const referencePathLength = tracePathLength(referenceSamples);
+  const traceSamples = traceStrokeSamples.flat();
+  const referenceSamples = referenceStrokeSamples.flat();
+  const rawPathLength = strokes.reduce(
+    (total, stroke) => total + tracePathLength(stroke),
+    0,
+  );
+  const pathLength = traceStrokeSamples.reduce(
+    (total, stroke) => total + tracePathLength(stroke),
+    0,
+  );
+  const referencePathLength = referenceStrokeSamples.reduce(
+    (total, stroke) => total + tracePathLength(stroke),
+    0,
+  );
   const lengthRatio = pathLength / referencePathLength;
   const rawLengthRatio = rawPathLength / referencePathLength;
   const bounds = traceBounds(traceSamples);
@@ -623,11 +638,10 @@ export function scoreDigitTrace(
     percentile90(traceToReference),
     percentile90(referenceToTrace),
   );
-  const endpointError =
-    (distance(traceSamples[0]!, orientedReference[0]!) +
-      distance(traceSamples.at(-1)!, orientedReference.at(-1)!)) /
-    2;
-  const orderedRmsError = Math.min(forwardError, reverseError);
+  const endpointError = mean(
+    best!.alignments.map((alignment) => alignment.endpointError),
+  );
+  const orderedRmsError = best!.orderedRmsError;
 
   let rejectionReason: TraceRejectionReason | null = null;
   if (rawPathLength < options.minimumPathLength) {
@@ -662,9 +676,16 @@ export function scoreDigitTrace(
   return {
     accepted: rejectionReason === null,
     rejectionReason,
-    direction,
-    inputPointCount: points.length,
-    distinctPointCount: collapsed.length,
+    direction:
+      best!.alignments.filter(({ direction }) => direction === "reverse").length >
+      best!.alignments.length / 2
+        ? "reverse"
+        : "forward",
+    inputPointCount: strokes.reduce((total, stroke) => total + stroke.length, 0),
+    distinctPointCount: strokes.reduce(
+      (total, stroke) => total + stroke.length,
+      0,
+    ),
     pathLength,
     rawPathLength,
     referencePathLength,
@@ -681,6 +702,80 @@ export function scoreDigitTrace(
   };
 }
 
+/** Score one or more pen strokes against the digit's accepted handwriting. */
+export function scoreDigitStrokes(
+  strokes: readonly (readonly TracePoint[])[],
+  digit: TraceDigit,
+  optionOverrides: Partial<TraceQualityOptions> = {},
+): DigitTraceScore {
+  assertTraceDigit(digit);
+  const options = resolveOptions(digit, optionOverrides);
+  const inputPointCount = strokes.reduce(
+    (total, stroke) => total + stroke.length,
+    0,
+  );
+  if (strokes.some((stroke) => stroke.some((point) => !isFinitePoint(point)))) {
+    return rejectedEmptyScore(inputPointCount, "invalid_points");
+  }
+  const collapsed = strokes.map(collapseConsecutivePoints);
+  const distinctPointCount = collapsed.reduce(
+    (total, stroke) => total + stroke.length,
+    0,
+  );
+  const rawPathLength = collapsed.reduce(
+    (total, stroke) => total + tracePathLength(stroke),
+    0,
+  );
+  if (
+    collapsed.length === 0 ||
+    collapsed.some((stroke) => stroke.length < 2) ||
+    distinctPointCount < options.minimumPointCount ||
+    rawPathLength < options.minimumPathLength
+  ) {
+    return {
+      ...rejectedEmptyScore(inputPointCount, "tap"),
+      distinctPointCount,
+      rawPathLength,
+    };
+  }
+
+  const matchingTemplates = DIGIT_TRACE_TEMPLATES[digit].filter(
+    (template) => template.length === collapsed.length,
+  );
+  if (matchingTemplates.length === 0) {
+    return {
+      ...rejectedEmptyScore(
+        inputPointCount,
+        collapsed.length < DIGIT_REFERENCE_STROKES[digit].length
+          ? "incomplete"
+          : "too_long",
+      ),
+      distinctPointCount,
+      rawPathLength,
+    };
+  }
+
+  const scores = matchingTemplates.map((template) =>
+    scoreAgainstTemplate(collapsed, template, options),
+  );
+  return scores.find(({ accepted }) => accepted) ??
+    scores.reduce((best, score) =>
+      score.orderedRmsError + score.meanPathError + score.coverageError <
+      best.orderedRmsError + best.meanPathError + best.coverageError
+        ? score
+        : best,
+    );
+}
+
+/** Score a normalized one-stroke trace, including the one-stroke 5 variant. */
+export function scoreDigitTrace(
+  points: readonly TracePoint[],
+  digit: TraceDigit,
+  optionOverrides: Partial<TraceQualityOptions> = {},
+): DigitTraceScore {
+  return scoreDigitStrokes([points], digit, optionOverrides);
+}
+
 /** Strict default acceptance predicate for enabling a digit-grid submission. */
 export function isAcceptableDigitTrace(
   points: readonly TracePoint[],
@@ -688,4 +783,12 @@ export function isAcceptableDigitTrace(
   optionOverrides: Partial<TraceQualityOptions> = {},
 ): boolean {
   return scoreDigitTrace(points, digit, optionOverrides).accepted;
+}
+
+export function isAcceptableDigitStrokes(
+  strokes: readonly (readonly TracePoint[])[],
+  digit: TraceDigit,
+  optionOverrides: Partial<TraceQualityOptions> = {},
+): boolean {
+  return scoreDigitStrokes(strokes, digit, optionOverrides).accepted;
 }

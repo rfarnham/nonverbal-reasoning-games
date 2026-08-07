@@ -111,21 +111,21 @@ test("pointer traces require quality while keyboard activation remains available
   assert.match(traceSource, /setPointerCapture\(/);
   assert.match(traceSource, /!event\.isPrimary/);
   assert.match(traceSource, /event\.button\s*!==\s*0/);
-  assert.match(traceSource, /scoreDigitTrace\(/);
+  assert.match(traceSource, /scoreDigitStrokes\(/);
   assert.match(
     traceSource,
     /resolveDigitTraceAttempt\(/,
     "trace score and finite retry policy gate submission",
   );
 
-  const finishTrace = sourceSection(
+  const evaluateTrace = sourceSection(
     traceSource,
-    "const finishTrace",
-    "const cancelTrace",
+    "const evaluateTrace",
+    "useEffect(() => {",
   );
-  const qualityGate = finishTrace.indexOf("resolveDigitTraceAttempt");
-  const acceptedSubmission = finishTrace.indexOf("onAnswer(", qualityGate);
-  const rejectedFeedback = finishTrace.indexOf("setFeedback(", acceptedSubmission);
+  const qualityGate = evaluateTrace.indexOf("resolveDigitTraceAttempt");
+  const acceptedSubmission = evaluateTrace.indexOf("onAnswer(", qualityGate);
+  const rejectedFeedback = evaluateTrace.indexOf("setFeedback(", acceptedSubmission);
   assert.ok(qualityGate >= 0, "finished gestures pass through the quality gate");
   assert.ok(
     acceptedSubmission > qualityGate,
@@ -136,17 +136,17 @@ test("pointer traces require quality while keyboard activation remains available
     "the rejected path gives input feedback after the accepted path returns",
   );
   assert.match(
-    finishTrace.slice(acceptedSubmission, rejectedFeedback),
+    evaluateTrace.slice(acceptedSubmission, rejectedFeedback),
     /return;/,
     "accepted submission exits before retry feedback",
   );
   assert.match(
-    finishTrace,
+    evaluateTrace,
     /resolveDigitTraceAttempt\([\s\S]*result,[\s\S]*answer,[\s\S]*retryAnswerRef\.current/,
     "the finite answer-neutral retry policy receives the trace and numeral",
   );
   assert.match(
-    finishTrace,
+    evaluateTrace,
     /if \(decision\.disposition === ["']submit["']\)/,
     "a second good-faith trace cannot trap the player in an endless retry",
   );
@@ -170,19 +170,19 @@ test("pointer traces require quality while keyboard activation remains available
 });
 
 test("rejected traces use one answer-neutral amber retry state", () => {
-  const finishTrace = sourceSection(
+  const evaluateTrace = sourceSection(
     traceSource,
-    "const finishTrace",
-    "const cancelTrace",
+    "const evaluateTrace",
+    "useEffect(() => {",
   );
-  assert.match(finishTrace, /state:\s*["']almost["']/);
+  assert.match(evaluateTrace, /state:\s*["']almost["']/);
   assert.doesNotMatch(
     traceSource,
     /correctAnswer|correctChoice/,
     "low-quality gestures cannot probe which candidate is mathematically correct",
   );
-  assert.match(finishTrace, /Your next close trace will count/i);
-  assert.match(finishTrace, /switch to Tap above/i);
+  assert.match(evaluateTrace, /Your next close trace will count/i);
+  assert.match(evaluateTrace, /switch to Tap above/i);
 
   const almostRule = cssRule(
     String.raw`\.traceButton\[data-state=["']almost["']\]`,
@@ -202,6 +202,50 @@ test("rejected traces use one answer-neutral amber retry state", () => {
   assert.doesNotMatch(visibleFeedbackRule, /#bf493e/i);
   assert.match(traceSource, /role=["']status["']/);
   assert.match(traceSource, /aria-live=["']polite["']/);
+});
+
+test("4 and 5 keep multiple pen strokes without treating the lift as failure", () => {
+  assert.match(traceSource, /DIGIT_REFERENCE_STROKES/);
+  assert.doesNotMatch(
+    traceSource,
+    /MULTI_STROKE_GRACE_MS|completionTimerRef/,
+    "a child can reposition for the next stroke without racing a timer",
+  );
+  assert.match(
+    traceSource,
+    /strokes\.length\s*<\s*expectedStrokeCount\s*&&\s*!completedOneStrokeVariant[\s\S]*pendingTraceRef\.current\s*=\s*waiting/,
+    "the first stroke remains pending for a natural pen lift",
+  );
+  assert.match(
+    traceSource,
+    /completedOneStrokeVariant\s*=\s*scoreDigitStrokes\(strokes, answer\)\.accepted/,
+    "a complete one-stroke 5 still submits immediately",
+  );
+  assert.match(
+    traceSource,
+    /pending\?\.answer === answer \? pending\.strokes : \[\][\s\S]*active\.points/,
+    "the next stroke is combined only with the same answer tile",
+  );
+  assert.match(traceSource, /Lift and add the second stroke/i);
+  assert.match(traceSource, /feedback\.kind === ["']continue["']/);
+  assert.match(
+    stylesSource,
+    /\.traceFeedback\[data-kind=["']continue["']\][\s\S]*background\s*:\s*#eef7ff/i,
+    "a pen lift uses calm blue continuation feedback, not amber or red",
+  );
+});
+
+test("each SVG guide and visible ink stroke renders as its own polyline", () => {
+  assert.match(
+    traceSource,
+    /DIGIT_REFERENCE_STROKES\[answer\]\.map\(\(stroke, strokeIndex\)/,
+  );
+  assert.match(traceSource, /traceStrokes\.map\(\(stroke, strokeIndex\)/);
+  assert.doesNotMatch(
+    traceSource,
+    /DIGIT_REFERENCE_STROKES\[answer\]\.flat/,
+    "separate 4/5 strokes never gain a fake connecting line",
+  );
 });
 
 test("the trace answers form a large compact 3-by-3 grid with one empty cell", () => {
@@ -236,4 +280,25 @@ test("the trace answers form a large compact 3-by-3 grid with one empty cell", (
     /\.board\[data-answer-mode=["']trace["']\]\[data-session-active=["']true["']\]/,
     "the side-by-side landscape layout cannot trap the run chooser in one column",
   );
+});
+
+test("compact trace prompts scale both equation layouts from the card", () => {
+  const cardRule = cssRule(String.raw`\.questionCard`);
+  assert.match(
+    cardRule,
+    /container-type\s*:\s*inline-size/i,
+    "the prompt establishes a container for content-relative sizing",
+  );
+
+  const horizontalRule = cssRule(
+    String.raw`\.board\[data-answer-mode=["']trace["']\]\s+\.questionCard\s+\.horizontalProblem`,
+  );
+  assert.match(horizontalRule, /font-size\s*:\s*min\([^;]*cqi/i);
+  assert.match(horizontalRule, /gap\s*:\s*min\([^;]*cqi/i);
+
+  const verticalRule = cssRule(
+    String.raw`\.board\[data-answer-mode=["']trace["']\]\s+\.questionCard\s+\.verticalProblem`,
+  );
+  assert.match(verticalRule, /width\s*:\s*min\([^;]*cqi/i);
+  assert.match(verticalRule, /font-size\s*:\s*min\([^;]*cqi/i);
 });

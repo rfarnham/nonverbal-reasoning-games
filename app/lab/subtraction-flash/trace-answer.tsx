@@ -12,9 +12,9 @@ import {
 
 import type { AnswerValue } from "./game-engine";
 import {
-  DIGIT_REFERENCE_PATHS,
+  DIGIT_REFERENCE_STROKES,
   resolveDigitTraceAttempt,
-  scoreDigitTrace,
+  scoreDigitStrokes,
   type TracePoint,
 } from "./trace-geometry";
 import styles from "./subtraction-flash.module.css";
@@ -43,13 +43,19 @@ type ActiveTrace = {
 
 type VisibleTrace = Readonly<{
   answer: AnswerValue;
-  points: readonly TracePoint[];
+  strokes: readonly (readonly TracePoint[])[];
   state: "drawing" | "almost" | "accepted";
 }>;
 
 type TraceFeedback = Readonly<{
   answer: AnswerValue;
+  kind: "continue" | "retry";
   message: string;
+}>;
+
+type PendingTrace = Readonly<{
+  answer: AnswerValue;
+  strokes: readonly (readonly TracePoint[])[];
 }>;
 
 const TRACE_VIEWBOX_WIDTH = 100;
@@ -103,11 +109,47 @@ export function TraceAnswerGrid({
     Partial<Record<AnswerValue, SVGSVGElement | null>>
   >({});
   const retryAnswerRef = useRef<AnswerValue | null>(null);
+  const pendingTraceRef = useRef<PendingTrace | null>(null);
   const [visibleTrace, setVisibleTrace] = useState<VisibleTrace | null>(null);
   const [feedback, setFeedback] = useState<TraceFeedback | null>(null);
 
+  const evaluateTrace = useCallback(
+    (
+      answer: AnswerValue,
+      strokes: readonly (readonly TracePoint[])[],
+      answeredAt: number,
+    ) => {
+      pendingTraceRef.current = null;
+      const result = scoreDigitStrokes(strokes, answer);
+      const decision = resolveDigitTraceAttempt(
+        result,
+        answer,
+        retryAnswerRef.current,
+      );
+      retryAnswerRef.current = decision.nextRetryDigit;
+      if (decision.disposition === "submit") {
+        setFeedback(null);
+        setVisibleTrace({ answer, strokes, state: "accepted" });
+        onAnswer(answer, answeredAt, "trace");
+        return;
+      }
+
+      setVisibleTrace({ answer, strokes, state: "almost" });
+      setFeedback({
+        answer,
+        kind: "retry",
+        message:
+          decision.disposition === "retry"
+            ? "Close — trace this number once more. Your next close trace will count."
+            : "Draw along most of the number. You can also switch to Tap above.",
+      });
+    },
+    [onAnswer],
+  );
+
   useEffect(() => {
     if (!disabled) return;
+    pendingTraceRef.current = null;
     retryAnswerRef.current = null;
     const active = activeTraceRef.current;
     if (!active) return;
@@ -117,11 +159,12 @@ export function TraceAnswerGrid({
     }
     setVisibleTrace({
       answer: active.answer,
-      points: [...active.points],
+      strokes: [[...active.points]],
       state: "almost",
     });
     setFeedback({
       answer: active.answer,
+      kind: "retry",
       message: "Trace the full line.",
     });
   }, [disabled]);
@@ -162,6 +205,10 @@ export function TraceAnswerGrid({
     ) {
       retryAnswerRef.current = null;
     }
+    const pending = pendingTraceRef.current;
+    if (pending && pending.answer !== answer) {
+      pendingTraceRef.current = null;
+    }
     event.currentTarget.setPointerCapture(event.pointerId);
     const active: ActiveTrace = {
       answer,
@@ -171,7 +218,14 @@ export function TraceAnswerGrid({
     };
     activeTraceRef.current = active;
     setFeedback(null);
-    setVisibleTrace({ answer, points: [...active.points], state: "drawing" });
+    setVisibleTrace({
+      answer,
+      strokes: [
+        ...(pending?.answer === answer ? pending.strokes : []),
+        [...active.points],
+      ],
+      state: "drawing",
+    });
   };
 
   const extendTrace = (
@@ -195,7 +249,15 @@ export function TraceAnswerGrid({
       const point = pointFromClient(answer, sample.clientX, sample.clientY);
       if (point) appendDistinctPoint(active.points, point);
     }
-    setVisibleTrace({ answer, points: [...active.points], state: "drawing" });
+    const pending = pendingTraceRef.current;
+    setVisibleTrace({
+      answer,
+      strokes: [
+        ...(pending?.answer === answer ? pending.strokes : []),
+        [...active.points],
+      ],
+      state: "drawing",
+    });
   };
 
   const finishTrace = (
@@ -220,37 +282,26 @@ export function TraceAnswerGrid({
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
 
-    const result = scoreDigitTrace(active.points, answer);
-    const decision = resolveDigitTraceAttempt(
-      result,
-      answer,
-      retryAnswerRef.current,
-    );
-    retryAnswerRef.current = decision.nextRetryDigit;
-    if (decision.disposition === "submit") {
-      setFeedback(null);
-      setVisibleTrace({
+    const pending = pendingTraceRef.current;
+    const strokes = [
+      ...(pending?.answer === answer ? pending.strokes : []),
+      [...active.points],
+    ];
+    const expectedStrokeCount = DIGIT_REFERENCE_STROKES[answer].length;
+    const completedOneStrokeVariant = scoreDigitStrokes(strokes, answer).accepted;
+    if (strokes.length < expectedStrokeCount && !completedOneStrokeVariant) {
+      const waiting: PendingTrace = { answer, strokes };
+      pendingTraceRef.current = waiting;
+      setVisibleTrace({ answer, strokes, state: "drawing" });
+      setFeedback({
         answer,
-        points: [...active.points],
-        state: "accepted",
+        kind: "continue",
+        message: "Lift and add the second stroke anywhere on this number.",
       });
-      onAnswer(answer, answeredAt, "trace");
       return;
     }
 
-    const goodFaithAttempt = decision.disposition === "retry";
-
-    setVisibleTrace({
-      answer,
-      points: [...active.points],
-      state: "almost",
-    });
-    setFeedback({
-      answer,
-      message: goodFaithAttempt
-        ? "Close — trace this number once more. Your next close trace will count."
-        : "Draw along most of the number. You can also switch to Tap above.",
-    });
+    evaluateTrace(answer, strokes, answeredAt);
   };
 
   const cancelTrace = (
@@ -266,13 +317,19 @@ export function TraceAnswerGrid({
       return;
     }
     activeTraceRef.current = null;
+    const pending = pendingTraceRef.current;
+    const strokes = [
+      ...(pending?.answer === answer ? pending.strokes : []),
+      [...active.points],
+    ];
     setVisibleTrace({
       answer,
-      points: [...active.points],
+      strokes,
       state: "almost",
     });
     setFeedback({
       answer,
+      kind: "retry",
       message: "The trace stopped. Try again.",
     });
   };
@@ -280,7 +337,7 @@ export function TraceAnswerGrid({
   return (
     <div className={styles.traceSurface}>
       <p className={styles.traceInstruction} id={instructionId}>
-        Trace one number. Follow the full line.
+        Trace one number. Lift your finger where the line breaks.
       </p>
 
       <div
@@ -298,8 +355,8 @@ export function TraceAnswerGrid({
             selectedAnswer === null && visibleTrace?.answer === answer
               ? visibleTrace.state
               : roundState;
-          const tracePoints =
-            visibleTrace?.answer === answer ? visibleTrace.points : [];
+          const traceStrokes =
+            visibleTrace?.answer === answer ? visibleTrace.strokes : [];
           const stateLabel =
             traceState === "correct"
               ? ", correct"
@@ -349,20 +406,29 @@ export function TraceAnswerGrid({
                 preserveAspectRatio="none"
                 aria-hidden="true"
               >
-                <polyline
-                  className={styles.traceGuideHalo}
-                  points={svgPoints(DIGIT_REFERENCE_PATHS[answer])}
-                />
-                <polyline
-                  className={styles.traceGuide}
-                  points={svgPoints(DIGIT_REFERENCE_PATHS[answer])}
-                />
-                {tracePoints.length > 1 ? (
+                {DIGIT_REFERENCE_STROKES[answer].map((stroke, strokeIndex) => (
                   <polyline
-                    className={styles.traceInk}
-                    points={svgPoints(tracePoints)}
+                    key={`halo-${strokeIndex}`}
+                    className={styles.traceGuideHalo}
+                    points={svgPoints(stroke)}
                   />
-                ) : null}
+                ))}
+                {DIGIT_REFERENCE_STROKES[answer].map((stroke, strokeIndex) => (
+                  <polyline
+                    key={`guide-${strokeIndex}`}
+                    className={styles.traceGuide}
+                    points={svgPoints(stroke)}
+                  />
+                ))}
+                {traceStrokes.map((stroke, strokeIndex) =>
+                  stroke.length > 1 ? (
+                    <polyline
+                      key={`ink-${strokeIndex}`}
+                      className={styles.traceInk}
+                      points={svgPoints(stroke)}
+                    />
+                  ) : null,
+                )}
               </svg>
               <span className={styles.visuallyHidden}>{answer}</span>
             </button>
@@ -373,6 +439,7 @@ export function TraceAnswerGrid({
       <div
         className={styles.traceFeedback}
         data-visible={feedback !== null}
+        data-kind={feedback?.kind}
         role="status"
         aria-live="polite"
         aria-atomic="true"
@@ -380,10 +447,15 @@ export function TraceAnswerGrid({
         {feedback ? (
           <>
             <span className={styles.traceFeedbackSymbol} aria-hidden="true">
-              ↺
+              {feedback.kind === "continue" ? "+" : "↺"}
             </span>
             <span>
-              <strong>Try the trace again.</strong> {feedback.message}
+              <strong>
+                {feedback.kind === "continue"
+                  ? "Add the next stroke."
+                  : "Try the trace again."}
+              </strong>{" "}
+              {feedback.message}
             </span>
           </>
         ) : (
