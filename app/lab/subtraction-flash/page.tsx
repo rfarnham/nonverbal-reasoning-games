@@ -32,6 +32,7 @@ import {
   getSpeechRecognitionConstructor,
   type BrowserSpeechRecognition,
   type BrowserSpeechRecognitionErrorCode,
+  type SpokenAnswerMatch,
 } from "./browser-speech";
 import {
   recognizeDigit,
@@ -58,6 +59,13 @@ import {
 } from "./session-engine";
 import { SpokenAnswerStreamGate } from "./speech-answer-stream";
 import { AdaptiveSubtractionCurriculum } from "./adaptive-curriculum";
+import {
+  appendPerformanceAttempt,
+  createPerformanceAttempt,
+  createPerformanceSession,
+  finishPerformanceSession,
+  startPerformanceSession,
+} from "./performance-storage";
 import styles from "./subtraction-flash.module.css";
 
 type AnswerMode = "tap" | "draw" | "speak";
@@ -65,8 +73,19 @@ type SessionPhase = "choosing" | "playing" | "settling" | "results";
 type SessionFinishReason = "manual" | "time" | "deck";
 type SessionPauseReason = "hidden";
 
+type AnswerInputSource = "tap" | "keyboard" | "handwriting" | "speech";
+
+type AnswerEvidence = Readonly<{
+  inputSource: AnswerInputSource;
+  rawRecognition?: string | null;
+  recognitionConfidence?: number | null;
+  recognitionMargin?: number | null;
+  recognitionProcessingMs?: number | null;
+}>;
+
 type SessionProgress = Readonly<{
   id: number;
+  performanceSessionId: string | null;
   mode: SessionMode;
   clock: SessionClock;
   answered: number;
@@ -101,6 +120,17 @@ type ModeRounds = Record<PracticeMode, RoundState | null>;
 
 const TAP_RESULT_FLASH_MS = 520;
 const DRAW_RESULT_FLASH_MS = 900;
+
+function createPerformanceSessionId(): string {
+  const randomUUID = globalThis.crypto?.randomUUID;
+  return typeof randomUUID === "function"
+    ? randomUUID.call(globalThis.crypto)
+    : `flash-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function epochMillisecondsFromPerformance(timestamp: number): number {
+  return Math.max(0, Math.round(performance.timeOrigin + timestamp));
+}
 
 function resultFlashDuration(answeredWith: AnswerMode | null) {
   return answeredWith === "draw"
@@ -240,6 +270,19 @@ function MicIcon() {
   );
 }
 
+function AnalysisIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M5 19V11m7 8V5m7 14v-6"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function SoundIcon({ enabled }: Readonly<{ enabled: boolean }>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -316,7 +359,11 @@ function newRound(
 type HandwritingAnswerProps = Readonly<{
   disabled: boolean;
   focusRef: MutableRefObject<HTMLCanvasElement | null>;
-  onAnswer: (answer: AnswerValue, answeredAt: number) => void;
+  onAnswer: (
+    answer: AnswerValue,
+    answeredAt: number,
+    evidence: AnswerEvidence,
+  ) => void;
 }>;
 
 type DrawReadout = Readonly<{
@@ -506,7 +553,16 @@ function HandwritingAnswer({
             });
 
             if (accepted) {
-              onAnswer(answer as AnswerValue, answeredAt);
+              onAnswer(answer as AnswerValue, answeredAt, {
+                inputSource: "handwriting",
+                rawRecognition: String(answer),
+                recognitionConfidence: prediction.confidence,
+                recognitionMargin: prediction.margin,
+                recognitionProcessingMs: Math.max(
+                  0,
+                  performance.now() - answeredAt,
+                ),
+              });
             }
           })
           .catch(() => {
@@ -647,7 +703,7 @@ type SpeechAnswerProps = Readonly<{
   active: boolean;
   answerGate: SpokenAnswerStreamGate;
   microphonePermission: MicrophonePermission;
-  onAnswer: (answer: AnswerValue, answeredAt: number) => void;
+  onAnswer: (match: SpokenAnswerMatch, answeredAt: number) => void;
   roundId: string | null;
 }>;
 
@@ -751,7 +807,7 @@ function SpeechAnswer({
         message: `Heard ${bufferedAnswer.answer}`,
         transcript: bufferedAnswer.transcript,
       });
-      onAnswerRef.current(bufferedAnswer.answer, performance.now());
+      onAnswerRef.current(bufferedAnswer, performance.now());
     });
     return () => cancelAnimationFrame(frame);
   }, [accepting, answerGate, roundId]);
@@ -838,7 +894,7 @@ function SpeechAnswer({
             message: `Heard ${match.answer}`,
             transcript: match.transcript,
           });
-          onAnswerRef.current(match.answer, performance.now());
+          onAnswerRef.current(match, performance.now());
           return;
         }
 
@@ -1040,6 +1096,7 @@ export default function SubtractionFlashPage() {
     useState<SessionPhase>("choosing");
   const [sessionProgress, setSessionProgress] = useState<SessionProgress>({
     id: 0,
+    performanceSessionId: null,
     mode: "infinite",
     clock: createSessionClock(0, false),
     answered: 0,
@@ -1056,6 +1113,9 @@ export default function SubtractionFlashPage() {
   const [isQuestionSpeaking, setIsQuestionSpeaking] = useState(false);
   const [microphonePermission, setMicrophonePermission] =
     useState<MicrophonePermission>("idle");
+  const [performanceSaveWarning, setPerformanceSaveWarning] = useState<
+    string | null
+  >(null);
 
   const modeRef = useRef<PracticeMode>("visual");
   const roundsRef = useRef<ModeRounds>({ visual: null, listen: null });
@@ -1286,6 +1346,27 @@ export default function SubtractionFlashPage() {
         baseDeckSize: progress.baseDeckSize,
       };
 
+      if (progress.performanceSessionId) {
+        const write = finishPerformanceSession(
+          progress.performanceSessionId,
+          {
+            finishedAt: epochMillisecondsFromPerformance(now),
+            finishReason,
+            elapsedMs: elapsed,
+            answered: progress.answered,
+            correct: progress.correct,
+            slow: progress.slow,
+            reviews: progress.reviews,
+            baseDeckSize: progress.baseDeckSize,
+          },
+        );
+        if (!write.ok) {
+          setPerformanceSaveWarning(
+            "Performance data could not be saved on this device.",
+          );
+        }
+      }
+
       const reveal = () => {
         resultTimerRef.current = null;
         sessionPhaseRef.current = "results";
@@ -1307,6 +1388,7 @@ export default function SubtractionFlashPage() {
       answer: AnswerValue,
       answeredWith: AnswerMode = "tap",
       answeredAt = performance.now(),
+      evidence: AnswerEvidence = { inputSource: "tap" },
     ) => {
       if (sessionPhaseRef.current !== "playing") return;
       const activeMode = modeRef.current;
@@ -1347,7 +1429,7 @@ export default function SubtractionFlashPage() {
         0,
         activeElapsedMs - round.startedAt,
       );
-      deck.recordOutcome(round.draw.card, {
+      const outcomeRecord = deck.recordOutcome(round.draw.card, {
         correct,
         elapsedMs: answerElapsedMs,
       });
@@ -1372,6 +1454,58 @@ export default function SubtractionFlashPage() {
       setRounds(nextRounds);
 
       const deckSnapshot = deck.snapshot();
+      if (progress.performanceSessionId) {
+        try {
+          const attempt = createPerformanceAttempt({
+            sessionId: progress.performanceSessionId,
+            occurredAt: epochMillisecondsFromPerformance(answeredAt),
+            sessionPosition: progress.answered + 1,
+            gameType: progress.mode,
+            presentationMode: activeMode,
+            orientation:
+              activeMode === "visual" ? round.draw.card.orientation : null,
+            inputSource: evidence.inputSource,
+            cardId: round.draw.card.id,
+            factKey: round.draw.card.factKey,
+            minuend: round.draw.card.minuend,
+            subtrahend: round.draw.card.subtrahend,
+            expectedAnswer: round.draw.card.answer,
+            submittedAnswer: answer,
+            correct,
+            elapsedMs: answerElapsedMs,
+            slow: answerElapsedMs > SLOW_RESPONSE_MS,
+            isReview: round.draw.card.isReview,
+            reviewQueued: outcomeRecord.flagged,
+            reinserted: outcomeRecord.reinserted,
+            outcomeReason: outcomeRecord.reason,
+            drawNumber: round.draw.drawNumber,
+            cycle: round.draw.cycle,
+            cardsRemainingAfter: deckSnapshot.remaining,
+            sessionElapsedMs: activeElapsedMs,
+            rawRecognition: evidence.rawRecognition ?? null,
+            recognitionConfidence:
+              evidence.recognitionConfidence ?? null,
+            recognitionMargin: evidence.recognitionMargin ?? null,
+            recognitionProcessingMs:
+              evidence.recognitionProcessingMs ?? null,
+          });
+          const write = appendPerformanceAttempt(attempt);
+          if (!write.ok) {
+            setPerformanceSaveWarning(
+              "Performance data could not be saved on this device.",
+            );
+          }
+        } catch {
+          setPerformanceSaveWarning(
+            "Performance data could not be saved on this device.",
+          );
+        }
+      } else {
+        setPerformanceSaveWarning(
+          "Performance data could not be saved on this device.",
+        );
+      }
+
       const nextProgress: SessionProgress = {
         ...progress,
         answered: progress.answered + 1,
@@ -1508,9 +1642,11 @@ export default function SubtractionFlashPage() {
       });
       const firstDraw = deck.next();
       const nextId = sessionIdRef.current + 1;
+      const performanceSessionId = createPerformanceSessionId();
       sessionIdRef.current = nextId;
       const progress: SessionProgress = {
         id: nextId,
+        performanceSessionId,
         mode: sessionMode,
         clock: createSessionClock(now, pauseReasons.size === 0),
         answered: 0,
@@ -1520,6 +1656,26 @@ export default function SubtractionFlashPage() {
         baseDeckSize: firstDraw.baseDeckSize,
         cardsRemaining: firstDraw.remaining + 1,
       };
+
+      try {
+        const session = createPerformanceSession({
+          sessionId: performanceSessionId,
+          gameType: sessionMode,
+          presentationMode: activeMode,
+          baseDeckSize: firstDraw.baseDeckSize,
+          startedAt: epochMillisecondsFromPerformance(now),
+        });
+        const write = startPerformanceSession(session);
+        setPerformanceSaveWarning(
+          write.ok
+            ? null
+            : "Performance data could not be saved on this device.",
+        );
+      } catch {
+        setPerformanceSaveWarning(
+          "Performance data could not be saved on this device.",
+        );
+      }
       const round = newRound(firstDraw, activeMode, 0);
       const nextRounds: ModeRounds = {
         visual: activeMode === "visual" ? round : null,
@@ -1741,7 +1897,12 @@ export default function SubtractionFlashPage() {
       const answer = Number(event.key);
       if (!ANSWER_VALUES.includes(answer as AnswerValue)) return;
       event.preventDefault();
-      submitAnswer(answer as AnswerValue);
+      submitAnswer(
+        answer as AnswerValue,
+        "tap",
+        performance.now(),
+        { inputSource: "keyboard" },
+      );
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -1885,6 +2046,13 @@ export default function SubtractionFlashPage() {
                   </span>
                 </button>
               </div>
+              <Link
+                className={styles.analysisLink}
+                href="/lab/subtraction-flash/analysis/"
+              >
+                <AnalysisIcon />
+                Analyze results
+              </Link>
             </section>
           ) : (
             <>
@@ -2066,7 +2234,17 @@ export default function SubtractionFlashPage() {
                             aria-keyshortcuts={String(answer)}
                             aria-label={`${answer}${stateLabel}`}
                             aria-pressed={selected}
-                            onClick={() => submitAnswer(answer)}
+                            onClick={(event) =>
+                              submitAnswer(
+                                answer,
+                                "tap",
+                                performance.now(),
+                                {
+                                  inputSource:
+                                    event.detail === 0 ? "keyboard" : "tap",
+                                },
+                              )
+                            }
                           >
                             {answer}
                           </button>
@@ -2080,8 +2258,8 @@ export default function SubtractionFlashPage() {
                       }`}
                       disabled={!answerReady}
                       focusRef={drawFocusRef}
-                      onAnswer={(answer, answeredAt) =>
-                        submitAnswer(answer, "draw", answeredAt)
+                      onAnswer={(answer, answeredAt, evidence) =>
+                        submitAnswer(answer, "draw", answeredAt, evidence)
                       }
                     />
                   ) : (
@@ -2094,8 +2272,12 @@ export default function SubtractionFlashPage() {
                       }
                       answerGate={speechAnswerGate}
                       microphonePermission={microphonePermission}
-                      onAnswer={(answer, answeredAt) =>
-                        submitAnswer(answer, "speak", answeredAt)
+                      onAnswer={(match, answeredAt) =>
+                        submitAnswer(match.answer, "speak", answeredAt, {
+                          inputSource: "speech",
+                          rawRecognition: match.transcript,
+                          recognitionConfidence: match.confidence,
+                        })
                       }
                       roundId={
                         currentRound
@@ -2113,6 +2295,11 @@ export default function SubtractionFlashPage() {
             </>
           )}
         </section>
+        {performanceSaveWarning ? (
+          <p className={styles.storageWarning} role="status">
+            {performanceSaveWarning}
+          </p>
+        ) : null}
       </main>
 
       <dialog
@@ -2175,6 +2362,11 @@ export default function SubtractionFlashPage() {
                 </dd>
               </div>
             </dl>
+            {performanceSaveWarning ? (
+              <p className={styles.storageWarning} role="status">
+                {performanceSaveWarning}
+              </p>
+            ) : null}
             <div className={styles.resultsActions}>
               <button
                 className={styles.playAgainButton}
@@ -2191,6 +2383,13 @@ export default function SubtractionFlashPage() {
                 Choose mode
               </button>
             </div>
+            <Link
+              className={`${styles.analysisLink} ${styles.resultsAnalysisLink}`}
+              href="/lab/subtraction-flash/analysis/"
+            >
+              <AnalysisIcon />
+              Analyze results
+            </Link>
           </div>
         ) : null}
       </dialog>
