@@ -84,6 +84,7 @@
       mapRequestToken: 0,
       searchRequestToken: 0,
       neighborhoodRequestToken: 0,
+      detailRequestToken: 0,
       trail: [],
       trailIndex: -1,
       filters: { grade: "", points: "", domain: "", questionType: "" },
@@ -127,6 +128,15 @@
     stringValue(value, "Unknown")
       .replace(/[-_]+/g, " ")
       .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  const languageName = (value) => {
+    const code = stringValue(value).trim();
+    if (!code) return "Source language";
+    try {
+      return new Intl.DisplayNames([navigator.language || "en"], { type: "language" }).of(code) || code;
+    } catch {
+      return code;
+    }
+  };
   const gradeRangeValue = (value) => {
     if (typeof value === "string" || typeof value === "number") return String(value);
     const range = asRecord(value);
@@ -1142,6 +1152,101 @@
     });
   }
 
+  function normalizeRenderableChoices(value) {
+    if (!Array.isArray(value)) {
+      return textList(value).map((text) => ({ text, imageUrl: "", imageAlt: "" }));
+    }
+    return value.map((choice, index) => {
+      if (typeof choice === "string" || typeof choice === "number") {
+        return { text: String(choice), imageUrl: "", imageAlt: "" };
+      }
+      const record = asRecord(choice);
+      return {
+        text: stringValue(
+          firstDefined(
+            record.text,
+            record.value,
+            record.choice_text,
+            record.content,
+            record.label,
+          ),
+        ),
+        imageUrl: safeSameOriginUrl(
+          firstDefined(record.image_url, record.imageUrl, record.asset_url, record.assetUrl),
+        ),
+        imageAlt: stringValue(
+          firstDefined(record.image_alt, record.imageAlt, record.alt),
+          `Visual content for choice ${String.fromCharCode(65 + index)}`,
+        ),
+      };
+    });
+  }
+
+  function normalizeQuestionAssets(value, fallbackUrl = "") {
+    const assets = asArray(value).map((entry, index) => {
+      const record = asRecord(entry);
+      return {
+        ordinal: integer(firstDefined(record.ordinal, record.order, index + 1), index + 1),
+        url: safeSameOriginUrl(firstDefined(record.url, record.asset_url, record.src)),
+        status: stringValue(record.status, "available"),
+        mediaType: stringValue(firstDefined(record.media_type, record.mediaType)),
+        width: integer(record.width),
+        height: integer(record.height),
+        alt: stringValue(firstDefined(record.alt, record.alt_text, record.description)),
+        caption: stringValue(record.caption),
+      };
+    });
+    if (!assets.length && fallbackUrl) {
+      assets.push({
+        ordinal: 1,
+        url: fallbackUrl,
+        status: "available",
+        mediaType: "",
+        width: 0,
+        height: 0,
+        alt: "",
+        caption: "",
+      });
+    }
+    return assets.sort((left, right) => left.ordinal - right.ordinal);
+  }
+
+  function normalizeEnglishHelper(value) {
+    const record = asRecord(value);
+    if (!Object.keys(record).length) return null;
+    return {
+      sourceLanguage: stringValue(
+        firstDefined(record.source_language, record.sourceLanguage),
+      ),
+      sourcePrompt: stringValue(firstDefined(record.source_prompt, record.sourcePrompt)),
+      sourceChoices: normalizeRenderableChoices(
+        firstDefined(record.source_choices, record.sourceChoices),
+      ),
+      englishPrompt: stringValue(
+        firstDefined(record.english_prompt, record.englishPrompt),
+      ),
+      englishChoices: normalizeRenderableChoices(
+        firstDefined(record.english_choices, record.englishChoices),
+      ),
+      promptStatus: stringValue(
+        firstDefined(record.prompt_status, record.promptStatus),
+        "unknown",
+      ),
+      choicesStatus: stringValue(
+        firstDefined(record.choices_status, record.choicesStatus),
+        "unknown",
+      ),
+      translationMethod: stringValue(
+        firstDefined(record.translation_method, record.translationMethod),
+        "unknown",
+      ),
+      reviewStatus: stringValue(
+        firstDefined(record.review_status, record.reviewStatus),
+        "unknown",
+      ),
+    };
+  }
+
   function normalizeReview(value) {
     const review = asRecord(value);
     const sourceChecks = asRecord(firstDefined(review.source_checks, review.sourceChecks));
@@ -1185,6 +1290,9 @@
       firstDefined(merged.existing_review, merged.current_review, merged.review),
     );
     const directEtag = response?.headers?.get("ETag") || "";
+    const cropUrl = safeSameOriginUrl(
+      firstDefined(merged.source_crop_url, source.crop_url, source.source_crop_url),
+    );
     return {
       id: itemId(merged),
       contentVersion: stringValue(firstDefined(merged.content_version, merged.version)),
@@ -1192,6 +1300,16 @@
       sourceLine: sourceLabel(Object.keys(source).length ? source : merged.source_label),
       prompt: stringValue(firstDefined(merged.prompt, merged.prompt_text, merged.question_text)),
       choices: normalizeChoices(firstDefined(merged.choices, merged.answer_choices, merged.options)),
+      renderableChoices: normalizeRenderableChoices(
+        firstDefined(merged.choices, merged.answer_choices, merged.options),
+      ),
+      englishHelper: normalizeEnglishHelper(
+        firstDefined(merged.english_helper, merged.englishHelper),
+      ),
+      assets: normalizeQuestionAssets(
+        firstDefined(merged.assets, merged.question_assets, merged.asset_refs),
+        cropUrl,
+      ),
       answer,
       warnings: textList(firstDefined(merged.warnings, merged.source_warnings, merged.review_flags)),
       gaps: textList(firstDefined(merged.gaps, merged.content_gaps, merged.missing_content)),
@@ -1199,9 +1317,7 @@
       promotion,
       blockers: textList(firstDefined(merged.blockers, promotion.blockers)),
       review,
-      cropUrl: safeSameOriginUrl(
-        firstDefined(merged.source_crop_url, source.crop_url, source.source_crop_url),
-      ),
+      cropUrl,
       pdfUrl: safeSameOriginUrl(
         firstDefined(merged.source_pdf_url, source.pdf_url, source.source_pdf_url),
       ),
@@ -1682,6 +1798,7 @@
     const projectionQuality = asRecord(
       firstDefined(projection.quality, root.projection_quality),
     );
+    const projectionParameters = asRecord(projection.parameters);
     const rawKnnOverlap = optionalNumber(
       firstDefined(
         projectionQuality.knn_overlap,
@@ -1707,6 +1824,22 @@
           projection.algorithm,
         ),
       ),
+      projectionParameters: {
+        implementation: stringValue(projectionParameters.implementation),
+        implementationVersion: stringValue(
+          projectionParameters.implementation_version,
+        ),
+        inputMode: stringValue(projectionParameters.input_mode),
+        configuredNeighbors: optionalNumber(
+          projectionParameters.configured_neighbors,
+        ),
+        effectiveNeighbors: optionalNumber(
+          projectionParameters.effective_neighbors,
+        ),
+        minDist: optionalNumber(projectionParameters.min_dist),
+        randomSeed: optionalNumber(projectionParameters.random_seed),
+        jobs: optionalNumber(projectionParameters.jobs),
+      },
       projectionQuality: {
         neighborK: integer(
           firstDefined(projectionQuality.neighbor_k, projectionQuality.k),
@@ -1720,6 +1853,15 @@
         ),
         exactDuplicateCandidateCount: integer(
           projectionQuality.exact_duplicate_candidate_count,
+        ),
+        tieAtCutoffAnchorCount: integer(
+          projectionQuality.tie_at_cutoff_anchor_count,
+        ),
+        tieAtCutoffAnchorFraction: optionalNumber(
+          projectionQuality.tie_at_cutoff_anchor_fraction,
+        ),
+        meanCutoffTieCandidateCount: optionalNumber(
+          projectionQuality.mean_cutoff_tie_candidate_count,
         ),
         knnOverlap: rawKnnOverlap === null ? null : score01(rawKnnOverlap),
         pcaKnnOverlap: optionalNumber(projectionQuality.pca_knn_overlap),
@@ -1870,16 +2012,20 @@
   function problemMapBasePoint(point, width, height) {
     const bounds = state.problemSpace.mapPayload?.bounds;
     if (!bounds || point.x === null || point.y === null) return { x: 0, y: 0 };
-    const margin = Math.min(52, Math.max(28, width * 0.06));
-    const baseX =
-      margin +
-      ((point.x - bounds.minimumX) / (bounds.maximumX - bounds.minimumX)) *
-        (width - margin * 2);
-    const baseY =
-      height -
-      margin -
-      ((point.y - bounds.minimumY) / (bounds.maximumY - bounds.minimumY)) *
-        (height - margin * 2);
+    const margin = Math.min(52, Math.max(28, Math.min(width, height) * 0.06));
+    const extentX = Math.max(0, bounds.maximumX - bounds.minimumX);
+    const extentY = Math.max(0, bounds.maximumY - bounds.minimumY);
+    const availableWidth = Math.max(1, width - margin * 2);
+    const availableHeight = Math.max(1, height - margin * 2);
+    const fitScale = Math.min(
+      extentX > 0 ? availableWidth / extentX : Number.POSITIVE_INFINITY,
+      extentY > 0 ? availableHeight / extentY : Number.POSITIVE_INFINITY,
+    );
+    const uniformScale = Number.isFinite(fitScale) ? fitScale : 1;
+    const centerX = (bounds.minimumX + bounds.maximumX) / 2;
+    const centerY = (bounds.minimumY + bounds.maximumY) / 2;
+    const baseX = width / 2 + (point.x - centerX) * uniformScale;
+    const baseY = height / 2 - (point.y - centerY) * uniformScale;
     return { x: baseX, y: baseY };
   }
 
@@ -2529,8 +2675,28 @@
       applyProblemMapFilters();
       const method = state.problemSpace.mapPayload.projectionMethod;
       const version = state.problemSpace.mapPayload.mapVersion;
+      const parameters = state.problemSpace.mapPayload.projectionParameters;
+      const implementation = [
+        parameters.implementation,
+        parameters.implementationVersion,
+      ]
+        .filter(Boolean)
+        .join(" ");
+      const parameterLabels = [
+        implementation,
+        parameters.configuredNeighbors !== null &&
+        parameters.effectiveNeighbors !== null
+          ? `${parameters.effectiveNeighbors}/${parameters.configuredNeighbors} neighbors`
+          : "",
+        parameters.minDist !== null ? `min distance ${parameters.minDist}` : "",
+        parameters.randomSeed !== null ? `seed ${parameters.randomSeed}` : "",
+        parameters.inputMode ? `${humanize(parameters.inputMode)} input` : "",
+        parameters.jobs !== null
+          ? `${parameters.jobs} worker${parameters.jobs === 1 ? "" : "s"}`
+          : "",
+      ].filter(Boolean);
       const methodText = method
-        ? `Method: ${method} · ${humanize(state.problemSpace.view)} view${version ? ` · ${version}` : ""}`
+        ? `Method: ${method}${parameterLabels.length ? ` · ${parameterLabels.join(" · ")}` : ""} · ${humanize(state.problemSpace.view)} view${version ? ` · ${version}` : ""}`
         : `Projection method not reported · ${humanize(state.problemSpace.view)} view${version ? ` · ${version}` : ""}`;
       setText("problem-map-method", methodText);
       const quality = state.problemSpace.mapPayload.projectionQuality;
@@ -2577,14 +2743,17 @@
       setText("problem-map-quality", preservationSummary);
       const hasProjectionWarnings = Boolean(
         state.problemSpace.mapPayload.warnings.length ||
-          (quality.exactDuplicateCandidateCount && quality.qualityCaveat),
+          ((quality.exactDuplicateCandidateCount || quality.tieAtCutoffAnchorCount) &&
+            quality.qualityCaveat),
       );
       setText(
         "problem-map-warnings",
         hasProjectionWarnings
           ? [
               ...state.problemSpace.mapPayload.warnings.map(humanize),
-              quality.exactDuplicateCandidateCount ? quality.qualityCaveat : "",
+              quality.exactDuplicateCandidateCount || quality.tieAtCutoffAnchorCount
+                ? quality.qualityCaveat
+                : "",
             ]
               .filter(Boolean)
               .join(" · ")
@@ -2885,6 +3054,229 @@
     );
   }
 
+  function renderProblemSelectedQuestionDetail(detail) {
+    const englishHelper = detail.englishHelper;
+    setText("problem-selected-source", detail.sourceLine || "Source metadata not reported");
+    setText(
+      "problem-selected-prompt-heading",
+      englishHelper ? "English helper prompt" : "Complete prompt",
+    );
+    setText(
+      "problem-selected-choices-heading",
+      englishHelper ? "English helper choices" : "Answer choices",
+    );
+    setText(
+      "problem-selected-prompt",
+      englishHelper?.englishPrompt ||
+        detail.prompt ||
+        "No complete parsed prompt is available for this record.",
+    );
+
+    const assetList = byId("problem-selected-assets");
+    assetList.replaceChildren();
+    const assetSection = byId("problem-selected-assets-section");
+    assetSection.hidden = false;
+    if (!detail.assets.length) {
+      assetList.append(
+        node("p", {
+          className: "problem-selected-asset-missing",
+          text: "No audited question-scoped image is available for this record.",
+        }),
+      );
+    } else {
+      detail.assets.forEach((asset, index) => {
+        const ordinal = asset.ordinal || index + 1;
+        const figure = node("figure", { className: "problem-selected-asset" });
+        if (asset.url && asset.status === "available") {
+          const image = node("img", {
+            attrs: {
+              src: asset.url,
+              alt:
+                asset.alt ||
+                `Complete question-scoped source image ${ordinal} of ${detail.assets.length} for ${detail.id}. It may contain visual prompt information or answer choices.`,
+              loading: "eager",
+              decoding: "async",
+              width: asset.width || undefined,
+              height: asset.height || undefined,
+            },
+          });
+          image.addEventListener("error", () => {
+            image.hidden = true;
+            let missing = figure.querySelector(".problem-selected-asset-missing");
+            if (!missing) {
+              missing = node("p", {
+                className: "problem-selected-asset-missing",
+                text: `Question image ${ordinal} could not be displayed from its audited local file.`,
+              });
+              figure.insertBefore(missing, figure.firstChild);
+            }
+          });
+          figure.append(image);
+        } else {
+          figure.append(
+            node("p", {
+              className: "problem-selected-asset-missing",
+              text: `Question image ${ordinal} was unavailable when this catalogue snapshot was built.`,
+            }),
+          );
+        }
+        figure.append(
+          node("figcaption", {
+            text:
+              asset.caption ||
+              `Audited question-scoped image ${ordinal} of ${detail.assets.length}, shown in source order.`,
+          }),
+        );
+        assetList.append(figure);
+      });
+    }
+
+    const choices = byId("problem-selected-choices");
+    const choicesNote = byId("problem-selected-choices-note");
+    choices.replaceChildren();
+    const renderableChoices = englishHelper
+      ? englishHelper.englishChoices
+      : detail.renderableChoices || [];
+    renderableChoices.forEach((choice, index) => {
+      const item = node("li");
+      if (choice.text) {
+        item.append(node("span", { text: choice.text }));
+      } else if (!choice.imageUrl) {
+        item.append(
+          node("span", {
+            className: "problem-selected-choice-unparsed",
+            text: "No separately extracted text; inspect the source image.",
+          }),
+        );
+      }
+      if (choice.imageUrl) {
+        item.append(
+          node("img", {
+            className: "problem-selected-choice-image",
+            attrs: {
+              src: choice.imageUrl,
+              alt: choice.imageAlt || `Visual content for choice ${String.fromCharCode(65 + index)}`,
+              loading: "eager",
+              decoding: "async",
+            },
+          }),
+        );
+      }
+      choices.append(item);
+    });
+    choices.hidden = renderableChoices.length === 0;
+    choicesNote.hidden = renderableChoices.length !== 0;
+    choicesNote.textContent = renderableChoices.length
+      ? ""
+      : "No structured choice text was extracted. Inspect the complete source image above for visual answer choices as they appeared in the original question.";
+
+    const languageSection = byId("problem-selected-language-helper");
+    languageSection.hidden = !englishHelper;
+    if (englishHelper) {
+      const displayLanguage = languageName(englishHelper.sourceLanguage);
+      setText("problem-selected-language-label", displayLanguage);
+      setText(
+        "problem-selected-source-prompt",
+        englishHelper.sourcePrompt ||
+          "No separate source-language prompt transcription is available.",
+      );
+      const languageCode = englishHelper.sourceLanguage;
+      const validLanguageCode = /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i.test(languageCode);
+      const sourcePrompt = byId("problem-selected-source-prompt");
+      const sourceChoices = byId("problem-selected-source-choices");
+      if (validLanguageCode) {
+        sourcePrompt.setAttribute("lang", languageCode);
+        sourceChoices.setAttribute("lang", languageCode);
+      } else {
+        sourcePrompt.removeAttribute("lang");
+        sourceChoices.removeAttribute("lang");
+      }
+      sourceChoices.replaceChildren();
+      englishHelper.sourceChoices.forEach((choice) => {
+        const item = node("li");
+        item.append(
+          node("span", {
+            text:
+              choice.text ||
+              "No separately extracted source-language text; inspect the source image.",
+          }),
+        );
+        if (choice.imageUrl) {
+          item.append(
+            node("img", {
+              className: "problem-selected-choice-image",
+              attrs: {
+                src: choice.imageUrl,
+                alt: choice.imageAlt,
+                loading: "eager",
+                decoding: "async",
+              },
+            }),
+          );
+        }
+        sourceChoices.append(item);
+      });
+      const sourceChoicesNote = byId("problem-selected-source-choices-note");
+      sourceChoices.hidden = englishHelper.sourceChoices.length === 0;
+      sourceChoicesNote.hidden = englishHelper.sourceChoices.length !== 0;
+      sourceChoicesNote.textContent = englishHelper.sourceChoices.length
+        ? ""
+        : englishHelper.choicesStatus === "graphical"
+          ? "The source answer choices are graphical. Inspect the audited source image above."
+          : "No structured source-language choice transcription is available; inspect the audited source image above.";
+      renderDefinitionList("problem-selected-language-status", [
+        ["English prompt", humanize(englishHelper.promptStatus)],
+        ["English choices", humanize(englishHelper.choicesStatus)],
+        ["Translation method", humanize(englishHelper.translationMethod)],
+        ["Translation review", humanize(englishHelper.reviewStatus)],
+      ]);
+    }
+
+    const sourcePdf = byId("problem-selected-source-pdf");
+    sourcePdf.hidden = !detail.pdfUrl;
+    if (detail.pdfUrl) sourcePdf.href = detail.pdfUrl;
+    else sourcePdf.removeAttribute("href");
+
+    byId("problem-selected-question-loading").hidden = true;
+    setInlineError("problem-selected-question-error");
+    byId("problem-selected-question").hidden = false;
+  }
+
+  async function loadProblemSelectedQuestionDetail(entry) {
+    const token = ++state.problemSpace.detailRequestToken;
+    byId("problem-selected-question").hidden = true;
+    setInlineError("problem-selected-question-error");
+    byId("problem-selected-question-loading").hidden = false;
+    try {
+      const { payload, response } = await requestJson(
+        `${API.items}/${encodeURIComponent(entry.id)}`,
+      );
+      const detail = normalizeDetail(payload, response);
+      entry.detail = detail;
+      const current = state.problemSpace.trail[state.problemSpace.trailIndex];
+      if (token !== state.problemSpace.detailRequestToken || current !== entry) return;
+      renderProblemSelectedQuestionDetail(detail);
+    } catch (error) {
+      const current = state.problemSpace.trail[state.problemSpace.trailIndex];
+      if (token !== state.problemSpace.detailRequestToken || current !== entry) return;
+      byId("problem-selected-question-loading").hidden = true;
+      byId("problem-selected-question").hidden = true;
+      setInlineError(
+        "problem-selected-question-error",
+        `The complete question could not be loaded: ${error.message}`,
+      );
+    }
+  }
+
+  function renderProblemSelectedQuestion(entry) {
+    state.problemSpace.detailRequestToken += 1;
+    if (entry.detail) {
+      renderProblemSelectedQuestionDetail(entry.detail);
+      return;
+    }
+    loadProblemSelectedQuestionDetail(entry);
+  }
+
   function renderProblemNeighborhood() {
     const entry = state.problemSpace.trail[state.problemSpace.trailIndex];
     if (!entry) {
@@ -2897,7 +3289,7 @@
     const anchor = payload.anchor;
     state.problemSpace.anchorId = anchor.id || entry.id;
     setText("problem-selected-reference", state.problemSpace.anchorId);
-    setText("problem-selected-prompt", anchor.prompt);
+    renderProblemSelectedQuestion(entry);
     renderDefinitionList("problem-selected-metadata", [
       ["Grade", anchor.grade ? humanize(anchor.grade) : "Not reported"],
       ["Published points", anchor.pointTier ? String(anchor.pointTier) : "Not reported"],
@@ -3032,7 +3424,11 @@
     if (!id) return;
     payload.anchor.id = id;
     const current = state.problemSpace.trail[state.problemSpace.trailIndex];
-    const entry = { id, payload };
+    const entry = {
+      id,
+      payload,
+      detail: current?.id === id ? current.detail : null,
+    };
     if (state.problemSpace.trailIndex >= 0 && (replaceCurrent || current?.id === id)) {
       state.problemSpace.trail[state.problemSpace.trailIndex] = entry;
     } else {

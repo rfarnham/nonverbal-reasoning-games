@@ -11,7 +11,10 @@ import pytest
 
 from math_kangaroo_trainer.retrieval import (
     MISSING_STRATEGY_WARNING,
+    SEMANTIC_MAP_DISTANCE_VERSION,
     SEMANTIC_MAP_HYBRID_METRIC,
+    SEMANTIC_MAP_IMPLEMENTATION_VERSION,
+    SEMANTIC_MAP_PROJECTION_VERSION,
     TEXT_QUERY_LOW_EVIDENCE,
     TEXT_QUERY_NO_CORPUS_EVIDENCE,
     TEXT_QUERY_TAG_WARNING,
@@ -29,10 +32,13 @@ from math_kangaroo_trainer.retrieval import semantic as semantic_module
 from math_kangaroo_trainer.retrieval.semantic import (
     SemanticManifestItem,
     _feature_bucket,
+    _neighbor_cutoff_tie_diagnostics,
     _neighbor_overlap_at_k,
+    _orient_and_scale_projection,
     _pca_projection,
     _projection_clusters,
     _projection_inputs_for_view,
+    _served_distance_matrix,
 )
 
 
@@ -212,6 +218,11 @@ def test_map_has_distinct_exploratory_views_and_quality_baseline(
     assert "inflate" in str(quality["quality_caveat"])
     assert 0 <= float(quality["knn_overlap"]) <= 1
     assert 0 <= float(quality["pca_knn_overlap"]) <= 1
+    assert quality["projection_method"] == SEMANTIC_MAP_PROJECTION_VERSION
+    assert quality["input_distance_version"] == SEMANTIC_MAP_DISTANCE_VERSION
+    assert quality["projection_implementation_version"] == (
+        SEMANTIC_MAP_IMPLEMENTATION_VERSION
+    )
 
 
 def test_map_quality_samples_anchors_against_all_candidates_and_full_pca(
@@ -288,7 +299,98 @@ def test_map_quality_samples_anchors_against_all_candidates_and_full_pca(
     assert quality["exact_duplicate_candidate_count"] == 0
     assert pca_rows == [401]
     assert overlap_calls == [((401, 401), (401, 2), 400)] * 2
-    assert float(quality["knn_overlap_improvement"]) >= 0
+    assert quality["knn_overlap_improvement"] == round(
+        float(quality["knn_overlap"]) - float(quality["pca_knn_overlap"]), 6
+    )
+
+
+def test_umap_precomputed_distances_are_exactly_monotone_with_served_similarity(
+    index: SemanticIndex,
+) -> None:
+    for view in (RetrievalView.SURFACE, RetrievalView.TAG, RetrievalView.HYBRID):
+        _, similarities, mapped, _ = _projection_inputs_for_view(
+            view,
+            surface_vectors=index.surface_vectors,
+            tag_vectors=index.tag_vectors,
+            config=index.config,
+        )
+        mapped_similarities = similarities[np.ix_(mapped, mapped)]
+        distances = _served_distance_matrix(mapped_similarities)
+
+        np.testing.assert_allclose(
+            distances,
+            np.clip(1.0 - mapped_similarities, 0.0, 2.0),
+            rtol=0,
+            atol=1e-7,
+        )
+        np.testing.assert_array_equal(np.diag(distances), np.zeros(len(distances)))
+        metadata = index.map_projection_metadata(view)
+        assert (
+            metadata["source_similarity_metric"]
+            == index.map_quality(view)["source_metric"]
+        )
+        assert metadata["parameters"]["input_mode"] == "precomputed"
+        assert metadata["parameters"]["random_seed"] == 20260807
+        assert metadata["parameters"]["jobs"] == 1
+
+
+def test_quality_reports_similarity_ties_that_cross_the_neighbor_cutoff() -> None:
+    similarities = np.asarray(
+        [
+            [1.0, 0.9, 0.8, 0.8, 0.1],
+            [0.9, 1.0, 0.7, 0.6, 0.5],
+            [0.8, 0.7, 1.0, 0.4, 0.3],
+            [0.8, 0.6, 0.4, 1.0, 0.2],
+            [0.1, 0.5, 0.3, 0.2, 1.0],
+        ],
+        dtype=np.float64,
+    )
+
+    diagnostics = _neighbor_cutoff_tie_diagnostics(
+        similarities,
+        k=2,
+        anchor_indices=np.asarray([0], dtype=np.int64),
+    )
+
+    assert diagnostics == {
+        "tie_at_cutoff_anchor_count": 1,
+        "tie_at_cutoff_anchor_fraction": 1.0,
+        "mean_cutoff_tie_candidate_count": 2.0,
+        "max_cutoff_tie_candidate_count": 2,
+        "similarity_tie_tolerance": 1e-7,
+    }
+
+
+def test_projection_normalization_preserves_euclidean_aspect_ratio() -> None:
+    coordinates = np.asarray(
+        [[-4.0, -1.0], [0.0, 2.0], [4.0, -1.0]],
+        dtype=np.float64,
+    )
+
+    normalized = _orient_and_scale_projection(coordinates)
+    original_distances = np.asarray(
+        [
+            np.linalg.norm(coordinates[0] - coordinates[1]),
+            np.linalg.norm(coordinates[0] - coordinates[2]),
+            np.linalg.norm(coordinates[1] - coordinates[2]),
+        ]
+    )
+    normalized_distances = np.asarray(
+        [
+            np.linalg.norm(normalized[0] - normalized[1]),
+            np.linalg.norm(normalized[0] - normalized[2]),
+            np.linalg.norm(normalized[1] - normalized[2]),
+        ]
+    )
+
+    np.testing.assert_allclose(
+        normalized_distances / original_distances,
+        np.full(3, normalized_distances[0] / original_distances[0]),
+        rtol=1e-6,
+        atol=1e-7,
+    )
+    assert np.max(np.abs(normalized[:, 0])) == pytest.approx(1.0)
+    assert np.max(np.abs(normalized[:, 1])) == pytest.approx(0.5)
 
 
 def test_cluster_labels_use_corpus_relative_evidence_not_ubiquitous_tags() -> None:
@@ -353,6 +455,9 @@ def test_tag_projection_explicitly_leaves_tagless_items_unmapped() -> None:
     )
     assert cluster_ids[tagless_position] == -1
     np.testing.assert_array_equal(coordinates[tagless_position], np.zeros(2))
+    metadata = local_index.map_projection_metadata("tag")
+    assert metadata["parameters"]["effective_neighbors"] == 0
+    assert metadata["parameters"]["used_small_sample_fallback"] is True
 
 
 def test_hybrid_map_symmetrizes_actual_tagged_and_tagless_retrieval() -> None:
@@ -595,11 +700,24 @@ def test_save_and_load_preserve_results_and_compact_arrays(
     assert manifest.strategy_available is False
     assert manifest.ordered_items_sha256
     assert manifest.projection_is_exploratory is True
+    assert manifest.projection_algorithm_version == SEMANTIC_MAP_PROJECTION_VERSION
+    assert manifest.projection_parameters.implementation == "umap-learn"
+    assert manifest.projection_parameters.implementation_version == (
+        SEMANTIC_MAP_IMPLEMENTATION_VERSION
+    )
+    assert manifest.projection_parameters.input_mode == "precomputed"
+    assert manifest.projection_parameters.random_seed == 20260807
     assert [projection.view.value for projection in manifest.projection_views] == [
         "surface",
         "tag",
         "hybrid",
     ]
+    assert all(
+        projection.source_similarity_metric
+        and projection.input_distance_version == SEMANTIC_MAP_DISTANCE_VERSION
+        and projection.mapped_count + projection.unmapped_count == len(documents)
+        for projection in manifest.projection_views
+    )
     with np.load(artifact.vectors_path, allow_pickle=False) as arrays:
         assert "surface_idf" in arrays.files
         assert "surface_components" in arrays.files
@@ -627,6 +745,33 @@ def test_load_rejects_stale_content_and_version_bindings(
         SemanticIndex.load(artifact, expected_ontology_version="ontology.v2")
     with pytest.raises(StaleSemanticArtifactError, match="classifier version"):
         SemanticIndex.load(artifact, expected_classifier_version="classifier.v2")
+
+
+def test_load_rejects_changed_umap_runtime_and_view_metadata(
+    tmp_path: Path,
+    index: SemanticIndex,
+) -> None:
+    artifact = index.save(tmp_path / "projection-metadata")
+    manifest = json.loads(artifact.manifest_path.read_text(encoding="utf-8"))
+    manifest["projection_parameters"]["implementation_version"] = "0.0.0"
+    artifact.manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SemanticArtifactError, match="manifest is invalid"):
+        SemanticIndex.load(artifact)
+
+    artifact = index.save(tmp_path / "projection-view-metadata")
+    manifest = json.loads(artifact.manifest_path.read_text(encoding="utf-8"))
+    manifest["projection_views"][0]["source_similarity_metric"] = "invented-metric"
+    artifact.manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SemanticArtifactError, match="projection metadata changed"):
+        SemanticIndex.load(artifact)
 
 
 def test_load_rejects_nonfinite_persisted_query_transform_even_with_new_file_hash(

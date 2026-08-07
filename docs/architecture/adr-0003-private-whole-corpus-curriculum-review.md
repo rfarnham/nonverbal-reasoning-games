@@ -56,9 +56,11 @@ The workbench also exposes two explicitly experimental QA surfaces:
 - **Problem Space** projects all catalogue questions into separate Surface,
   proposed-tag, and Hybrid two-dimensional maps. A teacher can begin with a
   random filtered item, an exact stable ID, or private pasted text and then
-  follow auditable nearest-neighbor steps. The projection is deterministic
-  PCA initialization plus neighbor-graph refinement, and the UI must report
-  its measured neighbor preservation rather than call it UMAP or t-SNE.
+  follow auditable nearest-neighbor steps. The projection is fixed-seed,
+  single-worker UMAP over a precomputed monotone distance derived from each
+  view's exact served similarity relation. The UI must report the UMAP library
+  version and parameters, measured neighbor preservation, and a full-data PCA
+  comparison rather than imply that two-dimensional distance is authoritative.
   Cluster names are non-authoritative proposal-derived descriptions ranked by
   corpus-relative enrichment. Map filters include grade, published point tier,
   domain, and question type. The bulk map contains no prompt, choice, answer,

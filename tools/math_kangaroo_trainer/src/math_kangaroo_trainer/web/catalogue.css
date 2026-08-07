@@ -2705,8 +2705,199 @@ footer p {
   text-align: right;
 }
 
-.problem-selected-card .similarity-prompt {
-  margin-top: 0.8rem;
+.problem-selected-question-loading,
+.problem-selected-question-error {
+  margin: 0.9rem 0 0;
+}
+
+.problem-selected-question-loading {
+  padding: 0.8rem;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.problem-selected-question {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 0.9rem;
+  padding: 0.9rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 14px;
+  background: #fffefa;
+}
+
+.problem-selected-question section,
+.problem-selected-question h4,
+.problem-selected-question p {
+  min-width: 0;
+  margin: 0;
+}
+
+.problem-selected-question h4 {
+  margin-bottom: 0.55rem;
+  font-size: 0.76rem;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.problem-selected-source {
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.problem-selected-prompt {
+  color: var(--ink);
+  font-size: 0.94rem;
+  line-height: 1.62;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.problem-selected-assets {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.problem-selected-asset {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: white;
+}
+
+.problem-selected-asset img {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: white;
+}
+
+.problem-selected-asset figcaption {
+  padding: 0.55rem 0.7rem;
+  border-top: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.problem-selected-asset-missing {
+  padding: 1rem;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.problem-selected-choices {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding-left: 2.1rem;
+}
+
+.problem-selected-choices li {
+  min-height: 44px;
+  padding: 0.58rem 0.65rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: white;
+  font-size: 0.84rem;
+  line-height: 1.48;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.problem-selected-choices li::marker {
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.problem-selected-choice-image {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  margin-top: 0.45rem;
+}
+
+.problem-selected-choice-unparsed {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.problem-selected-choices-note {
+  padding: 0.75rem;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.problem-selected-language-helper {
+  padding: 0.8rem;
+  border: 1px solid #c7bff0;
+  border-radius: 12px;
+  background: var(--violet-soft);
+}
+
+.problem-selected-language-heading-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.problem-selected-language-heading-row .eyebrow {
+  margin-bottom: 0.2rem;
+}
+
+.problem-selected-language-heading-row h4 {
+  margin-bottom: 0;
+}
+
+.problem-selected-language-note {
+  margin-top: 0.65rem !important;
+  color: #514a76;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.problem-selected-source-prompt {
+  margin-top: 0.75rem !important;
+  color: var(--ink);
+  font-size: 0.84rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.problem-selected-source-choices {
+  margin-top: 0.65rem;
+}
+
+.problem-selected-language-status {
+  margin-top: 0.7rem;
+  background: rgb(255 255 255 / 72%);
+}
+
+.problem-selected-source-pdf {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  min-height: 44px;
+  font-size: 0.75rem;
+  font-weight: 850;
 }
 
 .problem-selected-card .compact-breakdown {
@@ -3250,6 +3441,7 @@ footer p {
   }
 
   .problem-selected-card .panel-heading,
+  .problem-selected-language-heading-row,
   .problem-search-results .panel-heading {
     display: grid;
   }

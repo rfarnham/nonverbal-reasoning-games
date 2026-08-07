@@ -616,6 +616,47 @@ class CatalogueWebApplication:
         source_payload = item.source_payload
         learner = item.learner_payload
         protected = item.protected_payload
+        english_helper: dict[str, Any] | None = None
+        if source_payload.get("english_helper_needed") is True:
+            source_choices = source_payload.get("choices", [])
+            english_choices = source_payload.get(
+                "english_choices", learner.get("choices", [])
+            )
+            english_helper = {
+                "source_language": str(
+                    source_payload.get("translation_source_language")
+                    or item.source_metadata.language
+                ),
+                "source_prompt": str(source_payload.get("stem_markdown", "")),
+                "source_choices": (
+                    source_choices
+                    if isinstance(source_choices, list)
+                    and all(isinstance(choice, str) for choice in source_choices)
+                    else []
+                ),
+                "english_prompt": str(
+                    source_payload.get("english_stem")
+                    or learner.get("stem_markdown", "")
+                ),
+                "english_choices": (
+                    english_choices
+                    if isinstance(english_choices, list)
+                    and all(isinstance(choice, str) for choice in english_choices)
+                    else []
+                ),
+                "prompt_status": str(
+                    source_payload.get("english_prompt_status") or "unknown"
+                ),
+                "choices_status": str(
+                    source_payload.get("english_options_status") or "unknown"
+                ),
+                "translation_method": str(
+                    source_payload.get("translation_method") or "unknown"
+                ),
+                "review_status": str(
+                    source_payload.get("translation_review_status") or "unknown"
+                ),
+            }
         return {
             "run_id": self.run_id,
             "item_id": item_id,
@@ -626,6 +667,7 @@ class CatalogueWebApplication:
             },
             "prompt": learner.get("stem_markdown", ""),
             "choices": learner.get("choices", []),
+            "english_helper": english_helper,
             "answer_metadata": {
                 "answer_status": item.answer_status,
                 "official_answer": protected.get("official_answer"),
@@ -637,6 +679,21 @@ class CatalogueWebApplication:
             "existing_review": self._review_payload(record),
             "promotion": self._promotion_payload(record),
             "blockers": record.promotion.public_blockers,
+            "assets": [
+                {
+                    "ordinal": index + 1,
+                    "url": (
+                        self._asset_resource_url(item_id, index)
+                        if asset.status == "available"
+                        else None
+                    ),
+                    "status": asset.status,
+                    "media_type": asset.media_type,
+                    "width": asset.width,
+                    "height": asset.height,
+                }
+                for index, asset in enumerate(item.asset_refs)
+            ],
             "source_crop_url": self._resource_url(item_id, "asset"),
             "source_pdf_url": self._resource_url(
                 item_id, "source-pdf", fragment=f"#page={source_payload.get('page', 1)}"
@@ -651,6 +708,10 @@ class CatalogueWebApplication:
     @staticmethod
     def _resource_url(item_id: str, resource: str, *, fragment: str = "") -> str:
         return f"/api/catalogue/items/{quote(item_id, safe='')}/{resource}{fragment}"
+
+    @staticmethod
+    def _asset_resource_url(item_id: str, index: int) -> str:
+        return f"/api/catalogue/items/{quote(item_id, safe='')}/assets/{index}"
 
     def _parse_review(self, item_id: str, body: Any) -> CatalogueTeacherReview:
         if not isinstance(body, dict):
@@ -876,6 +937,7 @@ class CatalogueWebApplication:
             coordinates, cluster_ids, clusters = self.semantic_index.map_projection(
                 view
             )
+            projection_metadata = self.semantic_index.map_projection_metadata(view)
             quality = self.semantic_index.map_quality(view)
         except (ValueError, SemanticIndexError) as error:
             raise CatalogueApiProblem(
@@ -941,17 +1003,12 @@ class CatalogueWebApplication:
             warnings.append("ITEMS_WITHOUT_VIEW_SIGNAL_ARE_UNMAPPED")
         return {
             "run_id": self.run_id,
-            "map_version": (
-                f"{self.semantic_index.identity_sha256[:16]}:" f"{view.value}"
-            ),
+            "map_version": (f"{self.semantic_index.identity_sha256[:16]}:{view.value}"),
             "view": view.value,
             "focus_item_id": focus_item_id,
             "projection": {
-                "algorithm_version": SEMANTIC_MAP_PROJECTION_VERSION,
-                "method": (
-                    "PCA initialization with deterministic k-nearest-neighbor "
-                    "attractive-force refinement"
-                ),
+                "algorithm_version": projection_metadata["algorithm_version"],
+                "method": projection_metadata["method"],
                 "dimensions": 2,
                 "exploratory": True,
                 "represents_mastery_or_difficulty": False,
@@ -959,6 +1016,8 @@ class CatalogueWebApplication:
                     "unreviewed catalogue proposal tags at index build"
                 ),
                 "source_metric": quality["source_metric"],
+                "input_distance_version": quality["input_distance_version"],
+                "parameters": projection_metadata["parameters"],
                 "configured_weights": {
                     "surface": self.semantic_index.config.surface_weight,
                     "tag": self.semantic_index.config.tag_weight,
@@ -1470,23 +1529,7 @@ class CatalogueWebApplication:
             raise CatalogueApiProblem(HTTPStatus.NOT_FOUND, "not_found", "Unknown item")
         item = record.item
         if resource == "asset":
-            if not item.asset_refs:
-                raise CatalogueApiProblem(
-                    HTTPStatus.GONE, "asset_unavailable", "Asset unavailable"
-                )
-            asset = item.asset_refs[0]
-            if asset.status != "available" or asset.sha256 is None:
-                raise CatalogueApiProblem(
-                    HTTPStatus.GONE,
-                    "asset_unavailable",
-                    "Asset was not available in the audited catalogue snapshot",
-                )
-            return self._safe_file(
-                Path(asset.local_ref),
-                suffixes=IMAGE_SUFFIXES,
-                expected_sha256=asset.sha256,
-                expected_bytes=asset.bytes,
-            )
+            return self.file_for_item_asset(item_id, 0)
         source_path = str(item.source_payload.get("source_path", ""))
         if resource == "source-pdf":
             document = self._source_documents.get(source_path)
@@ -1513,6 +1556,31 @@ class CatalogueWebApplication:
                 expected_bytes=snapshot.bytes,
             )
         raise CatalogueApiProblem(HTTPStatus.NOT_FOUND, "not_found", "Unknown resource")
+
+    def file_for_item_asset(self, item_id: str, index: int) -> FilePayload:
+        """Return one audited question-scoped image by its stable source order."""
+
+        record = self._items.get(item_id)
+        if record is None:
+            raise CatalogueApiProblem(HTTPStatus.NOT_FOUND, "not_found", "Unknown item")
+        assets = record.item.asset_refs
+        if index < 0 or index >= len(assets):
+            raise CatalogueApiProblem(
+                HTTPStatus.NOT_FOUND, "asset_not_found", "Question asset not found"
+            )
+        asset = assets[index]
+        if asset.status != "available" or asset.sha256 is None:
+            raise CatalogueApiProblem(
+                HTTPStatus.GONE,
+                "asset_unavailable",
+                "Asset was not available in the audited catalogue snapshot",
+            )
+        return self._safe_file(
+            Path(asset.local_ref),
+            suffixes=IMAGE_SUFFIXES,
+            expected_sha256=asset.sha256,
+            expected_bytes=asset.bytes,
+        )
 
 
 class CatalogueHTTPServer(ThreadingHTTPServer):
@@ -1777,6 +1845,21 @@ def _handler_class(
                     and segments[4] in {"asset", "source-pdf", "answer-key"}
                 ):
                     self._send_file(application.file_for_item(segments[3], segments[4]))
+                    return
+                if (
+                    len(segments) == 6
+                    and segments[:3] == ("api", "catalogue", "items")
+                    and segments[4] == "assets"
+                ):
+                    if not segments[5].isdigit():
+                        raise CatalogueApiProblem(
+                            HTTPStatus.BAD_REQUEST,
+                            "invalid_asset_index",
+                            "Question asset index must be a non-negative integer",
+                        )
+                    self._send_file(
+                        application.file_for_item_asset(segments[3], int(segments[5]))
+                    )
                     return
                 if (
                     len(segments) == 5

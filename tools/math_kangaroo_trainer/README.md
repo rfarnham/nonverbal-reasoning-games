@@ -81,10 +81,12 @@ Open the printed loopback URL. The workbench provides:
   question, an exact stable ID, or pasted question text; walk through nearby
   questions with Back/Forward history; and pan or zoom a labeled two-dimensional
   map filtered by grade, published point tier, domain, and question type;
-- separate Surface, Proposed taxonomy, and Hybrid maps. Their deterministic
-  PCA-plus-neighbor refinement is an exploratory navigation aid, not a UMAP,
-  t-SNE, mastery, or difficulty model. The UI reports measured neighbor
-  preservation and labels clusters from enriched unreviewed proposal tags;
+- separate Surface, Proposed taxonomy, and Hybrid maps. Their fixed-seed,
+  single-worker UMAP projection consumes a precomputed distance matrix derived
+  from the exact similarity relation served by each view. It remains an
+  exploratory navigation aid, not a mastery or difficulty model. The UI reports
+  its versioned parameters, measured neighbor preservation against a PCA
+  baseline, and cluster labels from enriched unreviewed proposal tags;
 - ontology skill inspection and append-only advisory approve/revise/merge/
   split/remove judgements;
 - Similarity Lab comparisons across surface, tag, and hybrid neighbors with

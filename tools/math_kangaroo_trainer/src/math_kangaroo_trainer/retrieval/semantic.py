@@ -17,12 +17,14 @@ from __future__ import annotations
 
 import hashlib
 import io
+import importlib.metadata
 import json
 import math
 import os
 import re
 import stat
 import tempfile
+import warnings
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -30,17 +32,31 @@ from typing import Any, Final, Literal, Sequence, cast
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from umap import UMAP  # type: ignore[import-untyped]
 
 from math_kangaroo_trainer.corpus.catalogue import CatalogueClassificationProposal
 from math_kangaroo_trainer.domain.catalogue_reviews import CatalogueInventoryItem
 from math_kangaroo_trainer.domain.items import ImportedItem
 
 
-SEMANTIC_INDEX_MANIFEST_VERSION: Final = "semantic-index-manifest.v3"
+SEMANTIC_INDEX_MANIFEST_VERSION: Final = "semantic-index-manifest.v4"
 SEMANTIC_INDEX_ALGORITHM_VERSION: Final = "hashed-tfidf-randomized-lsa.v1"
 SEMANTIC_INDEX_CONFIG_VERSION: Final = "semantic-index-config.v1"
 SEMANTIC_DOCUMENT_SCHEMA_VERSION: Final = "semantic-document.v1"
-SEMANTIC_MAP_PROJECTION_VERSION: Final = "semantic-map-pca-knn-attraction.v2"
+SEMANTIC_MAP_PROJECTION_VERSION: Final = "semantic-map-umap-precomputed.v1"
+SEMANTIC_MAP_IMPLEMENTATION: Final = "umap-learn"
+SEMANTIC_MAP_IMPLEMENTATION_VERSION: Final = importlib.metadata.version(
+    SEMANTIC_MAP_IMPLEMENTATION
+)
+SEMANTIC_MAP_DISTANCE_VERSION: Final = "one-minus-served-similarity-clipped.v1"
+SEMANTIC_MAP_RANDOM_SEED: Final = 20260807
+SEMANTIC_MAP_NEIGHBOR_COUNT: Final = 15
+SEMANTIC_MAP_MIN_DIST: Final = 0.1
+SEMANTIC_MAP_SPREAD: Final = 1.0
+SEMANTIC_MAP_EPOCHS: Final = 500
+SEMANTIC_MAP_SMALL_SAMPLE_FALLBACK: Final = (
+    "deterministic-linear-layout-below-three-items.v1"
+)
 SEMANTIC_MAP_CLUSTER_LABEL_VERSION: Final = "proposal-tag-lift.v1"
 SEMANTIC_MAP_HYBRID_METRIC: Final = (
     "mean-bidirectional-anchor-renormalized-similarity.v1"
@@ -250,9 +266,50 @@ class SemanticManifestItem(StrictFrozenModel):
     exact_duplicate_group_id: str | None = None
 
 
+class SemanticMapProjectionParameters(StrictFrozenModel):
+    """Versioned UMAP settings used to create every persisted map view."""
+
+    implementation: Literal["umap-learn"] = SEMANTIC_MAP_IMPLEMENTATION
+    implementation_version: str = Field(min_length=1)
+    input_mode: Literal["precomputed"] = "precomputed"
+    input_distance_version: Literal[
+        "one-minus-served-similarity-clipped.v1"
+    ] = SEMANTIC_MAP_DISTANCE_VERSION
+    configured_neighbors: Literal[15] = SEMANTIC_MAP_NEIGHBOR_COUNT
+    min_dist: float = Field(default=SEMANTIC_MAP_MIN_DIST, ge=0)
+    spread: float = Field(default=SEMANTIC_MAP_SPREAD, gt=0)
+    epochs: Literal[500] = SEMANTIC_MAP_EPOCHS
+    initialization: Literal["random"] = "random"
+    random_seed: Literal[20260807] = SEMANTIC_MAP_RANDOM_SEED
+    transform_seed: Literal[20260807] = SEMANTIC_MAP_RANDOM_SEED
+    jobs: Literal[1] = 1
+    output_metric: Literal["euclidean"] = "euclidean"
+    set_op_mix_ratio: float = Field(default=1.0, ge=0, le=1)
+    local_connectivity: float = Field(default=1.0, ge=0)
+    repulsion_strength: float = Field(default=1.0, ge=0)
+    negative_sample_rate: Literal[5] = 5
+    learning_rate: float = Field(default=1.0, gt=0)
+    small_sample_fallback: Literal[
+        "deterministic-linear-layout-below-three-items.v1"
+    ] = SEMANTIC_MAP_SMALL_SAMPLE_FALLBACK
+
+    @model_validator(mode="after")
+    def fixed_algorithm_parameters_match(self) -> "SemanticMapProjectionParameters":
+        if (
+            self.min_dist,
+            self.spread,
+            self.set_op_mix_ratio,
+            self.local_connectivity,
+            self.repulsion_strength,
+            self.learning_rate,
+        ) != (SEMANTIC_MAP_MIN_DIST, SEMANTIC_MAP_SPREAD, 1.0, 1.0, 1.0, 1.0):
+            raise ValueError("semantic projection parameters do not match the version")
+        return self
+
+
 class SemanticArtifactManifest(StrictFrozenModel):
     manifest_version: Literal[
-        "semantic-index-manifest.v3"
+        "semantic-index-manifest.v4"
     ] = SEMANTIC_INDEX_MANIFEST_VERSION
     algorithm_version: Literal[
         "hashed-tfidf-randomized-lsa.v1"
@@ -272,8 +329,9 @@ class SemanticArtifactManifest(StrictFrozenModel):
     tag_dimensions: int = Field(ge=0)
     strategy_available: Literal[False] = False
     projection_algorithm_version: Literal[
-        "semantic-map-pca-knn-attraction.v2"
+        "semantic-map-umap-precomputed.v1"
     ] = SEMANTIC_MAP_PROJECTION_VERSION
+    projection_parameters: SemanticMapProjectionParameters
     cluster_label_algorithm_version: Literal[
         "proposal-tag-lift.v1"
     ] = SEMANTIC_MAP_CLUSTER_LABEL_VERSION
@@ -289,6 +347,13 @@ class SemanticArtifactManifest(StrictFrozenModel):
             raise ValueError("ordered item manifest checksum does not match its rows")
         if self.tag_dimensions != len(self.tag_vocabulary):
             raise ValueError("tag dimensions do not match tag vocabulary")
+        if (
+            self.projection_parameters.implementation_version
+            != SEMANTIC_MAP_IMPLEMENTATION_VERSION
+        ):
+            raise ValueError(
+                "semantic projection implementation version does not match runtime"
+            )
         if tuple(value.view for value in self.projection_views) != (
             RetrievalView.SURFACE,
             RetrievalView.TAG,
@@ -301,11 +366,29 @@ class SemanticArtifactManifest(StrictFrozenModel):
                 raise ValueError(
                     "projection cluster IDs must be contiguous and ordered"
                 )
-            if sum(
+            clustered_count = sum(
                 cluster.member_count for cluster in projection.clusters
-            ) + projection.unmapped_count != len(self.ordered_items):
+            )
+            if clustered_count != projection.mapped_count:
+                raise ValueError("projection mapped count does not match its clusters")
+            if projection.mapped_count + projection.unmapped_count != len(
+                self.ordered_items
+            ):
                 raise ValueError(
                     "projection cluster counts do not cover the item manifest"
+                )
+            expected_neighbors = (
+                min(SEMANTIC_MAP_NEIGHBOR_COUNT, projection.mapped_count - 1)
+                if projection.mapped_count >= 3
+                else 0
+            )
+            if projection.effective_neighbors != expected_neighbors:
+                raise ValueError("projection effective neighbor count is inconsistent")
+            if projection.used_small_sample_fallback != (
+                0 < projection.mapped_count < 3
+            ):
+                raise ValueError(
+                    "projection small-sample fallback flag is inconsistent"
                 )
         return self
 
@@ -337,7 +420,14 @@ class SemanticMapViewManifest(StrictFrozenModel):
         RetrievalView.HYBRID,
     ]
     clusters: tuple[SemanticMapCluster, ...]
+    source_similarity_metric: str = Field(min_length=1)
+    input_distance_version: Literal[
+        "one-minus-served-similarity-clipped.v1"
+    ] = SEMANTIC_MAP_DISTANCE_VERSION
+    mapped_count: int = Field(ge=0)
     unmapped_count: int = Field(ge=0)
+    effective_neighbors: int = Field(ge=0, le=SEMANTIC_MAP_NEIGHBOR_COUNT)
+    used_small_sample_fallback: bool
     projection_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
@@ -517,6 +607,9 @@ def _semantic_identity_sha256(
                 "tag_vocabulary": list(tag_vocabulary),
                 "surface_feature_support_count": len(surface_feature_digests),
                 "projection_algorithm_version": SEMANTIC_MAP_PROJECTION_VERSION,
+                "projection_parameters": SemanticMapProjectionParameters(
+                    implementation_version=SEMANTIC_MAP_IMPLEMENTATION_VERSION
+                ).model_dump(mode="json"),
                 "cluster_label_algorithm_version": (SEMANTIC_MAP_CLUSTER_LABEL_VERSION),
                 "projection_clusters": {
                     view.value: [
@@ -785,6 +878,16 @@ def _hybrid_similarity_matrix(
     return (directional + directional.T) / 2.0, mapped
 
 
+def _source_similarity_metric(view: RetrievalView) -> str:
+    if view is RetrievalView.SURFACE:
+        return "surface-cosine-similarity.v1"
+    if view is RetrievalView.TAG:
+        return "tag-cosine-similarity.v1"
+    if view is RetrievalView.HYBRID:
+        return SEMANTIC_MAP_HYBRID_METRIC
+    raise ValueError("semantic map does not support a strategy projection")
+
+
 def _projection_inputs_for_view(
     view: RetrievalView,
     *,
@@ -801,7 +904,7 @@ def _projection_inputs_for_view(
             vectors,
             np.asarray(vectors @ vectors.T, dtype=np.float64),
             mapped,
-            "surface-cosine-similarity.v1",
+            _source_similarity_metric(view),
         )
     if view is RetrievalView.TAG:
         vectors = _normalize_rows(tag_vectors)
@@ -810,7 +913,7 @@ def _projection_inputs_for_view(
             vectors,
             np.asarray(vectors @ vectors.T, dtype=np.float64),
             mapped,
-            "tag-cosine-similarity.v1",
+            _source_similarity_metric(view),
         )
     if view is RetrievalView.HYBRID:
         similarities, mapped = _hybrid_similarity_matrix(
@@ -822,23 +925,26 @@ def _projection_inputs_for_view(
             _combined_exploration_vectors(surface_vectors, tag_vectors, config),
             similarities,
             mapped,
-            SEMANTIC_MAP_HYBRID_METRIC,
+            _source_similarity_metric(view),
         )
     raise ValueError("semantic map does not support a strategy projection")
 
 
 def _orient_and_scale_projection(values: np.ndarray) -> np.ndarray:
     coordinates = np.asarray(values, dtype=np.float64).copy()
+    if coordinates.size == 0:
+        return np.asarray(coordinates, dtype=np.float32)
+    coordinates -= np.mean(coordinates, axis=0)
     for dimension in range(coordinates.shape[1]):
         column = coordinates[:, dimension]
         pivot = int(np.argmax(np.abs(column)))
         if column[pivot] < 0:
             coordinates[:, dimension] *= -1
-        extent = float(np.max(np.abs(coordinates[:, dimension])))
-        if extent > 1e-12:
-            coordinates[:, dimension] /= extent
-        else:
-            coordinates[:, dimension] = 0
+    extent = float(np.max(np.abs(coordinates)))
+    if extent > 1e-12:
+        coordinates /= extent
+    else:
+        coordinates.fill(0)
     return np.asarray(coordinates, dtype=np.float32)
 
 
@@ -853,45 +959,87 @@ def _pca_projection(vectors: np.ndarray) -> np.ndarray:
     return _orient_and_scale_projection(coordinates)
 
 
-def _neighbor_graph_projection(
-    vectors: np.ndarray,
-    source_similarities: np.ndarray,
-) -> np.ndarray:
-    """Full-data PCA initialization plus deterministic served-kNN attraction."""
+def _served_distance_matrix(source_similarities: np.ndarray) -> np.ndarray:
+    """Convert the exact served similarity relation into UMAP distances.
 
-    rows = vectors.shape[0]
-    if source_similarities.shape != (rows, rows):
-        raise ValueError("source similarity matrix must cover all projected rows")
-    coordinates = np.asarray(_pca_projection(vectors), dtype=np.float64)
-    initial = coordinates.copy()
+    Every available map relation is symmetric: Surface and Tag cosine are
+    naturally symmetric, while Hybrid is explicitly the mean of both served
+    anchor directions. ``1 - similarity`` is monotone, so it preserves the
+    retrieval ordering while giving UMAP one precomputed distance matrix. The
+    clip only absorbs floating-point drift immediately outside cosine's
+    theoretical ``[-1, 1]`` range.
+    """
 
-    if rows > 1:
-        neighbor_count = min(10, rows - 1)
-        similarities = np.asarray(source_similarities, dtype=np.float64).copy()
-        np.fill_diagonal(similarities, -np.inf)
-        neighbors = np.argsort(-similarities, axis=1, kind="stable")[:, :neighbor_count]
-        for _ in range(24):
-            neighbor_centers = np.mean(coordinates[neighbors], axis=1)
-            coordinates += 0.12 * (neighbor_centers - coordinates)
-            coordinates += 0.04 * (initial - coordinates)
-    candidate = _orient_and_scale_projection(coordinates)
-    baseline = _orient_and_scale_projection(initial)
-    quality_anchors = (
-        np.linspace(0, rows - 1, num=400, dtype=np.int64)
-        if rows > 400
-        else np.arange(rows, dtype=np.int64)
-    )
-    if _neighbor_overlap_at_k(
-        source_similarities,
-        candidate,
-        anchor_indices=quality_anchors,
-    ) < _neighbor_overlap_at_k(
-        source_similarities,
-        baseline,
-        anchor_indices=quality_anchors,
-    ):
-        return baseline
-    return candidate
+    similarities = np.asarray(source_similarities, dtype=np.float64)
+    if similarities.ndim != 2 or similarities.shape[0] != similarities.shape[1]:
+        raise ValueError("source similarity matrix must be square")
+    if not np.isfinite(similarities).all():
+        raise ValueError("source similarity matrix must be finite")
+    if not np.allclose(similarities, similarities.T, rtol=0, atol=1e-7):
+        raise ValueError("source similarity matrix must be symmetric")
+    if np.any(similarities < -1.00001) or np.any(similarities > 1.00001):
+        raise ValueError("source similarities must remain in cosine bounds")
+    distances = np.clip(1.0 - similarities, 0.0, 2.0)
+    np.fill_diagonal(distances, 0.0)
+    return np.asarray(distances, dtype=np.float32)
+
+
+def _effective_umap_neighbors(rows: int) -> int:
+    if rows < 3:
+        return 0
+    return min(SEMANTIC_MAP_NEIGHBOR_COUNT, rows - 1)
+
+
+def _umap_projection(source_similarities: np.ndarray) -> np.ndarray:
+    """Run deterministic UMAP over the exact served-distance relation."""
+
+    distances = _served_distance_matrix(source_similarities)
+    rows = len(distances)
+    if rows == 0:
+        return np.zeros((0, 2), dtype=np.float32)
+    if rows == 1:
+        return np.zeros((1, 2), dtype=np.float32)
+    if rows == 2:
+        separation = float(distances[0, 1])
+        if separation <= 1e-12:
+            return np.zeros((2, 2), dtype=np.float32)
+        return _orient_and_scale_projection(
+            np.asarray(
+                [[-separation / 2.0, 0.0], [separation / 2.0, 0.0]],
+                dtype=np.float64,
+            )
+        )
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="using precomputed metric; inverse_transform will be unavailable",
+            category=UserWarning,
+        )
+        raw_coordinates = UMAP(
+            n_neighbors=_effective_umap_neighbors(rows),
+            n_components=2,
+            metric="precomputed",
+            output_metric="euclidean",
+            n_epochs=SEMANTIC_MAP_EPOCHS,
+            learning_rate=1.0,
+            init="random",
+            min_dist=SEMANTIC_MAP_MIN_DIST,
+            spread=SEMANTIC_MAP_SPREAD,
+            low_memory=True,
+            n_jobs=1,
+            set_op_mix_ratio=1.0,
+            local_connectivity=1.0,
+            repulsion_strength=1.0,
+            negative_sample_rate=5,
+            random_state=SEMANTIC_MAP_RANDOM_SEED,
+            transform_seed=SEMANTIC_MAP_RANDOM_SEED,
+            verbose=False,
+        ).fit_transform(distances)
+    coordinates = np.asarray(raw_coordinates, dtype=np.float64)
+    if coordinates.shape != (rows, 2) or not np.isfinite(coordinates).all():
+        raise SemanticArtifactError("UMAP returned invalid projection coordinates")
+    return _orient_and_scale_projection(coordinates)
 
 
 def _neighbor_overlap_at_k(
@@ -937,6 +1085,63 @@ def _neighbor_overlap_at_k(
         for row in range(len(anchors))
     ]
     return round(float(np.mean(overlap)), 6)
+
+
+def _neighbor_cutoff_tie_diagnostics(
+    source_similarities: np.ndarray,
+    *,
+    k: int = 10,
+    anchor_indices: np.ndarray | None = None,
+    tolerance: float = 1e-7,
+) -> dict[str, float | int]:
+    """Quantify when exact top-k membership depends on stable tie ordering."""
+
+    rows = len(source_similarities)
+    if source_similarities.shape != (rows, rows):
+        raise ValueError("source similarity matrix must be square")
+    anchors: Any = (
+        np.arange(rows, dtype=np.int64)
+        if anchor_indices is None
+        else np.asarray(anchor_indices, dtype=np.int64)
+    )
+    if np.any(anchors < 0) or np.any(anchors >= rows):
+        raise ValueError("anchor indices must identify source candidates")
+    if rows <= 1 or len(anchors) == 0:
+        return {
+            "tie_at_cutoff_anchor_count": 0,
+            "tie_at_cutoff_anchor_fraction": 0.0,
+            "mean_cutoff_tie_candidate_count": 0.0,
+            "max_cutoff_tie_candidate_count": 0,
+            "similarity_tie_tolerance": tolerance,
+        }
+
+    effective_k = min(k, rows - 1)
+    source_scores = np.asarray(source_similarities, dtype=np.float64).copy()
+    np.fill_diagonal(source_scores, -np.inf)
+    affected_tie_sizes: list[int] = []
+    for anchor in anchors:
+        row = source_scores[int(anchor)]
+        ordered = np.sort(row)[::-1]
+        cutoff = float(ordered[effective_k - 1])
+        at_cutoff = np.isclose(row, cutoff, rtol=0, atol=tolerance)
+        strictly_above = (row > cutoff) & ~at_cutoff
+        available_tie_slots = effective_k - int(np.count_nonzero(strictly_above))
+        tied_candidates = int(np.count_nonzero(at_cutoff))
+        if tied_candidates > available_tie_slots:
+            affected_tie_sizes.append(tied_candidates)
+
+    affected_count = len(affected_tie_sizes)
+    return {
+        "tie_at_cutoff_anchor_count": affected_count,
+        "tie_at_cutoff_anchor_fraction": round(affected_count / len(anchors), 6),
+        "mean_cutoff_tie_candidate_count": (
+            round(float(np.mean(affected_tie_sizes)), 6) if affected_tie_sizes else 0.0
+        ),
+        "max_cutoff_tie_candidate_count": (
+            max(affected_tie_sizes) if affected_tie_sizes else 0
+        ),
+        "similarity_tie_tolerance": tolerance,
+    }
 
 
 def _semantic_map_cluster_count(item_count: int) -> int:
@@ -1170,7 +1375,6 @@ def _projection_clusters(
 def _build_semantic_map(
     *,
     items: Sequence[SemanticManifestItem],
-    vectors: np.ndarray,
     source_similarities: np.ndarray,
     mapped: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, tuple[SemanticMapCluster, ...]]:
@@ -1185,10 +1389,7 @@ def _build_semantic_map(
     mapped_items = tuple(
         item for item, included in zip(items, mapped, strict=True) if bool(included)
     )
-    mapped_coordinates = _neighbor_graph_projection(
-        vectors[mapped],
-        source_similarities[np.ix_(mapped, mapped)],
-    )
+    mapped_coordinates = _umap_projection(source_similarities[np.ix_(mapped, mapped)])
     mapped_cluster_ids = _cluster_coordinates(mapped_coordinates, mapped_items)
     coordinates[mapped] = mapped_coordinates
     cluster_ids[mapped] = mapped_cluster_ids
@@ -1355,7 +1556,7 @@ class SemanticIndex:
             RetrievalView.HYBRID,
         ):
             (
-                projection_vectors,
+                _,
                 source_similarities,
                 mapped,
                 _,
@@ -1367,7 +1568,6 @@ class SemanticIndex:
             )
             coordinates, cluster_ids, clusters = _build_semantic_map(
                 items=items,
-                vectors=projection_vectors,
                 source_similarities=source_similarities,
                 mapped=mapped,
             )
@@ -1522,6 +1722,31 @@ class SemanticIndex:
             self.projection_clusters[resolved],
         )
 
+    def map_projection_metadata(
+        self,
+        view: RetrievalView | str,
+    ) -> dict[str, Any]:
+        resolved = RetrievalView(view)
+        if resolved is RetrievalView.STRATEGY:
+            raise StrategyViewUnavailableError(
+                "strategy projection is unavailable until reviewed solution paths exist"
+            )
+        mapped_count = int(np.count_nonzero(self.projection_cluster_ids[resolved] >= 0))
+        parameters = SemanticMapProjectionParameters(
+            implementation_version=SEMANTIC_MAP_IMPLEMENTATION_VERSION
+        ).model_dump(mode="json")
+        parameters["effective_neighbors"] = _effective_umap_neighbors(mapped_count)
+        parameters["used_small_sample_fallback"] = 0 < mapped_count < 3
+        return {
+            "algorithm_version": SEMANTIC_MAP_PROJECTION_VERSION,
+            "method": (
+                "UMAP over a precomputed distance matrix derived monotonically "
+                "from the exact served similarity relation"
+            ),
+            "source_similarity_metric": _source_similarity_metric(resolved),
+            "parameters": parameters,
+        }
+
     def map_quality(
         self,
         view: RetrievalView | str,
@@ -1561,7 +1786,7 @@ class SemanticIndex:
             if count > 1
         }
         duplicate_candidate_count = sum(repeated_duplicate_groups.values())
-        quality_caveat = (
+        duplicate_caveat = (
             "Exact-duplicate candidates are included and can inflate kNN overlap."
             if duplicate_candidate_count
             else "No mapped exact-duplicate groups are present."
@@ -1581,17 +1806,48 @@ class SemanticIndex:
                 "candidate_count": 0,
                 "exact_duplicate_group_count": 0,
                 "exact_duplicate_candidate_count": 0,
+                "tie_at_cutoff_anchor_count": 0,
+                "tie_at_cutoff_anchor_fraction": 0.0,
+                "mean_cutoff_tie_candidate_count": 0.0,
+                "max_cutoff_tie_candidate_count": 0,
+                "similarity_tie_tolerance": 1e-7,
                 "neighbor_k": 0,
                 "knn_overlap": 0.0,
                 "pca_knn_overlap": 0.0,
                 "knn_overlap_improvement": 0.0,
                 "source_metric": source_metric,
-                "quality_caveat": quality_caveat,
+                "input_distance_version": SEMANTIC_MAP_DISTANCE_VERSION,
+                "projection_method": SEMANTIC_MAP_PROJECTION_VERSION,
+                "projection_implementation": SEMANTIC_MAP_IMPLEMENTATION,
+                "projection_implementation_version": (
+                    SEMANTIC_MAP_IMPLEMENTATION_VERSION
+                ),
+                "configured_neighbors": SEMANTIC_MAP_NEIGHBOR_COUNT,
+                "effective_neighbors": 0,
+                "baseline_method": "full-data-pca.v1",
+                "quality_caveat": duplicate_caveat,
             }
             self._projection_quality_cache[resolved] = empty_quality
             return dict(empty_quality)
         mapped_vectors = vectors[mapped]
         mapped_similarities = similarities[np.ix_(mapped, mapped)]
+        tie_diagnostics = _neighbor_cutoff_tie_diagnostics(
+            mapped_similarities,
+            anchor_indices=anchor_indices,
+        )
+        tie_affected_count = int(tie_diagnostics["tie_at_cutoff_anchor_count"])
+        tie_fraction = float(tie_diagnostics["tie_at_cutoff_anchor_fraction"])
+        tie_caveat = (
+            "Similarity ties cross the k-neighbor cutoff for "
+            f"{tie_affected_count} of {len(anchor_indices)} sampled anchors "
+            f"({tie_fraction:.1%}; mean "
+            f"{float(tie_diagnostics['mean_cutoff_tie_candidate_count']):.1f} "
+            "candidates in each affected cutoff tie). Exact kNN overlap is "
+            "stable-index-order dependent."
+            if tie_affected_count
+            else "No similarity ties cross the sampled k-neighbor cutoffs."
+        )
+        quality_caveat = f"{duplicate_caveat} {tie_caveat}"
         final_coordinates = self.projection_coordinates[resolved][mapped]
         pca_coordinates = _pca_projection(mapped_vectors)
         knn_overlap = _neighbor_overlap_at_k(
@@ -1609,11 +1865,19 @@ class SemanticIndex:
             "candidate_count": int(candidate_count),
             "exact_duplicate_group_count": len(repeated_duplicate_groups),
             "exact_duplicate_candidate_count": duplicate_candidate_count,
+            **tie_diagnostics,
             "neighbor_k": min(10, max(0, candidate_count - 1)),
             "knn_overlap": knn_overlap,
             "pca_knn_overlap": pca_knn_overlap,
             "knn_overlap_improvement": round(knn_overlap - pca_knn_overlap, 6),
             "source_metric": source_metric,
+            "input_distance_version": SEMANTIC_MAP_DISTANCE_VERSION,
+            "projection_method": SEMANTIC_MAP_PROJECTION_VERSION,
+            "projection_implementation": SEMANTIC_MAP_IMPLEMENTATION,
+            "projection_implementation_version": SEMANTIC_MAP_IMPLEMENTATION_VERSION,
+            "configured_neighbors": SEMANTIC_MAP_NEIGHBOR_COUNT,
+            "effective_neighbors": _effective_umap_neighbors(candidate_count),
+            "baseline_method": "full-data-pca.v1",
             "quality_caveat": quality_caveat,
         }
         self._projection_quality_cache[resolved] = quality
@@ -1958,14 +2222,13 @@ class SemanticIndex:
                 mode="wb", suffix=".npz", dir=directory, delete=False
             ) as target:
                 temporary_vectors = Path(target.name)
-                np.savez_compressed(
-                    target,
-                    surface_vectors=self.surface_vectors,
-                    tag_vectors=self.tag_vectors,
-                    surface_idf=self.surface_idf,
-                    surface_components=self.surface_components,
-                    surface_feature_digests=self.surface_feature_digests,
-                    surface_feature_document_frequencies=(
+                persisted_arrays: dict[str, Any] = {
+                    "surface_vectors": self.surface_vectors,
+                    "tag_vectors": self.tag_vectors,
+                    "surface_idf": self.surface_idf,
+                    "surface_components": self.surface_components,
+                    "surface_feature_digests": self.surface_feature_digests,
+                    "surface_feature_document_frequencies": (
                         self.surface_feature_document_frequencies
                     ),
                     **{
@@ -1988,7 +2251,8 @@ class SemanticIndex:
                             RetrievalView.HYBRID,
                         )
                     },
-                )
+                }
+                np.savez_compressed(target, **persisted_arrays)
                 target.flush()
                 os.fsync(target.fileno())
             os.replace(temporary_vectors, vectors_path)
@@ -2007,12 +2271,27 @@ class SemanticIndex:
             surface_dimensions=self.surface_vectors.shape[1],
             surface_feature_support_count=len(self.surface_feature_digests),
             tag_dimensions=self.tag_vectors.shape[1],
+            projection_parameters=SemanticMapProjectionParameters(
+                implementation_version=SEMANTIC_MAP_IMPLEMENTATION_VERSION
+            ),
             projection_views=tuple(
                 SemanticMapViewManifest(
                     view=cast(Any, view),
                     clusters=self.projection_clusters[view],
+                    source_similarity_metric=_source_similarity_metric(view),
+                    mapped_count=int(
+                        np.count_nonzero(self.projection_cluster_ids[view] >= 0)
+                    ),
                     unmapped_count=int(
                         np.count_nonzero(self.projection_cluster_ids[view] < 0)
+                    ),
+                    effective_neighbors=_effective_umap_neighbors(
+                        int(np.count_nonzero(self.projection_cluster_ids[view] >= 0))
+                    ),
+                    used_small_sample_fallback=(
+                        0
+                        < int(np.count_nonzero(self.projection_cluster_ids[view] >= 0))
+                        < 3
                     ),
                     projection_sha256=_projection_sha256(
                         self.projection_coordinates[view],
@@ -2276,19 +2555,33 @@ class SemanticIndex:
             RetrievalView.TAG,
             RetrievalView.HYBRID,
         ):
+            projection_manifest = projection_manifests[view]
+            mapped_count = int(np.count_nonzero(projection_cluster_ids[view] >= 0))
+            if (
+                projection_manifest.source_similarity_metric
+                != _source_similarity_metric(view)
+                or projection_manifest.mapped_count != mapped_count
+                or projection_manifest.effective_neighbors
+                != _effective_umap_neighbors(mapped_count)
+                or projection_manifest.used_small_sample_fallback
+                != (0 < mapped_count < 3)
+            ):
+                raise SemanticArtifactError(
+                    f"{view.value} semantic projection metadata changed"
+                )
             if (
                 _projection_sha256(
                     projection_coordinates[view],
                     projection_cluster_ids[view],
                     projection_clusters[view],
                 )
-                != projection_manifests[view].projection_sha256
+                != projection_manifest.projection_sha256
             ):
                 raise SemanticArtifactError(
                     f"{view.value} semantic projection checksum changed"
                 )
             (
-                projection_vectors,
+                _,
                 source_similarities,
                 mapped,
                 _,
@@ -2304,7 +2597,6 @@ class SemanticIndex:
                 expected_clusters,
             ) = _build_semantic_map(
                 items=manifest.ordered_items,
-                vectors=projection_vectors,
                 source_similarities=source_similarities,
                 mapped=mapped,
             )
@@ -2344,7 +2636,10 @@ __all__ = [
     "SEMANTIC_INDEX_CONFIG_VERSION",
     "SEMANTIC_INDEX_MANIFEST_VERSION",
     "SEMANTIC_MAP_CLUSTER_LABEL_VERSION",
+    "SEMANTIC_MAP_DISTANCE_VERSION",
     "SEMANTIC_MAP_HYBRID_METRIC",
+    "SEMANTIC_MAP_IMPLEMENTATION",
+    "SEMANTIC_MAP_IMPLEMENTATION_VERSION",
     "SEMANTIC_MAP_PROJECTION_VERSION",
     "TEXT_QUERY_LOW_EVIDENCE",
     "TEXT_QUERY_NO_CORPUS_EVIDENCE",
@@ -2361,6 +2656,7 @@ __all__ = [
     "SemanticIndexConfig",
     "SemanticIndexError",
     "SemanticMapCluster",
+    "SemanticMapProjectionParameters",
     "SemanticMapTagEvidence",
     "SemanticMapViewManifest",
     "SemanticNeighbor",

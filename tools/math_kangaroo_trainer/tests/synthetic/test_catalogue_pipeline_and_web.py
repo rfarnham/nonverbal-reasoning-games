@@ -201,6 +201,12 @@ def test_catalogue_does_not_trust_an_asset_that_appears_after_build(
             f"/api/catalogue/items/{item_id}/asset",
         )
         assert status == HTTPStatus.GONE
+        status, _, _ = request(
+            port,
+            "GET",
+            f"/api/catalogue/items/{item_id}/assets/0",
+        )
+        assert status == HTTPStatus.GONE
 
 
 def test_catalogue_http_exposes_taxonomy_neighbors_and_policy_without_bulk_content(
@@ -229,7 +235,7 @@ def test_catalogue_http_exposes_taxonomy_neighbors_and_policy_without_bulk_conte
         assert status == HTTPStatus.OK
         assert problem_map["projection"]["exploratory"] is True
         assert problem_map["projection"]["represents_mastery_or_difficulty"] is False
-        assert "PCA initialization" in problem_map["projection"]["method"]
+        assert "UMAP" in problem_map["projection"]["method"]
         projection = problem_map["projection"]
         quality = projection["quality"]
         assert "effective_facets" not in projection
@@ -237,6 +243,14 @@ def test_catalogue_http_exposes_taxonomy_neighbors_and_policy_without_bulk_conte
         assert projection["source_metric"] == (
             "mean-bidirectional-anchor-renormalized-similarity.v1"
         )
+        assert projection["input_distance_version"] == (
+            "one-minus-served-similarity-clipped.v1"
+        )
+        assert projection["parameters"]["implementation"] == "umap-learn"
+        assert projection["parameters"]["input_mode"] == "precomputed"
+        assert projection["parameters"]["random_seed"] == 20260807
+        assert projection["parameters"]["jobs"] == 1
+        assert projection["parameters"]["effective_neighbors"] == 15
         assert projection["configured_weights"] == {
             "surface": application.semantic_index.config.surface_weight,
             "tag": application.semantic_index.config.tag_weight,
@@ -251,6 +265,10 @@ def test_catalogue_http_exposes_taxonomy_neighbors_and_policy_without_bulk_conte
         assert quality["candidate_count"] == sum(
             point["mapped"] for point in problem_map["points"]
         )
+        assert 0 <= quality["tie_at_cutoff_anchor_fraction"] <= 1
+        assert quality["tie_at_cutoff_anchor_count"] <= quality["sample_size"]
+        if quality["tie_at_cutoff_anchor_count"]:
+            assert "stable-index-order dependent" in quality["quality_caveat"]
         assert quality["knn_overlap_improvement"] == round(
             quality["knn_overlap"] - quality["pca_knn_overlap"], 6
         )
@@ -350,6 +368,52 @@ def test_catalogue_http_exposes_taxonomy_neighbors_and_policy_without_bulk_conte
         assert status == HTTPStatus.OK
         assert detail["prompt"].startswith(("Invented prompt", "English helper"))
         assert detail["source_crop_url"].endswith("/asset")
+        assert detail["assets"] == [
+            {
+                "ordinal": 1,
+                "url": f"/api/catalogue/items/{item_id}/assets/0",
+                "status": "available",
+                "media_type": "image/webp",
+                "width": 100,
+                "height": 80,
+            }
+        ]
+        helper = detail["english_helper"]
+        assert helper == {
+            "source_language": "English and Greek",
+            "source_prompt": "Invented prompt 0: count the imaginary tokens.",
+            "source_choices": detail["choices"],
+            "english_prompt": "English helper for item 0",
+            "english_choices": detail["choices"],
+            "prompt_status": "translated",
+            "choices_status": "translated",
+            "translation_method": "invented-human-review",
+            "review_status": "translated",
+        }
+        assert "Invented translation note" not in data.decode("utf-8")
+        assert "local_ref" not in data.decode("utf-8")
+
+        status, headers, asset_data = request(
+            port,
+            "GET",
+            f"/api/catalogue/items/{item_id}/assets/0",
+        )
+        assert status == HTTPStatus.OK
+        assert headers["content-type"] == "image/webp"
+        assert asset_data == b"image-0"
+
+        status, _, _ = request(
+            port,
+            "GET",
+            f"/api/catalogue/items/{item_id}/assets/not-an-index",
+        )
+        assert status == HTTPStatus.BAD_REQUEST
+        status, _, _ = request(
+            port,
+            "GET",
+            f"/api/catalogue/items/{item_id}/assets/99",
+        )
+        assert status == HTTPStatus.NOT_FOUND
 
         status, _, data = request(
             port,

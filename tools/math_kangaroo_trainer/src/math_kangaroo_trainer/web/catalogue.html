@@ -879,7 +879,84 @@
                       </button>
                     </div>
                   </header>
-                  <p id="problem-selected-prompt" class="similarity-prompt"></p>
+                  <div
+                    id="problem-selected-question-loading"
+                    class="problem-selected-question-loading"
+                    role="status"
+                    hidden
+                  >
+                    Loading the complete question…
+                  </div>
+                  <p
+                    id="problem-selected-question-error"
+                    class="inline-error problem-selected-question-error"
+                    role="alert"
+                    hidden
+                  ></p>
+                  <div id="problem-selected-question" class="problem-selected-question" hidden>
+                    <p id="problem-selected-source" class="problem-selected-source"></p>
+                    <section aria-labelledby="problem-selected-prompt-heading">
+                      <h4 id="problem-selected-prompt-heading">Complete prompt</h4>
+                      <p id="problem-selected-prompt" class="problem-selected-prompt"></p>
+                    </section>
+                    <section
+                      id="problem-selected-assets-section"
+                      class="problem-selected-assets-section"
+                      aria-labelledby="problem-selected-assets-heading"
+                    >
+                      <h4 id="problem-selected-assets-heading">Question artwork</h4>
+                      <div id="problem-selected-assets" class="problem-selected-assets"></div>
+                    </section>
+                    <section
+                      id="problem-selected-choices-section"
+                      class="problem-selected-choices-section"
+                      aria-labelledby="problem-selected-choices-heading"
+                    >
+                      <h4 id="problem-selected-choices-heading">Answer choices</h4>
+                      <ol id="problem-selected-choices" class="problem-selected-choices" type="A"></ol>
+                      <p id="problem-selected-choices-note" class="problem-selected-choices-note" hidden></p>
+                    </section>
+                    <section
+                      id="problem-selected-language-helper"
+                      class="problem-selected-language-helper"
+                      aria-labelledby="problem-selected-language-heading"
+                      hidden
+                    >
+                      <div class="problem-selected-language-heading-row">
+                        <div>
+                          <p class="eyebrow">Translation evidence</p>
+                          <h4 id="problem-selected-language-heading">Source-language transcription</h4>
+                        </div>
+                        <span id="problem-selected-language-label" class="status-badge"></span>
+                      </div>
+                      <p class="problem-selected-language-note">
+                        The English helper appears above. Compare this transcription with the
+                        audited source image before treating it as authoritative.
+                      </p>
+                      <p id="problem-selected-source-prompt" class="problem-selected-source-prompt"></p>
+                      <ol
+                        id="problem-selected-source-choices"
+                        class="problem-selected-choices problem-selected-source-choices"
+                        type="A"
+                      ></ol>
+                      <p
+                        id="problem-selected-source-choices-note"
+                        class="problem-selected-choices-note"
+                        hidden
+                      ></p>
+                      <dl id="problem-selected-language-status" class="compact-breakdown"></dl>
+                    </section>
+                    <a
+                      id="problem-selected-source-pdf"
+                      class="problem-selected-source-pdf"
+                      href="#"
+                      target="_blank"
+                      rel="noreferrer"
+                      hidden
+                    >
+                      Inspect source PDF <span aria-hidden="true">↗</span>
+                    </a>
+                  </div>
                   <dl id="problem-selected-metadata" class="compact-breakdown"></dl>
                   <div id="problem-selected-tags" class="tag-row" aria-label="Selected question tags"></div>
                 </article>
