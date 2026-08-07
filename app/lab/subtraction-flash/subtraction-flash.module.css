@@ -562,9 +562,9 @@
 }
 
 .answerModeSwitch {
-  width: min(100%, 390px);
+  width: min(100%, 500px);
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 4px;
   justify-self: center;
   padding: 4px;
@@ -665,6 +665,175 @@
 
 .answerButton:disabled {
   cursor: default;
+}
+
+.traceSurface {
+  width: min(100%, 620px);
+  display: grid;
+  gap: 7px;
+}
+
+.traceInstruction {
+  margin: 0;
+  color: var(--muted);
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 760;
+  line-height: 1.35;
+}
+
+.traceGrid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.traceButton {
+  min-width: 0;
+  min-height: 100px;
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  border: 2px solid #8b8478;
+  border-radius: 18px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    border-color 100ms ease,
+    background 100ms ease,
+    box-shadow 100ms ease;
+}
+
+.traceButton:disabled {
+  cursor: default;
+}
+
+.traceDigit {
+  width: min(100%, 62px);
+  height: 86px;
+  display: block;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.traceGuideHalo,
+.traceGuide,
+.traceInk {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.traceGuideHalo {
+  stroke: #fff;
+  stroke-width: 14;
+}
+
+.traceGuide {
+  stroke: #827b70;
+  stroke-width: 7;
+}
+
+.traceInk {
+  stroke: var(--focus);
+  stroke-width: 5.5;
+}
+
+.traceButton[data-state="drawing"] {
+  border-color: var(--focus);
+  background: #eef7ff;
+  box-shadow: 0 0 0 4px rgb(22 121 210 / 10%);
+}
+
+.traceButton[data-state="almost"] {
+  border-color: #c48a12;
+  background: #fff5cc;
+  color: #654800;
+}
+
+.traceButton[data-state="almost"] .traceGuide {
+  stroke: #b9800e;
+}
+
+.traceButton[data-state="almost"] .traceInk {
+  stroke: #7b5700;
+}
+
+.traceButton[data-state="accepted"],
+.traceButton[data-state="correct"] {
+  border-color: var(--correct);
+  background: #e7f5f1;
+}
+
+.traceButton[data-state="accepted"] .traceGuide,
+.traceButton[data-state="accepted"] .traceInk,
+.traceButton[data-state="correct"] .traceGuide,
+.traceButton[data-state="correct"] .traceInk {
+  stroke: var(--correct);
+}
+
+.traceButton[data-state="incorrect"] {
+  border-color: var(--incorrect);
+  background: #fff0ed;
+}
+
+.traceButton[data-state="incorrect"] .traceGuide,
+.traceButton[data-state="incorrect"] .traceInk {
+  stroke: var(--incorrect);
+}
+
+.traceButton[data-state="muted"] {
+  opacity: 0.44;
+}
+
+.traceFeedback {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 5px 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: #654800;
+  text-align: center;
+  font-size: 0.84rem;
+  font-weight: 710;
+  line-height: 1.3;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 100ms ease;
+}
+
+.traceFeedback[data-visible="true"] {
+  border-color: #d5a12f;
+  background: #fff5cc;
+  visibility: visible;
+  opacity: 1;
+}
+
+.traceFeedbackSymbol {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.board[data-answer-mode="trace"] .answerSection {
+  gap: 8px;
+  padding: 12px 20px 14px;
 }
 
 .drawSurface {
@@ -993,6 +1162,7 @@
 .finishButton:focus-visible,
 .listeningCard:focus-visible,
 .answerButton:focus-visible,
+.traceButton:focus-visible,
 .answerModeButton:focus-visible,
 .digitCanvas:focus-visible,
 .clearButton:focus-visible,
@@ -1031,6 +1201,10 @@
     --prompt-size: min(400px, 50svh, 52vw);
   }
 
+  .board[data-answer-mode="trace"] .promptArea {
+    --prompt-size: min(260px, 32svh, 34vw);
+  }
+
   .drawSurface {
     grid-template-columns: minmax(0, 1fr) 116px;
     grid-template-rows: minmax(0, 1fr) 48px;
@@ -1063,12 +1237,136 @@
     --prompt-size: min(340px, 44svh, 46vw);
   }
 
+  .board[data-answer-mode="trace"] .promptArea {
+    --prompt-size: min(160px, 21svh, 21vw);
+    padding: 70px 14px 10px;
+  }
+
+  .board[data-answer-mode="trace"] .answerSection {
+    padding-block: 8px 10px;
+  }
+
+  .board[data-answer-mode="trace"] .horizontalProblem {
+    gap: 6px;
+    font-size: 2.25rem;
+  }
+
+  .board[data-answer-mode="trace"] .verticalProblem {
+    width: 94px;
+    grid-template-columns: 25px 1fr;
+    font-size: 3.15rem;
+  }
+
+  .board[data-answer-mode="trace"] .verticalRule {
+    height: 4px;
+    margin-top: 8px;
+  }
+
+  .board[data-answer-mode="trace"] .traceSurface {
+    gap: 5px;
+  }
+
+  .board[data-answer-mode="trace"] .traceGrid {
+    gap: 6px;
+  }
+
+  .board[data-answer-mode="trace"] .traceButton {
+    min-height: 70px;
+    border-radius: 14px;
+  }
+
+  .board[data-answer-mode="trace"] .traceDigit {
+    width: min(100%, 44px);
+    height: 62px;
+  }
+
+  .board[data-answer-mode="trace"] .traceFeedback {
+    min-height: 28px;
+    padding-block: 1px;
+  }
+
   .board[data-answer-mode="draw"] .digitCanvas {
     height: clamp(200px, 27svh, 220px);
   }
 
   .answerSection {
     padding-block: 18px 20px;
+  }
+}
+
+@media (max-width: 820px) and (min-width: 621px) and (min-height: 821px) {
+  .board[data-answer-mode="trace"] .promptArea {
+    --prompt-size: min(220px, 26svh, 28vw);
+    padding: 76px 20px 20px;
+  }
+
+  .board[data-answer-mode="trace"] .answerSection {
+    padding-block: 10px 12px;
+  }
+
+  .board[data-answer-mode="trace"] .traceButton {
+    min-height: 84px;
+    padding-block: 4px;
+  }
+
+  .board[data-answer-mode="trace"] .traceDigit {
+    width: min(100%, 56px);
+    height: 78px;
+  }
+
+  .board[data-answer-mode="trace"] .traceFeedback {
+    min-height: 34px;
+    padding-block: 3px;
+  }
+}
+
+@media (min-width: 821px) and (min-height: 821px) and (max-height: 960px) {
+  .board[data-answer-mode="trace"] .promptArea {
+    --prompt-size: min(160px, 21svh, 21vw);
+    padding: 70px 14px 10px;
+  }
+
+  .board[data-answer-mode="trace"] .answerSection {
+    padding-block: 8px 10px;
+  }
+
+  .board[data-answer-mode="trace"] .horizontalProblem {
+    gap: 6px;
+    font-size: 2.25rem;
+  }
+
+  .board[data-answer-mode="trace"] .verticalProblem {
+    width: 94px;
+    grid-template-columns: 25px 1fr;
+    font-size: 3.15rem;
+  }
+
+  .board[data-answer-mode="trace"] .verticalRule {
+    height: 4px;
+    margin-top: 8px;
+  }
+
+  .board[data-answer-mode="trace"] .traceSurface {
+    gap: 5px;
+  }
+
+  .board[data-answer-mode="trace"] .traceGrid {
+    gap: 6px;
+  }
+
+  .board[data-answer-mode="trace"] .traceButton {
+    min-height: 70px;
+    border-radius: 14px;
+  }
+
+  .board[data-answer-mode="trace"] .traceDigit {
+    width: min(100%, 44px);
+    height: 62px;
+  }
+
+  .board[data-answer-mode="trace"] .traceFeedback {
+    min-height: 28px;
+    padding-block: 1px;
   }
 }
 
@@ -1205,8 +1503,14 @@
   }
 
   .answerModeButton {
-    padding-inline: 8px;
-    font-size: 0.78rem;
+    gap: 5px;
+    padding-inline: 6px;
+    font-size: 0.74rem;
+  }
+
+  .answerModeButton svg {
+    width: 17px;
+    height: 17px;
   }
 
   .answerGrid {
@@ -1218,6 +1522,40 @@
     min-height: 62px;
     border-radius: 15px;
     font-size: 1.55rem;
+  }
+
+  .board[data-answer-mode="trace"] .promptArea {
+    --prompt-size: min(170px, 44vw, 23svh);
+  }
+
+  .traceSurface {
+    gap: 6px;
+  }
+
+  .traceGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .traceButton {
+    min-height: 94px;
+    border-radius: 16px;
+  }
+
+  .traceDigit {
+    width: min(100%, 59px);
+    height: 82px;
+  }
+
+  .traceFeedback {
+    min-height: 38px;
+    padding-inline: 10px;
+    font-size: 0.78rem;
+  }
+
+  .board[data-answer-mode="trace"] .answerSection {
+    gap: 8px;
+    padding: 10px 12px 12px;
   }
 
   .drawSurface {
@@ -1290,8 +1628,272 @@
   }
 }
 
+@media (max-width: 620px) and (max-height: 806px) {
+  .board[data-answer-mode="trace"] .promptArea {
+    --prompt-size: min(130px, 20svh, 34vw);
+    padding: 64px 14px 10px;
+  }
+
+  .board[data-answer-mode="trace"] .horizontalProblem {
+    gap: 5px;
+    font-size: 2rem;
+  }
+
+  .board[data-answer-mode="trace"] .verticalProblem {
+    width: 88px;
+    grid-template-columns: 24px 1fr;
+    font-size: 2.85rem;
+  }
+
+  .board[data-answer-mode="trace"] .verticalRule {
+    height: 4px;
+    margin-top: 7px;
+  }
+
+  .board[data-answer-mode="trace"] .answerSection {
+    gap: 6px;
+    padding: 6px 12px 8px;
+  }
+
+  .board[data-answer-mode="trace"] .traceSurface {
+    gap: 4px;
+  }
+
+  .board[data-answer-mode="trace"] .traceGrid {
+    gap: 6px;
+  }
+
+  .board[data-answer-mode="trace"] .traceButton {
+    min-height: 66px;
+    padding-block: 4px;
+    border-radius: 14px;
+  }
+
+  .board[data-answer-mode="trace"] .traceDigit {
+    width: min(100%, 42px);
+    height: 58px;
+  }
+
+  .board[data-answer-mode="trace"] .traceFeedback {
+    min-height: 28px;
+    padding-block: 1px;
+    font-size: 0.74rem;
+  }
+}
+
+@media (max-width: 620px) and (max-height: 634px) {
+  .board[data-answer-mode="trace"] .promptArea {
+    --prompt-size: min(108px, 19svh, 30vw);
+    padding: 58px 10px 6px;
+  }
+
+  .board[data-answer-mode="trace"] .horizontalProblem {
+    gap: 4px;
+    font-size: 1.75rem;
+  }
+
+  .board[data-answer-mode="trace"] .verticalProblem {
+    width: 76px;
+    grid-template-columns: 21px 1fr;
+    font-size: 2.45rem;
+  }
+
+  .board[data-answer-mode="trace"] .verticalRule {
+    height: 3px;
+    margin-top: 5px;
+  }
+
+  .board[data-answer-mode="trace"] .answerSection {
+    gap: 4px;
+    padding: 4px 8px 6px;
+  }
+
+  .board[data-answer-mode="trace"] .traceSurface {
+    gap: 3px;
+  }
+
+  .board[data-answer-mode="trace"] .traceInstruction {
+    font-size: 0.74rem;
+    line-height: 1.2;
+  }
+
+  .board[data-answer-mode="trace"] .traceGrid {
+    gap: 4px;
+  }
+
+  .board[data-answer-mode="trace"] .traceButton {
+    min-height: 56px;
+    padding-block: 2px;
+    border-radius: 12px;
+  }
+
+  .board[data-answer-mode="trace"] .traceDigit {
+    width: min(100%, 42px);
+    height: 48px;
+  }
+
+  .board[data-answer-mode="trace"] .traceFeedback {
+    min-height: 24px;
+    padding-block: 1px;
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 567px) and (max-height: 532px) {
+  .board[data-answer-mode="trace"] .promptArea {
+    --prompt-size: min(96px, 19svh, 28vw);
+    padding: 54px 8px 2px;
+  }
+
+  .board[data-answer-mode="trace"] .traceSurface {
+    gap: 5px;
+  }
+
+  .board[data-answer-mode="trace"] .traceButton {
+    min-height: 48px;
+    padding-block: 0;
+  }
+
+  .board[data-answer-mode="trace"] .traceDigit {
+    width: min(100%, 38px);
+    height: 40px;
+  }
+
+  .board[data-answer-mode="trace"] .traceFeedback {
+    min-height: 20px;
+    padding-block: 0;
+    font-size: 0.68rem;
+  }
+
+  .board[data-answer-mode="trace"] .traceFeedbackSymbol {
+    width: 18px;
+    height: 18px;
+    border-width: 2px;
+    font-size: 0.75rem;
+  }
+}
+
+@media (orientation: landscape) and (min-width: 568px) and (max-height: 500px) {
+  .board[data-answer-mode="trace"][data-session-active="true"] {
+    grid-template-columns: minmax(180px, 40%) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    border-radius: 24px;
+  }
+
+  .board[data-answer-mode="trace"] .promptArea {
+    --prompt-size: min(120px, 36svh, 18vw);
+    grid-column: 1;
+    grid-row: 1;
+    padding: 56px 8px 6px;
+  }
+
+  .board[data-answer-mode="trace"] .sessionHud {
+    inset: 6px 4px auto;
+    min-height: 44px;
+    gap: 3px;
+  }
+
+  .board[data-answer-mode="trace"] .sessionName {
+    padding: 5px 7px;
+    font-size: 0.56rem;
+  }
+
+  .board[data-answer-mode="trace"] .sessionReadout {
+    min-height: 40px;
+    gap: 4px;
+    padding: 4px 7px;
+  }
+
+  .board[data-answer-mode="trace"] .sessionReadout strong {
+    font-size: 0.75rem;
+  }
+
+  .board[data-answer-mode="trace"] .sessionReadout span {
+    font-size: 0.6rem;
+  }
+
+  .board[data-answer-mode="trace"] .finishButton {
+    min-height: 44px;
+    padding-inline: 8px;
+    font-size: 0.65rem;
+  }
+
+  .board[data-answer-mode="trace"] .horizontalProblem {
+    gap: 4px;
+    font-size: 1.8rem;
+  }
+
+  .board[data-answer-mode="trace"] .verticalProblem {
+    width: 76px;
+    grid-template-columns: 21px 1fr;
+    font-size: 2.45rem;
+  }
+
+  .board[data-answer-mode="trace"] .verticalRule {
+    height: 3px;
+    margin-top: 5px;
+  }
+
+  .board[data-answer-mode="trace"] .answerSection {
+    grid-column: 2;
+    grid-row: 1;
+    gap: 4px;
+    padding: 4px 8px;
+    border-top: 0;
+    border-left: 1px solid #e2ddd1;
+  }
+
+  .board[data-answer-mode="trace"] .answerModeSwitch,
+  .board[data-answer-mode="trace"] .traceSurface {
+    width: 100%;
+  }
+
+  .board[data-answer-mode="trace"] .answerModeButton {
+    gap: 3px;
+    padding-inline: 2px;
+    font-size: 0.7rem;
+  }
+
+  .board[data-answer-mode="trace"] .answerModeButton svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .board[data-answer-mode="trace"] .traceSurface {
+    gap: 2px;
+  }
+
+  .board[data-answer-mode="trace"] .traceInstruction {
+    font-size: 0.7rem;
+    line-height: 1.2;
+  }
+
+  .board[data-answer-mode="trace"] .traceGrid {
+    gap: 4px;
+  }
+
+  .board[data-answer-mode="trace"] .traceButton {
+    min-height: 52px;
+    padding-block: 2px;
+    border-radius: 11px;
+  }
+
+  .board[data-answer-mode="trace"] .traceDigit {
+    width: min(100%, 38px);
+    height: 44px;
+  }
+
+  .board[data-answer-mode="trace"] .traceFeedback {
+    min-height: 32px;
+    padding-block: 1px;
+    font-size: 0.68rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .answerButton,
+  .traceButton,
+  .traceFeedback,
   .resultFlash {
     transition: none;
   }

@@ -13,6 +13,7 @@ export type PerformanceInputSource =
   | "tap"
   | "keyboard"
   | "handwriting"
+  | "trace"
   | "speech";
 export type PerformanceOutcomeReason =
   | "incorrect"
@@ -209,6 +210,7 @@ const INPUT_SOURCES: readonly PerformanceInputSource[] = [
   "tap",
   "keyboard",
   "handwriting",
+  "trace",
   "speech",
 ];
 const OUTCOME_REASONS: readonly Exclude<

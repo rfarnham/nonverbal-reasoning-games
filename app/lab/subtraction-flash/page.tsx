@@ -59,6 +59,7 @@ import {
 } from "./session-engine";
 import { SpokenAnswerStreamGate } from "./speech-answer-stream";
 import { AdaptiveSubtractionCurriculum } from "./adaptive-curriculum";
+import { TraceAnswerGrid } from "./trace-answer";
 import {
   appendPerformanceAttempt,
   createPerformanceAttempt,
@@ -68,12 +69,17 @@ import {
 } from "./performance-storage";
 import styles from "./subtraction-flash.module.css";
 
-type AnswerMode = "tap" | "draw" | "speak";
+type AnswerMode = "tap" | "draw" | "trace" | "speak";
 type SessionPhase = "choosing" | "playing" | "settling" | "results";
 type SessionFinishReason = "manual" | "time" | "deck";
 type SessionPauseReason = "hidden";
 
-type AnswerInputSource = "tap" | "keyboard" | "handwriting" | "speech";
+type AnswerInputSource =
+  | "tap"
+  | "keyboard"
+  | "handwriting"
+  | "trace"
+  | "speech";
 
 type AnswerEvidence = Readonly<{
   inputSource: AnswerInputSource;
@@ -244,6 +250,21 @@ function DrawIcon() {
         strokeWidth="1.7"
         strokeLinecap="round"
       />
+    </svg>
+  );
+}
+
+function TraceIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M5 18c2.6-7.4 4.3-12 7-12 2.2 0 2.7 2.9.9 5.2-1.7 2.2-4.8 3.7-3.3 6 1.4 2.2 4.8.1 6.5-2.5 1.4-2.1 2.7-1.6 3.4.2"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="5" cy="18" r="1.7" fill="currentColor" />
     </svg>
   );
 }
@@ -1131,6 +1152,7 @@ export default function SubtractionFlashPage() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const playbackTokenRef = useRef(0);
   const drawFocusRef = useRef<HTMLCanvasElement | null>(null);
+  const traceFocusRef = useRef<HTMLButtonElement | null>(null);
   const resultsDialogRef = useRef<HTMLDialogElement | null>(null);
   const resultsHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const firstSessionChoiceRef = useRef<HTMLButtonElement | null>(null);
@@ -1429,9 +1451,12 @@ export default function SubtractionFlashPage() {
         0,
         activeElapsedMs - round.startedAt,
       );
+      const timingEligible = evidence.inputSource !== "trace";
+      const answerWasSlow =
+        timingEligible && answerElapsedMs > SLOW_RESPONSE_MS;
       const outcomeRecord = deck.recordOutcome(round.draw.card, {
         correct,
-        elapsedMs: answerElapsedMs,
+        elapsedMs: timingEligible ? answerElapsedMs : 0,
       });
 
       const answeredRound: RoundState = {
@@ -1473,7 +1498,7 @@ export default function SubtractionFlashPage() {
             submittedAnswer: answer,
             correct,
             elapsedMs: answerElapsedMs,
-            slow: answerElapsedMs > SLOW_RESPONSE_MS,
+            slow: answerWasSlow,
             isReview: round.draw.card.isReview,
             reviewQueued: outcomeRecord.flagged,
             reinserted: outcomeRecord.reinserted,
@@ -1510,8 +1535,7 @@ export default function SubtractionFlashPage() {
         ...progress,
         answered: progress.answered + 1,
         correct: progress.correct + (correct ? 1 : 0),
-        slow:
-          progress.slow + (answerElapsedMs > SLOW_RESPONSE_MS ? 1 : 0),
+        slow: progress.slow + (answerWasSlow ? 1 : 0),
         reviews: progress.reviews + (round.draw.card.isReview ? 1 : 0),
         cardsRemaining: deckSnapshot.remaining,
       };
@@ -1861,6 +1885,8 @@ export default function SubtractionFlashPage() {
       if (answerReady) {
         if (answerMode === "draw") {
           drawFocusRef.current?.focus();
+        } else if (answerMode === "trace") {
+          traceFocusRef.current?.focus({ preventScroll: true });
         } else if (answerMode === "tap") {
           answerButtonRefs.current[ANSWER_VALUES[0]]?.focus();
         }
@@ -1868,7 +1894,13 @@ export default function SubtractionFlashPage() {
     });
 
     return () => cancelAnimationFrame(frame);
-  }, [answerMode, answerReady, currentRound]);
+  }, [
+    answerMode,
+    answerReady,
+    currentRound,
+    mode,
+    sessionProgress.id,
+  ]);
 
   useEffect(() => {
     if (!currentRound || currentRound.selectedAnswer === null) return;
@@ -1899,7 +1931,7 @@ export default function SubtractionFlashPage() {
       event.preventDefault();
       submitAnswer(
         answer as AnswerValue,
-        "tap",
+        answerMode === "trace" ? "trace" : "tap",
         performance.now(),
         { inputSource: "keyboard" },
       );
@@ -1907,7 +1939,7 @@ export default function SubtractionFlashPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [submitAnswer]);
+  }, [answerMode, submitAnswer]);
 
   const returnToModeChoice = useCallback(() => {
     if (resultTimerRef.current !== null) {
@@ -2002,6 +2034,9 @@ export default function SubtractionFlashPage() {
         <section
           className={styles.board}
           data-answer-mode={answerMode}
+          data-session-active={
+            !adaptiveOpen && sessionPhase !== "choosing"
+          }
           aria-labelledby="game-heading"
         >
           <h1 className={styles.visuallyHidden} id="game-heading">
@@ -2056,7 +2091,10 @@ export default function SubtractionFlashPage() {
             </section>
           ) : (
             <>
-              <div className={styles.promptArea} data-running="true">
+              <div
+                className={styles.promptArea}
+                data-running="true"
+              >
                 <div className={styles.sessionHud}>
                   <span className={styles.sessionName}>
                     {SESSION_LABELS[sessionProgress.mode]}
@@ -2198,6 +2236,16 @@ export default function SubtractionFlashPage() {
                   <button
                     className={styles.answerModeButton}
                     type="button"
+                    aria-pressed={answerMode === "trace"}
+                    disabled={sessionPhase !== "playing"}
+                    onClick={() => handleAnswerModeChange("trace")}
+                  >
+                    <TraceIcon />
+                    Trace
+                  </button>
+                  <button
+                    className={styles.answerModeButton}
+                    type="button"
                     aria-pressed={answerMode === "speak"}
                     disabled={sessionPhase !== "playing"}
                     onClick={() => handleAnswerModeChange("speak")}
@@ -2260,6 +2308,26 @@ export default function SubtractionFlashPage() {
                       focusRef={drawFocusRef}
                       onAnswer={(answer, answeredAt, evidence) =>
                         submitAnswer(answer, "draw", answeredAt, evidence)
+                      }
+                    />
+                  ) : answerMode === "trace" ? (
+                    <TraceAnswerGrid
+                      key={`${sessionProgress.id}:${mode}:${
+                        currentRound?.draw.card.id ?? "loading"
+                      }`}
+                      answers={answerOptions}
+                      disabled={!answerReady}
+                      focusRef={traceFocusRef}
+                      selectedAnswer={
+                        currentRound?.selectedAnswer ?? null
+                      }
+                      selectedAnswerWasCorrect={
+                        currentRound?.correct ?? null
+                      }
+                      onAnswer={(answer, answeredAt, source) =>
+                        submitAnswer(answer, "trace", answeredAt, {
+                          inputSource: source,
+                        })
                       }
                     />
                   ) : (

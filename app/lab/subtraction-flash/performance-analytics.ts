@@ -189,7 +189,7 @@ function normalizeCoreAttempt(
     submittedAnswer: attempt.submittedAnswer,
     correct: attempt.correct,
     latencyMs: attempt.elapsedMs,
-    timingEligible: true,
+    timingEligible: attempt.inputSource !== "trace",
     slow: attempt.slow,
     isReview: attempt.isReview,
     cardId: attempt.cardId,
@@ -322,6 +322,7 @@ export function buildLatencyDistribution(
 ): LatencyDistribution {
   const correct = attempts.filter((attempt) => attempt.correct);
   const timedCorrectLatencies = correct
+    .filter((attempt) => attempt.timingEligible)
     .map((attempt) => finiteNonnegative(attempt.latencyMs))
     .filter((latency): latency is number => latency !== null)
     .sort((left, right) => left - right);

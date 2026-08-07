@@ -202,6 +202,30 @@ test("wrong answers are the infinity spike while summary timing is correct-only"
   assert.equal(distribution.correctP90Ms, 2_800);
 });
 
+test("trace answers count toward accuracy without distorting fluency timing", () => {
+  const rows = [
+    normalizedAttempt({ id: "tap", latencyMs: 1_000 }),
+    normalizedAttempt({
+      id: "trace",
+      inputSource: "trace",
+      latencyMs: 9_000,
+      timingEligible: false,
+    }),
+  ];
+  const distribution = buildLatencyDistribution(rows);
+  assert.equal(distribution.totalCount, 2);
+  assert.equal(distribution.correctCount, 2);
+  assert.equal(distribution.accuracy, 1);
+  assert.equal(distribution.timedCorrectCount, 1);
+  assert.equal(distribution.correctMeanMs, 1_000);
+  assert.equal(distribution.correctMedianMs, 1_000);
+  assert.equal(distribution.correctP90Ms, 1_000);
+  assert.equal(
+    distribution.bins.find((bin) => bin.id === "8-12")?.count,
+    0,
+  );
+});
+
 test("fixed bins use half-open edges and retain extreme correct outliers", () => {
   const latencies = [0, 999, 1_000, 1_999, 2_000, 5_999, 6_000, 7_999, 8_000, 11_999, 12_000, 999_999];
   const rows = latencies.map((latencyMs, index) =>
@@ -305,6 +329,67 @@ test("normalization and filters combine Flash and adaptive attempt rows", () => 
     filterPerformanceAttempts(normalized, { presentationModes: ["listen"] }).length,
     1,
   );
+});
+
+test("trace attempts round-trip through storage, filters, and CSV export", () => {
+  const storage = new MemoryStorage();
+  const session = createPerformanceSession({
+    sessionId: "trace-run",
+    gameType: "infinite",
+    presentationMode: "visual",
+    baseDeckSize: 72,
+    startedAt: BASE_TIME,
+  });
+  const attempt = coreAttempt({
+    id: "trace-run:1",
+    sessionId: "trace-run",
+    inputSource: "trace",
+    elapsedMs: 5_875,
+    slow: false,
+  });
+
+  assert.deepEqual(startPerformanceSession(session, storage), {
+    ok: true,
+    status: "written",
+  });
+  assert.deepEqual(appendPerformanceAttempt(attempt, storage), {
+    ok: true,
+    status: "written",
+  });
+
+  const loaded = loadPerformanceLogDiagnostic(storage);
+  assert.equal(loaded.status, "loaded");
+  assert.equal(loaded.log?.attempts.length, 1);
+  assert.equal(loaded.log?.attempts[0].inputSource, "trace");
+
+  const normalized = normalizePerformanceAttempts(
+    loaded.log?.attempts ?? [],
+    [],
+  );
+  assert.equal(normalized[0].inputSource, "trace");
+  assert.equal(
+    normalized[0].timingEligible,
+    false,
+    "motor-tracing time is not treated as subtraction-fluency timing",
+  );
+  assert.equal(normalized[0].slow, false);
+  assert.deepEqual(
+    filterPerformanceAttempts(normalized, { inputSources: ["trace"] }).map(
+      (row) => row.id,
+    ),
+    [`flash:${attempt.id}`],
+  );
+  assert.equal(
+    filterPerformanceAttempts(normalized, { inputSources: ["tap"] }).length,
+    0,
+  );
+
+  const [header, row] = performanceAttemptsToCsv(undefined, storage).split(
+    "\r\n",
+  );
+  const columns = header.split(",");
+  const values = row.split(",");
+  assert.equal(values[columns.indexOf("input_source")], "trace");
 });
 
 test("rolling scrub frames are capped and reuse the fixed distribution bins", () => {

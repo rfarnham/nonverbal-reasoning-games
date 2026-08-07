@@ -732,6 +732,7 @@ export function PerformanceAnalysisClient() {
                     <option value="tap">Tap</option>
                     <option value="keyboard">Keyboard</option>
                     <option value="handwriting">Draw / handwriting</option>
+                    <option value="trace">Trace</option>
                     <option value="speech">Speak / speech</option>
                     <option value="adaptive">Adaptive</option>
                   </select>
