@@ -21,7 +21,8 @@ import {
 } from "../performance-analytics";
 import {
   loadPerformanceLogDiagnostic,
-  type PerformanceInputSource,
+  type PerformanceInputMode,
+  type PerformanceLevel,
   type PerformanceLoadStatus,
 } from "../performance-storage";
 import styles from "./performance-analysis.module.css";
@@ -29,11 +30,13 @@ import styles from "./performance-analysis.module.css";
 type DateRange = "all" | "7" | "30" | "90";
 type GameFilter = "all" | AnalyticsGameType;
 type PresentationFilter = "all" | "visual" | "listen" | "adaptive";
-type InputFilter = "all" | PerformanceInputSource | "adaptive";
+type LevelFilter = "all" | PerformanceLevel;
+type InputFilter = "all" | PerformanceInputMode | "adaptive";
 
 type FilterState = Readonly<{
   dateRange: DateRange;
   gameType: GameFilter;
+  level: LevelFilter;
   presentation: PresentationFilter;
   input: InputFilter;
   minuend: "all" | `${number}`;
@@ -51,6 +54,7 @@ type LoadState = Readonly<{
 const DEFAULT_FILTERS: FilterState = {
   dateRange: "all",
   gameType: "all",
+  level: "all",
   presentation: "all",
   input: "all",
   minuend: "all",
@@ -58,8 +62,11 @@ const DEFAULT_FILTERS: FilterState = {
 };
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
-const MINUENDS = [11, 12, 13, 14, 15, 16, 17, 18] as const;
-const SUBTRAHENDS = [2, 3, 4, 5, 6, 7, 8, 9] as const;
+const MINUENDS = [
+  ...Array.from({ length: 8 }, (_, index) => index + 11),
+  ...Array.from({ length: 45 }, (_, index) => index + 20),
+];
+const SUBTRAHENDS = [2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
 
 function ArrowLeftIcon() {
   return (
@@ -196,7 +203,9 @@ function normalizedAttemptsToCsv(attempts: readonly NormalizedPerformanceAttempt
     "timestamp_ms",
     "occurred_at_iso",
     "game_type",
+    "level",
     "presentation_mode",
+    "input_mode",
     "orientation",
     "input_source",
     "minuend",
@@ -236,7 +245,9 @@ function normalizedAttemptsToCsv(attempts: readonly NormalizedPerformanceAttempt
     attempt.timestamp,
     new Date(attempt.timestamp).toISOString(),
     attempt.gameType,
+    attempt.level,
     attempt.presentationMode,
+    attempt.inputMode,
     attempt.orientation,
     attempt.inputSource,
     attempt.minuend,
@@ -520,11 +531,12 @@ export function PerformanceAnalysisClient() {
     const dayCount = filters.dateRange === "all" ? null : Number(filters.dateRange);
     const fromTimestamp = dayCount === null ? null : loadedAt - dayCount * DAY_MS;
     const gameTypes = filters.gameType === "all" ? undefined : [filters.gameType];
+    const levels = filters.level === "all" ? undefined : [filters.level];
     const presentationModes =
       filters.presentation === "visual" || filters.presentation === "listen"
         ? [filters.presentation]
         : undefined;
-    const inputSources =
+    const inputModes =
       filters.input !== "all" && filters.input !== "adaptive"
         ? [filters.input]
         : undefined;
@@ -535,8 +547,9 @@ export function PerformanceAnalysisClient() {
     const filtered = filterPerformanceAttempts(load.attempts, {
       fromTimestamp,
       gameTypes,
+      levels,
       presentationModes,
-      inputSources,
+      inputModes,
       minuends,
       subtrahends,
     });
@@ -711,6 +724,17 @@ export function PerformanceAnalysisClient() {
                   </select>
                 </label>
                 <label>
+                  <span>Level</span>
+                  <select
+                    value={filters.level}
+                    onChange={(event) => updateFilter("level", event.target.value as LevelFilter)}
+                  >
+                    <option value="all">All levels</option>
+                    <option value="B100">B100</option>
+                    <option value="B120">B120</option>
+                  </select>
+                </label>
+                <label>
                   <span>Prompt</span>
                   <select
                     value={filters.presentation}
@@ -730,10 +754,9 @@ export function PerformanceAnalysisClient() {
                   >
                     <option value="all">All inputs</option>
                     <option value="tap">Tap</option>
-                    <option value="keyboard">Keyboard</option>
-                    <option value="handwriting">Draw / handwriting</option>
+                    <option value="draw">Draw</option>
                     <option value="trace">Trace</option>
-                    <option value="speech">Speak / speech</option>
+                    <option value="speak">Speak</option>
                     <option value="adaptive">Adaptive</option>
                   </select>
                 </label>
@@ -870,6 +893,7 @@ export function PerformanceAnalysisClient() {
                           <tr>
                             <th scope="col">Date &amp; time</th>
                             <th scope="col">Game</th>
+                            <th scope="col">Level</th>
                             <th scope="col">Problem</th>
                             <th scope="col">Answer</th>
                             <th scope="col">Result</th>
@@ -883,6 +907,7 @@ export function PerformanceAnalysisClient() {
                             <tr key={attempt.id}>
                               <td>{formatDateTime(attempt.timestamp)}</td>
                               <td>{gameLabel(attempt.gameType)}</td>
+                              <td>{attempt.level ?? "—"}</td>
                               <td>
                                 {attempt.minuend === null || attempt.subtrahend === null
                                   ? "—"
@@ -894,7 +919,12 @@ export function PerformanceAnalysisClient() {
                               </td>
                               <td>{formatSeconds(attempt.latencyMs, 2)}</td>
                               <td>{attempt.source === "adaptive" ? "Adaptive" : attempt.presentationMode === "listen" ? "Listen" : "Cards"}</td>
-                              <td>{attempt.inputSource}</td>
+                              <td>
+                                {attempt.inputMode ?? "Adaptive"}
+                                {attempt.inputMode && attempt.inputSource !== attempt.inputMode
+                                  ? ` · ${attempt.inputSource}`
+                                  : ""}
+                              </td>
                             </tr>
                           ))}
                         </tbody>

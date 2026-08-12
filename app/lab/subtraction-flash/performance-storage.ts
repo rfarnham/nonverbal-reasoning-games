@@ -1,6 +1,8 @@
 export const PERFORMANCE_STORAGE_KEY =
+  "spatial-gym:subtraction-flash:performance:v2";
+export const PERFORMANCE_LEGACY_STORAGE_KEY =
   "spatial-gym:subtraction-flash:performance:v1";
-export const PERFORMANCE_SCHEMA_VERSION = 1 as const;
+export const PERFORMANCE_SCHEMA_VERSION = 2 as const;
 export const PERFORMANCE_SLOW_RESPONSE_MS = 4_000;
 
 export type PerformanceGameType =
@@ -9,6 +11,8 @@ export type PerformanceGameType =
   | "deck-sprint";
 export type PerformancePresentationMode = "visual" | "listen";
 export type PerformanceOrientation = "horizontal" | "vertical";
+export type PerformanceLevel = "B100" | "B120";
+export type PerformanceInputMode = "tap" | "draw" | "trace" | "speak";
 export type PerformanceInputSource =
   | "tap"
   | "keyboard"
@@ -42,7 +46,9 @@ export type PerformanceAttempt = Readonly<
     occurredAt: number;
     sessionPosition: number;
     gameType: PerformanceGameType;
+    level: PerformanceLevel;
     presentationMode: PerformancePresentationMode;
+    inputMode: PerformanceInputMode;
     orientation: PerformanceOrientation | null;
     inputSource: PerformanceInputSource;
     cardId: string;
@@ -75,7 +81,9 @@ export type CreatePerformanceAttemptInput = Readonly<{
   occurredAt?: number;
   sessionPosition: number;
   gameType: PerformanceGameType;
+  level: PerformanceLevel;
   presentationMode: PerformancePresentationMode;
+  inputMode: PerformanceInputMode;
   orientation?: PerformanceOrientation | null;
   inputSource: PerformanceInputSource;
   cardId: string;
@@ -108,7 +116,9 @@ export type PerformanceSessionStart = Readonly<
     sessionId: string;
     occurredAt: number;
     gameType: PerformanceGameType;
+    level: PerformanceLevel;
     presentationMode: PerformancePresentationMode;
+    inputMode: PerformanceInputMode;
     baseDeckSize: number;
   }
 >;
@@ -116,7 +126,9 @@ export type PerformanceSessionStart = Readonly<
 export type CreatePerformanceSessionInput = Readonly<{
   sessionId: string;
   gameType: PerformanceGameType;
+  level: PerformanceLevel;
   presentationMode: PerformancePresentationMode;
+  inputMode: PerformanceInputMode;
   baseDeckSize: number;
   startedAt?: number;
 }>;
@@ -201,6 +213,13 @@ const GAME_TYPES: readonly PerformanceGameType[] = [
 const PRESENTATION_MODES: readonly PerformancePresentationMode[] = [
   "visual",
   "listen",
+];
+const LEVELS: readonly PerformanceLevel[] = ["B100", "B120"];
+const INPUT_MODES: readonly PerformanceInputMode[] = [
+  "tap",
+  "draw",
+  "trace",
+  "speak",
 ];
 const ORIENTATIONS: readonly PerformanceOrientation[] = [
   "horizontal",
@@ -340,6 +359,50 @@ function inferredOutcomeReason(
   return null;
 }
 
+function isValidPerformanceFact(
+  level: PerformanceLevel,
+  minuend: unknown,
+  subtrahend: unknown,
+): boolean {
+  if (!Number.isSafeInteger(minuend) || !Number.isSafeInteger(subtrahend)) {
+    return false;
+  }
+  const safeMinuend = minuend as number;
+  const safeSubtrahend = subtrahend as number;
+  if (level === "B100") {
+    return (
+      safeMinuend >= 11 &&
+      safeMinuend <= 18 &&
+      safeSubtrahend >= 2 &&
+      safeSubtrahend <= 9 &&
+      safeMinuend % 10 < safeSubtrahend
+    );
+  }
+  return (
+    safeMinuend >= 20 &&
+    safeMinuend <= 64 &&
+    safeSubtrahend >= 2 &&
+    safeSubtrahend <= 10 &&
+    (safeSubtrahend === 10 || safeMinuend % 10 < safeSubtrahend)
+  );
+}
+
+function inputSourceMatchesMode(
+  inputMode: PerformanceInputMode,
+  inputSource: PerformanceInputSource,
+): boolean {
+  switch (inputMode) {
+    case "tap":
+      return inputSource === "tap" || inputSource === "keyboard";
+    case "draw":
+      return inputSource === "handwriting";
+    case "trace":
+      return inputSource === "trace";
+    case "speak":
+      return inputSource === "speech";
+  }
+}
+
 export function createPerformanceAttempt(
   input: CreatePerformanceAttemptInput,
 ): PerformanceAttempt {
@@ -353,16 +416,16 @@ export function createPerformanceAttempt(
   assertNonnegativeInteger(input.cardsRemainingAfter, "cardsRemainingAfter");
   assertFiniteNonnegative(input.elapsedMs, "elapsedMs");
   assertFiniteNonnegative(input.sessionElapsedMs, "sessionElapsedMs");
-  if (
-    !Number.isSafeInteger(input.minuend) ||
-    input.minuend < 11 ||
-    input.minuend > 18 ||
-    !Number.isSafeInteger(input.subtrahend) ||
-    input.subtrahend < 2 ||
-    input.subtrahend > 9 ||
-    input.minuend % 10 >= input.subtrahend
-  ) {
-    throw new RangeError("Performance attempts must contain a borrowing fact from this game.");
+  if (!LEVELS.includes(input.level)) {
+    throw new TypeError("Unknown subtraction level.");
+  }
+  if (!INPUT_MODES.includes(input.inputMode)) {
+    throw new TypeError("Unknown configured input mode.");
+  }
+  if (!isValidPerformanceFact(input.level, input.minuend, input.subtrahend)) {
+    throw new RangeError(
+      "Performance attempts must contain a fact allowed by the selected level.",
+    );
   }
   if (
     !Number.isSafeInteger(input.expectedAnswer) ||
@@ -386,6 +449,9 @@ export function createPerformanceAttempt(
   }
   if (!INPUT_SOURCES.includes(input.inputSource)) {
     throw new TypeError("Unknown performance input source.");
+  }
+  if (!inputSourceMatchesMode(input.inputMode, input.inputSource)) {
+    throw new TypeError("The input source does not match the configured input mode.");
   }
   const correct = input.correct ?? input.submittedAnswer === input.expectedAnswer;
   if (correct !== (input.submittedAnswer === input.expectedAnswer)) {
@@ -418,7 +484,9 @@ export function createPerformanceAttempt(
     ...performanceLocalTimestamp(occurredAt),
     sessionPosition: input.sessionPosition,
     gameType: input.gameType,
+    level: input.level,
     presentationMode: input.presentationMode,
+    inputMode: input.inputMode,
     orientation: input.orientation ?? null,
     inputSource: input.inputSource,
     cardId: input.cardId.trim(),
@@ -457,6 +525,12 @@ export function createPerformanceSession(
   if (!PRESENTATION_MODES.includes(input.presentationMode)) {
     throw new TypeError("Unknown presentation mode.");
   }
+  if (!LEVELS.includes(input.level)) {
+    throw new TypeError("Unknown subtraction level.");
+  }
+  if (!INPUT_MODES.includes(input.inputMode)) {
+    throw new TypeError("Unknown configured input mode.");
+  }
   assertNonnegativeInteger(input.baseDeckSize, "baseDeckSize");
   const occurredAt = input.startedAt ?? Date.now();
   const sessionId = input.sessionId.trim();
@@ -467,15 +541,17 @@ export function createPerformanceSession(
     occurredAt,
     ...performanceLocalTimestamp(occurredAt),
     gameType: input.gameType,
+    level: input.level,
     presentationMode: input.presentationMode,
+    inputMode: input.inputMode,
     baseDeckSize: input.baseDeckSize,
   };
 }
 
 const ATTEMPT_KEYS = [
   "id", "sessionId", "occurredAt", "localDate", "localTime", "timeZone",
-  "utcOffsetMinutes", "sessionPosition", "gameType", "presentationMode",
-  "orientation", "inputSource", "cardId", "factKey", "minuend",
+  "utcOffsetMinutes", "sessionPosition", "gameType", "level",
+  "presentationMode", "inputMode", "orientation", "inputSource", "cardId", "factKey", "minuend",
   "subtrahend", "expectedAnswer", "submittedAnswer", "correct", "elapsedMs",
   "slow", "isReview", "reviewQueued", "reinserted", "outcomeReason",
   "drawNumber", "cycle", "cardsRemainingAfter", "sessionElapsedMs",
@@ -484,14 +560,20 @@ const ATTEMPT_KEYS = [
 ] as const;
 const SESSION_START_KEYS = [
   "id", "event", "sessionId", "occurredAt", "localDate", "localTime",
-  "timeZone", "utcOffsetMinutes", "gameType", "presentationMode",
-  "baseDeckSize",
+  "timeZone", "utcOffsetMinutes", "gameType", "level", "presentationMode",
+  "inputMode", "baseDeckSize",
 ] as const;
 const SESSION_FINISH_KEYS = [
   "id", "event", "sessionId", "occurredAt", "localDate", "localTime",
   "timeZone", "utcOffsetMinutes", "finishReason", "elapsedMs", "answered",
   "correct", "slow", "reviews", "baseDeckSize",
 ] as const;
+const LEGACY_ATTEMPT_KEYS = ATTEMPT_KEYS.filter(
+  (key) => key !== "level" && key !== "inputMode",
+);
+const LEGACY_SESSION_START_KEYS = SESSION_START_KEYS.filter(
+  (key) => key !== "level" && key !== "inputMode",
+);
 
 function isPerformanceAttempt(value: unknown): value is PerformanceAttempt {
   if (!isRecord(value) || !hasExactKeys(value, ATTEMPT_KEYS)) return false;
@@ -502,21 +584,25 @@ function isPerformanceAttempt(value: unknown): value is PerformanceAttempt {
     isLocalTimestamp(value) &&
     isNonnegativeInteger(value.sessionPosition) &&
     GAME_TYPES.includes(value.gameType as PerformanceGameType) &&
+    LEVELS.includes(value.level as PerformanceLevel) &&
     PRESENTATION_MODES.includes(
       value.presentationMode as PerformancePresentationMode,
     ) &&
+    INPUT_MODES.includes(value.inputMode as PerformanceInputMode) &&
     (value.orientation === null ||
       ORIENTATIONS.includes(value.orientation as PerformanceOrientation)) &&
     INPUT_SOURCES.includes(value.inputSource as PerformanceInputSource) &&
+    inputSourceMatchesMode(
+      value.inputMode as PerformanceInputMode,
+      value.inputSource as PerformanceInputSource,
+    ) &&
     isText(value.cardId) &&
     isText(value.factKey) &&
-    Number.isSafeInteger(value.minuend) &&
-    (value.minuend as number) >= 11 &&
-    (value.minuend as number) <= 18 &&
-    Number.isSafeInteger(value.subtrahend) &&
-    (value.subtrahend as number) >= 2 &&
-    (value.subtrahend as number) <= 9 &&
-    (value.minuend as number) % 10 < (value.subtrahend as number) &&
+    isValidPerformanceFact(
+      value.level as PerformanceLevel,
+      value.minuend,
+      value.subtrahend,
+    ) &&
     Number.isSafeInteger(value.expectedAnswer) &&
     value.expectedAnswer ===
       (value.minuend as number) - (value.subtrahend as number) &&
@@ -551,9 +637,11 @@ function isSessionStart(value: unknown): value is PerformanceSessionStart {
     isValidEpoch(value.occurredAt) &&
     isLocalTimestamp(value) &&
     GAME_TYPES.includes(value.gameType as PerformanceGameType) &&
+    LEVELS.includes(value.level as PerformanceLevel) &&
     PRESENTATION_MODES.includes(
       value.presentationMode as PerformancePresentationMode,
     ) &&
+    INPUT_MODES.includes(value.inputMode as PerformanceInputMode) &&
     isNonnegativeInteger(value.baseDeckSize)
   );
 }
@@ -578,6 +666,75 @@ function isSessionFinish(value: unknown): value is PerformanceSessionFinish {
     (value.reviews as number) <= (value.answered as number) &&
     isNonnegativeInteger(value.baseDeckSize)
   );
+}
+
+function legacyInputMode(inputSource: unknown): PerformanceInputMode {
+  switch (inputSource) {
+    case "handwriting":
+      return "draw";
+    case "trace":
+      return "trace";
+    case "speech":
+      return "speak";
+    default:
+      return "tap";
+  }
+}
+
+function migrateLegacyAttempt(value: unknown): PerformanceAttempt | null {
+  if (!isRecord(value) || !hasExactKeys(value, LEGACY_ATTEMPT_KEYS)) {
+    return null;
+  }
+  const migrated = {
+    ...value,
+    level: "B100",
+    inputMode: legacyInputMode(value.inputSource),
+  };
+  return isPerformanceAttempt(migrated) ? migrated : null;
+}
+
+function migrateLegacySessionStart(
+  value: unknown,
+  attempts: readonly PerformanceAttempt[],
+): PerformanceSessionStart | null {
+  if (!isRecord(value) || !hasExactKeys(value, LEGACY_SESSION_START_KEYS)) {
+    return null;
+  }
+  const sessionAttempt = attempts.find(
+    (attempt) => attempt.sessionId === value.sessionId,
+  );
+  const migrated = {
+    ...value,
+    level: "B100",
+    inputMode: sessionAttempt?.inputMode ?? "tap",
+  };
+  return isSessionStart(migrated) ? migrated : null;
+}
+
+function migrateLegacyPerformanceLog(value: unknown): PerformanceLog | null {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, ["schemaVersion", "attempts", "sessionEvents"]) ||
+    value.schemaVersion !== 1 ||
+    !Array.isArray(value.attempts) ||
+    !Array.isArray(value.sessionEvents)
+  ) {
+    return null;
+  }
+  const attempts = value.attempts.map(migrateLegacyAttempt);
+  if (attempts.some((attempt) => attempt === null)) return null;
+  const migratedAttempts = attempts as PerformanceAttempt[];
+  const sessionEvents = value.sessionEvents.map((event) => {
+    if (isSessionFinish(event)) return event;
+    return migrateLegacySessionStart(event, migratedAttempts);
+  });
+  if (sessionEvents.some((event) => event === null)) return null;
+  const migrated: PerformanceLog = {
+    schemaVersion: PERFORMANCE_SCHEMA_VERSION,
+    attempts: migratedAttempts,
+    sessionEvents: sessionEvents as PerformanceSessionEvent[],
+  };
+  return isPerformanceLog(migrated) ? migrated : null;
 }
 
 function isPerformanceLog(value: unknown): value is PerformanceLog {
@@ -626,6 +783,9 @@ export function loadPerformanceLogDiagnostic(
   let raw: string | null;
   try {
     raw = storage.getItem(PERFORMANCE_STORAGE_KEY);
+    if (raw === null) {
+      raw = storage.getItem(PERFORMANCE_LEGACY_STORAGE_KEY);
+    }
   } catch {
     return {
       status: "unavailable",
@@ -659,6 +819,10 @@ export function loadPerformanceLogDiagnostic(
       canWrite: false,
       message: "Saved performance data uses a newer schema and was left untouched.",
     };
+  }
+  const migrated = migrateLegacyPerformanceLog(parsed);
+  if (migrated) {
+    return { status: "loaded", log: migrated, canWrite: true, message: null };
   }
   if (!isPerformanceLog(parsed)) {
     return {
@@ -704,6 +868,17 @@ export function appendPerformanceAttempt(
   }
   const diagnostic = loadPerformanceLogDiagnostic(storage);
   if (!diagnostic.log) return blockedWrite(diagnostic.status);
+  const sessionStart = diagnostic.log.sessionEvents.find(
+    (event): event is PerformanceSessionStart =>
+      event.event === "start" && event.sessionId === attempt.sessionId,
+  );
+  if (
+    sessionStart &&
+    (sessionStart.level !== attempt.level ||
+      sessionStart.inputMode !== attempt.inputMode)
+  ) {
+    return { ok: false, status: "conflict" };
+  }
   const existing = diagnostic.log.attempts.find((row) => row.id === attempt.id);
   if (existing) {
     return {
@@ -807,8 +982,8 @@ export function finishPerformanceSession(
 
 const CSV_COLUMNS = [
   "date", "time", "time_zone", "utc_offset_minutes", "timestamp_ms",
-  "session_id", "session_position", "game_type", "presentation_mode",
-  "orientation", "input_source", "minuend", "subtrahend", "expected_answer",
+  "session_id", "session_position", "game_type", "level", "presentation_mode",
+  "input_mode", "orientation", "input_source", "minuend", "subtrahend", "expected_answer",
   "submitted_answer", "result", "correct", "time_taken_ms", "slow",
   "is_review", "review_queued", "reinserted", "outcome_reason", "draw_number",
   "cycle", "cards_remaining_after", "session_elapsed_ms", "card_id", "fact_key",
@@ -837,7 +1012,9 @@ export function performanceAttemptsToCsv(
       attempt.sessionId,
       attempt.sessionPosition,
       attempt.gameType,
+      attempt.level,
       attempt.presentationMode,
+      attempt.inputMode,
       attempt.orientation,
       attempt.inputSource,
       attempt.minuend,

@@ -4,17 +4,60 @@ export const REVIEW_SPACING = 4;
 export const ANSWER_VALUES = [2, 3, 4, 5, 6, 7, 8, 9] as const;
 export const VISUAL_ORIENTATIONS = ["horizontal", "vertical"] as const;
 export const LISTEN_COPIES = 3;
+export const SUBTRACTION_LEVELS = ["B100", "B120"] as const;
 
 export type AnswerValue = (typeof ANSWER_VALUES)[number];
+export type SubmittedAnswer = number;
 export type VisualOrientation = (typeof VISUAL_ORIENTATIONS)[number];
 export type PracticeMode = "visual" | "listen";
+export type SubtractionLevel = (typeof SUBTRACTION_LEVELS)[number];
 export type RandomSource = () => number;
 
+export type SubtractionLevelConfig = Readonly<{
+  label: SubtractionLevel;
+  minuendMin: number;
+  minuendMax: number;
+  subtrahendMin: number;
+  subtrahendMax: number;
+  answerDigits: 1 | 2;
+  includesTenReview: boolean;
+  visualCopies: 1 | 2;
+  listenCopies: 1 | 3;
+}>;
+
+export const SUBTRACTION_LEVEL_CONFIG: Readonly<
+  Record<SubtractionLevel, SubtractionLevelConfig>
+> = Object.freeze({
+  B100: Object.freeze({
+    label: "B100",
+    minuendMin: 11,
+    minuendMax: 18,
+    subtrahendMin: 2,
+    subtrahendMax: 9,
+    answerDigits: 1,
+    includesTenReview: false,
+    visualCopies: 2,
+    listenCopies: 3,
+  }),
+  B120: Object.freeze({
+    label: "B120",
+    minuendMin: 20,
+    minuendMax: 64,
+    subtrahendMin: 2,
+    subtrahendMax: 10,
+    answerDigits: 2,
+    includesTenReview: true,
+    visualCopies: 1,
+    listenCopies: 1,
+  }),
+});
+
 export type SubtractionFact = Readonly<{
+  level: SubtractionLevel;
   factKey: string;
   minuend: number;
   subtrahend: number;
-  answer: AnswerValue;
+  answer: SubmittedAnswer;
 }>;
 
 export type SubtractionCard = Readonly<
@@ -61,26 +104,54 @@ export function requiresBorrow(minuend: number, subtrahend: number): boolean {
     Number.isInteger(minuend) &&
     Number.isInteger(subtrahend) &&
     minuend >= 11 &&
-    minuend <= 18 &&
     subtrahend >= 2 &&
-    subtrahend <= 9 &&
-    minuend % 10 < subtrahend
+    subtrahend <= 10 &&
+    minuend > subtrahend &&
+    minuend % 10 < subtrahend % 10
   );
 }
 
-export const SUBTRACTION_FACTS: readonly SubtractionFact[] = Object.freeze(
-  Array.from({ length: 8 }, (_, minuendOffset) => 11 + minuendOffset).flatMap(
-    (minuend) =>
-      Array.from({ length: 8 }, (_, subtrahendOffset) => 2 + subtrahendOffset)
-        .filter((subtrahend) => requiresBorrow(minuend, subtrahend))
+function createFacts(config: SubtractionLevelConfig): readonly SubtractionFact[] {
+  return Object.freeze(
+    Array.from(
+      { length: config.minuendMax - config.minuendMin + 1 },
+      (_, offset) => config.minuendMin + offset,
+    ).flatMap((minuend) =>
+      Array.from(
+        { length: config.subtrahendMax - config.subtrahendMin + 1 },
+        (_, offset) => config.subtrahendMin + offset,
+      )
+        .filter(
+          (subtrahend) =>
+            requiresBorrow(minuend, subtrahend) ||
+            (config.includesTenReview && subtrahend === 10),
+        )
         .map((subtrahend) => ({
+          level: config.label,
           factKey: `${minuend}-${subtrahend}`,
           minuend,
           subtrahend,
-          answer: (minuend - subtrahend) as AnswerValue,
+          answer: minuend - subtrahend,
         })),
-  ),
-);
+    ),
+  );
+}
+
+export const SUBTRACTION_FACTS_BY_LEVEL: Readonly<
+  Record<SubtractionLevel, readonly SubtractionFact[]>
+> = Object.freeze({
+  B100: createFacts(SUBTRACTION_LEVEL_CONFIG.B100),
+  B120: createFacts(SUBTRACTION_LEVEL_CONFIG.B120),
+});
+
+/** The original catalogue remains a B100 alias for older callers. */
+export const SUBTRACTION_FACTS = SUBTRACTION_FACTS_BY_LEVEL.B100;
+
+export function subtractionFactsForLevel(
+  level: SubtractionLevel,
+): readonly SubtractionFact[] {
+  return SUBTRACTION_FACTS_BY_LEVEL[level];
+}
 
 function normalizedRandom(random: RandomSource): number {
   const value = random();
@@ -104,18 +175,28 @@ function cardCopiesForFact(
   mode: PracticeMode,
   cycle: number,
 ): SubtractionCard[] {
+  const config = SUBTRACTION_LEVEL_CONFIG[fact.level];
   if (mode === "visual") {
-    return VISUAL_ORIENTATIONS.map((orientation) => ({
+    const orientations =
+      config.visualCopies === 2
+        ? VISUAL_ORIENTATIONS
+        : [
+            VISUAL_ORIENTATIONS[
+              (fact.minuend + fact.subtrahend + cycle) %
+                VISUAL_ORIENTATIONS.length
+            ],
+          ];
+    return orientations.map((orientation) => ({
       ...fact,
-      id: `${mode}:${cycle}:${fact.factKey}:${orientation}`,
+      id: `${fact.level}:${mode}:${cycle}:${fact.factKey}:${orientation}`,
       orientation,
       isReview: false,
     }));
   }
 
-  return Array.from({ length: LISTEN_COPIES }, (_, index) => ({
+  return Array.from({ length: config.listenCopies }, (_, index) => ({
     ...fact,
-    id: `${mode}:${cycle}:${fact.factKey}:copy-${index + 1}`,
+    id: `${fact.level}:${mode}:${cycle}:${fact.factKey}:copy-${index + 1}`,
     orientation: VISUAL_ORIENTATIONS[index % VISUAL_ORIENTATIONS.length],
     isReview: false,
   }));
@@ -191,11 +272,13 @@ export function createBaseDeck(
     random?: RandomSource;
     cycle?: number;
     precedingFactKeys?: readonly string[];
+    level?: SubtractionLevel;
   }> = {},
 ): SubtractionCard[] {
   const random = options.random ?? Math.random;
   const cycle = options.cycle ?? 1;
-  const cards = SUBTRACTION_FACTS.flatMap((fact) =>
+  const facts = subtractionFactsForLevel(options.level ?? "B100");
+  const cards = facts.flatMap((fact) =>
     cardCopiesForFact(fact, mode, cycle),
   );
 
@@ -209,7 +292,7 @@ export function createBaseDeck(
 export function buildAnswerOptions(
   fact: Pick<SubtractionFact, "answer">,
 ): readonly AnswerValue[] {
-  if (!ANSWER_VALUES.includes(fact.answer)) {
+  if (!ANSWER_VALUES.some((answer) => answer === fact.answer)) {
     throw new RangeError("A subtraction card must have an answer from 2 to 9.");
   }
   return ANSWER_VALUES;
@@ -261,18 +344,21 @@ function insertReviewAtSafeDistance(
 export function createSubtractionDeck(
   options: Readonly<{
     mode: PracticeMode;
+    level?: SubtractionLevel;
     random?: RandomSource;
     repeat?: boolean;
   }>,
 ): SubtractionDeck {
-  const { mode } = options;
+  const { mode, level = "B100" } = options;
   const random = options.random ?? Math.random;
   const repeat = options.repeat ?? true;
+  const facts = subtractionFactsForLevel(level);
+  const config = SUBTRACTION_LEVEL_CONFIG[level];
   const baseDeckSize =
-    SUBTRACTION_FACTS.length *
+    facts.length *
     (mode === "visual"
-      ? VISUAL_ORIENTATIONS.length
-      : LISTEN_COPIES);
+      ? config.visualCopies
+      : config.listenCopies);
   const recentFactKeys: string[] = [];
   const reviewedFactKeys = new Set<string>();
   const pendingReviews: SubtractionCard[] = [];
@@ -285,6 +371,7 @@ export function createSubtractionDeck(
     queue = createBaseDeck(mode, {
       random,
       cycle,
+      level,
       precedingFactKeys: recentFactKeys,
     });
 

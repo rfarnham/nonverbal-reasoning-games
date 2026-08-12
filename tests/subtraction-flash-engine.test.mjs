@@ -7,12 +7,16 @@ import {
   REVIEW_SPACING,
   SLOW_RESPONSE_MS,
   SUBTRACTION_FACTS,
+  SUBTRACTION_FACTS_BY_LEVEL,
+  SUBTRACTION_LEVEL_CONFIG,
+  SUBTRACTION_LEVELS,
   VISUAL_ORIENTATIONS,
   buildAnswerOptions,
   createBaseDeck,
   createSeededRandom,
   createSubtractionDeck,
   requiresBorrow,
+  subtractionFactsForLevel,
 } from "../app/lab/subtraction-flash/game-engine.ts";
 
 function assertFactSpacing(cards, preceding = []) {
@@ -44,6 +48,87 @@ test("the fact catalogue contains exactly the 36 borrow-required facts", () => {
   assert.equal(requiresBorrow(13, 4), true);
   assert.equal(requiresBorrow(11, 3), true);
   assert.equal(requiresBorrow(15, 2), false);
+});
+
+test("B120 adds harder borrowing facts through 64 and occasional minus ten", () => {
+  assert.deepEqual(SUBTRACTION_LEVELS, ["B100", "B120"]);
+  assert.equal(SUBTRACTION_FACTS_BY_LEVEL.B100, SUBTRACTION_FACTS);
+
+  const facts = subtractionFactsForLevel("B120");
+  assert.equal(facts.length, 255);
+  assert.equal(new Set(facts.map((fact) => fact.factKey)).size, facts.length);
+  assert.ok(facts.some((fact) => fact.minuend === 64));
+  assert.ok(facts.some((fact) => fact.answer > 9));
+
+  const minusTen = facts.filter((fact) => fact.subtrahend === 10);
+  assert.equal(minusTen.length, 45);
+  assert.ok(
+    facts.every(
+      (fact) =>
+        fact.level === "B120" &&
+        fact.minuend >= 20 &&
+        fact.minuend <= 64 &&
+        fact.subtrahend >= 2 &&
+        fact.subtrahend <= 10 &&
+        fact.answer === fact.minuend - fact.subtrahend &&
+        (fact.subtrahend === 10 ||
+          requiresBorrow(fact.minuend, fact.subtrahend)),
+    ),
+  );
+  assert.equal(requiresBorrow(64, 9), true);
+  assert.equal(requiresBorrow(64, 10), false);
+});
+
+test("B120 uses one shuffled card per fact and balances layouts over cycles", () => {
+  const firstCycle = createBaseDeck("visual", {
+    level: "B120",
+    cycle: 1,
+    random: createSeededRandom(901),
+  });
+  const secondCycle = createBaseDeck("visual", {
+    level: "B120",
+    cycle: 2,
+    random: createSeededRandom(902),
+  });
+  const facts = subtractionFactsForLevel("B120");
+
+  assert.equal(firstCycle.length, facts.length);
+  assert.equal(
+    firstCycle.length,
+    facts.length * SUBTRACTION_LEVEL_CONFIG.B120.visualCopies,
+  );
+  assertFactSpacing(firstCycle);
+  assert.equal(
+    new Set(firstCycle.map((card) => card.factKey)).size,
+    facts.length,
+  );
+
+  for (const fact of facts) {
+    const first = firstCycle.find((card) => card.factKey === fact.factKey);
+    const second = secondCycle.find((card) => card.factKey === fact.factKey);
+    assert.ok(first);
+    assert.ok(second);
+    assert.notEqual(first.orientation, second.orientation);
+  }
+});
+
+test("finite B120 decks finish after the harder catalogue plus bounded reviews", () => {
+  const deck = createSubtractionDeck({
+    level: "B120",
+    mode: "visual",
+    repeat: false,
+    random: createSeededRandom(1_120),
+  });
+  let count = 0;
+  let baseDeckSize = 0;
+  while (!deck.snapshot().exhausted) {
+    const draw = deck.next();
+    baseDeckSize ||= draw.baseDeckSize;
+    count += 1;
+    deck.recordOutcome(draw.card, { correct: true, elapsedMs: 900 });
+  }
+  assert.equal(baseDeckSize, subtractionFactsForLevel("B120").length);
+  assert.equal(count, baseDeckSize);
 });
 
 test("visual cycles balance both layouts and keep duplicate facts apart", () => {

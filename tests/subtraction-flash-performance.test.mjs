@@ -11,6 +11,7 @@ import {
 } from "../app/lab/subtraction-flash/performance-analytics.ts";
 import {
   PERFORMANCE_SCHEMA_VERSION,
+  PERFORMANCE_LEGACY_STORAGE_KEY,
   PERFORMANCE_STORAGE_KEY,
   appendPerformanceAttempt,
   createPerformanceAttempt,
@@ -33,6 +34,14 @@ class MemoryStorage {
   }
 }
 
+function withoutV2Fields(record) {
+  return Object.fromEntries(
+    Object.entries(record).filter(
+      ([key]) => key !== "level" && key !== "inputMode",
+    ),
+  );
+}
+
 const BASE_TIME = new Date(2026, 0, 15, 9, 30).getTime();
 
 function coreAttempt(changes = {}) {
@@ -44,7 +53,9 @@ function coreAttempt(changes = {}) {
     occurredAt: BASE_TIME + sessionPosition * 1_000,
     sessionPosition,
     gameType: "infinite",
+    level: "B100",
     presentationMode: "visual",
+    inputMode: "tap",
     orientation: "horizontal",
     inputSource: "tap",
     cardId: `visual:1:13-4:${sessionPosition}`,
@@ -76,7 +87,9 @@ function normalizedAttempt(changes = {}) {
     timeZone: "America/Los_Angeles",
     utcOffsetMinutes: -480,
     gameType: "infinite",
+    level: "B100",
     presentationMode: "visual",
+    inputMode: "tap",
     orientation: "horizontal",
     inputSource: "tap",
     minuend: 13,
@@ -111,7 +124,9 @@ test("storage appends strict session and attempt events without rewriting duplic
   const session = createPerformanceSession({
     sessionId: "run-1",
     gameType: "infinite",
+    level: "B100",
     presentationMode: "visual",
+    inputMode: "tap",
     baseDeckSize: 72,
     startedAt: BASE_TIME,
   });
@@ -139,6 +154,17 @@ test("storage appends strict session and attempt events without rewriting duplic
     ok: false,
     status: "conflict",
   });
+  assert.deepEqual(
+    appendPerformanceAttempt(
+      coreAttempt({
+        id: "run-1:wrong-configured-mode",
+        inputMode: "draw",
+        inputSource: "handwriting",
+      }),
+      storage,
+    ),
+    { ok: false, status: "conflict" },
+  );
   assert.deepEqual(
     finishPerformanceSession(
       "run-1",
@@ -184,6 +210,99 @@ test("corrupt and newer-schema storage is diagnosed and never overwritten", () =
     assert.equal(appendPerformanceAttempt(coreAttempt(), storage).ok, false);
     assert.equal(storage.getItem(PERFORMANCE_STORAGE_KEY), raw);
   }
+});
+
+test("v1 logs migrate in memory and are preserved when v2 data is written", () => {
+  const storage = new MemoryStorage();
+  const currentAttempt = coreAttempt({
+    inputMode: "draw",
+    inputSource: "handwriting",
+  });
+  const currentSession = createPerformanceSession({
+    sessionId: "run-1",
+    gameType: "infinite",
+    level: "B100",
+    presentationMode: "visual",
+    inputMode: "draw",
+    baseDeckSize: 72,
+    startedAt: BASE_TIME,
+  });
+  const legacyAttempt = withoutV2Fields(currentAttempt);
+  const legacySession = withoutV2Fields(currentSession);
+  const legacyRaw = JSON.stringify({
+    schemaVersion: 1,
+    attempts: [legacyAttempt],
+    sessionEvents: [legacySession],
+  });
+  storage.setItem(PERFORMANCE_LEGACY_STORAGE_KEY, legacyRaw);
+
+  const migrated = loadPerformanceLogDiagnostic(storage);
+  assert.equal(migrated.status, "loaded");
+  assert.equal(migrated.log?.schemaVersion, PERFORMANCE_SCHEMA_VERSION);
+  assert.equal(migrated.log?.attempts[0].level, "B100");
+  assert.equal(migrated.log?.attempts[0].inputMode, "draw");
+  assert.equal(migrated.log?.sessionEvents[0].inputMode, "draw");
+  assert.equal(storage.getItem(PERFORMANCE_STORAGE_KEY), null);
+
+  const b120Session = createPerformanceSession({
+    sessionId: "run-b120",
+    gameType: "infinite",
+    level: "B120",
+    presentationMode: "visual",
+    inputMode: "speak",
+    baseDeckSize: 100,
+    startedAt: BASE_TIME + 1_000,
+  });
+  assert.equal(startPerformanceSession(b120Session, storage).ok, true);
+  const b120Attempt = createPerformanceAttempt({
+    ...coreAttempt({
+      id: "run-b120:1",
+      sessionId: "run-b120",
+      sessionPosition: 2,
+      level: "B120",
+      inputMode: "speak",
+      inputSource: "speech",
+      cardId: "visual:1:64-10:2",
+      factKey: "64-10",
+      minuend: 64,
+      subtrahend: 10,
+      expectedAnswer: 54,
+      submittedAnswer: 54,
+    }),
+  });
+  assert.equal(appendPerformanceAttempt(b120Attempt, storage).ok, true);
+  assert.equal(storage.getItem(PERFORMANCE_LEGACY_STORAGE_KEY), legacyRaw);
+  const persistedV2 = JSON.parse(storage.getItem(PERFORMANCE_STORAGE_KEY));
+  assert.equal(persistedV2.schemaVersion, 2);
+  assert.equal(persistedV2.attempts.length, 2);
+  assert.equal(persistedV2.sessionEvents.length, 2);
+});
+
+test("B120 accepts borrowing facts through 64 and the explicit minus-ten exception", () => {
+  const accepted = coreAttempt({
+    level: "B120",
+    minuend: 64,
+    subtrahend: 10,
+    expectedAnswer: 54,
+    submittedAnswer: 54,
+    factKey: "64-10",
+    cardId: "visual:1:64-10:1",
+  });
+  assert.equal(accepted.level, "B120");
+  assert.equal(accepted.subtrahend, 10);
+
+  assert.throws(
+    () => coreAttempt({
+      level: "B120",
+      minuend: 64,
+      subtrahend: 2,
+      expectedAnswer: 62,
+      submittedAnswer: 62,
+      factKey: "64-2",
+      cardId: "visual:1:64-2:1",
+    }),
+    /selected level/,
+  );
 });
 
 test("wrong answers are the infinity spike while summary timing is correct-only", () => {
@@ -258,6 +377,7 @@ test("normalization and filters combine Flash and adaptive attempt rows", () => 
     presentationMode: "listen",
     orientation: null,
     inputSource: "speech",
+    inputMode: "speak",
   });
   const adaptive = {
     id: "adaptive-1",
@@ -311,6 +431,8 @@ test("normalization and filters combine Flash and adaptive attempt rows", () => 
 
   const normalized = normalizePerformanceAttempts([flash], [adaptive]);
   assert.deepEqual(normalized.map((row) => row.gameType), ["two-minute", "adaptive"]);
+  assert.deepEqual(normalized.map((row) => row.level), ["B100", null]);
+  assert.deepEqual(normalized.map((row) => row.inputMode), ["speak", null]);
   assert.equal(normalized[1].inputSource, "handwriting");
   assert.equal(normalized[1].isReview, true);
 
@@ -329,6 +451,13 @@ test("normalization and filters combine Flash and adaptive attempt rows", () => 
     filterPerformanceAttempts(normalized, { presentationModes: ["listen"] }).length,
     1,
   );
+  assert.equal(
+    filterPerformanceAttempts(normalized, {
+      levels: ["B100"],
+      inputModes: ["speak"],
+    }).length,
+    1,
+  );
 });
 
 test("trace attempts round-trip through storage, filters, and CSV export", () => {
@@ -336,7 +465,9 @@ test("trace attempts round-trip through storage, filters, and CSV export", () =>
   const session = createPerformanceSession({
     sessionId: "trace-run",
     gameType: "infinite",
+    level: "B100",
     presentationMode: "visual",
+    inputMode: "trace",
     baseDeckSize: 72,
     startedAt: BASE_TIME,
   });
@@ -344,6 +475,7 @@ test("trace attempts round-trip through storage, filters, and CSV export", () =>
     id: "trace-run:1",
     sessionId: "trace-run",
     inputSource: "trace",
+    inputMode: "trace",
     elapsedMs: 5_875,
     slow: false,
   });
@@ -390,6 +522,8 @@ test("trace attempts round-trip through storage, filters, and CSV export", () =>
   const columns = header.split(",");
   const values = row.split(",");
   assert.equal(values[columns.indexOf("input_source")], "trace");
+  assert.equal(values[columns.indexOf("input_mode")], "trace");
+  assert.equal(values[columns.indexOf("level")], "B100");
 });
 
 test("rolling scrub frames are capped and reuse the fixed distribution bins", () => {

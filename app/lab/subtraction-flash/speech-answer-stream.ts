@@ -11,7 +11,7 @@ type SpeechResultEvent = Pick<
 >;
 
 /**
- * Reads a digit as soon as it becomes the recognizer's leading hypothesis.
+ * Reads an answer as soon as it becomes the recognizer's leading hypothesis.
  * Final results may also use ranked alternatives, but an interim low-ranked
  * guess never becomes an answer.
  */
@@ -56,41 +56,33 @@ export function readStreamingSpokenAnswer(
   return null;
 }
 
-const PROMPT_NUMBER_TOKENS: Readonly<Record<string, string>> =
-  Object.freeze({
-    two: "2",
-    to: "2",
-    too: "2",
-    three: "3",
-    four: "4",
-    for: "4",
-    fore: "4",
-    five: "5",
-    six: "6",
-    seven: "7",
-    eight: "8",
-    ate: "8",
-    nine: "9",
-    ten: "10",
-    eleven: "11",
-    twelve: "12",
-    thirteen: "13",
-    fourteen: "14",
-    fifteen: "15",
-    sixteen: "16",
-    seventeen: "17",
-    eighteen: "18",
-  });
-
 type SpeechToken = Readonly<{ raw: string; comparable: string }>;
 
 function speechTokens(transcript: string): readonly SpeechToken[] {
-  return (transcript.toLowerCase().match(/[a-z0-9]+/g) ?? []).map(
-    (raw) => ({
+  const rawTokens = transcript.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+  const tokens: SpeechToken[] = [];
+
+  for (let index = 0; index < rawTokens.length; index += 1) {
+    const raw = rawTokens[index];
+    const next = rawTokens[index + 1];
+    if (next) {
+      const phrase = `${raw} ${next}`;
+      const phraseNumber = parseCanonicalSpokenAnswer(phrase);
+      if (phraseNumber !== null) {
+        tokens.push({ raw: phrase, comparable: String(phraseNumber) });
+        index += 1;
+        continue;
+      }
+    }
+
+    const number = parseSpokenAnswer(raw);
+    tokens.push({
       raw,
-      comparable: PROMPT_NUMBER_TOKENS[raw] ?? raw,
-    }),
-  );
+      comparable: number === null ? raw : String(number),
+    });
+  }
+
+  return tokens;
 }
 
 function transcriptAfterPrompt(

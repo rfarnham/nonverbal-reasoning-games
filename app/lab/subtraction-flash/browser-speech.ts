@@ -1,4 +1,4 @@
-import type { AnswerValue } from "./game-engine";
+import type { SubmittedAnswer } from "./game-engine";
 
 export type BrowserSpeechRecognitionErrorCode =
   | "aborted"
@@ -66,54 +66,53 @@ export type BrowserSpeechRecognitionScope = Readonly<{
 }>;
 
 export type SpokenAnswerMatch = Readonly<{
-  answer: AnswerValue;
+  answer: SubmittedAnswer;
   confidence: number;
   transcript: string;
 }>;
 
-const SPOKEN_ANSWERS: Readonly<Record<string, AnswerValue>> = Object.freeze({
-  "2": 2,
-  two: 2,
-  to: 2,
-  too: 2,
-  "3": 3,
-  three: 3,
-  "4": 4,
-  four: 4,
-  for: 4,
-  fore: 4,
-  "5": 5,
-  five: 5,
-  "6": 6,
-  six: 6,
-  "7": 7,
-  seven: 7,
-  "8": 8,
-  eight: 8,
-  ate: 8,
-  "9": 9,
-  nine: 9,
+const SMALL_NUMBER_WORDS: Readonly<Record<string, SubmittedAnswer>> =
+  Object.freeze({
+    zero: 0,
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+    nine: 9,
+    ten: 10,
+    eleven: 11,
+    twelve: 12,
+    thirteen: 13,
+    fourteen: 14,
+    fifteen: 15,
+    sixteen: 16,
+    seventeen: 17,
+    eighteen: 18,
+    nineteen: 19,
+  });
+
+const TENS_NUMBER_WORDS: Readonly<Record<string, SubmittedAnswer>> = Object.freeze({
+  twenty: 20,
+  thirty: 30,
+  forty: 40,
+  fifty: 50,
+  sixty: 60,
+  seventy: 70,
+  eighty: 80,
+  ninety: 90,
 });
 
-const CANONICAL_SPOKEN_ANSWERS: Readonly<Record<string, AnswerValue>> =
-  Object.freeze({
-    "2": 2,
-    two: 2,
-    "3": 3,
-    three: 3,
-    "4": 4,
-    four: 4,
-    "5": 5,
-    five: 5,
-    "6": 6,
-    six: 6,
-    "7": 7,
-    seven: 7,
-    "8": 8,
-    eight: 8,
-    "9": 9,
-    nine: 9,
-  });
+const SPOKEN_HOMOPHONES: Readonly<Record<string, SubmittedAnswer>> = Object.freeze({
+  to: 2,
+  too: 2,
+  for: 4,
+  fore: 4,
+  ate: 8,
+});
 
 function normalizeSpokenAnswer(transcript: string): string {
   return transcript
@@ -124,12 +123,44 @@ function normalizeSpokenAnswer(transcript: string): string {
     .replace(/\s+/g, " ");
 }
 
+function parseNormalizedSpokenNumber(
+  normalized: string,
+  allowHomophones: boolean,
+): SubmittedAnswer | null {
+  if (/^(?:0|[1-9]\d?)$/.test(normalized)) {
+    return Number(normalized);
+  }
+
+  const words = normalized.split(" ");
+  if (words.length === 1) {
+    return (
+      SMALL_NUMBER_WORDS[words[0]] ??
+      TENS_NUMBER_WORDS[words[0]] ??
+      (allowHomophones ? SPOKEN_HOMOPHONES[words[0]] : undefined) ??
+      null
+    );
+  }
+
+  if (words.length !== 2) return null;
+  const tens = TENS_NUMBER_WORDS[words[0]];
+  const ones = SMALL_NUMBER_WORDS[words[1]];
+  if (tens === undefined || ones === undefined || ones < 1 || ones > 9) {
+    return null;
+  }
+  return tens + ones;
+}
+
+function hasExplicitSign(transcript: string): boolean {
+  return /^[+\-\u2212]/.test(transcript.normalize("NFKC").trimStart());
+}
+
 /**
  * Parses one standalone spoken answer. Extra words and multiple numbers are
  * deliberately rejected so speech-recognition guesses never become answers.
  */
-export function parseSpokenAnswer(transcript: string): AnswerValue | null {
-  return SPOKEN_ANSWERS[normalizeSpokenAnswer(transcript)] ?? null;
+export function parseSpokenAnswer(transcript: string): SubmittedAnswer | null {
+  if (hasExplicitSign(transcript)) return null;
+  return parseNormalizedSpokenNumber(normalizeSpokenAnswer(transcript), true);
 }
 
 /**
@@ -138,9 +169,11 @@ export function parseSpokenAnswer(transcript: string): AnswerValue | null {
  */
 export function parseCanonicalSpokenAnswer(
   transcript: string,
-): AnswerValue | null {
-  return (
-    CANONICAL_SPOKEN_ANSWERS[normalizeSpokenAnswer(transcript)] ?? null
+): SubmittedAnswer | null {
+  if (hasExplicitSign(transcript)) return null;
+  return parseNormalizedSpokenNumber(
+    normalizeSpokenAnswer(transcript),
+    false,
   );
 }
 
@@ -194,7 +227,7 @@ export function getSpeechRecognitionConstructor(
 
 /**
  * Creates the continuous recognition stream used by Subtraction Flash. The
- * caller gates prompt audio and decides when a recognized digit may submit.
+ * caller gates prompt audio and decides when a recognized answer may submit.
  */
 export function createDigitSpeechRecognition(
   scope?: BrowserSpeechRecognitionScope,

@@ -4,7 +4,9 @@ import {
   performanceLocalTimestamp,
   type PerformanceAttempt,
   type PerformanceGameType,
+  type PerformanceInputMode,
   type PerformanceInputSource,
+  type PerformanceLevel,
   type PerformanceOrientation,
   type PerformanceOutcomeReason,
   type PerformancePresentationMode,
@@ -23,7 +25,9 @@ export type NormalizedPerformanceAttempt = Readonly<{
   timeZone: string;
   utcOffsetMinutes: number;
   gameType: AnalyticsGameType;
+  level: PerformanceLevel | null;
   presentationMode: PerformancePresentationMode;
+  inputMode: PerformanceInputMode | null;
   orientation: PerformanceOrientation | null;
   inputSource: PerformanceInputSource;
   minuend: number | null;
@@ -57,7 +61,9 @@ export type PerformanceAttemptFilters = Readonly<{
   fromTimestamp?: number | null;
   toTimestamp?: number | null;
   gameTypes?: readonly AnalyticsGameType[];
+  levels?: readonly PerformanceLevel[];
   presentationModes?: readonly PerformancePresentationMode[];
+  inputModes?: readonly PerformanceInputMode[];
   inputSources?: readonly PerformanceInputSource[];
   minuends?: readonly number[];
   subtrahends?: readonly number[];
@@ -180,7 +186,9 @@ function normalizeCoreAttempt(
     timeZone: attempt.timeZone,
     utcOffsetMinutes: attempt.utcOffsetMinutes,
     gameType: attempt.gameType,
+    level: attempt.level,
     presentationMode: attempt.presentationMode,
+    inputMode: attempt.inputMode,
     orientation: attempt.orientation,
     inputSource: attempt.inputSource,
     minuend: attempt.minuend,
@@ -189,7 +197,7 @@ function normalizeCoreAttempt(
     submittedAnswer: attempt.submittedAnswer,
     correct: attempt.correct,
     latencyMs: attempt.elapsedMs,
-    timingEligible: attempt.inputSource !== "trace",
+    timingEligible: attempt.inputMode !== "trace",
     slow: attempt.slow,
     isReview: attempt.isReview,
     cardId: attempt.cardId,
@@ -226,7 +234,9 @@ function normalizeAdaptiveAttempt(
     timeZone: localTimestamp.timeZone,
     utcOffsetMinutes: localTimestamp.utcOffsetMinutes,
     gameType: "adaptive",
+    level: null,
     presentationMode: "visual",
+    inputMode: null,
     orientation: attempt.format,
     inputSource: adaptiveInputSource(attempt),
     minuend: integerOperand(attempt.operands.minuend),
@@ -294,7 +304,13 @@ export function filterPerformanceAttempts(
     }
     return (
       matchesSelection(attempt.gameType, filters.gameTypes) &&
+      (attempt.level === null
+        ? !filters.levels || filters.levels.length === 0
+        : matchesSelection(attempt.level, filters.levels)) &&
       matchesSelection(attempt.presentationMode, filters.presentationModes) &&
+      (attempt.inputMode === null
+        ? !filters.inputModes || filters.inputModes.length === 0
+        : matchesSelection(attempt.inputMode, filters.inputModes)) &&
       matchesSelection(attempt.inputSource, filters.inputSources) &&
       (attempt.minuend === null
         ? !filters.minuends || filters.minuends.length === 0

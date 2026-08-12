@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type MutableRefObject,
+  type ReactNode,
 } from "react";
 
 import {
@@ -20,12 +21,16 @@ import { createGameNarrationPlayer } from "@/lib/game-narration";
 import {
   ANSWER_VALUES,
   SLOW_RESPONSE_MS,
+  SUBTRACTION_LEVEL_CONFIG,
+  SUBTRACTION_LEVELS,
   buildAnswerOptions,
   createSubtractionDeck,
   type AnswerValue,
   type DeckDraw,
   type PracticeMode,
+  type SubmittedAnswer,
   type SubtractionDeck,
+  type SubtractionLevel,
 } from "./game-engine";
 import {
   createDigitSpeechRecognition,
@@ -60,6 +65,7 @@ import {
 import { SpokenAnswerStreamGate } from "./speech-answer-stream";
 import { AdaptiveSubtractionCurriculum } from "./adaptive-curriculum";
 import { TraceAnswerGrid } from "./trace-answer";
+import { FlashHandwriting } from "./flash-handwriting";
 import {
   appendPerformanceAttempt,
   createPerformanceAttempt,
@@ -93,6 +99,9 @@ type SessionProgress = Readonly<{
   id: number;
   performanceSessionId: string | null;
   mode: SessionMode;
+  level: SubtractionLevel;
+  presentationMode: PracticeMode;
+  answerMode: AnswerMode;
   clock: SessionClock;
   answered: number;
   correct: number;
@@ -104,6 +113,9 @@ type SessionProgress = Readonly<{
 
 type SessionResult = Readonly<{
   mode: SessionMode;
+  level: SubtractionLevel;
+  presentationMode: PracticeMode;
+  answerMode: AnswerMode;
   finishReason: SessionFinishReason;
   elapsedMs: number;
   answered: number;
@@ -115,7 +127,7 @@ type SessionResult = Readonly<{
 
 type RoundState = Readonly<{
   draw: DeckDraw;
-  selectedAnswer: AnswerValue | null;
+  selectedAnswer: SubmittedAnswer | null;
   correct: boolean | null;
   startedAt: number | null;
   answeredWith: AnswerMode | null;
@@ -333,29 +345,101 @@ function SoundIcon({ enabled }: Readonly<{ enabled: boolean }>) {
   );
 }
 
-function VisualProblem({ round }: Readonly<{ round: RoundState }>) {
+type NumericAnswerInputProps = Readonly<{
+  digitCount: 1 | 2;
+  disabled: boolean;
+  inputRef: MutableRefObject<HTMLInputElement | null>;
+  onAnswer(answer: number, source: "tap" | "keyboard"): void;
+}>;
+
+function NumericAnswerInput({
+  digitCount,
+  disabled,
+  inputRef,
+  onAnswer,
+}: NumericAnswerInputProps) {
+  const [value, setValue] = useState("");
+  const hardwareKeyRef = useRef(false);
+
+  const submit = (rawValue: string, source: "tap" | "keyboard") => {
+    if (!/^\d{1,2}$/.test(rawValue)) return;
+    onAnswer(Number(rawValue), source);
+  };
+
+  return (
+    <input
+      ref={inputRef}
+      className={styles.numericAnswerInput}
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      autoComplete="off"
+      enterKeyHint="done"
+      maxLength={digitCount}
+      value={value}
+      disabled={disabled}
+      aria-label="Answer"
+      onKeyDown={(event) => {
+        hardwareKeyRef.current = true;
+        if (event.key === "Enter") {
+          event.preventDefault();
+          submit(value, "keyboard");
+        }
+      }}
+      onChange={(event) => {
+        const next = event.currentTarget.value.replace(/\D/g, "").slice(0, digitCount);
+        const source = hardwareKeyRef.current ? "keyboard" : "tap";
+        hardwareKeyRef.current = false;
+        setValue(next);
+        if (next.length === digitCount) submit(next, source);
+      }}
+    />
+  );
+}
+
+function ProblemWithAnswer({
+  mode,
+  round,
+  answer,
+}: Readonly<{
+  mode: PracticeMode;
+  round: RoundState;
+  answer: ReactNode;
+}>) {
   const { card } = round.draw;
   const accessibleProblem =
     card.orientation === "horizontal"
-      ? `${card.minuend} minus ${card.subtrahend} equals`
-      : `Vertical subtraction: ${card.minuend} minus ${card.subtrahend}`;
+      ? `${card.minuend} minus ${card.subtrahend} equals. Enter the answer.`
+      : `Vertical subtraction: ${card.minuend} minus ${card.subtrahend}. Enter the answer below the line.`;
+
+  if (mode === "listen") {
+    return (
+      <div className={styles.listenAnswerOnly} aria-label="Enter the answer">
+        {answer}
+      </div>
+    );
+  }
 
   return (
-    <div className={styles.questionCard} aria-label={accessibleProblem}>
+    <div className={styles.liveProblem} aria-label={accessibleProblem}>
       <span className={styles.visuallyHidden}>{accessibleProblem}</span>
       {card.orientation === "horizontal" ? (
-        <div className={styles.horizontalProblem} aria-hidden="true">
-          <span>{card.minuend}</span>
-          <span className={styles.operator}>−</span>
-          <span>{card.subtrahend}</span>
-          <span className={styles.equalsMark}>=</span>
+        <div className={styles.liveHorizontal}>
+          <span aria-hidden="true">{card.minuend}</span>
+          <span className={styles.liveOperator} aria-hidden="true">−</span>
+          <span aria-hidden="true">{card.subtrahend}</span>
+          <span className={styles.liveEquals} aria-hidden="true">=</span>
+          {answer}
         </div>
       ) : (
-        <div className={styles.verticalProblem} aria-hidden="true">
-          <span className={styles.verticalTop}>{card.minuend}</span>
-          <span className={styles.verticalOperator}>−</span>
-          <span className={styles.verticalBottom}>{card.subtrahend}</span>
-          <span className={styles.verticalRule} />
+        <div className={styles.liveVertical}>
+          <div className={styles.liveVerticalOperands} aria-hidden="true">
+            <span className={styles.liveVerticalTop}>{card.minuend}</span>
+            <span className={styles.liveVerticalOperator}>−</span>
+            <span className={styles.liveVerticalBottom}>{card.subtrahend}</span>
+            <span className={styles.liveVerticalRule} />
+          </div>
+          {answer}
         </div>
       )}
     </div>
@@ -1107,8 +1191,11 @@ function SpeechAnswer({
 
 export default function SubtractionFlashPage() {
   const [adaptiveOpen, setAdaptiveOpen] = useState(false);
+  const [interactionReady, setInteractionReady] = useState(false);
+  const [selectedLevel, setSelectedLevel] =
+    useState<SubtractionLevel>("B100");
   const [mode, setMode] = useState<PracticeMode>("visual");
-  const [answerMode, setAnswerMode] = useState<AnswerMode>("tap");
+  const [answerMode, setAnswerMode] = useState<AnswerMode | null>(null);
   const [rounds, setRounds] = useState<ModeRounds>({
     visual: null,
     listen: null,
@@ -1119,6 +1206,9 @@ export default function SubtractionFlashPage() {
     id: 0,
     performanceSessionId: null,
     mode: "infinite",
+    level: "B100",
+    presentationMode: "visual",
+    answerMode: "tap",
     clock: createSessionClock(0, false),
     answered: 0,
     correct: 0,
@@ -1139,6 +1229,8 @@ export default function SubtractionFlashPage() {
   >(null);
 
   const modeRef = useRef<PracticeMode>("visual");
+  const selectedLevelRef = useRef<SubtractionLevel>("B100");
+  const selectedAnswerModeRef = useRef<AnswerMode | null>(null);
   const roundsRef = useRef<ModeRounds>({ visual: null, listen: null });
   const deckRef = useRef<SubtractionDeck | null>(null);
   const sessionProgressRef = useRef(sessionProgress);
@@ -1153,6 +1245,7 @@ export default function SubtractionFlashPage() {
   const playbackTokenRef = useRef(0);
   const drawFocusRef = useRef<HTMLCanvasElement | null>(null);
   const traceFocusRef = useRef<HTMLButtonElement | null>(null);
+  const numericInputRef = useRef<HTMLInputElement | null>(null);
   const resultsDialogRef = useRef<HTMLDialogElement | null>(null);
   const resultsHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const firstSessionChoiceRef = useRef<HTMLButtonElement | null>(null);
@@ -1166,15 +1259,21 @@ export default function SubtractionFlashPage() {
   const [speechAnswerGate] = useState(() => new SpokenAnswerStreamGate());
 
   const currentRound = rounds[mode];
+  const activeLevel =
+    sessionPhase === "choosing" ? selectedLevel : sessionProgress.level;
+  const activeAnswerMode =
+    sessionPhase === "choosing" ? answerMode : sessionProgress.answerMode;
   const answerOptions = currentRound
-    ? buildAnswerOptions(currentRound.draw.card)
+    ? currentRound.draw.card.level === "B100"
+      ? buildAnswerOptions(currentRound.draw.card)
+      : ANSWER_VALUES
     : ANSWER_VALUES;
   const answerReady =
     sessionPhase === "playing" &&
     sessionProgress.clock.runningSince !== null &&
     currentRound !== null &&
     currentRound.selectedAnswer === null &&
-    !(answerMode === "speak" && microphonePermission === "requesting") &&
+    !(activeAnswerMode === "speak" && microphonePermission === "requesting") &&
     !(mode === "listen" && !soundEnabled) &&
     (mode === "visual" ||
       (currentRound.startedAt !== null && !isQuestionSpeaking));
@@ -1359,6 +1458,9 @@ export default function SubtractionFlashPage() {
 
       const result: SessionResult = {
         mode: progress.mode,
+        level: progress.level,
+        presentationMode: progress.presentationMode,
+        answerMode: progress.answerMode,
         finishReason,
         elapsedMs: elapsed,
         answered: progress.answered,
@@ -1407,7 +1509,7 @@ export default function SubtractionFlashPage() {
 
   const submitAnswer = useCallback(
     (
-      answer: AnswerValue,
+      answer: SubmittedAnswer,
       answeredWith: AnswerMode = "tap",
       answeredAt = performance.now(),
       evidence: AnswerEvidence = { inputSource: "tap" },
@@ -1486,7 +1588,9 @@ export default function SubtractionFlashPage() {
             occurredAt: epochMillisecondsFromPerformance(answeredAt),
             sessionPosition: progress.answered + 1,
             gameType: progress.mode,
+            level: progress.level,
             presentationMode: activeMode,
+            inputMode: progress.answerMode,
             orientation:
               activeMode === "visual" ? round.draw.card.orientation : null,
             inputSource: evidence.inputSource,
@@ -1604,10 +1708,40 @@ export default function SubtractionFlashPage() {
 
   const handleAnswerModeChange = useCallback(
     (nextMode: AnswerMode) => {
+      if (sessionPhaseRef.current !== "choosing") return;
+      if (selectedLevelRef.current === "B120" && nextMode === "trace") return;
       if (nextMode === "speak") primeMicrophonePermission();
+      selectedAnswerModeRef.current = nextMode;
       setAnswerMode(nextMode);
     },
     [primeMicrophonePermission],
+  );
+
+  const handleLevelChange = useCallback(
+    (nextLevel: SubtractionLevel) => {
+      if (
+        nextLevel === selectedLevelRef.current ||
+        sessionPhaseRef.current !== "choosing"
+      ) {
+        return;
+      }
+      selectedLevelRef.current = nextLevel;
+      setSelectedLevel(nextLevel);
+      if (nextLevel === "B120") {
+        if (modeRef.current === "listen") {
+          modeRef.current = "visual";
+          setMode("visual");
+        }
+        if (selectedAnswerModeRef.current === "trace") {
+          selectedAnswerModeRef.current = null;
+          setAnswerMode(null);
+        }
+      }
+      const emptyRounds: ModeRounds = { visual: null, listen: null };
+      roundsRef.current = emptyRounds;
+      setRounds(emptyRounds);
+    },
+    [],
   );
 
   const advanceRound = useCallback(() => {
@@ -1648,6 +1782,9 @@ export default function SubtractionFlashPage() {
       ) {
         return;
       }
+      const chosenAnswerMode = selectedAnswerModeRef.current;
+      const chosenLevel = selectedLevelRef.current;
+      if (!chosenAnswerMode) return;
       if (resultTimerRef.current !== null) {
         window.clearTimeout(resultTimerRef.current);
         resultTimerRef.current = null;
@@ -1655,6 +1792,7 @@ export default function SubtractionFlashPage() {
       stopSpeaking();
 
       const activeMode = modeRef.current;
+      if (chosenLevel === "B120" && activeMode === "listen") return;
       const now = performance.now();
       const pauseReasons = pauseReasonsRef.current;
       pauseReasons.clear();
@@ -1662,6 +1800,7 @@ export default function SubtractionFlashPage() {
 
       const deck = createSubtractionDeck({
         mode: activeMode,
+        level: chosenLevel,
         repeat: sessionMode !== "deck-sprint",
       });
       const firstDraw = deck.next();
@@ -1672,6 +1811,9 @@ export default function SubtractionFlashPage() {
         id: nextId,
         performanceSessionId,
         mode: sessionMode,
+        level: chosenLevel,
+        presentationMode: activeMode,
+        answerMode: chosenAnswerMode,
         clock: createSessionClock(now, pauseReasons.size === 0),
         answered: 0,
         correct: 0,
@@ -1685,7 +1827,9 @@ export default function SubtractionFlashPage() {
         const session = createPerformanceSession({
           sessionId: performanceSessionId,
           gameType: sessionMode,
+          level: chosenLevel,
           presentationMode: activeMode,
+          inputMode: chosenAnswerMode,
           baseDeckSize: firstDraw.baseDeckSize,
           startedAt: epochMillisecondsFromPerformance(now),
         });
@@ -1716,13 +1860,12 @@ export default function SubtractionFlashPage() {
       setSessionResult(null);
       setSessionPhase("playing");
 
-      if (answerMode === "speak") primeMicrophonePermission();
+      if (chosenAnswerMode === "speak") primeMicrophonePermission();
       if (activeMode === "listen" && soundEnabledRef.current) {
         speakQuestion(round);
       }
     },
     [
-      answerMode,
       primeMicrophonePermission,
       replaceSessionProgress,
       speakQuestion,
@@ -1734,7 +1877,8 @@ export default function SubtractionFlashPage() {
     (nextMode: PracticeMode) => {
       if (
         nextMode === modeRef.current ||
-        sessionPhaseRef.current !== "choosing"
+        sessionPhaseRef.current !== "choosing" ||
+        (selectedLevelRef.current === "B120" && nextMode === "listen")
       ) {
         return;
       }
@@ -1779,6 +1923,11 @@ export default function SubtractionFlashPage() {
     speakQuestion,
     stopSpeaking,
   ]);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setInteractionReady(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
     const enabled = readSoundPreference();
@@ -1883,19 +2032,19 @@ export default function SubtractionFlashPage() {
 
     const frame = requestAnimationFrame(() => {
       if (answerReady) {
-        if (answerMode === "draw") {
+        if (activeAnswerMode === "draw") {
           drawFocusRef.current?.focus();
-        } else if (answerMode === "trace") {
+        } else if (activeAnswerMode === "trace") {
           traceFocusRef.current?.focus({ preventScroll: true });
-        } else if (answerMode === "tap") {
-          answerButtonRefs.current[ANSWER_VALUES[0]]?.focus();
+        } else if (activeAnswerMode === "tap") {
+          numericInputRef.current?.focus({ preventScroll: true });
         }
       }
     });
 
     return () => cancelAnimationFrame(frame);
   }, [
-    answerMode,
+    activeAnswerMode,
     answerReady,
     currentRound,
     mode,
@@ -1915,6 +2064,21 @@ export default function SubtractionFlashPage() {
   }, [advanceRound, currentRound, mode]);
 
   useEffect(() => {
+    if (sessionPhase !== "playing" || sessionProgress.mode !== "infinite") {
+      return;
+    }
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || sessionProgressRef.current.answered === 0) {
+        return;
+      }
+      event.preventDefault();
+      finishSession("manual");
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [finishSession, sessionPhase, sessionProgress.mode]);
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (sessionPhaseRef.current !== "playing") return;
       const target = event.target;
@@ -1926,12 +2090,13 @@ export default function SubtractionFlashPage() {
         return;
       }
 
+      if (sessionProgressRef.current.answerMode !== "trace") return;
       const answer = Number(event.key);
-      if (!ANSWER_VALUES.includes(answer as AnswerValue)) return;
+      if (!ANSWER_VALUES.includes(answer as (typeof ANSWER_VALUES)[number])) return;
       event.preventDefault();
       submitAnswer(
         answer as AnswerValue,
-        answerMode === "trace" ? "trace" : "tap",
+        "trace",
         performance.now(),
         { inputSource: "keyboard" },
       );
@@ -1939,7 +2104,7 @@ export default function SubtractionFlashPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [answerMode, submitAnswer]);
+  }, [submitAnswer]);
 
   const returnToModeChoice = useCallback(() => {
     if (resultTimerRef.current !== null) {
@@ -1985,6 +2150,122 @@ export default function SubtractionFlashPage() {
         : `${sessionResult.answered} answered`
     : "";
 
+  const liveAnswer = currentRound ? (
+    <div
+      className={styles.liveAnswerSlot}
+      data-state={
+        currentRound.correct === true
+          ? "correct"
+          : currentRound.correct === false
+            ? "incorrect"
+            : "idle"
+      }
+    >
+      {activeAnswerMode === "tap" ? (
+        <NumericAnswerInput
+          key={`${sessionProgress.id}:${currentRound.draw.card.id}`}
+          digitCount={SUBTRACTION_LEVEL_CONFIG[activeLevel].answerDigits}
+          disabled={!answerReady}
+          inputRef={numericInputRef}
+          onAnswer={(answer, source) =>
+            submitAnswer(answer, "tap", performance.now(), {
+              inputSource: source,
+            })
+          }
+        />
+      ) : activeAnswerMode === "draw" ? (
+        <FlashHandwriting
+          key={`${sessionProgress.id}:${currentRound.draw.card.id}`}
+          digitCount={SUBTRACTION_LEVEL_CONFIG[activeLevel].answerDigits}
+          disabled={!answerReady}
+          focusRef={drawFocusRef}
+          roundId={currentRound.draw.card.id}
+          onAnswer={(answer, answeredAt, evidence) =>
+            submitAnswer(answer, "draw", answeredAt, {
+              inputSource: "handwriting",
+              ...evidence,
+            })
+          }
+        />
+      ) : activeAnswerMode === "trace" ? (
+        <TraceAnswerGrid
+          key={`${sessionProgress.id}:${currentRound.draw.card.id}`}
+          answers={answerOptions}
+          disabled={!answerReady}
+          focusRef={traceFocusRef}
+          selectedAnswer={
+            currentRound.selectedAnswer !== null &&
+            ANSWER_VALUES.some(
+              (answer) => answer === currentRound.selectedAnswer,
+            )
+              ? (currentRound.selectedAnswer as AnswerValue)
+              : null
+          }
+          selectedAnswerWasCorrect={currentRound.correct}
+          onAnswer={(answer, answeredAt, source) =>
+            submitAnswer(answer, "trace", answeredAt, {
+              inputSource: source,
+            })
+          }
+        />
+      ) : (
+        <SpeechAnswer
+          key={`${sessionProgress.id}:${mode}`}
+          accepting={answerReady}
+          active={
+            sessionPhase === "playing" &&
+            (mode !== "listen" || soundEnabled)
+          }
+          answerGate={speechAnswerGate}
+          microphonePermission={microphonePermission}
+          onAnswer={(match, answeredAt) =>
+            submitAnswer(match.answer, "speak", answeredAt, {
+              inputSource: "speech",
+              rawRecognition: match.transcript,
+              recognitionConfidence: match.confidence,
+            })
+          }
+          roundId={speechAnswerRoundId(
+            sessionProgress.id,
+            mode,
+            currentRound.draw.card.id,
+          )}
+        />
+      )}
+      {currentRound.correct !== null ? (
+        <span className={styles.liveVerdict} aria-hidden="true">
+          {currentRound.correct ? "✓" : "×"}
+        </span>
+      ) : null}
+    </div>
+  ) : null;
+
+  if (sessionPhase === "playing" || sessionPhase === "settling") {
+    return (
+      <main className={styles.livePage}>
+        {currentRound && liveAnswer ? (
+          <ProblemWithAnswer
+            mode={sessionProgress.presentationMode}
+            round={currentRound}
+            answer={liveAnswer}
+          />
+        ) : null}
+        <span
+          className={styles.visuallyHidden}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {currentRound?.correct === true
+            ? "Correct"
+            : currentRound?.correct === false
+              ? "Incorrect"
+              : ""}
+        </span>
+      </main>
+    );
+  }
+
   return (
     <div className={styles.page}>
       <header className={styles.topbar}>
@@ -1995,27 +2276,19 @@ export default function SubtractionFlashPage() {
         {adaptiveOpen ? (
           <div className={styles.adaptiveModeLabel}>Adaptive practice</div>
         ) : (
-          <nav className={styles.modeSwitch} aria-label="Practice style">
-            <button
-              className={styles.modeButton}
-              type="button"
-              aria-pressed={mode === "visual"}
-              disabled={sessionPhase !== "choosing"}
-              onClick={() => handleModeChange("visual")}
-            >
-              <CardsIcon />
-              Cards
-            </button>
-            <button
-              className={styles.modeButton}
-              type="button"
-              aria-pressed={mode === "listen"}
-              disabled={sessionPhase !== "choosing"}
-              onClick={() => handleModeChange("listen")}
-            >
-              <SpeakerIcon />
-              Listen
-            </button>
+          <nav className={styles.levelSwitch} aria-label="Level">
+            {SUBTRACTION_LEVELS.map((level) => (
+              <button
+                key={level}
+                className={styles.levelButton}
+                type="button"
+                aria-pressed={selectedLevel === level}
+                disabled={!interactionReady}
+                onClick={() => handleLevelChange(level)}
+              >
+                {level}
+              </button>
+            ))}
           </nav>
         )}
 
@@ -2054,8 +2327,80 @@ export default function SubtractionFlashPage() {
               aria-labelledby="session-choice-heading"
             >
               <div className={styles.sessionChoiceHeading}>
-                <span>{mode === "visual" ? "Cards" : "Listen"}</span>
-                <h2 id="session-choice-heading">Choose a run</h2>
+                <span>{selectedLevel}</span>
+                <h2 id="session-choice-heading">Set up a run</h2>
+              </div>
+              <div className={styles.setupControls}>
+                <fieldset className={styles.setupGroup}>
+                  <legend>Question</legend>
+                  <div className={styles.setupOptions}>
+                    <button
+                      className={styles.setupOption}
+                      type="button"
+                      aria-pressed={mode === "visual"}
+                      disabled={!interactionReady}
+                      onClick={() => handleModeChange("visual")}
+                    >
+                      <CardsIcon />
+                      Cards
+                    </button>
+                    <button
+                      className={styles.setupOption}
+                      type="button"
+                      aria-pressed={mode === "listen"}
+                      disabled={!interactionReady || selectedLevel === "B120"}
+                      onClick={() => handleModeChange("listen")}
+                    >
+                      <SpeakerIcon />
+                      Listen
+                    </button>
+                  </div>
+                </fieldset>
+                <fieldset className={styles.setupGroup}>
+                  <legend>Answer</legend>
+                  <div className={styles.setupOptions}>
+                    <button
+                      className={styles.setupOption}
+                      type="button"
+                      aria-pressed={answerMode === "tap"}
+                      disabled={!interactionReady}
+                      onClick={() => handleAnswerModeChange("tap")}
+                    >
+                      <TapIcon />
+                      Type
+                    </button>
+                    <button
+                      className={styles.setupOption}
+                      type="button"
+                      aria-pressed={answerMode === "draw"}
+                      disabled={!interactionReady}
+                      onClick={() => handleAnswerModeChange("draw")}
+                    >
+                      <DrawIcon />
+                      Draw
+                    </button>
+                    <button
+                      className={styles.setupOption}
+                      type="button"
+                      aria-pressed={answerMode === "trace"}
+                      disabled={!interactionReady || selectedLevel === "B120"}
+                      onClick={() => handleAnswerModeChange("trace")}
+                    >
+                      <TraceIcon />
+                      Trace
+                    </button>
+                    <button
+                      className={styles.setupOption}
+                      type="button"
+                      aria-pressed={answerMode === "speak"}
+                      disabled={!interactionReady}
+                      onClick={() => handleAnswerModeChange("speak")}
+                    >
+                      <MicIcon />
+                      Speak
+                    </button>
+                  </div>
+                </fieldset>
               </div>
               <div className={styles.sessionChoiceGrid}>
                 {SESSION_MODES.map((sessionMode, index) => (
@@ -2064,6 +2409,7 @@ export default function SubtractionFlashPage() {
                     ref={index === 0 ? firstSessionChoiceRef : undefined}
                     className={styles.sessionChoice}
                     type="button"
+                    disabled={!interactionReady || answerMode === null}
                     onClick={() => beginSession(sessionMode)}
                   >
                     <strong>{SESSION_LABELS[sessionMode]}</strong>
@@ -2073,6 +2419,7 @@ export default function SubtractionFlashPage() {
                 <button
                   className={`${styles.sessionChoice} ${styles.adaptiveSessionChoice}`}
                   type="button"
+                  disabled={!interactionReady}
                   onClick={() => setAdaptiveOpen(true)}
                 >
                   <strong>Adaptive practice</strong>
@@ -2091,10 +2438,7 @@ export default function SubtractionFlashPage() {
             </section>
           ) : (
             <>
-              <div
-                className={styles.promptArea}
-                data-running="true"
-              >
+              <div className={styles.promptArea} data-running="true">
                 <div className={styles.sessionHud}>
                   <span className={styles.sessionName}>
                     {SESSION_LABELS[sessionProgress.mode]}
@@ -2120,10 +2464,7 @@ export default function SubtractionFlashPage() {
                     <button
                       className={styles.finishButton}
                       type="button"
-                      disabled={
-                        sessionPhase !== "playing" ||
-                        sessionProgress.answered === 0
-                      }
+                      disabled={sessionProgress.answered === 0}
                       onClick={() => finishSession("manual")}
                     >
                       Finish
@@ -2137,7 +2478,11 @@ export default function SubtractionFlashPage() {
                     aria-label="Shuffling cards"
                   />
                 ) : mode === "visual" ? (
-                  <VisualProblem round={currentRound} />
+                  <ProblemWithAnswer
+                    mode="visual"
+                    round={currentRound}
+                    answer={<span />}
+                  />
                 ) : (
                   <button
                     className={`${styles.listeningCard} ${
@@ -2152,7 +2497,6 @@ export default function SubtractionFlashPage() {
                           : "Replay subtraction question"
                     }
                     disabled={
-                      sessionPhase !== "playing" ||
                       !soundEnabled ||
                       isQuestionSpeaking ||
                       currentRound.selectedAnswer !== null
@@ -2217,7 +2561,7 @@ export default function SubtractionFlashPage() {
                     className={styles.answerModeButton}
                     type="button"
                     aria-pressed={answerMode === "tap"}
-                    disabled={sessionPhase !== "playing"}
+                    disabled
                     onClick={() => handleAnswerModeChange("tap")}
                   >
                     <TapIcon />
@@ -2227,7 +2571,7 @@ export default function SubtractionFlashPage() {
                     className={styles.answerModeButton}
                     type="button"
                     aria-pressed={answerMode === "draw"}
-                    disabled={sessionPhase !== "playing"}
+                    disabled
                     onClick={() => handleAnswerModeChange("draw")}
                   >
                     <DrawIcon />
@@ -2237,7 +2581,7 @@ export default function SubtractionFlashPage() {
                     className={styles.answerModeButton}
                     type="button"
                     aria-pressed={answerMode === "trace"}
-                    disabled={sessionPhase !== "playing"}
+                    disabled
                     onClick={() => handleAnswerModeChange("trace")}
                   >
                     <TraceIcon />
@@ -2247,7 +2591,7 @@ export default function SubtractionFlashPage() {
                     className={styles.answerModeButton}
                     type="button"
                     aria-pressed={answerMode === "speak"}
-                    disabled={sessionPhase !== "playing"}
+                    disabled
                     onClick={() => handleAnswerModeChange("speak")}
                   >
                     <MicIcon />
@@ -2319,7 +2663,14 @@ export default function SubtractionFlashPage() {
                       disabled={!answerReady}
                       focusRef={traceFocusRef}
                       selectedAnswer={
-                        currentRound?.selectedAnswer ?? null
+                        currentRound?.selectedAnswer !== null &&
+                        currentRound?.selectedAnswer !== undefined &&
+                        ANSWER_VALUES.some(
+                          (answer) =>
+                            answer === currentRound.selectedAnswer,
+                        )
+                          ? (currentRound.selectedAnswer as AnswerValue)
+                          : null
                       }
                       selectedAnswerWasCorrect={
                         currentRound?.correct ?? null
@@ -2335,8 +2686,7 @@ export default function SubtractionFlashPage() {
                       key={`${sessionProgress.id}:${mode}`}
                       accepting={answerReady}
                       active={
-                        sessionPhase === "playing" &&
-                        (mode !== "listen" || soundEnabled)
+                        mode !== "listen" || soundEnabled
                       }
                       answerGate={speechAnswerGate}
                       microphonePermission={microphonePermission}
