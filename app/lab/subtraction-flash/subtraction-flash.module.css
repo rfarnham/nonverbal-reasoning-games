@@ -558,6 +558,29 @@
   color: var(--incorrect);
 }
 
+.liveRetryFeedback {
+  position: absolute;
+  z-index: 3;
+  top: calc(100% + 14px);
+  left: 50%;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 22px;
+  border: 2px solid var(--incorrect);
+  border-radius: 999px;
+  background: #fff0ed;
+  color: var(--incorrect);
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  font-weight: 880;
+  line-height: 1;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  box-shadow: 0 4px 0 rgb(191 73 62 / 18%);
+}
+
 .numericAnswerInput {
   width: clamp(190px, 24vw, 360px);
   min-height: clamp(150px, 21vw, 260px);

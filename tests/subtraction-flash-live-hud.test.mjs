@@ -39,8 +39,8 @@ test("live rounds retain distinct Home and Back navigation in the compact HUD", 
   assert.match(liveBranch, /styles\.liveCorrect/);
   assert.doesNotMatch(
     liveBranch,
-    /styles\.liveWrong|wrongAnswers|\bIncorrect\b|data-state=[^\n]*incorrect|×/,
-    "the live round never displays a wrong counter, red wrong state, or cross",
+    /styles\.liveWrong|wrongAnswers|\bIncorrect\b|×/,
+    "the live round never displays a wrong counter, Incorrect label, or cross",
   );
   assert.match(liveBranch, /sessionProgress\.mode === "infinite"[\s\S]*Finish/);
 

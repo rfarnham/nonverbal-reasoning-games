@@ -158,6 +158,7 @@ type ModeRounds = Record<PracticeMode, RoundState | null>;
 
 const TAP_RESULT_FLASH_MS = 520;
 const DRAW_RESULT_FLASH_MS = 900;
+const INCORRECT_RETRY_FLASH_MS = 900;
 
 function createPerformanceSessionId(): string {
   const randomUUID = globalThis.crypto?.randomUUID;
@@ -170,7 +171,11 @@ function epochMillisecondsFromPerformance(timestamp: number): number {
   return Math.max(0, Math.round(performance.timeOrigin + timestamp));
 }
 
-function resultFlashDuration(answeredWith: AnswerMode | null) {
+function resultFlashDuration(
+  answeredWith: AnswerMode | null,
+  correct: boolean | null,
+) {
+  if (correct === false) return INCORRECT_RETRY_FLASH_MS;
   return answeredWith === "draw"
     ? DRAW_RESULT_FLASH_MS
     : TAP_RESULT_FLASH_MS;
@@ -2379,7 +2384,7 @@ export default function SubtractionFlashPage() {
           retryRound();
         }
       }
-    }, resultFlashDuration(currentRound.answeredWith));
+    }, resultFlashDuration(currentRound.answeredWith, currentRound.correct));
     return () => window.clearTimeout(timer);
   }, [advanceRound, currentRound, mode, retryRound]);
 
@@ -2519,7 +2524,13 @@ export default function SubtractionFlashPage() {
   const liveAnswer = currentRound ? (
     <div
       className={styles.liveAnswerSlot}
-      data-state={currentRound.correct === true ? "correct" : "idle"}
+      data-state={
+        currentRound.correct === true
+          ? "correct"
+          : currentRound.correct === false
+            ? "incorrect"
+            : "idle"
+      }
     >
       {activeAnswerMode === "tap" ? (
         <NumericAnswerInput
@@ -2554,7 +2565,6 @@ export default function SubtractionFlashPage() {
           disabled={!answerReady}
           focusRef={traceFocusRef}
           selectedAnswer={
-            currentRound.correct === true &&
             currentRound.selectedAnswer !== null &&
             ANSWER_VALUES.some(
               (answer) => answer === currentRound.selectedAnswer,
@@ -2598,6 +2608,11 @@ export default function SubtractionFlashPage() {
         <span className={styles.liveVerdict} aria-hidden="true">
           ✓
         </span>
+      ) : null}
+      {currentRound.correct === false ? (
+        <strong className={styles.liveRetryFeedback} aria-hidden="true">
+          Try again
+        </strong>
       ) : null}
     </div>
   ) : null;

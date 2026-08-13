@@ -70,12 +70,13 @@ test("a miss clears the answer and retries the same card without advancing", () 
   );
 });
 
-test("live feedback never exposes a miss marker or wrong counter", () => {
+test("live feedback uses Try again without a miss mark or wrong counter", () => {
   assert.doesNotMatch(
     liveBranch,
-    /styles\.liveWrong|wrongAnswers|\bIncorrect\b|data-state=[^\n]*incorrect|×/,
+    /styles\.liveWrong|wrongAnswers|\bIncorrect\b|×/,
   );
   assert.match(liveBranch, /currentRound\?\.correct\s*===\s*true/);
+  assert.match(pageSource, />\s*Try again\s*</);
 });
 
 test("score counters use only each practice card's first attempt", () => {
