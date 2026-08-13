@@ -69,6 +69,8 @@
   background: rgb(255 253 248 / 92%);
   color: #17213d;
   font-size: clamp(3.5rem, 8vw, 6rem);
+  font-weight: 900;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }

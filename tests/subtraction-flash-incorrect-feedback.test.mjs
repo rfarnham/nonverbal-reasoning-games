@@ -144,4 +144,11 @@ test("retry feedback has its own legible line below handwriting status", () => {
     /letter-spacing:\s*(?:normal|0)/,
     "handwriting status must override the equation's tight tracking",
   );
+
+  const handwritingReadoutRule = cssRule(handwritingStylesSource, ".readout");
+  assert.match(
+    handwritingReadoutRule,
+    /font-weight:\s*900/,
+    "the recognized answer must remain a large, emphatic number",
+  );
 });
