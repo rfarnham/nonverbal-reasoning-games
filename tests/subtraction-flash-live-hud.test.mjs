@@ -29,12 +29,19 @@ test("live rounds retain distinct Home and Back navigation in the compact HUD", 
   assert.match(liveBranch, /aria-label="Back to Borrow Flash setup"/);
   assert.match(liveBranch, /onClick=\{abandonSession\}/);
   assert.match(liveBranch, /<ArrowLeftIcon\s*\/>/);
-  assert.match(liveBranch, /role="timer"/);
+  assert.match(
+    liveBranch,
+    /role=\{sessionProgress\.stage === "main" \? "timer" : undefined\}/,
+    "only the timed/main clock has timer semantics",
+  );
   assert.match(liveBranch, /Time remaining/);
   assert.match(liveBranch, /Time elapsed/);
   assert.match(liveBranch, /styles\.liveCorrect/);
-  assert.match(liveBranch, /styles\.liveWrong/);
-  assert.match(liveBranch, /sessionProgress\.answered - sessionProgress\.correct/);
+  assert.doesNotMatch(
+    liveBranch,
+    /styles\.liveWrong|wrongAnswers|\bIncorrect\b|data-state=[^\n]*incorrect|×/,
+    "the live round never displays a wrong counter, red wrong state, or cross",
+  );
   assert.match(liveBranch, /sessionProgress\.mode === "infinite"[\s\S]*Finish/);
 
   assert.match(stylesSource, /\.liveHud\s*\{[\s\S]*position:\s*absolute;/);

@@ -272,7 +272,9 @@ export function normalizePerformanceAttempts(
   adaptiveAttempts: readonly AttemptEvent[] = [],
 ): NormalizedPerformanceAttempt[] {
   return [
-    ...coreAttempts.map(normalizeCoreAttempt),
+    ...coreAttempts
+      .filter((attempt) => attempt.firstAttempt)
+      .map(normalizeCoreAttempt),
     ...adaptiveAttempts.map(normalizeAdaptiveAttempt),
   ].sort((left, right) => left.timestamp - right.timestamp || left.id.localeCompare(right.id));
 }

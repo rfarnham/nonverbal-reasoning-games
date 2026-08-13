@@ -37,7 +37,12 @@ class MemoryStorage {
 function withoutV2Fields(record) {
   return Object.fromEntries(
     Object.entries(record).filter(
-      ([key]) => key !== "level" && key !== "inputMode",
+      ([key]) =>
+        key !== "level" &&
+        key !== "inputMode" &&
+        key !== "attemptOrdinal" &&
+        key !== "firstAttempt" &&
+        key !== "sessionLane",
     ),
   );
 }
@@ -190,11 +195,162 @@ test("storage appends strict session and attempt events without rewriting duplic
   assert.equal(loaded.log?.attempts.length, 1);
   assert.equal(loaded.log?.sessionEvents.length, 2);
   assert.equal(loaded.log?.attempts[0].rawRecognition, "nine, clearly");
+  assert.equal(loaded.log?.attempts[0].attemptOrdinal, 1);
+  assert.equal(loaded.log?.attempts[0].firstAttempt, true);
+  assert.equal(loaded.log?.attempts[0].sessionLane, "main");
 
   const csv = performanceAttemptsToCsv(undefined, storage);
   assert.match(csv, /date,time,time_zone/);
   assert.match(csv, /correct,true,1500/);
   assert.match(csv, /"nine, clearly"/);
+});
+
+test("raw retries and redemption stay stored while analysis scores only the first miss", () => {
+  const storage = new MemoryStorage();
+  assert.equal(
+    startPerformanceSession(
+      createPerformanceSession({
+        sessionId: "retry-run",
+        gameType: "infinite",
+        level: "B100",
+        presentationMode: "visual",
+        inputMode: "draw",
+        baseDeckSize: 72,
+        startedAt: BASE_TIME,
+      }),
+      storage,
+    ).ok,
+    true,
+  );
+
+  const shared = {
+    sessionId: "retry-run",
+    inputMode: "draw",
+    inputSource: "handwriting",
+    cardId: "visual:1:13-4:1",
+  };
+  const firstMiss = coreAttempt({
+    ...shared,
+    sessionPosition: 1,
+    submittedAnswer: 8,
+    correct: false,
+    attemptOrdinal: 1,
+    firstAttempt: true,
+    sessionLane: "main",
+    rawRecognition: "8",
+    recognitionConfidence: 0.94,
+  });
+  const retrySuccess = coreAttempt({
+    ...shared,
+    sessionPosition: 2,
+    submittedAnswer: 9,
+    correct: true,
+    attemptOrdinal: 2,
+    firstAttempt: false,
+    sessionLane: "retry",
+    rawRecognition: "9",
+    recognitionConfidence: 0.9,
+  });
+  const redemptionSuccess = coreAttempt({
+    ...shared,
+    sessionPosition: 3,
+    submittedAnswer: 9,
+    correct: true,
+    attemptOrdinal: 1,
+    firstAttempt: false,
+    sessionLane: "redemption",
+    isReview: true,
+    rawRecognition: "nine",
+    recognitionConfidence: 0.86,
+  });
+
+  for (const attempt of [firstMiss, retrySuccess, redemptionSuccess]) {
+    assert.equal(appendPerformanceAttempt(attempt, storage).ok, true);
+  }
+
+  const raw = loadPerformanceLogDiagnostic(storage).log?.attempts ?? [];
+  assert.equal(raw.length, 3);
+  assert.deepEqual(
+    raw.map(({ attemptOrdinal, firstAttempt, sessionLane, rawRecognition }) => ({
+      attemptOrdinal,
+      firstAttempt,
+      sessionLane,
+      rawRecognition,
+    })),
+    [
+      {
+        attemptOrdinal: 1,
+        firstAttempt: true,
+        sessionLane: "main",
+        rawRecognition: "8",
+      },
+      {
+        attemptOrdinal: 2,
+        firstAttempt: false,
+        sessionLane: "retry",
+        rawRecognition: "9",
+      },
+      {
+        attemptOrdinal: 1,
+        firstAttempt: false,
+        sessionLane: "redemption",
+        rawRecognition: "nine",
+      },
+    ],
+  );
+
+  const normalized = normalizePerformanceAttempts(raw, []);
+  assert.equal(normalized.length, 1);
+  assert.equal(normalized[0].correct, false);
+  assert.equal(buildLatencyDistribution(normalized).infinity.count, 1);
+
+  const [header, ...rows] = performanceAttemptsToCsv(raw, storage).split("\r\n");
+  assert.equal(rows.length, 3);
+  assert.match(header, /attempt_ordinal,first_attempt,session_lane/);
+  assert.match(rows[1], /retry/);
+  assert.match(rows[2], /redemption/);
+});
+
+test("attempt progress metadata rejects ambiguous scored retries", () => {
+  assert.throws(
+    () =>
+      coreAttempt({
+        attemptOrdinal: 2,
+        firstAttempt: true,
+        sessionLane: "retry",
+      }),
+    /Only ordinal 1 in the main lane/,
+  );
+  assert.throws(
+    () => coreAttempt({ attemptOrdinal: 0 }),
+    /positive integer/,
+  );
+});
+
+test("existing v2 rows gain first-attempt metadata without rewriting storage", () => {
+  const storage = new MemoryStorage();
+  const current = coreAttempt({ isReview: true });
+  const legacyV2 = Object.fromEntries(
+    Object.entries(current).filter(
+      ([key]) =>
+        key !== "attemptOrdinal" &&
+        key !== "firstAttempt" &&
+        key !== "sessionLane",
+    ),
+  );
+  const serialized = JSON.stringify({
+    schemaVersion: PERFORMANCE_SCHEMA_VERSION,
+    attempts: [legacyV2],
+    sessionEvents: [],
+  });
+  storage.setItem(PERFORMANCE_STORAGE_KEY, serialized);
+
+  const loaded = loadPerformanceLogDiagnostic(storage);
+  assert.equal(loaded.status, "loaded");
+  assert.equal(loaded.log?.attempts[0].attemptOrdinal, 1);
+  assert.equal(loaded.log?.attempts[0].firstAttempt, false);
+  assert.equal(loaded.log?.attempts[0].sessionLane, "redemption");
+  assert.equal(storage.getItem(PERFORMANCE_STORAGE_KEY), serialized);
 });
 
 test("corrupt and newer-schema storage is diagnosed and never overwritten", () => {

@@ -18,6 +18,7 @@ import {
   writeSoundPreference,
 } from "@/lib/game-audio";
 import { createGameNarrationPlayer } from "@/lib/game-narration";
+import { RedemptionIntroPanel } from "@/components/progression/ProgressionSessionPanels";
 
 import {
   ANSWER_VALUES,
@@ -88,6 +89,7 @@ import styles from "./subtraction-flash.module.css";
 type AnswerMode = "tap" | "draw" | "trace" | "speak";
 type SessionPhase = "choosing" | "playing" | "settling" | "results";
 type SessionFinishReason = "manual" | "time" | "deck";
+type SessionStage = "main" | "redemption-intro" | "redemption";
 type SessionPauseReason = "hidden";
 
 type AnswerInputSource =
@@ -113,11 +115,16 @@ type SessionProgress = Readonly<{
   level: SubtractionLevel;
   presentationMode: PracticeMode;
   answerMode: AnswerMode;
+  stage: SessionStage;
+  pendingFinishReason: SessionFinishReason | null;
+  mainElapsedMs: number | null;
   clock: SessionClock;
+  submissions: number;
   answered: number;
   correct: number;
   slow: number;
   reviews: number;
+  redemptionTotal: number;
   baseDeckSize: number;
   cardsRemaining: number;
 }>;
@@ -133,6 +140,7 @@ type SessionResult = Readonly<{
   correct: number;
   slow: number;
   reviews: number;
+  redemptionTotal: number;
   baseDeckSize: number;
 }>;
 
@@ -141,6 +149,7 @@ type RoundState = Readonly<{
   selectedAnswer: SubmittedAnswer | null;
   correct: boolean | null;
   startedAt: number | null;
+  attemptOrdinal: number;
   answeredWith: AnswerMode | null;
   interpretation: string | null;
 }>;
@@ -171,8 +180,9 @@ function speechAnswerRoundId(
   sessionId: number,
   mode: PracticeMode,
   cardId: string,
+  attemptOrdinal: number,
 ) {
-  return `${sessionId}:${mode}:${cardId}`;
+  return `${sessionId}:${mode}:${cardId}:attempt-${attemptOrdinal}`;
 }
 
 const SESSION_LABELS: Record<SessionMode, string> = {
@@ -504,6 +514,7 @@ function newRound(
     selectedAnswer: null,
     correct: null,
     startedAt: mode === "visual" ? sessionElapsedMs : null,
+    attemptOrdinal: 1,
     answeredWith: null,
     interpretation: null,
   };
@@ -1257,11 +1268,16 @@ export default function SubtractionFlashPage() {
     level: "B100",
     presentationMode: "visual",
     answerMode: "tap",
+    stage: "main",
+    pendingFinishReason: null,
+    mainElapsedMs: null,
     clock: createSessionClock(0, false),
+    submissions: 0,
     answered: 0,
     correct: 0,
     slow: 0,
     reviews: 0,
+    redemptionTotal: 0,
     baseDeckSize: 0,
     cardsRemaining: 0,
   });
@@ -1516,6 +1532,7 @@ export default function SubtractionFlashPage() {
         sessionIdRef.current,
         "listen",
         cardId,
+        listeningRound.attemptOrdinal,
       );
       if (listeningRound.startedAt !== null) {
         speechAnswerGate.updateRound(roundId, true);
@@ -1550,6 +1567,7 @@ export default function SubtractionFlashPage() {
           sessionIdRef.current,
           "listen",
           round.draw.card.id,
+          round.attemptOrdinal,
         ),
         SUBTRACTION_QUESTION_NARRATION.clips[cueId].transcript,
       );
@@ -1582,23 +1600,21 @@ export default function SubtractionFlashPage() {
     setIsQuestionSpeaking(false);
   }, [narrationPlayer]);
 
-  const finishSession = useCallback(
+  const completeSession = useCallback(
     (
       finishReason: SessionFinishReason,
-      finishedAtMs?: number,
-      revealDelayMs = 0,
+      mainElapsedMs: number,
     ) => {
       if (sessionPhaseRef.current !== "playing") return;
 
       const now = performance.now();
       const progress = sessionProgressRef.current;
-      const elapsed = Math.max(
-        0,
-        finishedAtMs ?? readSessionElapsed(progress.clock, now),
-      );
       const frozenProgress: SessionProgress = {
         ...progress,
-        clock: { elapsedMs: elapsed, runningSince: null },
+        clock: {
+          elapsedMs: readSessionElapsed(progress.clock, now),
+          runningSince: null,
+        },
       };
 
       sessionPhaseRef.current = "settling";
@@ -1613,11 +1629,12 @@ export default function SubtractionFlashPage() {
         presentationMode: progress.presentationMode,
         answerMode: progress.answerMode,
         finishReason,
-        elapsedMs: elapsed,
+        elapsedMs: mainElapsedMs,
         answered: progress.answered,
         correct: progress.correct,
         slow: progress.slow,
         reviews: progress.reviews,
+        redemptionTotal: progress.redemptionTotal,
         baseDeckSize: progress.baseDeckSize,
       };
 
@@ -1627,7 +1644,7 @@ export default function SubtractionFlashPage() {
           {
             finishedAt: epochMillisecondsFromPerformance(now),
             finishReason,
-            elapsedMs: elapsed,
+            elapsedMs: mainElapsedMs,
             answered: progress.answered,
             correct: progress.correct,
             slow: progress.slow,
@@ -1643,21 +1660,92 @@ export default function SubtractionFlashPage() {
         }
       }
 
-      const reveal = () => {
-        resultTimerRef.current = null;
-        sessionPhaseRef.current = "results";
-        setSessionPhase("results");
-        setSessionResult(result);
-      };
-
-      if (revealDelayMs > 0) {
-        resultTimerRef.current = window.setTimeout(reveal, revealDelayMs);
-      } else {
-        reveal();
-      }
+      sessionPhaseRef.current = "results";
+      setSessionPhase("results");
+      setSessionResult(result);
     },
     [replaceSessionProgress, stopSpeaking],
   );
+
+  const finishSession = useCallback(
+    (
+      finishReason: SessionFinishReason,
+      finishedAtMs?: number,
+    ) => {
+      if (sessionPhaseRef.current !== "playing") return;
+
+      const now = performance.now();
+      const progress = sessionProgressRef.current;
+      const deck = deckRef.current;
+      const elapsed = Math.max(
+        0,
+        progress.mainElapsedMs ??
+          finishedAtMs ??
+          readSessionElapsed(progress.clock, now),
+      );
+
+      if (progress.stage !== "main") {
+        if (deck?.snapshot().exhausted) {
+          completeSession(
+            progress.pendingFinishReason ?? finishReason,
+            elapsed,
+          );
+        }
+        return;
+      }
+
+      const redemption = deck?.beginRedemption();
+      if (!deck || !redemption || redemption.phase !== "redemption") {
+        completeSession(finishReason, elapsed);
+        return;
+      }
+
+      stopSpeaking();
+      answerLockRef.current = null;
+      const nextProgress: SessionProgress = {
+        ...progress,
+        stage: "redemption-intro",
+        pendingFinishReason: finishReason,
+        mainElapsedMs: elapsed,
+        redemptionTotal: redemption.pending,
+        cardsRemaining: redemption.pending,
+      };
+      const nextRounds: ModeRounds = { visual: null, listen: null };
+      roundsRef.current = nextRounds;
+      replaceSessionProgress(nextProgress);
+      setRounds(nextRounds);
+      setClockNow(now);
+    },
+    [completeSession, replaceSessionProgress, stopSpeaking],
+  );
+
+  const startRedemption = useCallback(() => {
+    if (sessionPhaseRef.current !== "playing") return;
+    const progress = sessionProgressRef.current;
+    const deck = deckRef.current;
+    if (progress.stage !== "redemption-intro" || !deck) return;
+
+    const now = performance.now();
+    const activeMode = modeRef.current;
+    const activeElapsedMs = readSessionElapsed(progress.clock, now);
+    const round = newRound(deck.next(), activeMode, activeElapsedMs);
+    const snapshot = deck.snapshot();
+    const nextProgress: SessionProgress = {
+      ...progress,
+      stage: "redemption",
+      cardsRemaining: snapshot.remaining + 1,
+    };
+    const nextRounds: ModeRounds = {
+      visual: activeMode === "visual" ? round : null,
+      listen: activeMode === "listen" ? round : null,
+    };
+    roundsRef.current = nextRounds;
+    answerLockRef.current = null;
+    replaceSessionProgress(nextProgress);
+    setRounds(nextRounds);
+    setClockNow(now);
+    if (activeMode === "listen") speakQuestion(round);
+  }, [replaceSessionProgress, speakQuestion]);
 
   const submitAnswer = useCallback(
     (
@@ -1692,6 +1780,7 @@ export default function SubtractionFlashPage() {
         answeredAt,
       );
       if (
+        progress.stage === "main" &&
         progress.mode === "two-minute" &&
         !isTimedAnswerAllowed(activeElapsedMs)
       ) {
@@ -1707,11 +1796,21 @@ export default function SubtractionFlashPage() {
       );
       const timingEligible = evidence.inputSource !== "trace";
       const answerWasSlow =
-        timingEligible && answerElapsedMs > SLOW_RESPONSE_MS;
+        progress.stage === "main" &&
+        timingEligible &&
+        answerElapsedMs > SLOW_RESPONSE_MS;
       const outcomeRecord = deck.recordOutcome(round.draw.card, {
         correct,
         elapsedMs: timingEligible ? answerElapsedMs : 0,
       });
+      const scoredFirstAttempt =
+        progress.stage === "main" && outcomeRecord.firstAttempt;
+      const sessionLane =
+        progress.stage === "redemption"
+          ? "redemption"
+          : outcomeRecord.firstAttempt
+            ? "main"
+            : "retry";
 
       const answeredRound: RoundState = {
         ...round,
@@ -1738,7 +1837,7 @@ export default function SubtractionFlashPage() {
           const attempt = createPerformanceAttempt({
             sessionId: progress.performanceSessionId,
             occurredAt: epochMillisecondsFromPerformance(answeredAt),
-            sessionPosition: progress.answered + 1,
+            sessionPosition: progress.submissions + 1,
             gameType: progress.mode,
             level: progress.level,
             presentationMode: activeMode,
@@ -1755,8 +1854,11 @@ export default function SubtractionFlashPage() {
             correct,
             elapsedMs: answerElapsedMs,
             slow: answerWasSlow,
+            attemptOrdinal: round.attemptOrdinal,
+            firstAttempt: scoredFirstAttempt,
+            sessionLane,
             isReview: round.draw.card.isReview,
-            reviewQueued: outcomeRecord.flagged,
+            reviewQueued: outcomeRecord.reinserted,
             reinserted: outcomeRecord.reinserted,
             outcomeReason: outcomeRecord.reason,
             drawNumber: round.draw.drawNumber,
@@ -1792,25 +1894,29 @@ export default function SubtractionFlashPage() {
 
       const nextProgress: SessionProgress = {
         ...progress,
-        answered: progress.answered + 1,
-        correct: progress.correct + (correct ? 1 : 0),
-        slow: progress.slow + (answerWasSlow ? 1 : 0),
-        reviews: progress.reviews + (round.draw.card.isReview ? 1 : 0),
+        submissions: progress.submissions + 1,
+        answered: progress.answered + (scoredFirstAttempt ? 1 : 0),
+        correct:
+          progress.correct + (scoredFirstAttempt && correct ? 1 : 0),
+        slow:
+          progress.slow +
+          (scoredFirstAttempt && answerWasSlow ? 1 : 0),
+        reviews:
+          progress.reviews +
+          (progress.stage === "redemption" && correct ? 1 : 0),
         cardsRemaining: deckSnapshot.remaining,
       };
       replaceSessionProgress(nextProgress);
 
       if (activeMode === "listen") stopSpeaking();
-      if (answeredWith !== "speak") playEarcon(correct);
+      if (correct && answeredWith !== "speak") playEarcon(true);
 
-      const feedbackDelay = resultFlashDuration(answeredWith);
-      if (progress.mode === "deck-sprint" && deckSnapshot.exhausted) {
-        finishSession("deck", activeElapsedMs, feedbackDelay);
-      } else if (
+      if (
+        progress.stage === "main" &&
         progress.mode === "two-minute" &&
         activeElapsedMs >= TWO_MINUTE_SESSION_MS
       ) {
-        finishSession("time", TWO_MINUTE_SESSION_MS, feedbackDelay);
+        finishSession("time", TWO_MINUTE_SESSION_MS);
       }
     },
     [finishSession, playEarcon, replaceSessionProgress, stopSpeaking],
@@ -1902,15 +2008,27 @@ export default function SubtractionFlashPage() {
   const advanceRound = useCallback(() => {
     if (sessionPhaseRef.current !== "playing") return;
     const deck = deckRef.current;
-    if (!deck || deck.snapshot().exhausted) return;
+    if (!deck) return;
     const activeMode = modeRef.current;
     const now = performance.now();
+    const progress = sessionProgressRef.current;
     const activeElapsedMs = readSessionElapsed(
-      sessionProgressRef.current.clock,
+      progress.clock,
       now,
     );
+    const snapshot = deck.snapshot();
+
+    if (progress.stage === "redemption" && snapshot.exhausted) {
+      finishSession(progress.pendingFinishReason ?? "deck");
+      return;
+    }
+    if (progress.stage === "main" && snapshot.practiceExhausted) {
+      finishSession("deck", activeElapsedMs);
+      return;
+    }
     if (
-      sessionProgressRef.current.mode === "two-minute" &&
+      progress.stage === "main" &&
+      progress.mode === "two-minute" &&
       activeElapsedMs >= TWO_MINUTE_SESSION_MS
     ) {
       finishSession("time", TWO_MINUTE_SESSION_MS);
@@ -1928,6 +2046,37 @@ export default function SubtractionFlashPage() {
     setRounds(nextRounds);
     if (activeMode === "listen") speakQuestion(round);
   }, [finishSession, speakQuestion, stopSpeaking]);
+
+  const retryRound = useCallback(() => {
+    if (sessionPhaseRef.current !== "playing") return;
+    const activeMode = modeRef.current;
+    const current = roundsRef.current[activeMode];
+    if (!current || current.correct !== false) return;
+
+    const now = performance.now();
+    const activeElapsedMs = readSessionElapsed(
+      sessionProgressRef.current.clock,
+      now,
+    );
+    stopSpeaking();
+    answerLockRef.current = null;
+    const retry: RoundState = {
+      ...current,
+      selectedAnswer: null,
+      correct: null,
+      startedAt: activeMode === "visual" ? activeElapsedMs : null,
+      attemptOrdinal: current.attemptOrdinal + 1,
+      answeredWith: null,
+      interpretation: null,
+    };
+    const nextRounds: ModeRounds = {
+      visual: activeMode === "visual" ? retry : null,
+      listen: activeMode === "listen" ? retry : null,
+    };
+    roundsRef.current = nextRounds;
+    setRounds(nextRounds);
+    if (activeMode === "listen") speakQuestion(retry);
+  }, [speakQuestion, stopSpeaking]);
 
   const beginSession = useCallback(
     (sessionMode: SessionMode) => {
@@ -1971,11 +2120,16 @@ export default function SubtractionFlashPage() {
         level: chosenLevel,
         presentationMode: activeMode,
         answerMode: chosenAnswerMode,
+        stage: "main",
+        pendingFinishReason: null,
+        mainElapsedMs: null,
         clock: createSessionClock(now, pauseReasons.size === 0),
+        submissions: 0,
         answered: 0,
         correct: 0,
         slow: 0,
         reviews: 0,
+        redemptionTotal: 0,
         baseDeckSize: firstDraw.baseDeckSize,
         cardsRemaining: firstDraw.remaining + 1,
       };
@@ -2147,15 +2301,11 @@ export default function SubtractionFlashPage() {
       setClockNow(now);
       const progress = sessionProgressRef.current;
       if (
+        progress.stage === "main" &&
         progress.mode === "two-minute" &&
         readSessionElapsed(progress.clock, now) >= TWO_MINUTE_SESSION_MS
       ) {
-        const round = roundsRef.current[modeRef.current];
-        finishSession(
-          "time",
-          TWO_MINUTE_SESSION_MS,
-          round && round.selectedAnswer !== null ? 240 : 0,
-        );
+        finishSession("time", TWO_MINUTE_SESSION_MS);
       }
     };
 
@@ -2223,14 +2373,22 @@ export default function SubtractionFlashPage() {
     const answeredMode = mode;
     const timer = window.setTimeout(() => {
       if (modeRef.current === answeredMode) {
-        advanceRound();
+        if (currentRound.correct) {
+          advanceRound();
+        } else {
+          retryRound();
+        }
       }
     }, resultFlashDuration(currentRound.answeredWith));
     return () => window.clearTimeout(timer);
-  }, [advanceRound, currentRound, mode]);
+  }, [advanceRound, currentRound, mode, retryRound]);
 
   useEffect(() => {
-    if (sessionPhase !== "playing" || sessionProgress.mode !== "infinite") {
+    if (
+      sessionPhase !== "playing" ||
+      sessionProgress.mode !== "infinite" ||
+      sessionProgress.stage !== "main"
+    ) {
       return;
     }
     const handleEscape = (event: KeyboardEvent) => {
@@ -2242,7 +2400,12 @@ export default function SubtractionFlashPage() {
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [finishSession, sessionPhase, sessionProgress.mode]);
+  }, [
+    finishSession,
+    sessionPhase,
+    sessionProgress.mode,
+    sessionProgress.stage,
+  ]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -2293,7 +2456,8 @@ export default function SubtractionFlashPage() {
     if (sessionPhaseRef.current === "playing") {
       const now = performance.now();
       const progress = sessionProgressRef.current;
-      const elapsedMs = readSessionElapsed(progress.clock, now);
+      const elapsedMs =
+        progress.mainElapsedMs ?? readSessionElapsed(progress.clock, now);
       if (progress.performanceSessionId) {
         const write = finishPerformanceSession(
           progress.performanceSessionId,
@@ -2343,7 +2507,9 @@ export default function SubtractionFlashPage() {
     ? sessionAccuracy(sessionResult.correct, sessionResult.answered)
     : null;
   const resultHero = sessionResult
-    ? sessionResult.mode === "deck-sprint"
+    ? sessionResult.redemptionTotal > 0
+      ? `${sessionResult.reviews} of ${sessionResult.redemptionTotal} cleared`
+      : sessionResult.mode === "deck-sprint"
       ? formatElapsedTime(sessionResult.elapsedMs, true)
       : sessionResult.mode === "two-minute"
         ? `${sessionResult.correct} correct`
@@ -2353,17 +2519,11 @@ export default function SubtractionFlashPage() {
   const liveAnswer = currentRound ? (
     <div
       className={styles.liveAnswerSlot}
-      data-state={
-        currentRound.correct === true
-          ? "correct"
-          : currentRound.correct === false
-            ? "incorrect"
-            : "idle"
-      }
+      data-state={currentRound.correct === true ? "correct" : "idle"}
     >
       {activeAnswerMode === "tap" ? (
         <NumericAnswerInput
-          key={`${sessionProgress.id}:${currentRound.draw.card.id}`}
+          key={`${sessionProgress.id}:${currentRound.draw.card.id}:${currentRound.attemptOrdinal}`}
           digitCount={SUBTRACTION_LEVEL_CONFIG[activeLevel].answerDigits}
           disabled={!answerReady}
           inputRef={numericInputRef}
@@ -2375,11 +2535,11 @@ export default function SubtractionFlashPage() {
         />
       ) : activeAnswerMode === "draw" ? (
         <FlashHandwriting
-          key={`${sessionProgress.id}:${currentRound.draw.card.id}`}
+          key={`${sessionProgress.id}:${currentRound.draw.card.id}:${currentRound.attemptOrdinal}`}
           digitCount={SUBTRACTION_LEVEL_CONFIG[activeLevel].answerDigits}
           disabled={!answerReady}
           focusRef={drawFocusRef}
-          roundId={currentRound.draw.card.id}
+          roundId={`${currentRound.draw.card.id}:${currentRound.attemptOrdinal}`}
           onAnswer={(answer, answeredAt, evidence) =>
             submitAnswer(answer, "draw", answeredAt, {
               inputSource: "handwriting",
@@ -2389,11 +2549,12 @@ export default function SubtractionFlashPage() {
         />
       ) : activeAnswerMode === "trace" ? (
         <TraceAnswerGrid
-          key={`${sessionProgress.id}:${currentRound.draw.card.id}`}
+          key={`${sessionProgress.id}:${currentRound.draw.card.id}:${currentRound.attemptOrdinal}`}
           answers={answerOptions}
           disabled={!answerReady}
           focusRef={traceFocusRef}
           selectedAnswer={
+            currentRound.correct === true &&
             currentRound.selectedAnswer !== null &&
             ANSWER_VALUES.some(
               (answer) => answer === currentRound.selectedAnswer,
@@ -2410,7 +2571,7 @@ export default function SubtractionFlashPage() {
         />
       ) : (
         <SpeechAnswer
-          key={`${sessionProgress.id}:${mode}`}
+          key={`${sessionProgress.id}:${mode}:${currentRound.draw.card.id}:${currentRound.attemptOrdinal}`}
           accepting={answerReady}
           active={
             sessionPhase === "playing" &&
@@ -2429,30 +2590,38 @@ export default function SubtractionFlashPage() {
             sessionProgress.id,
             mode,
             currentRound.draw.card.id,
+            currentRound.attemptOrdinal,
           )}
         />
       )}
-      {currentRound.correct !== null ? (
+      {currentRound.correct === true ? (
         <span className={styles.liveVerdict} aria-hidden="true">
-          {currentRound.correct ? "✓" : "×"}
+          ✓
         </span>
       ) : null}
     </div>
   ) : null;
 
   if (sessionPhase === "playing" || sessionPhase === "settling") {
+    const isRedemption = sessionProgress.stage !== "main";
+    const redemptionQuestion = Math.min(
+      sessionProgress.reviews + (currentRound?.correct === true ? 0 : 1),
+      sessionProgress.redemptionTotal,
+    );
     const liveClockValue =
-      sessionProgress.mode === "two-minute"
+      sessionProgress.stage === "redemption-intro"
+        ? "Untimed review"
+        : sessionProgress.stage === "redemption"
+          ? `Question ${redemptionQuestion} of ${sessionProgress.redemptionTotal}`
+        : sessionProgress.mode === "two-minute"
         ? formatCountdownTime(remainingTimedMs)
         : formatElapsedTime(elapsedMs);
     const liveClockLabel =
-      sessionProgress.mode === "two-minute"
+      isRedemption
+        ? "Untimed redemption"
+        : sessionProgress.mode === "two-minute"
         ? "Time remaining"
         : "Time elapsed";
-    const wrongAnswers = Math.max(
-      0,
-      sessionProgress.answered - sessionProgress.correct,
-    );
 
     return (
       <main className={styles.livePage}>
@@ -2476,27 +2645,57 @@ export default function SubtractionFlashPage() {
             </button>
           </nav>
 
-          <span
-            className={styles.liveClock}
-            role="timer"
-            aria-label={`${liveClockLabel}: ${liveClockValue}`}
-          >
-            {liveClockValue}
-          </span>
+          {sessionProgress.stage === "redemption" ? (
+            <div className={styles.liveReviewStatus}>
+              <span
+                className={styles.liveClock}
+                aria-label={`${liveClockLabel}: ${liveClockValue}`}
+              >
+                {liveClockValue}
+              </span>
+              <span
+                className={styles.liveReviewTrack}
+                role="progressbar"
+                aria-label="Redemption progress"
+                aria-valuemin={0}
+                aria-valuemax={sessionProgress.redemptionTotal}
+                aria-valuenow={sessionProgress.reviews}
+              >
+                <span
+                  className={styles.liveReviewFill}
+                  style={{
+                    width: `${
+                      (sessionProgress.reviews /
+                        Math.max(sessionProgress.redemptionTotal, 1)) *
+                      100
+                    }%`,
+                  }}
+                />
+              </span>
+            </div>
+          ) : (
+            <span
+              className={styles.liveClock}
+              role={sessionProgress.stage === "main" ? "timer" : undefined}
+              aria-label={`${liveClockLabel}: ${liveClockValue}`}
+            >
+              {liveClockValue}
+            </span>
+          )}
 
           <div className={styles.liveHudEnd}>
-            <span
-              className={styles.liveScore}
-              aria-label={`${sessionProgress.correct} correct, ${wrongAnswers} wrong`}
-            >
-              <span className={styles.liveCorrect} aria-hidden="true">
-                ✓ {sessionProgress.correct}
+            {sessionProgress.stage === "main" ? (
+              <span
+                className={styles.liveScore}
+                aria-label={`${sessionProgress.correct} correct on the first try`}
+              >
+                <span className={styles.liveCorrect} aria-hidden="true">
+                  ✓ {sessionProgress.correct}
+                </span>
               </span>
-              <span className={styles.liveWrong} aria-hidden="true">
-                × {wrongAnswers}
-              </span>
-            </span>
-            {sessionProgress.mode === "infinite" ? (
+            ) : null}
+            {sessionProgress.mode === "infinite" &&
+            sessionProgress.stage === "main" ? (
               <button
                 className={styles.liveFinish}
                 type="button"
@@ -2509,7 +2708,14 @@ export default function SubtractionFlashPage() {
           </div>
         </header>
 
-        {currentRound && liveAnswer ? (
+        {sessionProgress.stage === "redemption-intro" ? (
+          <RedemptionIntroPanel
+            missedCount={sessionProgress.redemptionTotal}
+            focusKey={sessionProgress.id}
+            complete={sessionProgress.pendingFinishReason === "deck"}
+            onBegin={startRedemption}
+          />
+        ) : currentRound && liveAnswer ? (
           <ProblemWithAnswer
             mode={sessionProgress.presentationMode}
             round={currentRound}
@@ -2525,7 +2731,7 @@ export default function SubtractionFlashPage() {
           {currentRound?.correct === true
             ? "Correct"
             : currentRound?.correct === false
-              ? "Incorrect"
+              ? "Try again"
               : ""}
         </span>
       </main>
@@ -2960,6 +3166,7 @@ export default function SubtractionFlashPage() {
                               sessionProgress.id,
                               mode,
                               currentRound.draw.card.id,
+                              currentRound.attemptOrdinal,
                             )
                           : null
                       }
@@ -3101,8 +3308,11 @@ export default function SubtractionFlashPage() {
         {sessionResult ? (
           <div className={styles.resultsSplash}>
             <p className={styles.resultsKicker}>
-              {SESSION_LABELS[sessionResult.mode]}
-              {sessionResult.mode === "deck-sprint"
+              {sessionResult.redemptionTotal > 0
+                ? "Redeemed"
+                : SESSION_LABELS[sessionResult.mode]}
+              {sessionResult.redemptionTotal === 0 &&
+              sessionResult.mode === "deck-sprint"
                 ? ` · ${sessionResult.baseDeckSize}-card deck`
                 : ""}
             </p>
@@ -3111,10 +3321,12 @@ export default function SubtractionFlashPage() {
               id="results-heading"
               tabIndex={-1}
             >
-              {sessionEncouragement(
-                sessionResult.correct,
-                sessionResult.answered,
-              )}
+              {sessionResult.redemptionTotal > 0
+                ? "Redemption complete."
+                : sessionEncouragement(
+                    sessionResult.correct,
+                    sessionResult.answered,
+                  )}
             </h2>
             <p className={styles.resultsHero}>{resultHero}</p>
             <dl className={styles.resultsStats}>

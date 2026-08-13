@@ -76,7 +76,6 @@ export function ProgressionRedemptionIntro({
   attempt: ProgressionAttempt;
   onBegin: () => void;
 }>) {
-  const primaryButtonRef = useRef<HTMLButtonElement>(null);
   const missed = attempt.rounds.filter(
     ({ firstTryCorrect }) => firstTryCorrect === false,
   );
@@ -84,24 +83,53 @@ export function ProgressionRedemptionIntro({
     missed.map(({ question }) => question.gameSlug),
   ).size;
 
+  return (
+    <RedemptionIntroPanel
+      missedCount={missed.length}
+      gameCount={gameCount}
+      focusKey={attempt.id}
+      onBegin={onBegin}
+    />
+  );
+}
+
+export function RedemptionIntroPanel({
+  missedCount,
+  gameCount = 1,
+  focusKey = missedCount,
+  complete = true,
+  onBegin,
+}: Readonly<{
+  missedCount: number;
+  gameCount?: number;
+  focusKey?: string | number;
+  complete?: boolean;
+  onBegin: () => void;
+}>) {
+  const primaryButtonRef = useRef<HTMLButtonElement>(null);
+
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       primaryButtonRef.current?.focus();
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [attempt.id]);
+  }, [focusKey]);
 
   return (
     <section className={styles.panel} aria-labelledby="redemption-title">
       <span className={styles.badge} aria-hidden="true">
         ↻
       </span>
-      <p className={styles.kicker}>Full stop complete</p>
+      <p className={styles.kicker}>
+        {complete ? "Full stop complete" : "Practice paused"}
+      </p>
       <h1 id="redemption-title">Here’s your chance at redemption.</h1>
       <p>
-        You made it through every question. Revisit{" "}
-        <strong>{missed.length}</strong>{" "}
-        {missed.length === 1 ? "puzzle" : "puzzles"}
+        {complete
+          ? "You made it through every question. Revisit "
+          : "Before you finish, revisit "}
+        <strong>{missedCount}</strong>{" "}
+        {missedCount === 1 ? "puzzle" : "puzzles"}
         {gameCount > 1 ? ` across ${gameCount} games` : ""}, one at a time,
         and turn each into a win.
       </p>

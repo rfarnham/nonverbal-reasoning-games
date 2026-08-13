@@ -397,6 +397,33 @@
   letter-spacing: -0.02em;
 }
 
+.liveReviewStatus {
+  width: min(260px, 34vw);
+  display: grid;
+  justify-items: stretch;
+  gap: 4px;
+}
+
+.liveReviewStatus .liveClock {
+  width: 100%;
+  text-align: center;
+}
+
+.liveReviewTrack {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dbe3df;
+}
+
+.liveReviewFill {
+  height: 100%;
+  display: block;
+  border-radius: inherit;
+  background: #16836b;
+  transition: width 180ms ease;
+}
+
 .liveScore {
   justify-content: flex-end;
   gap: 10px;
@@ -653,6 +680,14 @@
   .liveScore {
     gap: 7px;
     font-size: 0.72rem;
+  }
+
+  .liveReviewStatus {
+    width: min(190px, 42vw);
+  }
+
+  .liveReviewStatus .liveClock {
+    font-size: 0.75rem;
   }
 
   .liveHorizontal {

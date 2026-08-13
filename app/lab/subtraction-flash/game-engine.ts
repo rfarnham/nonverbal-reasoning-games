@@ -85,16 +85,37 @@ export type OutcomeRecord = Readonly<{
   flagged: boolean;
   reinserted: boolean;
   reason: "incorrect" | "slow" | "both" | null;
+  firstAttempt: boolean;
+  firstAttemptMiss: boolean;
+  resolved: boolean;
+}>;
+
+export type SubtractionDeckPhase = "practice" | "redemption" | "complete";
+
+export type RedemptionStart = Readonly<{
+  started: boolean;
+  pending: number;
+  phase: SubtractionDeckPhase;
 }>;
 
 export type SubtractionDeck = Readonly<{
   next(): DeckDraw;
   recordOutcome(card: SubtractionCard, outcome: AnswerOutcome): OutcomeRecord;
+  /**
+   * End the scored part of a run and expose each first-attempt miss or slow
+   * response once.
+   * Any unplayed practice cards are deliberately discarded, which lets timed
+   * and manually-finished Infinite runs share the same redemption path.
+   */
+  beginRedemption(): RedemptionStart;
   snapshot(): Readonly<{
     cycle: number;
     drawCount: number;
     remaining: number;
     reviewedFactCount: number;
+    redemptionPending: number;
+    practiceExhausted: boolean;
+    phase: SubtractionDeckPhase;
     exhausted: boolean;
   }>;
 }>;
@@ -162,12 +183,6 @@ function normalizedRandom(random: RandomSource): number {
 function randomIndex(length: number, random: RandomSource): number {
   if (length <= 1) return 0;
   return Math.min(length - 1, Math.floor(normalizedRandom(random) * length));
-}
-
-function takeRandom<T>(values: T[], random: RandomSource): T {
-  const index = randomIndex(values.length, random);
-  const [value] = values.splice(index, 1);
-  return value;
 }
 
 function cardCopiesForFact(
@@ -298,49 +313,6 @@ export function buildAnswerOptions(
   return ANSWER_VALUES;
 }
 
-function safeInsertionIndexes(
-  queue: readonly SubtractionCard[],
-  factKey: string,
-  minimumIndex: number,
-): number[] {
-  const indexes: number[] = [];
-
-  for (let index = minimumIndex; index <= queue.length; index += 1) {
-    const nearby = queue.slice(
-      Math.max(0, index - REVIEW_SPACING),
-      Math.min(queue.length, index + REVIEW_SPACING),
-    );
-    if (nearby.every((card) => card.factKey !== factKey)) {
-      indexes.push(index);
-    }
-  }
-
-  return indexes;
-}
-
-function insertReviewAtSafeDistance(
-  queue: SubtractionCard[],
-  reviewCard: SubtractionCard,
-  random: RandomSource,
-): boolean {
-  if (queue.length < REVIEW_SPACING) return false;
-
-  const safeIndexes = safeInsertionIndexes(
-    queue,
-    reviewCard.factKey,
-    REVIEW_SPACING,
-  );
-  if (safeIndexes.length === 0) return false;
-
-  const nearbyIndexes = safeIndexes.filter(
-    (index) => index <= REVIEW_SPACING + 12,
-  );
-  const choices = nearbyIndexes.length > 0 ? nearbyIndexes : safeIndexes;
-  const index = choices[randomIndex(choices.length, random)];
-  queue.splice(index, 0, reviewCard);
-  return true;
-}
-
 export function createSubtractionDeck(
   options: Readonly<{
     mode: PracticeMode;
@@ -360,9 +332,14 @@ export function createSubtractionDeck(
       ? config.visualCopies
       : config.listenCopies);
   const recentFactKeys: string[] = [];
-  const reviewedFactKeys = new Set<string>();
-  const pendingReviews: SubtractionCard[] = [];
+  const attemptedCardIds = new Set<string>();
+  const missedCardsByFact = new Map<string, SubtractionCard>();
+  const redeemedFactKeys = new Set<string>();
   let queue: SubtractionCard[] = [];
+  let redemptionQueue: SubtractionCard[] = [];
+  let activePracticeCard: SubtractionCard | null = null;
+  let activeRedemptionCard: SubtractionCard | null = null;
+  let phase: SubtractionDeckPhase = "practice";
   let cycle = 0;
   let drawCount = 0;
 
@@ -375,35 +352,94 @@ export function createSubtractionDeck(
       precedingFactKeys: recentFactKeys,
     });
 
-    while (pendingReviews.length > 0) {
-      const pending = takeRandom(pendingReviews, random);
-      if (!insertReviewAtSafeDistance(queue, pending, random)) {
-        queue.push(pending);
-      }
-    }
   };
 
-  const drainPendingReviews = () => {
-    if (pendingReviews.length === 0) return;
-    queue = shuffledWithFactSpacing(
-      pendingReviews.splice(0),
+  const redemptionPending = () =>
+    Math.max(0, missedCardsByFact.size - redeemedFactKeys.size);
+
+  const startRedemption = (): RedemptionStart => {
+    if (phase !== "practice") {
+      return {
+        started: false,
+        pending: redemptionPending(),
+        phase,
+      };
+    }
+
+    // A timed/manual finish ends the main run immediately. Redemption is a
+    // separate, untimed queue and never resumes the abandoned base deck.
+    queue = [];
+    activePracticeCard = null;
+    redemptionQueue = shuffledWithFactSpacing(
+      [...missedCardsByFact.values()].map((card) => ({
+        ...card,
+        id: `${card.id}:redemption`,
+        isReview: true,
+      })),
       random,
       recentFactKeys,
     );
+    phase = redemptionQueue.length > 0 ? "redemption" : "complete";
+
+    return {
+      started: true,
+      pending: redemptionPending(),
+      phase,
+    };
   };
 
   return {
     next() {
+      if (phase === "complete") {
+        throw new Error("Subtraction deck is exhausted.");
+      }
+
+      if (phase === "redemption") {
+        if (activeRedemptionCard) {
+          throw new Error(
+            "The active redemption card must be solved before advancing.",
+          );
+        }
+        const card = redemptionQueue.shift();
+        if (!card) {
+          phase = "complete";
+          throw new Error("Subtraction deck is exhausted.");
+        }
+
+        activeRedemptionCard = card;
+        drawCount += 1;
+        recentFactKeys.push(card.factKey);
+        if (recentFactKeys.length > REVIEW_SPACING) recentFactKeys.shift();
+
+        return {
+          card,
+          drawNumber: drawCount,
+          cycle,
+          remaining: redemptionQueue.length,
+          baseDeckSize,
+        };
+      }
+
+      if (activePracticeCard) {
+        throw new Error(
+          "The active practice card must be solved before advancing.",
+        );
+      }
+
       if (queue.length === 0) {
         if (cycle === 0 || repeat) {
           refillBaseDeck();
+        } else if (missedCardsByFact.size > 0) {
+          startRedemption();
+          return this.next();
         } else {
-          drainPendingReviews();
+          phase = "complete";
         }
       }
       const card = queue.shift();
       if (!card) throw new Error("Subtraction deck is exhausted.");
 
+      activePracticeCard = card;
       drawCount += 1;
       recentFactKeys.push(card.factKey);
       if (recentFactKeys.length > REVIEW_SPACING) recentFactKeys.shift();
@@ -418,13 +454,24 @@ export function createSubtractionDeck(
     },
 
     recordOutcome(card, outcome) {
+      const activeCard =
+        phase === "practice" ? activePracticeCard : activeRedemptionCard;
+      if (!activeCard || activeCard.id !== card.id) {
+        throw new Error("Outcome does not match the active subtraction card.");
+      }
+
       const elapsedMs =
         Number.isFinite(outcome.elapsedMs) && outcome.elapsedMs >= 0
           ? outcome.elapsedMs
           : 0;
-      const slow = elapsedMs > SLOW_RESPONSE_MS;
+      // Redemption is deliberately untimed. Long review attempts may still be
+      // logged by the caller, but they never carry the gameplay "slow" flag.
+      const slow = !card.isReview && elapsedMs > SLOW_RESPONSE_MS;
       const incorrect = !outcome.correct;
       const flagged = incorrect || slow;
+      const firstAttempt = !attemptedCardIds.has(card.id);
+      attemptedCardIds.add(card.id);
+      const firstAttemptMiss = firstAttempt && incorrect && !card.isReview;
       const reason =
         incorrect && slow
           ? "both"
@@ -434,37 +481,72 @@ export function createSubtractionDeck(
               ? "slow"
               : null;
 
-      if (!flagged || reviewedFactKeys.has(card.factKey)) {
-        return { flagged, reinserted: false, reason };
+      let reinserted = false;
+      if (
+        phase === "practice" &&
+        firstAttempt &&
+        flagged &&
+        !card.isReview &&
+        !missedCardsByFact.has(card.factKey)
+      ) {
+        missedCardsByFact.set(card.factKey, card);
+        reinserted = true;
       }
 
-      reviewedFactKeys.add(card.factKey);
-      const reviewCard: SubtractionCard = {
-        ...card,
-        id: `${card.id}:review`,
-        isReview: true,
-      };
-      const reinserted = insertReviewAtSafeDistance(
-        queue,
-        reviewCard,
-        random,
-      );
-      if (!reinserted) pendingReviews.push(reviewCard);
+      if (
+        phase === "redemption" &&
+        activeRedemptionCard?.id === card.id &&
+        outcome.correct
+      ) {
+        redeemedFactKeys.add(card.factKey);
+        activeRedemptionCard = null;
+        if (redemptionQueue.length === 0) phase = "complete";
+      }
+      if (
+        phase === "practice" &&
+        activePracticeCard?.id === card.id &&
+        outcome.correct
+      ) {
+        activePracticeCard = null;
+      }
 
-      return { flagged: true, reinserted: true, reason };
+      return {
+        flagged,
+        reinserted,
+        reason,
+        firstAttempt,
+        firstAttemptMiss,
+        resolved: outcome.correct,
+      };
+    },
+
+    beginRedemption() {
+      return startRedemption();
     },
 
     snapshot() {
+      const practiceExhausted =
+        phase !== "practice" ||
+        (!repeat &&
+          cycle > 0 &&
+          queue.length === 0 &&
+          activePracticeCard === null);
       return {
         cycle,
         drawCount,
-        remaining: queue.length + pendingReviews.length,
-        reviewedFactCount: reviewedFactKeys.size,
+        remaining:
+          phase === "practice"
+            ? queue.length + missedCardsByFact.size
+            : redemptionQueue.length,
+        reviewedFactCount: missedCardsByFact.size,
+        redemptionPending: redemptionPending(),
+        practiceExhausted,
+        phase,
         exhausted:
-          !repeat &&
-          cycle > 0 &&
-          queue.length === 0 &&
-          pendingReviews.length === 0,
+          phase === "complete" ||
+          (phase === "practice" &&
+            practiceExhausted &&
+            missedCardsByFact.size === 0),
       };
     },
   };

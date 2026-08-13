@@ -178,7 +178,12 @@ test("cycle reshuffles preserve spacing across the boundary", () => {
     mode: "visual",
     random: createSeededRandom(77),
   });
-  const draws = Array.from({ length: 78 }, () => deck.next());
+  const draws = [];
+  for (let index = 0; index < 78; index += 1) {
+    const draw = deck.next();
+    draws.push(draw);
+    deck.recordOutcome(draw.card, { correct: true, elapsedMs: 700 });
+  }
   const firstCycle = draws.filter((draw) => draw.cycle === 1);
 
   assert.equal(firstCycle.length, 72);
@@ -192,7 +197,7 @@ test("cycle reshuffles preserve spacing across the boundary", () => {
   assert.deepEqual(new Set(counts.values()), new Set([2]));
 });
 
-test("wrong and over-four-second facts return once, then stop", () => {
+test("wrong and over-four-second facts wait for end redemption", () => {
   const deck = createSubtractionDeck({
     mode: "listen",
     random: createSeededRandom(515),
@@ -206,28 +211,29 @@ test("wrong and over-four-second facts return once, then stop", () => {
     flagged: true,
     reinserted: true,
     reason: "incorrect",
+    firstAttempt: true,
+    firstAttemptMiss: true,
+    resolved: false,
   });
 
-  const intervening = [];
-  let review;
-  for (let index = 0; index < 130; index += 1) {
-    const draw = deck.next();
-    if (draw.card.id === `${first.id}:review`) {
-      review = draw.card;
-      break;
-    }
-    intervening.push(draw.card);
-  }
-
-  assert.ok(review, "the flagged card returns");
-  assert.ok(intervening.length >= REVIEW_SPACING);
-  assert.equal(review.isReview, true);
+  assert.throws(() => deck.next(), /must be solved/);
   assert.equal(
-    deck.recordOutcome(review, {
+    deck.recordOutcome(first, {
       correct: false,
       elapsedMs: SLOW_RESPONSE_MS + 1,
     }).reinserted,
     false,
+  );
+  assert.deepEqual(
+    deck.recordOutcome(first, { correct: true, elapsedMs: 900 }),
+    {
+      flagged: false,
+      reinserted: false,
+      reason: null,
+      firstAttempt: false,
+      firstAttemptMiss: false,
+      resolved: true,
+    },
   );
 
   const onTime = deck.next().card;
@@ -244,8 +250,44 @@ test("wrong and over-four-second facts return once, then stop", () => {
       correct: true,
       elapsedMs: SLOW_RESPONSE_MS + 1,
     }),
-    { flagged: true, reinserted: true, reason: "slow" },
+    {
+      flagged: true,
+      reinserted: true,
+      reason: "slow",
+      firstAttempt: true,
+      firstAttemptMiss: false,
+      resolved: true,
+    },
   );
+
+  const redemption = deck.beginRedemption();
+  assert.deepEqual(redemption, {
+    started: true,
+    pending: 2,
+    phase: "redemption",
+  });
+  assert.equal(deck.snapshot().phase, "redemption");
+
+  const reviewFacts = [];
+  while (!deck.snapshot().exhausted) {
+    const review = deck.next().card;
+    reviewFacts.push(review.factKey);
+    assert.equal(review.isReview, true);
+    assert.match(review.id, /:redemption$/);
+    assert.deepEqual(
+      deck.recordOutcome(review, { correct: true, elapsedMs: 80_000 }),
+      {
+        flagged: false,
+        reinserted: false,
+        reason: null,
+        firstAttempt: true,
+        firstAttemptMiss: false,
+        resolved: true,
+      },
+    );
+  }
+  assert.deepEqual(new Set(reviewFacts), new Set([first.factKey, slow.factKey]));
+  assert.equal(deck.snapshot().redemptionPending, 0);
 });
 
 test("repeated misses cannot create an infinite review loop", () => {
@@ -253,23 +295,40 @@ test("repeated misses cannot create an infinite review loop", () => {
     mode: "visual",
     random: createSeededRandom(19),
   });
-  let reviewCount = 0;
-
   for (let index = 0; index < 500; index += 1) {
     const { card } = deck.next();
-    if (card.isReview) reviewCount += 1;
     deck.recordOutcome(card, {
       correct: false,
       elapsedMs: SLOW_RESPONSE_MS + 10,
     });
+    deck.recordOutcome(card, {
+      correct: false,
+      elapsedMs: SLOW_RESPONSE_MS + 10,
+    });
+    deck.recordOutcome(card, { correct: true, elapsedMs: 500 });
   }
 
-  assert.ok(reviewCount > 0);
-  assert.ok(reviewCount <= SUBTRACTION_FACTS.length);
   assert.equal(
     deck.snapshot().reviewedFactCount,
     SUBTRACTION_FACTS.length,
   );
+  assert.equal(deck.beginRedemption().pending, SUBTRACTION_FACTS.length);
+
+  let reviewCount = 0;
+  while (!deck.snapshot().exhausted) {
+    const { card } = deck.next();
+    reviewCount += 1;
+    const firstMiss = deck.recordOutcome(card, {
+      correct: false,
+      elapsedMs: SLOW_RESPONSE_MS + 10,
+    });
+    assert.equal(firstMiss.reinserted, false);
+    assert.throws(() => deck.next(), /must be solved/);
+    deck.recordOutcome(card, { correct: true, elapsedMs: 500 });
+  }
+
+  assert.equal(reviewCount, SUBTRACTION_FACTS.length);
+  assert.equal(deck.snapshot().phase, "complete");
 });
 
 test("finite decks stop after one complete cycle", () => {
@@ -296,7 +355,7 @@ test("finite decks stop after one complete cycle", () => {
   }
 });
 
-test("a late review drains without starting a second finite cycle", () => {
+test("a late miss becomes one untimed redemption card", () => {
   const deck = createSubtractionDeck({
     mode: "visual",
     repeat: false,
@@ -309,6 +368,9 @@ test("a late review drains without starting a second finite cycle", () => {
     if (index === 71) {
       finalBaseCard = card;
       deck.recordOutcome(card, { correct: false, elapsedMs: 800 });
+      assert.equal(deck.snapshot().practiceExhausted, false);
+      assert.throws(() => deck.next(), /must be solved/);
+      deck.recordOutcome(card, { correct: true, elapsedMs: 800 });
     } else {
       deck.recordOutcome(card, { correct: true, elapsedMs: 800 });
     }
@@ -317,17 +379,52 @@ test("a late review drains without starting a second finite cycle", () => {
   assert.ok(finalBaseCard);
   assert.equal(deck.snapshot().exhausted, false);
   assert.equal(deck.snapshot().remaining, 1);
+  assert.equal(deck.snapshot().practiceExhausted, true);
 
   const review = deck.next().card;
-  assert.equal(review.id, `${finalBaseCard.id}:review`);
+  assert.equal(review.id, `${finalBaseCard.id}:redemption`);
   assert.equal(review.isReview, true);
   deck.recordOutcome(review, {
     correct: false,
     elapsedMs: SLOW_RESPONSE_MS + 1,
   });
+  assert.equal(deck.snapshot().exhausted, false);
+  assert.throws(() => deck.next(), /must be solved/);
+  deck.recordOutcome(review, { correct: true, elapsedMs: 400 });
 
   assert.equal(deck.snapshot().exhausted, true);
+  assert.equal(deck.snapshot().phase, "complete");
   assert.equal(deck.snapshot().cycle, 1);
+});
+
+test("manual Infinite finish is idempotent and discards the unfinished base run", () => {
+  const deck = createSubtractionDeck({
+    mode: "visual",
+    random: createSeededRandom(909),
+  });
+  const missed = deck.next().card;
+  deck.recordOutcome(missed, { correct: false, elapsedMs: 700 });
+  deck.recordOutcome(missed, { correct: true, elapsedMs: 500 });
+
+  const next = deck.next().card;
+  deck.recordOutcome(next, { correct: true, elapsedMs: 500 });
+  assert.ok(deck.snapshot().remaining > 1);
+
+  assert.deepEqual(deck.beginRedemption(), {
+    started: true,
+    pending: 1,
+    phase: "redemption",
+  });
+  assert.deepEqual(deck.beginRedemption(), {
+    started: false,
+    pending: 1,
+    phase: "redemption",
+  });
+
+  const review = deck.next().card;
+  assert.equal(review.factKey, missed.factKey);
+  deck.recordOutcome(review, { correct: true, elapsedMs: 999_999 });
+  assert.equal(deck.snapshot().exhausted, true);
 });
 
 test("the answer list is stable, distinct, and always contains the result", () => {

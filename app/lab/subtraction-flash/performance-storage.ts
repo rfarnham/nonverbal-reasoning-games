@@ -29,6 +29,7 @@ export type PerformanceSessionFinishReason =
   | "time"
   | "deck"
   | "abandoned";
+export type PerformanceSessionLane = "main" | "retry" | "redemption";
 
 export type PerformanceStorageLike = Pick<Storage, "getItem" | "setItem">;
 
@@ -60,6 +61,12 @@ export type PerformanceAttempt = Readonly<
     correct: boolean;
     elapsedMs: number;
     slow: boolean;
+    /** One-based submission number for the currently displayed question. */
+    attemptOrdinal: number;
+    /** True only for the original main-deck submission scored by analytics. */
+    firstAttempt: boolean;
+    /** The session segment in which this raw submission occurred. */
+    sessionLane: PerformanceSessionLane;
     isReview: boolean;
     reviewQueued: boolean;
     reinserted: boolean;
@@ -95,6 +102,9 @@ export type CreatePerformanceAttemptInput = Readonly<{
   correct?: boolean;
   elapsedMs: number;
   slow?: boolean;
+  attemptOrdinal?: number;
+  firstAttempt?: boolean;
+  sessionLane?: PerformanceSessionLane;
   isReview: boolean;
   reviewQueued?: boolean;
   reinserted?: boolean;
@@ -241,6 +251,11 @@ const FINISH_REASONS: readonly PerformanceSessionFinishReason[] = [
   "time",
   "deck",
   "abandoned",
+];
+const SESSION_LANES: readonly PerformanceSessionLane[] = [
+  "main",
+  "retry",
+  "redemption",
 ];
 const LOCAL_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const LOCAL_TIME_PATTERN = /^\d{2}:\d{2}:\d{2}\.\d{3}$/;
@@ -458,6 +473,24 @@ export function createPerformanceAttempt(
     throw new RangeError("The correct flag must match the submitted answer.");
   }
   const slow = input.slow ?? input.elapsedMs > PERFORMANCE_SLOW_RESPONSE_MS;
+  const sessionLane =
+    input.sessionLane ?? (input.isReview ? "redemption" : "main");
+  if (!SESSION_LANES.includes(sessionLane)) {
+    throw new TypeError("Unknown performance session lane.");
+  }
+  const attemptOrdinal = input.attemptOrdinal ?? 1;
+  if (!Number.isSafeInteger(attemptOrdinal) || attemptOrdinal < 1) {
+    throw new RangeError("attemptOrdinal must be a positive integer.");
+  }
+  const firstAttempt =
+    input.firstAttempt ?? (sessionLane === "main" && attemptOrdinal === 1);
+  if (
+    firstAttempt !== (sessionLane === "main" && attemptOrdinal === 1)
+  ) {
+    throw new RangeError(
+      "Only ordinal 1 in the main lane can be the scored first attempt.",
+    );
+  }
   const outcomeReason =
     input.outcomeReason === undefined
       ? inferredOutcomeReason(correct, slow)
@@ -476,7 +509,7 @@ export function createPerformanceAttempt(
     throw new RangeError("Recognition measurements are outside their valid range.");
   }
   const id = input.id?.trim() ||
-    `${input.sessionId}:attempt:${input.sessionPosition}:${input.cardId}`;
+    `${input.sessionId}:attempt:${input.sessionPosition}:${input.cardId}:${sessionLane}:${attemptOrdinal}`;
   return {
     id,
     sessionId: input.sessionId.trim(),
@@ -498,6 +531,9 @@ export function createPerformanceAttempt(
     correct,
     elapsedMs: input.elapsedMs,
     slow,
+    attemptOrdinal,
+    firstAttempt,
+    sessionLane,
     isReview: input.isReview,
     reviewQueued: input.reviewQueued ?? outcomeReason !== null,
     reinserted: input.reinserted ?? false,
@@ -553,7 +589,8 @@ const ATTEMPT_KEYS = [
   "utcOffsetMinutes", "sessionPosition", "gameType", "level",
   "presentationMode", "inputMode", "orientation", "inputSource", "cardId", "factKey", "minuend",
   "subtrahend", "expectedAnswer", "submittedAnswer", "correct", "elapsedMs",
-  "slow", "isReview", "reviewQueued", "reinserted", "outcomeReason",
+  "slow", "attemptOrdinal", "firstAttempt", "sessionLane", "isReview",
+  "reviewQueued", "reinserted", "outcomeReason",
   "drawNumber", "cycle", "cardsRemainingAfter", "sessionElapsedMs",
   "rawRecognition", "recognitionConfidence", "recognitionMargin",
   "recognitionProcessingMs",
@@ -568,7 +605,13 @@ const SESSION_FINISH_KEYS = [
   "timeZone", "utcOffsetMinutes", "finishReason", "elapsedMs", "answered",
   "correct", "slow", "reviews", "baseDeckSize",
 ] as const;
-const LEGACY_ATTEMPT_KEYS = ATTEMPT_KEYS.filter(
+const V2_ATTEMPT_KEYS = ATTEMPT_KEYS.filter(
+  (key) =>
+    key !== "attemptOrdinal" &&
+    key !== "firstAttempt" &&
+    key !== "sessionLane",
+);
+const LEGACY_ATTEMPT_KEYS = V2_ATTEMPT_KEYS.filter(
   (key) => key !== "level" && key !== "inputMode",
 );
 const LEGACY_SESSION_START_KEYS = SESSION_START_KEYS.filter(
@@ -611,6 +654,12 @@ function isPerformanceAttempt(value: unknown): value is PerformanceAttempt {
     value.correct === (value.submittedAnswer === value.expectedAnswer) &&
     isFiniteNonnegative(value.elapsedMs) &&
     typeof value.slow === "boolean" &&
+    isNonnegativeInteger(value.attemptOrdinal) &&
+    (value.attemptOrdinal as number) >= 1 &&
+    typeof value.firstAttempt === "boolean" &&
+    SESSION_LANES.includes(value.sessionLane as PerformanceSessionLane) &&
+    value.firstAttempt ===
+      (value.sessionLane === "main" && value.attemptOrdinal === 1) &&
     typeof value.isReview === "boolean" &&
     typeof value.reviewQueued === "boolean" &&
     typeof value.reinserted === "boolean" &&
@@ -681,6 +730,32 @@ function legacyInputMode(inputSource: unknown): PerformanceInputMode {
   }
 }
 
+function legacyAttemptProgress(value: Record<string, unknown>): Readonly<{
+  attemptOrdinal: 1;
+  firstAttempt: boolean;
+  sessionLane: PerformanceSessionLane;
+}> {
+  const sessionLane: PerformanceSessionLane = value.isReview
+    ? "redemption"
+    : "main";
+  return {
+    attemptOrdinal: 1,
+    firstAttempt: sessionLane === "main",
+    sessionLane,
+  };
+}
+
+function migrateV2Attempt(value: unknown): PerformanceAttempt | null {
+  if (!isRecord(value) || !hasExactKeys(value, V2_ATTEMPT_KEYS)) {
+    return null;
+  }
+  const migrated = {
+    ...value,
+    ...legacyAttemptProgress(value),
+  };
+  return isPerformanceAttempt(migrated) ? migrated : null;
+}
+
 function migrateLegacyAttempt(value: unknown): PerformanceAttempt | null {
   if (!isRecord(value) || !hasExactKeys(value, LEGACY_ATTEMPT_KEYS)) {
     return null;
@@ -689,8 +764,31 @@ function migrateLegacyAttempt(value: unknown): PerformanceAttempt | null {
     ...value,
     level: "B100",
     inputMode: legacyInputMode(value.inputSource),
+    ...legacyAttemptProgress(value),
   };
   return isPerformanceAttempt(migrated) ? migrated : null;
+}
+
+function migrateV2PerformanceLog(value: unknown): PerformanceLog | null {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, ["schemaVersion", "attempts", "sessionEvents"]) ||
+    value.schemaVersion !== PERFORMANCE_SCHEMA_VERSION ||
+    !Array.isArray(value.attempts) ||
+    !Array.isArray(value.sessionEvents)
+  ) {
+    return null;
+  }
+  const attempts = value.attempts.map((attempt) =>
+    isPerformanceAttempt(attempt) ? attempt : migrateV2Attempt(attempt),
+  );
+  if (attempts.some((attempt) => attempt === null)) return null;
+  const migrated: PerformanceLog = {
+    schemaVersion: PERFORMANCE_SCHEMA_VERSION,
+    attempts: attempts as PerformanceAttempt[],
+    sessionEvents: value.sessionEvents as PerformanceSessionEvent[],
+  };
+  return isPerformanceLog(migrated) ? migrated : null;
 }
 
 function migrateLegacySessionStart(
@@ -824,7 +922,8 @@ export function loadPerformanceLogDiagnostic(
   if (migrated) {
     return { status: "loaded", log: migrated, canWrite: true, message: null };
   }
-  if (!isPerformanceLog(parsed)) {
+  const migratedV2 = migrateV2PerformanceLog(parsed);
+  if (!migratedV2) {
     return {
       status: "corrupt",
       log: null,
@@ -832,7 +931,7 @@ export function loadPerformanceLogDiagnostic(
       message: "Saved performance data failed validation and was left untouched.",
     };
   }
-  return { status: "loaded", log: parsed, canWrite: true, message: null };
+  return { status: "loaded", log: migratedV2, canWrite: true, message: null };
 }
 
 function blockedWrite(status: PerformanceLoadStatus): PerformanceWriteResult {
@@ -985,7 +1084,8 @@ const CSV_COLUMNS = [
   "session_id", "session_position", "game_type", "level", "presentation_mode",
   "input_mode", "orientation", "input_source", "minuend", "subtrahend", "expected_answer",
   "submitted_answer", "result", "correct", "time_taken_ms", "slow",
-  "is_review", "review_queued", "reinserted", "outcome_reason", "draw_number",
+  "attempt_ordinal", "first_attempt", "session_lane", "is_review",
+  "review_queued", "reinserted", "outcome_reason", "draw_number",
   "cycle", "cards_remaining_after", "session_elapsed_ms", "card_id", "fact_key",
   "raw_recognition", "recognition_confidence", "recognition_margin",
   "recognition_processing_ms", "attempt_id",
@@ -1025,6 +1125,9 @@ export function performanceAttemptsToCsv(
       attempt.correct,
       attempt.elapsedMs,
       attempt.slow,
+      attempt.attemptOrdinal,
+      attempt.firstAttempt,
+      attempt.sessionLane,
       attempt.isReview,
       attempt.reviewQueued,
       attempt.reinserted,

@@ -212,14 +212,20 @@ export function FlashHandwriting({
       if (disabledRef.current) return;
       const startedAt = performance.now();
       setStatus("Reading…");
-      const images = Array.from({ length: digitCount }, (_, index) => {
-        const canvas = canvasRefs.current[index];
-        const context = canvas?.getContext("2d", { willReadFrequently: true });
-        if (!canvas || !context) throw new Error("Drawing field unavailable");
-        return context.getImageData(0, 0, canvas.width, canvas.height);
-      });
-
-      void Promise.all(images.map(recognizeDigit))
+      void Promise.resolve()
+        .then(() => {
+          const images = Array.from({ length: digitCount }, (_, index) => {
+            const canvas = canvasRefs.current[index];
+            const context = canvas?.getContext("2d", {
+              willReadFrequently: true,
+            });
+            if (!canvas || !context) {
+              throw new Error("Drawing field unavailable");
+            }
+            return context.getImageData(0, 0, canvas.width, canvas.height);
+          });
+          return Promise.all(images.map(recognizeDigit));
+        })
         .then((predictions) => {
           if (recognitionTokenRef.current !== token || disabledRef.current) {
             return;
@@ -231,14 +237,12 @@ export function FlashHandwriting({
           const margin = Math.min(
             ...predictions.map(({ margin: value }) => value),
           );
-          setReadout(raw);
-          if (
-            confidence < CONFIDENCE_MINIMUM ||
-            margin < MARGIN_MINIMUM
-          ) {
-            setStatus(`Read ${raw} · try again`);
+          if (confidence < CONFIDENCE_MINIMUM || margin < MARGIN_MINIMUM) {
+            clearAll();
+            setStatus("Couldn’t read that · draw it again");
             return;
           }
+          setReadout(raw);
           setStatus(`Read ${raw}`);
           onAnswer(Number(raw), answeredAtRef.current, {
             rawRecognition: raw,
@@ -252,10 +256,11 @@ export function FlashHandwriting({
         })
         .catch(() => {
           if (recognitionTokenRef.current !== token) return;
-          setStatus("Couldn’t read that · try again");
+          clearAll();
+          setStatus("Couldn’t read that · draw it again");
         });
     }, READ_DELAY_MS);
-  }, [cancelRecognition, digitCount, onAnswer]);
+  }, [cancelRecognition, clearAll, digitCount, onAnswer]);
 
   const beginStroke = (
     index: number,
