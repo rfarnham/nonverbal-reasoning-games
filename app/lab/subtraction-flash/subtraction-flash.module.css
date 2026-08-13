@@ -18,10 +18,10 @@
 }
 
 .topbar {
-  width: min(960px, calc(100% - 32px));
+  width: min(1080px, calc(100% - 32px));
   min-height: 72px;
   display: grid;
-  grid-template-columns: 52px 1fr 52px;
+  grid-template-columns: 52px 1fr minmax(52px, auto);
   align-items: center;
   gap: 16px;
   margin-inline: auto;
@@ -53,6 +53,48 @@
 .soundButton svg {
   width: 22px;
   height: 22px;
+}
+
+.topbarActions {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profileButton {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 15px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 840;
+  cursor: pointer;
+}
+
+.profileButton svg {
+  width: 19px;
+  height: 19px;
+  flex: 0 0 auto;
+}
+
+.profileButton span {
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profileButton:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 
 .modeSwitch {
@@ -268,7 +310,7 @@
   top: max(10px, env(safe-area-inset-top));
   left: 50%;
   width: min(
-    560px,
+    680px,
     calc(
       100vw - max(16px, env(safe-area-inset-left)) -
         max(16px, env(safe-area-inset-right))
@@ -287,19 +329,21 @@
   transform: translateX(-50%);
 }
 
-.liveHudStart,
+.liveNav,
+.liveHudEnd,
 .liveScore {
   min-width: 0;
   display: flex;
   align-items: center;
 }
 
-.liveHudStart {
+.liveNav {
   justify-self: start;
   gap: 4px;
 }
 
 .liveHome,
+.liveBack,
 .liveFinish {
   min-width: 44px;
   min-height: 44px;
@@ -311,11 +355,22 @@
 
 .liveHome {
   width: 44px;
+  text-decoration: none;
 }
 
-.liveHome svg {
+.liveHome svg,
+.liveBack svg {
   width: 21px;
   height: 21px;
+}
+
+.liveBack {
+  width: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
 }
 
 .liveFinish {
@@ -343,14 +398,18 @@
 }
 
 .liveScore {
-  justify-self: end;
   justify-content: flex-end;
   gap: 10px;
-  padding-right: 9px;
   font-size: clamp(0.76rem, 1.5vw, 0.88rem);
   font-weight: 880;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.liveHudEnd {
+  justify-self: end;
+  justify-content: flex-end;
+  gap: 5px;
 }
 
 .liveCorrect {
@@ -362,11 +421,13 @@
 }
 
 .liveHome:hover,
+.liveBack:hover,
 .liveFinish:not(:disabled):hover {
   background: rgba(101, 112, 135, 0.1);
 }
 
 .liveHome:focus-visible,
+.liveBack:focus-visible,
 .liveFinish:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
@@ -572,7 +633,9 @@
 
 @media (max-width: 420px) {
   .liveHud {
+    width: calc(100vw - 12px);
     gap: 4px;
+    padding-inline: 3px;
   }
 
   .liveFinish {
@@ -580,9 +643,16 @@
     font-size: 0.68rem;
   }
 
+  .liveHome,
+  .liveBack {
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
   .liveScore {
     gap: 7px;
-    padding-right: 7px;
+    font-size: 0.72rem;
   }
 
   .liveHorizontal {
@@ -1526,6 +1596,227 @@
   box-shadow: 0 28px 90px rgb(23 33 61 / 28%);
 }
 
+.profileDialog {
+  width: min(600px, calc(100vw - 28px));
+  max-height: calc(100svh - 28px);
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 30px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 28px 90px rgb(23 33 61 / 28%);
+}
+
+.profileDialog::backdrop {
+  background: rgb(23 33 61 / 46%);
+  backdrop-filter: blur(2px);
+}
+
+.profileDialogBody {
+  display: grid;
+  gap: 20px;
+  padding: clamp(24px, 5vw, 40px);
+}
+
+.profileDialogHeading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.profileDialogHeading p {
+  margin: 0 0 5px;
+  color: var(--coral);
+  font-size: 0.7rem;
+  font-weight: 880;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.profileDialogHeading h2 {
+  margin: 0;
+  font-size: clamp(2.15rem, 7vw, 3.2rem);
+  font-weight: 900;
+  letter-spacing: -0.055em;
+  line-height: 1;
+}
+
+.profileDialogHeading h2:focus {
+  outline: none;
+}
+
+.profileCloseButton {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-size: 1.65rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.profileList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.profileChoice {
+  min-width: 0;
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.profileChoice svg {
+  width: 21px;
+  height: 21px;
+}
+
+.profileChoice span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.profileChoice strong {
+  color: var(--correct);
+  font-size: 0.68rem;
+  font-weight: 880;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.profileChoice[aria-checked="true"] {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+
+.profileForm {
+  display: grid;
+  gap: 7px;
+}
+
+.profileForm label,
+.clearProfileSection h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.profileForm > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.profileForm input {
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 750;
+}
+
+.profileForm button,
+.clearProfileButton,
+.clearProfileConfirm button {
+  min-height: 48px;
+  padding: 0 17px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 840;
+  cursor: pointer;
+}
+
+.profileForm button:disabled,
+.clearProfileButton:disabled,
+.profileChoice:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.clearProfileSection {
+  display: grid;
+  gap: 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.clearProfileButton {
+  width: fit-content;
+  border-color: var(--incorrect);
+  background: transparent;
+  color: var(--incorrect);
+}
+
+.clearProfileConfirm {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--incorrect);
+  border-radius: 16px;
+  background: #fff0ed;
+}
+
+.clearProfileConfirm p {
+  flex: 1 1 100%;
+  margin: 0;
+  color: #873028;
+  font-size: 0.84rem;
+  font-weight: 720;
+  line-height: 1.4;
+}
+
+.clearProfileConfirm button:first-of-type {
+  border-color: var(--incorrect);
+  background: var(--incorrect);
+}
+
+.clearProfileConfirm button:last-of-type {
+  border-color: var(--line);
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.profileMessage {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 760;
+}
+
 .resultsDialog::backdrop {
   background: rgb(23 33 61 / 46%);
   backdrop-filter: blur(2px);
@@ -1655,6 +1946,13 @@
 
 .backLink:focus-visible,
 .soundButton:focus-visible,
+.profileButton:focus-visible,
+.profileCloseButton:focus-visible,
+.profileChoice:focus-visible,
+.profileForm input:focus-visible,
+.profileForm button:focus-visible,
+.clearProfileButton:focus-visible,
+.clearProfileConfirm button:focus-visible,
 .modeButton:focus-visible,
 .adaptiveSessionChoice:focus-visible,
 .sessionChoice:focus-visible,
@@ -1873,7 +2171,7 @@
   .topbar {
     width: calc(100% - 20px);
     min-height: 66px;
-    grid-template-columns: 48px 1fr 48px;
+    grid-template-columns: 48px 1fr auto;
     gap: 7px;
   }
 
@@ -1881,6 +2179,25 @@
   .soundButton {
     width: 46px;
     height: 46px;
+  }
+
+  .profileButton {
+    width: 46px;
+    height: 46px;
+    min-height: 46px;
+    padding: 0;
+  }
+
+  .profileButton span {
+    display: none;
+  }
+
+  .topbarActions {
+    gap: 5px;
+  }
+
+  .profileList {
+    grid-template-columns: 1fr;
   }
 
   .modeButton {

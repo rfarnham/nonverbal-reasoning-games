@@ -6,6 +6,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type FormEvent,
   type MutableRefObject,
   type ReactNode,
 } from "react";
@@ -63,9 +64,18 @@ import {
   type SessionMode,
 } from "./session-engine";
 import { SpokenAnswerStreamGate } from "./speech-answer-stream";
-import { AdaptiveSubtractionCurriculum } from "./adaptive-curriculum";
 import { TraceAnswerGrid } from "./trace-answer";
 import { FlashHandwriting } from "./flash-handwriting";
+import {
+  BORROW_FLASH_DEFAULT_PROFILE_ID,
+  clearBorrowFlashProfileData,
+  createBorrowFlashProfile,
+  createBorrowFlashProfileStorage,
+  loadBorrowFlashProfilesDiagnostic,
+  renameBorrowFlashProfile,
+  setActiveBorrowFlashProfile,
+  type BorrowFlashProfileRegistry,
+} from "./borrow-flash-profiles";
 import {
   appendPerformanceAttempt,
   createPerformanceAttempt,
@@ -98,6 +108,7 @@ type AnswerEvidence = Readonly<{
 type SessionProgress = Readonly<{
   id: number;
   performanceSessionId: string | null;
+  profileId: string;
   mode: SessionMode;
   level: SubtractionLevel;
   presentationMode: PracticeMode;
@@ -176,6 +187,15 @@ const SESSION_DESCRIPTIONS: Record<SessionMode, string> = {
   "deck-sprint": "Finish one shuffled deck",
 };
 
+function profileMutationCanWrite(status: string): boolean {
+  return ![
+    "corrupt",
+    "unsupported",
+    "unavailable",
+    "write-failed",
+  ].includes(status);
+}
+
 function ArrowLeftIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -185,6 +205,34 @@ function ArrowLeftIcon() {
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function HomeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="m4 11 8-7 8 7v8a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1v-8Z"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ProfileIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="8" r="3.4" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M5.5 20c.5-4 2.7-6 6.5-6s6 2 6.5 6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
       />
     </svg>
   );
@@ -1190,7 +1238,6 @@ function SpeechAnswer({
 }
 
 export default function SubtractionFlashPage() {
-  const [adaptiveOpen, setAdaptiveOpen] = useState(false);
   const [interactionReady, setInteractionReady] = useState(false);
   const [selectedLevel, setSelectedLevel] =
     useState<SubtractionLevel>("B100");
@@ -1205,6 +1252,7 @@ export default function SubtractionFlashPage() {
   const [sessionProgress, setSessionProgress] = useState<SessionProgress>({
     id: 0,
     performanceSessionId: null,
+    profileId: BORROW_FLASH_DEFAULT_PROFILE_ID,
     mode: "infinite",
     level: "B100",
     presentationMode: "visual",
@@ -1227,6 +1275,13 @@ export default function SubtractionFlashPage() {
   const [performanceSaveWarning, setPerformanceSaveWarning] = useState<
     string | null
   >(null);
+  const [profileRegistry, setProfileRegistry] =
+    useState<BorrowFlashProfileRegistry | null>(null);
+  const [profileWritable, setProfileWritable] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<string | null>(null);
+  const [newProfileName, setNewProfileName] = useState("");
+  const [renameProfileName, setRenameProfileName] = useState("");
+  const [clearProfilePending, setClearProfilePending] = useState(false);
 
   const modeRef = useRef<PracticeMode>("visual");
   const selectedLevelRef = useRef<SubtractionLevel>("B100");
@@ -1248,6 +1303,9 @@ export default function SubtractionFlashPage() {
   const numericInputRef = useRef<HTMLInputElement | null>(null);
   const resultsDialogRef = useRef<HTMLDialogElement | null>(null);
   const resultsHeadingRef = useRef<HTMLHeadingElement | null>(null);
+  const profileDialogRef = useRef<HTMLDialogElement | null>(null);
+  const profileDialogHeadingRef = useRef<HTMLHeadingElement | null>(null);
+  const profileButtonRef = useRef<HTMLButtonElement | null>(null);
   const firstSessionChoiceRef = useRef<HTMLButtonElement | null>(null);
   const answerButtonRefs = useRef<
     Partial<Record<AnswerValue, HTMLButtonElement | null>>
@@ -1259,6 +1317,11 @@ export default function SubtractionFlashPage() {
   const [speechAnswerGate] = useState(() => new SpokenAnswerStreamGate());
 
   const currentRound = rounds[mode];
+  const activeProfileId =
+    profileRegistry?.activeProfileId ?? BORROW_FLASH_DEFAULT_PROFILE_ID;
+  const activeProfile = profileRegistry?.profiles.find(
+    (profile) => profile.id === activeProfileId,
+  );
   const activeLevel =
     sessionPhase === "choosing" ? selectedLevel : sessionProgress.level;
   const activeAnswerMode =
@@ -1313,6 +1376,94 @@ export default function SubtractionFlashPage() {
     sessionProgressRef.current = next;
     setSessionProgress(next);
   }, []);
+
+  const refreshProfiles = useCallback(() => {
+    const diagnostic = loadBorrowFlashProfilesDiagnostic();
+    setProfileRegistry(diagnostic.registry);
+    setProfileWritable(diagnostic.canWrite);
+    setProfileMessage(diagnostic.message);
+    const active = diagnostic.registry.profiles.find(
+      (profile) => profile.id === diagnostic.registry.activeProfileId,
+    );
+    setRenameProfileName(active?.name ?? "");
+  }, []);
+
+  const openProfileDialog = useCallback(() => {
+    if (sessionPhaseRef.current !== "choosing") return;
+    const dialog = profileDialogRef.current;
+    if (!dialog || dialog.open) return;
+    setClearProfilePending(false);
+    setRenameProfileName(activeProfile?.name ?? "");
+    dialog.showModal();
+    requestAnimationFrame(() => profileDialogHeadingRef.current?.focus());
+  }, [activeProfile?.name]);
+
+  const closeProfileDialog = useCallback(() => {
+    profileDialogRef.current?.close();
+  }, []);
+
+  const handleProfileSwitch = useCallback((profileId: string) => {
+    if (sessionPhaseRef.current !== "choosing") return;
+    const result = setActiveBorrowFlashProfile(profileId);
+    setProfileRegistry(result.registry);
+    setProfileWritable(profileMutationCanWrite(result.status));
+    setProfileMessage(result.ok ? null : result.message);
+    if (result.ok) {
+      setClearProfilePending(false);
+      setRenameProfileName(result.profile?.name ?? "");
+      setPerformanceSaveWarning(null);
+    }
+  }, []);
+
+  const handleCreateProfile = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (sessionPhaseRef.current !== "choosing") return;
+      const result = createBorrowFlashProfile(newProfileName);
+      setProfileRegistry(result.registry);
+      setProfileWritable(profileMutationCanWrite(result.status));
+      setProfileMessage(
+        result.ok ? `${result.profile?.name ?? "Profile"} is ready.` : result.message,
+      );
+      if (result.ok) {
+        setNewProfileName("");
+        setRenameProfileName(result.profile?.name ?? "");
+        setClearProfilePending(false);
+        setPerformanceSaveWarning(null);
+      }
+    },
+    [newProfileName],
+  );
+
+  const handleRenameProfile = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (sessionPhaseRef.current !== "choosing") return;
+      const result = renameBorrowFlashProfile(
+        activeProfileId,
+        renameProfileName,
+      );
+      setProfileRegistry(result.registry);
+      setProfileWritable(profileMutationCanWrite(result.status));
+      setProfileMessage(result.ok ? "Name updated." : result.message);
+      if (result.ok) {
+        setRenameProfileName(result.profile?.name ?? renameProfileName);
+      }
+    },
+    [activeProfileId, renameProfileName],
+  );
+
+  const handleClearProfileData = useCallback(() => {
+    if (sessionPhaseRef.current !== "choosing") return;
+    const result = clearBorrowFlashProfileData(activeProfileId);
+    setProfileRegistry(result.registry);
+    setProfileWritable(profileMutationCanWrite(result.status));
+    setProfileMessage(
+      result.ok ? "This profile's practice data was cleared." : result.message,
+    );
+    setClearProfilePending(false);
+    if (result.ok) setPerformanceSaveWarning(null);
+  }, [activeProfileId]);
 
   const pauseSessionFor = useCallback(
     (reason: SessionPauseReason, now = performance.now()) => {
@@ -1483,6 +1634,7 @@ export default function SubtractionFlashPage() {
             reviews: progress.reviews,
             baseDeckSize: progress.baseDeckSize,
           },
+          createBorrowFlashProfileStorage(progress.profileId),
         );
         if (!write.ok) {
           setPerformanceSaveWarning(
@@ -1618,7 +1770,10 @@ export default function SubtractionFlashPage() {
             recognitionProcessingMs:
               evidence.recognitionProcessingMs ?? null,
           });
-          const write = appendPerformanceAttempt(attempt);
+          const write = appendPerformanceAttempt(
+            attempt,
+            createBorrowFlashProfileStorage(progress.profileId),
+          );
           if (!write.ok) {
             setPerformanceSaveWarning(
               "Performance data could not be saved on this device.",
@@ -1784,6 +1939,7 @@ export default function SubtractionFlashPage() {
       }
       const chosenAnswerMode = selectedAnswerModeRef.current;
       const chosenLevel = selectedLevelRef.current;
+      const chosenProfileId = activeProfileId;
       if (!chosenAnswerMode) return;
       if (resultTimerRef.current !== null) {
         window.clearTimeout(resultTimerRef.current);
@@ -1810,6 +1966,7 @@ export default function SubtractionFlashPage() {
       const progress: SessionProgress = {
         id: nextId,
         performanceSessionId,
+        profileId: chosenProfileId,
         mode: sessionMode,
         level: chosenLevel,
         presentationMode: activeMode,
@@ -1833,7 +1990,10 @@ export default function SubtractionFlashPage() {
           baseDeckSize: firstDraw.baseDeckSize,
           startedAt: epochMillisecondsFromPerformance(now),
         });
-        const write = startPerformanceSession(session);
+        const write = startPerformanceSession(
+          session,
+          createBorrowFlashProfileStorage(chosenProfileId),
+        );
         setPerformanceSaveWarning(
           write.ok
             ? null
@@ -1866,6 +2026,7 @@ export default function SubtractionFlashPage() {
       }
     },
     [
+      activeProfileId,
       primeMicrophonePermission,
       replaceSessionProgress,
       speakQuestion,
@@ -1928,6 +2089,11 @@ export default function SubtractionFlashPage() {
     const frame = requestAnimationFrame(() => setInteractionReady(true));
     return () => cancelAnimationFrame(frame);
   }, []);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(refreshProfiles);
+    return () => cancelAnimationFrame(frame);
+  }, [refreshProfiles]);
 
   useEffect(() => {
     const enabled = readSoundPreference();
@@ -2123,6 +2289,40 @@ export default function SubtractionFlashPage() {
     setSessionPhase("choosing");
   }, [stopSpeaking]);
 
+  const settleSessionForNavigation = useCallback(() => {
+    if (sessionPhaseRef.current === "playing") {
+      const now = performance.now();
+      const progress = sessionProgressRef.current;
+      const elapsedMs = readSessionElapsed(progress.clock, now);
+      if (progress.performanceSessionId) {
+        const write = finishPerformanceSession(
+          progress.performanceSessionId,
+          {
+            finishedAt: epochMillisecondsFromPerformance(now),
+            finishReason: "abandoned",
+            elapsedMs,
+            answered: progress.answered,
+            correct: progress.correct,
+            slow: progress.slow,
+            reviews: progress.reviews,
+            baseDeckSize: progress.baseDeckSize,
+          },
+          createBorrowFlashProfileStorage(progress.profileId),
+        );
+        if (!write.ok) {
+          setPerformanceSaveWarning(
+            "Performance data could not be saved on this device.",
+          );
+        }
+      }
+    }
+  }, []);
+
+  const abandonSession = useCallback(() => {
+    settleSessionForNavigation();
+    returnToModeChoice();
+  }, [returnToModeChoice, settleSessionForNavigation]);
+
   useEffect(() => {
     if (sessionPhase !== "choosing" || sessionProgress.id === 0) return;
     const frame = requestAnimationFrame(() => {
@@ -2257,14 +2457,45 @@ export default function SubtractionFlashPage() {
     return (
       <main className={styles.livePage}>
         <header className={styles.liveHud} aria-label="Session status">
-          <div className={styles.liveHudStart}>
+          <nav className={styles.liveNav} aria-label="Session navigation">
             <Link
               className={styles.liveHome}
               href="/"
-              aria-label="Back to all games"
+              aria-label="Home — all games"
+              onClick={settleSessionForNavigation}
+            >
+              <HomeIcon />
+            </Link>
+            <button
+              className={styles.liveBack}
+              type="button"
+              aria-label="Back to Borrow Flash setup"
+              onClick={abandonSession}
             >
               <ArrowLeftIcon />
-            </Link>
+            </button>
+          </nav>
+
+          <span
+            className={styles.liveClock}
+            role="timer"
+            aria-label={`${liveClockLabel}: ${liveClockValue}`}
+          >
+            {liveClockValue}
+          </span>
+
+          <div className={styles.liveHudEnd}>
+            <span
+              className={styles.liveScore}
+              aria-label={`${sessionProgress.correct} correct, ${wrongAnswers} wrong`}
+            >
+              <span className={styles.liveCorrect} aria-hidden="true">
+                ✓ {sessionProgress.correct}
+              </span>
+              <span className={styles.liveWrong} aria-hidden="true">
+                × {wrongAnswers}
+              </span>
+            </span>
             {sessionProgress.mode === "infinite" ? (
               <button
                 className={styles.liveFinish}
@@ -2276,26 +2507,6 @@ export default function SubtractionFlashPage() {
               </button>
             ) : null}
           </div>
-
-          <span
-            className={styles.liveClock}
-            role="timer"
-            aria-label={`${liveClockLabel}: ${liveClockValue}`}
-          >
-            {liveClockValue}
-          </span>
-
-          <span
-            className={styles.liveScore}
-            aria-label={`${sessionProgress.correct} correct, ${wrongAnswers} wrong`}
-          >
-            <span className={styles.liveCorrect} aria-hidden="true">
-              ✓ {sessionProgress.correct}
-            </span>
-            <span className={styles.liveWrong} aria-hidden="true">
-              × {wrongAnswers}
-            </span>
-          </span>
         </header>
 
         {currentRound && liveAnswer ? (
@@ -2324,59 +2535,61 @@ export default function SubtractionFlashPage() {
   return (
     <div className={styles.page}>
       <header className={styles.topbar}>
-        <Link className={styles.backLink} href="/" aria-label="All games">
-          <ArrowLeftIcon />
+        <Link className={styles.backLink} href="/" aria-label="Home — all games">
+          <HomeIcon />
         </Link>
 
-        {adaptiveOpen ? (
-          <div className={styles.adaptiveModeLabel}>Adaptive practice</div>
-        ) : (
-          <nav className={styles.levelSwitch} aria-label="Level">
-            {SUBTRACTION_LEVELS.map((level) => (
-              <button
-                key={level}
-                className={styles.levelButton}
-                type="button"
-                aria-pressed={selectedLevel === level}
-                disabled={!interactionReady}
-                onClick={() => handleLevelChange(level)}
-              >
-                {level}
-              </button>
-            ))}
-          </nav>
-        )}
+        <nav className={styles.levelSwitch} aria-label="Level">
+          {SUBTRACTION_LEVELS.map((level) => (
+            <button
+              key={level}
+              className={styles.levelButton}
+              type="button"
+              aria-pressed={selectedLevel === level}
+              disabled={!interactionReady}
+              onClick={() => handleLevelChange(level)}
+            >
+              {level}
+            </button>
+          ))}
+        </nav>
 
-        <button
-          className={styles.soundButton}
-          type="button"
-          aria-pressed={soundEnabled}
-          aria-label={`Sound ${soundEnabled ? "on" : "off"}. Toggle sound.`}
-          onClick={handleSoundToggle}
-        >
-          <SoundIcon enabled={soundEnabled} />
-        </button>
+        <div className={styles.topbarActions}>
+          <button
+            ref={profileButtonRef}
+            className={styles.profileButton}
+            type="button"
+            aria-haspopup="dialog"
+            aria-label={`Player: ${activeProfile?.name ?? "Player 1"}. Manage players.`}
+            disabled={!interactionReady || !profileRegistry}
+            onClick={openProfileDialog}
+          >
+            <ProfileIcon />
+            <span>{activeProfile?.name ?? "Player 1"}</span>
+          </button>
+          <button
+            className={styles.soundButton}
+            type="button"
+            aria-pressed={soundEnabled}
+            aria-label={`Sound ${soundEnabled ? "on" : "off"}. Toggle sound.`}
+            onClick={handleSoundToggle}
+          >
+            <SoundIcon enabled={soundEnabled} />
+          </button>
+        </div>
       </header>
 
       <main className={styles.main}>
         <section
           className={styles.board}
           data-answer-mode={answerMode}
-          data-session-active={
-            !adaptiveOpen && sessionPhase !== "choosing"
-          }
+          data-session-active={sessionPhase !== "choosing"}
           aria-labelledby="game-heading"
         >
           <h1 className={styles.visuallyHidden} id="game-heading">
             Borrow Flash
           </h1>
-          {adaptiveOpen ? (
-            <AdaptiveSubtractionCurriculum
-              soundEnabled={soundEnabled}
-              onFeedback={playEarcon}
-              onExit={() => setAdaptiveOpen(false)}
-            />
-          ) : sessionPhase === "choosing" ? (
+          {sessionPhase === "choosing" ? (
             <section
               className={styles.sessionChooser}
               aria-labelledby="session-choice-heading"
@@ -2471,17 +2684,6 @@ export default function SubtractionFlashPage() {
                     <span>{SESSION_DESCRIPTIONS[sessionMode]}</span>
                   </button>
                 ))}
-                <button
-                  className={`${styles.sessionChoice} ${styles.adaptiveSessionChoice}`}
-                  type="button"
-                  disabled={!interactionReady}
-                  onClick={() => setAdaptiveOpen(true)}
-                >
-                  <strong>Adaptive practice</strong>
-                  <span>
-                    A short, finite mix that finds the next useful step
-                  </span>
-                </button>
               </div>
               <Link
                 className={styles.analysisLink}
@@ -2774,6 +2976,118 @@ export default function SubtractionFlashPage() {
           </p>
         ) : null}
       </main>
+
+      <dialog
+        ref={profileDialogRef}
+        className={styles.profileDialog}
+        aria-labelledby="profile-dialog-heading"
+        onClose={() => {
+          setClearProfilePending(false);
+          profileButtonRef.current?.focus();
+        }}
+      >
+        <div className={styles.profileDialogBody}>
+          <div className={styles.profileDialogHeading}>
+            <div>
+              <p>Borrow Flash</p>
+              <h2
+                ref={profileDialogHeadingRef}
+                id="profile-dialog-heading"
+                tabIndex={-1}
+              >
+                Players
+              </h2>
+            </div>
+            <button
+              className={styles.profileCloseButton}
+              type="button"
+              aria-label="Close player profiles"
+              onClick={closeProfileDialog}
+            >
+              ×
+            </button>
+          </div>
+
+          <div className={styles.profileList} role="radiogroup" aria-label="Current player">
+            {profileRegistry?.profiles.map((profile) => (
+              <button
+                key={profile.id}
+                className={styles.profileChoice}
+                type="button"
+                role="radio"
+                aria-checked={profile.id === activeProfileId}
+                disabled={!profileWritable}
+                onClick={() => handleProfileSwitch(profile.id)}
+              >
+                <ProfileIcon />
+                <span>{profile.name}</span>
+                {profile.id === activeProfileId ? <strong>Current</strong> : null}
+              </button>
+            ))}
+          </div>
+
+          <form className={styles.profileForm} onSubmit={handleRenameProfile}>
+            <label htmlFor="rename-player">Rename current player</label>
+            <div>
+              <input
+                id="rename-player"
+                value={renameProfileName}
+                maxLength={24}
+                autoComplete="off"
+                disabled={!profileWritable}
+                onChange={(event) => setRenameProfileName(event.target.value)}
+              />
+              <button type="submit" disabled={!profileWritable || !renameProfileName.trim()}>
+                Rename
+              </button>
+            </div>
+          </form>
+
+          <form className={styles.profileForm} onSubmit={handleCreateProfile}>
+            <label htmlFor="new-player">Add a player</label>
+            <div>
+              <input
+                id="new-player"
+                value={newProfileName}
+                maxLength={24}
+                autoComplete="off"
+                placeholder="Name"
+                disabled={!profileWritable}
+                onChange={(event) => setNewProfileName(event.target.value)}
+              />
+              <button type="submit" disabled={!profileWritable || !newProfileName.trim()}>
+                Add
+              </button>
+            </div>
+          </form>
+
+          <section className={styles.clearProfileSection} aria-labelledby="clear-profile-heading">
+            <h3 id="clear-profile-heading">Clear {activeProfile?.name ?? "this player's"} data</h3>
+            {clearProfilePending ? (
+              <div className={styles.clearProfileConfirm} role="alert">
+                <p>This permanently removes this player’s saved practice history from this browser.</p>
+                <button type="button" onClick={handleClearProfileData}>Yes, clear data</button>
+                <button type="button" onClick={() => setClearProfilePending(false)}>Cancel</button>
+              </div>
+            ) : (
+              <button
+                className={styles.clearProfileButton}
+                type="button"
+                disabled={!profileWritable}
+                onClick={() => setClearProfilePending(true)}
+              >
+                Clear data…
+              </button>
+            )}
+          </section>
+
+          {profileMessage ? (
+            <p className={styles.profileMessage} role="status" aria-live="polite">
+              {profileMessage}
+            </p>
+          ) : null}
+        </div>
+      </dialog>
 
       <dialog
         ref={resultsDialogRef}

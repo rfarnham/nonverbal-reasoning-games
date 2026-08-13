@@ -20,19 +20,34 @@ const parentReport = await readFile(
   ),
   "utf8",
 );
+const performanceAnalysis = await readFile(
+  new URL(
+    "../app/lab/subtraction-flash/analysis/performance-analysis-client.tsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
 
-test("Borrow Flash keeps Cards and Listen while adding adaptive practice", () => {
-  assert.match(route, /import \{ AdaptiveSubtractionCurriculum \}/);
+test("Borrow Flash keeps adaptive practice off the launch route", () => {
+  assert.doesNotMatch(route, /import \{ AdaptiveSubtractionCurriculum \}/);
   assert.match(route, />\s*Cards\s*</);
   assert.match(route, />\s*Listen\s*</);
-  assert.match(route, /<strong>Adaptive practice<\/strong>/);
-  assert.match(route, /onFeedback=\{playEarcon\}/);
-  assert.match(route, /soundEnabled=\{soundEnabled\}/);
+  assert.doesNotMatch(route, /<strong>Adaptive practice<\/strong>/);
+  assert.doesNotMatch(route, /<AdaptiveSubtractionCurriculum/);
 });
 
 test("the adaptive UI persists and resumes both card and feedback boundaries", () => {
-  assert.match(curriculum, /loadAdaptiveSubtractionProgressDiagnostic\(\)/);
-  assert.match(curriculum, /writeAdaptiveSubtractionProgress\(next\)/);
+  assert.match(curriculum, /profileId: string/);
+  assert.match(curriculum, /createBorrowFlashProfileStorage\(profileId\)/);
+  assert.match(
+    curriculum,
+    /loadAdaptiveSubtractionProgressDiagnostic\(profileStorage\)/,
+  );
+  assert.match(
+    curriculum,
+    /writeAdaptiveSubtractionProgress\(next, profileStorage\)/,
+  );
+  assert.match(curriculum, /loadedProfileId !== profileId/);
   assert.match(curriculum, /setActiveAdaptiveSession/);
   assert.match(curriculum, /pendingFeedbackForSession/);
   assert.match(curriculum, /Continue this session/);
@@ -81,4 +96,26 @@ test("parent-only reporting keeps accuracy, timing, and benchmark data distinct"
   assert.match(parentReport, /Latest weekly check/);
   assert.match(parentReport, /External target comparison/);
   assert.match(parentReport, /never block new content or appear in the child session/);
+});
+
+test("analysis exports only the active profile's visible Borrow Flash history", () => {
+  assert.match(performanceAnalysis, /loadBorrowFlashProfilesDiagnostic\(\)/);
+  assert.match(
+    performanceAnalysis,
+    /profiles\.registry\.profiles\.find\([\s\S]*profiles\.registry\.activeProfileId/,
+  );
+  assert.match(
+    performanceAnalysis,
+    /const profileStorage = createBorrowFlashProfileStorage\([\s\S]*activeProfile\.id/,
+  );
+  assert.match(
+    performanceAnalysis,
+    /loadPerformanceLogDiagnostic\(profileStorage\)/,
+  );
+  assert.match(performanceAnalysis, /normalizePerformanceAttempts\(core\.log\?\.attempts \?\? \[\], \[\]\)/);
+  assert.doesNotMatch(performanceAnalysis, /loadAdaptiveSubtractionProgressDiagnostic/);
+  assert.doesNotMatch(performanceAnalysis, /<option value="adaptive">/);
+  assert.match(performanceAnalysis, /"profile_id"/);
+  assert.match(performanceAnalysis, /"profile_name"/);
+  assert.match(performanceAnalysis, /Only this profile’s[\s\S]*saved Borrow Flash answers/);
 });

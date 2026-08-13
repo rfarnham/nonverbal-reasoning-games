@@ -15,6 +15,7 @@ import {
 } from "./adaptive-handwriting";
 import { AdaptiveParentReport } from "./adaptive-parent-report";
 import { AdaptiveProblemCard } from "./adaptive-problem-card";
+import { createBorrowFlashProfileStorage } from "./borrow-flash-profiles";
 import {
   DEVICE_LEARNER_ID,
   appendAttemptEvent,
@@ -100,6 +101,7 @@ type FeedbackState = Readonly<{
 }>;
 
 type Props = Readonly<{
+  profileId: string;
   soundEnabled: boolean;
   onFeedback(correct: boolean): void;
   onExit(): void;
@@ -274,12 +276,18 @@ function sessionSummary(
 }
 
 export function AdaptiveSubtractionCurriculum({
+  profileId,
   soundEnabled,
   onFeedback,
   onExit,
 }: Props) {
+  const profileStorage = useMemo(
+    () => createBorrowFlashProfileStorage(profileId),
+    [profileId],
+  );
   const [progress, setProgress] =
     useState<AdaptiveSubtractionProgress | null>(null);
+  const [loadedProfileId, setLoadedProfileId] = useState<string | null>(null);
   const [loadStatus, setLoadStatus] =
     useState<AdaptiveSubtractionLoadStatus>("empty");
   const [storageWritable, setStorageWritable] = useState(true);
@@ -313,11 +321,11 @@ export function AdaptiveSubtractionCurriculum({
       progressRef.current = next;
       setProgress(next);
       if (storageWriteBlockedRef.current) return;
-      if (!writeAdaptiveSubtractionProgress(next)) {
+      if (!writeAdaptiveSubtractionProgress(next, profileStorage)) {
         setStorageWritable(false);
       }
     },
-    [],
+    [profileStorage],
   );
 
   const commitSession = useCallback(
@@ -351,9 +359,15 @@ export function AdaptiveSubtractionCurriculum({
 
   useEffect(() => {
     let cancelled = false;
+    progressRef.current = null;
+    sessionRef.current = null;
+    storageWriteBlockedRef.current = false;
     const frame = requestAnimationFrame(() => {
       if (cancelled) return;
-      const loaded = loadAdaptiveSubtractionProgressDiagnostic();
+      setView("home");
+      setCompletedSummary(null);
+      resetRoundState();
+      const loaded = loadAdaptiveSubtractionProgressDiagnostic(profileStorage);
       let next = loaded.progress;
       const states = deriveLearnerSkillStates(
         SKILL_DEFINITIONS,
@@ -364,6 +378,7 @@ export function AdaptiveSubtractionCurriculum({
       storageWriteBlockedRef.current = loaded.status === "unsupported";
       progressRef.current = next;
       setProgress(next);
+      setLoadedProfileId(profileId);
       setLoadStatus(loaded.status);
       setStorageWritable(
         loaded.status !== "unavailable" && loaded.status !== "unsupported",
@@ -376,7 +391,7 @@ export function AdaptiveSubtractionCurriculum({
       cancelled = true;
       cancelAnimationFrame(frame);
     };
-  }, []);
+  }, [profileId, profileStorage, resetRoundState]);
 
   useEffect(() => {
     const problemId = session?.currentProblem?.id;
@@ -1010,7 +1025,7 @@ export function AdaptiveSubtractionCurriculum({
     );
   }, [completedSummary, progress]);
 
-  if (!progress) {
+  if (!progress || loadedProfileId !== profileId) {
     return (
       <section className={styles.loading} aria-live="polite">
         <p>Preparing a short practice…</p>

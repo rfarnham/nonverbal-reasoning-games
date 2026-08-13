@@ -14,7 +14,7 @@ const stylesSource = await readFile(
   "utf8",
 );
 
-test("live rounds retain only a compact home, clock, and score HUD", () => {
+test("live rounds retain distinct Home and Back navigation in the compact HUD", () => {
   const liveBranchStart = pageSource.indexOf(
     'if (sessionPhase === "playing" || sessionPhase === "settling")',
   );
@@ -24,7 +24,11 @@ test("live rounds retain only a compact home, clock, and score HUD", () => {
 
   const liveBranch = pageSource.slice(liveBranchStart, liveBranchEnd);
   assert.match(liveBranch, /className=\{styles\.liveHud\}/);
-  assert.match(liveBranch, /aria-label="Back to all games"/);
+  assert.match(liveBranch, /aria-label="Home — all games"/);
+  assert.match(liveBranch, /<HomeIcon\s*\/>/);
+  assert.match(liveBranch, /aria-label="Back to Borrow Flash setup"/);
+  assert.match(liveBranch, /onClick=\{abandonSession\}/);
+  assert.match(liveBranch, /<ArrowLeftIcon\s*\/>/);
   assert.match(liveBranch, /role="timer"/);
   assert.match(liveBranch, /Time remaining/);
   assert.match(liveBranch, /Time elapsed/);
@@ -35,5 +39,5 @@ test("live rounds retain only a compact home, clock, and score HUD", () => {
 
   assert.match(stylesSource, /\.liveHud\s*\{[\s\S]*position:\s*absolute;/);
   assert.match(stylesSource, /\.liveHud\s*\{[\s\S]*min-height:\s*52px;/);
-  assert.match(stylesSource, /\.liveHome,[\s\S]*min-width:\s*44px;/);
+  assert.match(stylesSource, /\.liveHome,[\s\S]*\.liveBack,[\s\S]*min-width:\s*44px;/);
 });
