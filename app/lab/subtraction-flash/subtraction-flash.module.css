@@ -248,6 +248,7 @@
   --correct: #16836b;
   --incorrect: #bf493e;
   --focus: #1679d2;
+  position: relative;
   min-height: 100svh;
   display: grid;
   place-items: center;
@@ -259,6 +260,116 @@
     max(18px, env(safe-area-inset-left));
   background: #fbf8f0;
   color: var(--ink);
+}
+
+.liveHud {
+  position: absolute;
+  z-index: 2;
+  top: max(10px, env(safe-area-inset-top));
+  left: 50%;
+  width: min(
+    560px,
+    calc(
+      100vw - max(16px, env(safe-area-inset-left)) -
+        max(16px, env(safe-area-inset-right))
+    )
+  );
+  min-height: 52px;
+  padding: 4px 7px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(101, 112, 135, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 253, 248, 0.94);
+  color: #657087;
+  transform: translateX(-50%);
+}
+
+.liveHudStart,
+.liveScore {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.liveHudStart {
+  justify-self: start;
+  gap: 4px;
+}
+
+.liveHome,
+.liveFinish {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--ink);
+}
+
+.liveHome {
+  width: 44px;
+}
+
+.liveHome svg {
+  width: 21px;
+  height: 21px;
+}
+
+.liveFinish {
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 820;
+  cursor: pointer;
+}
+
+.liveFinish:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.liveClock {
+  justify-self: center;
+  color: var(--ink);
+  font-size: clamp(0.88rem, 1.8vw, 1rem);
+  font-weight: 880;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.liveScore {
+  justify-self: end;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-right: 9px;
+  font-size: clamp(0.76rem, 1.5vw, 0.88rem);
+  font-weight: 880;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.liveCorrect {
+  color: var(--correct);
+}
+
+.liveWrong {
+  color: var(--incorrect);
+}
+
+.liveHome:hover,
+.liveFinish:not(:disabled):hover {
+  background: rgba(101, 112, 135, 0.1);
+}
+
+.liveHome:focus-visible,
+.liveFinish:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .liveProblem {
@@ -460,6 +571,20 @@
 }
 
 @media (max-width: 420px) {
+  .liveHud {
+    gap: 4px;
+  }
+
+  .liveFinish {
+    padding-inline: 6px;
+    font-size: 0.68rem;
+  }
+
+  .liveScore {
+    gap: 7px;
+    padding-right: 7px;
+  }
+
   .liveHorizontal {
     width: 96vw;
     grid-template-columns: max-content max-content max-content max-content minmax(104px, auto);

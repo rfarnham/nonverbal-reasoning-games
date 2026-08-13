@@ -2241,8 +2241,63 @@ export default function SubtractionFlashPage() {
   ) : null;
 
   if (sessionPhase === "playing" || sessionPhase === "settling") {
+    const liveClockValue =
+      sessionProgress.mode === "two-minute"
+        ? formatCountdownTime(remainingTimedMs)
+        : formatElapsedTime(elapsedMs);
+    const liveClockLabel =
+      sessionProgress.mode === "two-minute"
+        ? "Time remaining"
+        : "Time elapsed";
+    const wrongAnswers = Math.max(
+      0,
+      sessionProgress.answered - sessionProgress.correct,
+    );
+
     return (
       <main className={styles.livePage}>
+        <header className={styles.liveHud} aria-label="Session status">
+          <div className={styles.liveHudStart}>
+            <Link
+              className={styles.liveHome}
+              href="/"
+              aria-label="Back to all games"
+            >
+              <ArrowLeftIcon />
+            </Link>
+            {sessionProgress.mode === "infinite" ? (
+              <button
+                className={styles.liveFinish}
+                type="button"
+                disabled={sessionProgress.answered === 0}
+                onClick={() => finishSession("manual")}
+              >
+                Finish
+              </button>
+            ) : null}
+          </div>
+
+          <span
+            className={styles.liveClock}
+            role="timer"
+            aria-label={`${liveClockLabel}: ${liveClockValue}`}
+          >
+            {liveClockValue}
+          </span>
+
+          <span
+            className={styles.liveScore}
+            aria-label={`${sessionProgress.correct} correct, ${wrongAnswers} wrong`}
+          >
+            <span className={styles.liveCorrect} aria-hidden="true">
+              ✓ {sessionProgress.correct}
+            </span>
+            <span className={styles.liveWrong} aria-hidden="true">
+              × {wrongAnswers}
+            </span>
+          </span>
+        </header>
+
         {currentRound && liveAnswer ? (
           <ProblemWithAnswer
             mode={sessionProgress.presentationMode}
