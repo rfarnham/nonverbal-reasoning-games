@@ -18,12 +18,16 @@ function section(startMarker, endMarker) {
   return component.slice(start, end);
 }
 
-test("two-digit handwriting waits for ink in every required slot", () => {
+test("default multi-digit handwriting still waits for every required slot", () => {
+  const slotGate = section(
+    "export function handwritingRecognitionSlots",
+    "function clearPixels",
+  );
   const recognition = section(
     "const recognizeAnswer = useCallback",
     "const beginStroke =",
   );
-  const completeSlotGate = recognition.indexOf(".every(Boolean)");
+  const completeSlotGate = recognition.indexOf("handwritingRecognitionSlots(");
   const recognitionDelay = recognition.indexOf("window.setTimeout");
 
   assert.ok(completeSlotGate >= 0, "all required slots share one completion gate");
@@ -32,13 +36,13 @@ test("two-digit handwriting waits for ink in every required slot", () => {
     "no recognition starts before every required writing slot has ink",
   );
   assert.match(
-    recognition,
-    /Array\.from\(\{ length: digitCount \}, \(_, index\) =>[\s\S]*hasInkRef\.current\[index\][\s\S]*\.every\(Boolean\)/,
+    slotGate,
+    /entryMode === "exact-slots"[\s\S]*occupied\.every\(Boolean\)/,
   );
   assert.match(
     recognition,
-    /Array\.from\(\{ length: digitCount \}, \(_, index\) =>[\s\S]*getImageData/,
-    "the recognizer reads exactly the one or two required fields",
+    /const slots = handwritingRecognitionSlots[\s\S]*slots\.map\(\(index\)[\s\S]*getImageData/,
+    "the recognizer reads exactly the required one, two, or three fields",
   );
   assert.match(
     section("const finishStroke =", "return ("),
@@ -47,26 +51,49 @@ test("two-digit handwriting waits for ink in every required slot", () => {
   );
 });
 
-test("only a confident complete answer replaces handwriting with the large readout", () => {
+test("curriculum handwriting waits for a contiguous suffix ending in Ones", () => {
+  const slotGate = section(
+    "export function handwritingRecognitionSlots",
+    "function clearPixels",
+  );
+  assert.match(slotGate, /if \(!occupied\.at\(-1\)\) return null/);
+  assert.match(slotGate, /const firstOccupied = occupied\.indexOf\(true\)/);
+  assert.match(slotGate, /occupied\.slice\(firstOccupied\)\.every\(Boolean\)/);
+  assert.match(component, /entryMode\?: "exact-slots" \| "right-aligned"/);
+  assert.match(component, /Use the rightmost boxes/);
+  assert.match(component, /PLACE_LABELS\[digitCount\]\[index\]/);
+});
+
+test("the shared handwriting control supports three-digit Grade 1 answers", () => {
+  assert.match(component, /digitCount: 1 \| 2 \| 3/);
+  assert.match(component, /useRef\(\[false, false, false\]\)/);
+  assert.match(component, /useState\(\[false, false, false\]\)/);
+});
+
+test("default low-confidence handwriting still clears for Borrow Flash", () => {
   const recognizedResult = section(
     ".then((predictions) => {",
     ".catch(() => {",
   );
-  const qualityGate = recognizedResult.indexOf(
-    "confidence < CONFIDENCE_MINIMUM || margin < MARGIN_MINIMUM",
-  );
-  const readout = recognizedResult.indexOf("setReadout(raw)");
+  const qualityGate = recognizedResult.indexOf("confidence < CONFIDENCE_MINIMUM");
+  const clear = recognizedResult.indexOf("clearAll()", qualityGate);
 
   assert.ok(qualityGate >= 0, "recognition checks both confidence measures");
-  assert.ok(
-    readout > qualityGate,
-    "a guessed digit is not rendered before the confidence gate passes",
-  );
-  assert.match(
-    recognizedResult.slice(qualityGate, readout),
-    /clearAll\(\)[\s\S]*draw it again[\s\S]*return;/,
-    "an uncertain result clears both scribble fields instead of displaying its guess",
-  );
+  assert.match(recognizedResult, /margin < MARGIN_MINIMUM/);
+  assert.match(component, /rejectedRecognitionMode = "clear"/);
+  assert.ok(clear > qualityGate, "the default path clears uncertain ink");
+  assert.match(recognizedResult.slice(clear), /draw it again[\s\S]*return;/);
+});
+
+test("curriculum can preserve a low-confidence readout for confirmation or correction", () => {
+  assert.match(component, /rejectedRecognitionMode\?: "clear" \| "confirm"/);
+  assert.match(component, /rejectedRecognitionMode === "confirm"/);
+  assert.match(component, /setPendingRecognition\(rejected\)/);
+  assert.match(component, /We read \$\{raw\}\. Is that right\?/);
+  assert.match(component, />\s*Yes\s*<\/button>/);
+  assert.match(component, />\s*Change\s*<\/button>/);
+  assert.match(component, /recognitionStatus[\s\S]*"confirmed"[\s\S]*"corrected"/);
+  assert.match(component, /Correct the recognized number\. Press Done to submit\./);
 });
 
 test("recognizer failures also clear stale scribbles", () => {

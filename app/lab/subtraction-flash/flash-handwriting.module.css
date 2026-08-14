@@ -17,6 +17,31 @@
   width: min(42vw, 430px);
 }
 
+.exactSlot,
+.digitSlot {
+  min-width: 0;
+  display: grid;
+}
+
+.digitSlot {
+  gap: 6px;
+}
+
+.placeLabel {
+  color: #657087;
+  font-size: clamp(0.63rem, 1.2vw, 0.76rem);
+  font-weight: 850;
+  letter-spacing: 0.045em;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.root[data-digit-count="3"] .canvases {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: min(62vw, 650px);
+}
+
 .root[data-digit-count="1"] .canvases {
   grid-template-columns: minmax(0, 1fr);
   width: min(24vw, 230px);
@@ -75,6 +100,65 @@
   pointer-events: none;
 }
 
+.confirmation {
+  position: absolute;
+  inset: auto 50% 52px auto;
+  z-index: 2;
+  display: flex;
+  gap: 8px;
+  transform: translateX(50%);
+}
+
+.confirmButton,
+.changeButton {
+  min-width: 88px;
+  min-height: 46px;
+  padding: 10px 18px;
+  border: 2px solid #17213d;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.confirmButton {
+  background: #17213d;
+  color: #fffdf8;
+}
+
+.changeButton {
+  background: #fffdf8;
+  color: #17213d;
+}
+
+.confirmButton:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.confirmButton:focus-visible,
+.changeButton:focus-visible,
+.correctionInput:focus-visible {
+  outline: 4px solid #1679d2;
+  outline-offset: 4px;
+}
+
+.correctionInput {
+  width: min(44vw, 220px);
+  min-height: 58px;
+  box-sizing: border-box;
+  border: 3px solid #1679d2;
+  border-radius: 16px;
+  background: #fffdf8;
+  color: #17213d;
+  font: inherit;
+  font-size: 2rem;
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+}
+
 .status {
   width: 100%;
   box-sizing: border-box;
@@ -98,8 +182,26 @@
     width: min(44vw, 230px);
   }
 
+  .root[data-digit-count="3"] .canvases {
+    width: min(88vw, 600px);
+  }
+
   .canvas {
     height: clamp(190px, 29svh, 300px);
+  }
+}
+
+@media (min-width: 701px) and (max-width: 900px) {
+  .canvases {
+    width: min(66vw, 540px);
+  }
+
+  .root[data-digit-count="1"] .canvases {
+    width: min(40vw, 310px);
+  }
+
+  .root[data-digit-count="3"] .canvases {
+    width: min(74vw, 570px);
   }
 }
 

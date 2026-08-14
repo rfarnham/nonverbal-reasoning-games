@@ -1,4 +1,5 @@
 import { ADAPTIVE_SUBTRACTION_STORAGE_KEY } from "./adaptive-storage.ts";
+import { ARITHMETIC_FLUENCY_STORAGE_KEY } from "../../../lib/arithmetic-fluency/storage.ts";
 import {
   PERFORMANCE_LEGACY_STORAGE_KEY,
   PERFORMANCE_STORAGE_KEY,
@@ -486,6 +487,7 @@ const BORROW_FLASH_CHILD_DATA_KEYS = [
   PERFORMANCE_STORAGE_KEY,
   PERFORMANCE_LEGACY_STORAGE_KEY,
   ADAPTIVE_SUBTRACTION_STORAGE_KEY,
+  ARITHMETIC_FLUENCY_STORAGE_KEY,
 ] as const;
 
 export function clearBorrowFlashProfileData(

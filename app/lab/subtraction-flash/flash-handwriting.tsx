@@ -24,10 +24,21 @@ export type FlashHandwritingEvidence = Readonly<{
   recognitionConfidence: number;
   recognitionMargin: number;
   recognitionProcessingMs: number;
+  recognitionStatus: "accepted" | "confirmed" | "corrected";
+  confirmedAnswer: number | null;
+}>;
+
+export type FlashHandwritingRejectedRecognition = Readonly<{
+  rawRecognition: string | null;
+  recognitionConfidence: number | null;
+  recognitionMargin: number | null;
+  recognitionProcessingMs: number;
 }>;
 
 export type FlashHandwritingProps = Readonly<{
-  digitCount: 1 | 2;
+  digitCount: 1 | 2 | 3;
+  entryMode?: "exact-slots" | "right-aligned";
+  rejectedRecognitionMode?: "clear" | "confirm";
   disabled: boolean;
   focusRef: MutableRefObject<HTMLCanvasElement | null>;
   roundId: string;
@@ -36,6 +47,9 @@ export type FlashHandwritingProps = Readonly<{
     answeredAt: number,
     evidence: FlashHandwritingEvidence,
   ): void;
+  onRecognitionRejected?(
+    evidence: FlashHandwritingRejectedRecognition,
+  ): void;
 }>;
 
 const BACKGROUND = "#fffdf8";
@@ -43,6 +57,49 @@ const INK = "#17213d";
 const CONFIDENCE_MINIMUM = 0.52;
 const MARGIN_MINIMUM = 0.1;
 const READ_DELAY_MS = 560;
+
+const PLACE_LABELS: Readonly<Record<1 | 2 | 3, readonly string[]>> = {
+  1: ["Ones"],
+  2: ["Tens", "Ones"],
+  3: ["Hundreds", "Tens", "Ones"],
+};
+
+export function handwritingRecognitionSlots(
+  digitCount: 1 | 2 | 3,
+  hasInk: readonly boolean[],
+  entryMode: "exact-slots" | "right-aligned",
+): readonly number[] | null {
+  const occupied = Array.from(
+    { length: digitCount },
+    (_, index) => Boolean(hasInk[index]),
+  );
+  if (entryMode === "exact-slots") {
+    return occupied.every(Boolean)
+      ? occupied.map((_, index) => index)
+      : null;
+  }
+  if (!occupied.at(-1)) return null;
+  const firstOccupied = occupied.indexOf(true);
+  if (
+    firstOccupied < 0 ||
+    !occupied.slice(firstOccupied).every(Boolean)
+  ) {
+    return null;
+  }
+  return Array.from(
+    { length: digitCount - firstOccupied },
+    (_, index) => firstOccupied + index,
+  );
+}
+
+function handwritingEntryGuidance(
+  digitCount: 1 | 2 | 3,
+  entryMode: "exact-slots" | "right-aligned",
+): string {
+  return entryMode === "right-aligned" && digitCount > 1
+    ? "Use the rightmost boxes"
+    : "";
+}
 
 function clearPixels(canvas: HTMLCanvasElement): void {
   const context = canvas.getContext("2d", { willReadFrequently: true });
@@ -123,21 +180,31 @@ function paintSegment(canvas: HTMLCanvasElement, from: Point, to: Point): void {
 
 export function FlashHandwriting({
   digitCount,
+  entryMode = "exact-slots",
+  rejectedRecognitionMode = "clear",
   disabled,
   focusRef,
   roundId,
   onAnswer,
+  onRecognitionRejected,
 }: FlashHandwritingProps) {
   const canvasRefs = useRef<Array<HTMLCanvasElement | null>>([]);
-  const hasInkRef = useRef([false, false]);
+  const hasInkRef = useRef([false, false, false]);
   const activePointerRef = useRef<ActivePointer | null>(null);
   const recognitionTimerRef = useRef<number | null>(null);
   const recognitionTokenRef = useRef(0);
   const disabledRef = useRef(disabled);
   const answeredAtRef = useRef(0);
-  const [hasInk, setHasInk] = useState([false, false]);
+  const [hasInk, setHasInk] = useState([false, false, false]);
   const [readout, setReadout] = useState<string | null>(null);
-  const [status, setStatus] = useState("");
+  const [pendingRecognition, setPendingRecognition] =
+    useState<FlashHandwritingRejectedRecognition | null>(null);
+  const [editingRecognition, setEditingRecognition] = useState(false);
+  const [correctionValue, setCorrectionValue] = useState("");
+  const correctionInputRef = useRef<HTMLInputElement | null>(null);
+  const [status, setStatus] = useState(
+    handwritingEntryGuidance(digitCount, entryMode),
+  );
 
   const cancelRecognition = useCallback(() => {
     recognitionTokenRef.current += 1;
@@ -152,13 +219,16 @@ export function FlashHandwriting({
     for (const canvas of canvasRefs.current) {
       if (canvas) clearPixels(canvas);
     }
-    hasInkRef.current = [false, false];
-    setHasInk([false, false]);
+    hasInkRef.current = [false, false, false];
+    setHasInk([false, false, false]);
     setReadout(null);
-    setStatus("");
+    setPendingRecognition(null);
+    setEditingRecognition(false);
+    setCorrectionValue("");
+    setStatus(handwritingEntryGuidance(digitCount, entryMode));
     activePointerRef.current = null;
     canvasRefs.current[0]?.focus();
-  }, [cancelRecognition]);
+  }, [cancelRecognition, digitCount, entryMode]);
 
   useEffect(() => {
     disabledRef.current = disabled;
@@ -196,13 +266,60 @@ export function FlashHandwriting({
 
   useEffect(() => () => cancelRecognition(), [cancelRecognition]);
 
+  useEffect(() => {
+    if (!editingRecognition) return;
+    const frame = window.requestAnimationFrame(() =>
+      correctionInputRef.current?.focus(),
+    );
+    return () => window.cancelAnimationFrame(frame);
+  }, [editingRecognition]);
+
+  const confirmRecognition = useCallback(
+    (confirmed: string) => {
+      const pending = pendingRecognition;
+      if (
+        !pending ||
+        pending.rawRecognition === null ||
+        !/^(0|[1-9]\d{0,2})$/.test(confirmed)
+      ) {
+        setStatus("Use 0 by itself, or enter up to three digits");
+        return;
+      }
+      const answer = Number(confirmed);
+      const recognitionStatus =
+        confirmed === pending.rawRecognition ? "confirmed" : "corrected";
+      setReadout(confirmed);
+      setPendingRecognition(null);
+      setEditingRecognition(false);
+      setStatus(`Read ${confirmed}`);
+      onAnswer(answer, answeredAtRef.current, {
+        rawRecognition: pending.rawRecognition,
+        recognitionConfidence: pending.recognitionConfidence ?? 0,
+        recognitionMargin: pending.recognitionMargin ?? 0,
+        recognitionProcessingMs: pending.recognitionProcessingMs,
+        recognitionStatus,
+        confirmedAnswer: answer,
+      });
+    },
+    [onAnswer, pendingRecognition],
+  );
+
   const recognizeAnswer = useCallback(() => {
     cancelRecognition();
-    if (
-      !Array.from({ length: digitCount }, (_, index) =>
-        Boolean(hasInkRef.current[index]),
-      ).every(Boolean)
-    ) {
+    const slots = handwritingRecognitionSlots(
+      digitCount,
+      hasInkRef.current,
+      entryMode,
+    );
+    if (!slots) {
+      if (entryMode === "right-aligned") {
+        const occupied = hasInkRef.current.slice(0, digitCount);
+        setStatus(
+          occupied.at(-1)
+            ? "Keep the written digits together"
+            : "Finish in the Ones box",
+        );
+      }
       return;
     }
 
@@ -214,7 +331,7 @@ export function FlashHandwriting({
       setStatus("Reading…");
       void Promise.resolve()
         .then(() => {
-          const images = Array.from({ length: digitCount }, (_, index) => {
+          const images = slots.map((index) => {
             const canvas = canvasRefs.current[index];
             const context = canvas?.getContext("2d", {
               willReadFrequently: true,
@@ -237,7 +354,32 @@ export function FlashHandwriting({
           const margin = Math.min(
             ...predictions.map(({ margin: value }) => value),
           );
-          if (confidence < CONFIDENCE_MINIMUM || margin < MARGIN_MINIMUM) {
+          if (
+            confidence < CONFIDENCE_MINIMUM ||
+            margin < MARGIN_MINIMUM ||
+            (rejectedRecognitionMode === "confirm" && /^0\d/.test(raw))
+          ) {
+            const rejected = {
+              rawRecognition: raw,
+              recognitionConfidence: confidence,
+              recognitionMargin: margin,
+              recognitionProcessingMs: Math.max(
+                0,
+                performance.now() - startedAt,
+              ),
+            } satisfies FlashHandwritingRejectedRecognition;
+            onRecognitionRejected?.(rejected);
+            if (rejectedRecognitionMode === "confirm") {
+              setPendingRecognition(rejected);
+              setCorrectionValue(raw);
+              setReadout(raw);
+              setStatus(
+                /^(0|[1-9]\d{0,2})$/.test(raw)
+                  ? `We read ${raw}. Is that right?`
+                  : "Remove the first 0, then press Done",
+              );
+              return;
+            }
             clearAll();
             setStatus("Couldn’t read that · draw it again");
             return;
@@ -252,15 +394,34 @@ export function FlashHandwriting({
               0,
               performance.now() - startedAt,
             ),
+            recognitionStatus: "accepted",
+            confirmedAnswer: null,
           });
         })
         .catch(() => {
           if (recognitionTokenRef.current !== token) return;
+          onRecognitionRejected?.({
+            rawRecognition: null,
+            recognitionConfidence: null,
+            recognitionMargin: null,
+            recognitionProcessingMs: Math.max(
+              0,
+              performance.now() - startedAt,
+            ),
+          });
           clearAll();
           setStatus("Couldn’t read that · draw it again");
         });
     }, READ_DELAY_MS);
-  }, [cancelRecognition, clearAll, digitCount, onAnswer]);
+  }, [
+    cancelRecognition,
+    clearAll,
+    digitCount,
+    entryMode,
+    onAnswer,
+    onRecognitionRejected,
+    rejectedRecognitionMode,
+  ]);
 
   const beginStroke = (
     index: number,
@@ -270,6 +431,8 @@ export function FlashHandwriting({
     event.preventDefault();
     cancelRecognition();
     setReadout(null);
+    setPendingRecognition(null);
+    setEditingRecognition(false);
     setStatus("");
     const point = pointFromEvent(event.currentTarget, event);
     activePointerRef.current = {
@@ -343,34 +506,106 @@ export function FlashHandwriting({
     <div
       className={styles.root}
       data-digit-count={digitCount}
+      data-entry-mode={entryMode}
       data-has-readout={readout !== null}
     >
       <div className={styles.canvases}>
-        {Array.from({ length: digitCount }, (_, index) => (
-          <canvas
-            key={index}
-            ref={(node) => {
-              canvasRefs.current[index] = node;
-              if (index === 0) focusRef.current = node;
-            }}
-            className={styles.canvas}
-            data-has-ink={hasInk[index]}
-            tabIndex={disabled ? -1 : 0}
-            role="img"
-            aria-label={`Draw answer digit ${index + 1} of ${digitCount}`}
-            onPointerDown={(event) => beginStroke(index, event)}
-            onPointerMove={(event) => moveStroke(index, event)}
-            onPointerUp={(event) => finishStroke(index, event)}
-            onPointerCancel={() => {
-              activePointerRef.current = null;
-            }}
-          />
-        ))}
+        {Array.from({ length: digitCount }, (_, index) => {
+          const canvas = (
+            <canvas
+              ref={(node) => {
+                canvasRefs.current[index] = node;
+                if (index === 0) focusRef.current = node;
+              }}
+              className={styles.canvas}
+              data-has-ink={hasInk[index]}
+              tabIndex={disabled ? -1 : 0}
+              role="img"
+              aria-label={
+                entryMode === "right-aligned"
+                  ? `${PLACE_LABELS[digitCount][index]} answer place. Draw this digit if needed.`
+                  : `Draw answer digit ${index + 1} of ${digitCount}`
+              }
+              onPointerDown={(event) => beginStroke(index, event)}
+              onPointerMove={(event) => moveStroke(index, event)}
+              onPointerUp={(event) => finishStroke(index, event)}
+              onPointerCancel={() => {
+                activePointerRef.current = null;
+              }}
+            />
+          );
+          return entryMode === "right-aligned" ? (
+            <span className={styles.digitSlot} key={index}>
+              {canvas}
+              <span className={styles.placeLabel} aria-hidden="true">
+                {PLACE_LABELS[digitCount][index]}
+              </span>
+            </span>
+          ) : (
+            <span className={styles.exactSlot} key={index}>
+              {canvas}
+            </span>
+          );
+        })}
       </div>
       {readout !== null ? (
         <strong className={styles.readout} aria-hidden="true">
           {readout}
         </strong>
+      ) : null}
+      {pendingRecognition !== null && !disabled ? (
+        <div className={styles.confirmation}>
+          {editingRecognition ? (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                confirmRecognition(correctionValue);
+              }}
+            >
+              <input
+                ref={correctionInputRef}
+                className={styles.correctionInput}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={3}
+                enterKeyHint="done"
+                aria-label="Correct the recognized number. Press Done to submit."
+                value={correctionValue}
+                onChange={(event) =>
+                  setCorrectionValue(
+                    event.currentTarget.value.replace(/\D/g, "").slice(0, 3),
+                  )
+                }
+              />
+            </form>
+          ) : (
+            <>
+              <button
+                type="button"
+                className={styles.confirmButton}
+                disabled={
+                  pendingRecognition.rawRecognition === null ||
+                  !/^(0|[1-9]\d{0,2})$/.test(
+                    pendingRecognition.rawRecognition,
+                  )
+                }
+                onClick={() =>
+                  confirmRecognition(pendingRecognition.rawRecognition ?? "")
+                }
+              >
+                Yes
+              </button>
+              <button
+                type="button"
+                className={styles.changeButton}
+                onClick={() => setEditingRecognition(true)}
+              >
+                Change
+              </button>
+            </>
+          )}
+        </div>
       ) : null}
       <button
         className={styles.clear}

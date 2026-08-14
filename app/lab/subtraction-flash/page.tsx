@@ -2907,6 +2907,14 @@ export default function SubtractionFlashPage() {
                 ))}
               </div>
               <Link
+                className={styles.curriculumLink}
+                href="/lab/subtraction-flash/curriculum/"
+              >
+                <span>Grade 1</span>
+                <strong>Arithmetic curriculum</strong>
+                <small>Build fluency skill by skill</small>
+              </Link>
+              <Link
                 className={styles.analysisLink}
                 href="/lab/subtraction-flash/analysis/"
               >

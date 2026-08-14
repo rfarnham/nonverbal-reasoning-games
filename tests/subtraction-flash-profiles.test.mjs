@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { ADAPTIVE_SUBTRACTION_STORAGE_KEY } from "../app/lab/subtraction-flash/adaptive-storage.ts";
+import { ARITHMETIC_FLUENCY_STORAGE_KEY } from "../lib/arithmetic-fluency/storage.ts";
 import {
   BORROW_FLASH_DEFAULT_PROFILE_ID,
   BORROW_FLASH_MAX_PROFILES,
@@ -174,6 +175,7 @@ test("clear removes only that profile's Flash and adaptive data", () => {
     adapter.setItem(PERFORMANCE_STORAGE_KEY, `${label}-v2`);
     adapter.setItem(PERFORMANCE_LEGACY_STORAGE_KEY, `${label}-v1`);
     adapter.setItem(ADAPTIVE_SUBTRACTION_STORAGE_KEY, `${label}-adaptive`);
+    adapter.setItem(ARITHMETIC_FLUENCY_STORAGE_KEY, `${label}-curriculum`);
     adapter.setItem("unrelated", `${label}-keep`);
   }
 
@@ -185,8 +187,13 @@ test("clear removes only that profile's Flash and adaptive data", () => {
   assert.equal(adaStorage.getItem(PERFORMANCE_STORAGE_KEY), null);
   assert.equal(adaStorage.getItem(PERFORMANCE_LEGACY_STORAGE_KEY), null);
   assert.equal(adaStorage.getItem(ADAPTIVE_SUBTRACTION_STORAGE_KEY), null);
+  assert.equal(adaStorage.getItem(ARITHMETIC_FLUENCY_STORAGE_KEY), null);
   assert.equal(adaStorage.getItem("unrelated"), "ada-keep");
   assert.equal(graceStorage.getItem(PERFORMANCE_STORAGE_KEY), "grace-v2");
+  assert.equal(
+    graceStorage.getItem(ARITHMETIC_FLUENCY_STORAGE_KEY),
+    "grace-curriculum",
+  );
   assert.equal(defaultStorage.getItem(PERFORMANCE_STORAGE_KEY), "default-v2");
 });
 
