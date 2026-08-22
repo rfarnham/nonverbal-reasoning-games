@@ -31,7 +31,10 @@ const performanceAnalysis = await readFile(
 test("Borrow Flash keeps adaptive practice off the launch route", () => {
   assert.doesNotMatch(route, /import \{ AdaptiveSubtractionCurriculum \}/);
   assert.match(route, />\s*Cards\s*</);
-  assert.match(route, />\s*Listen\s*</);
+  assert.match(
+    route,
+    /levelSupportsListening\(selectedLevel\)[\s\S]*?\? ["']Listen["'][\s\S]*?: ["']Listen · B100 only["']/,
+  );
   assert.doesNotMatch(route, /<strong>Adaptive practice<\/strong>/);
   assert.doesNotMatch(route, /<AdaptiveSubtractionCurriculum/);
 });
