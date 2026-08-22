@@ -11,7 +11,8 @@ export type PerformanceGameType =
   | "deck-sprint";
 export type PerformancePresentationMode = "visual" | "listen";
 export type PerformanceOrientation = "horizontal" | "vertical";
-export type PerformanceLevel = "B100" | "B120";
+export const PERFORMANCE_LEVELS = ["B100", "B120", "B140"] as const;
+export type PerformanceLevel = (typeof PERFORMANCE_LEVELS)[number];
 export type PerformanceInputMode = "tap" | "draw" | "trace" | "speak";
 export type PerformanceInputSource =
   | "tap"
@@ -224,7 +225,6 @@ const PRESENTATION_MODES: readonly PerformancePresentationMode[] = [
   "visual",
   "listen",
 ];
-const LEVELS: readonly PerformanceLevel[] = ["B100", "B120"];
 const INPUT_MODES: readonly PerformanceInputMode[] = [
   "tap",
   "draw",
@@ -393,12 +393,21 @@ function isValidPerformanceFact(
       safeMinuend % 10 < safeSubtrahend
     );
   }
+  if (level === "B120") {
+    return (
+      safeMinuend >= 20 &&
+      safeMinuend <= 64 &&
+      safeSubtrahend >= 2 &&
+      safeSubtrahend <= 10 &&
+      (safeSubtrahend === 10 || safeMinuend % 10 < safeSubtrahend)
+    );
+  }
   return (
     safeMinuend >= 20 &&
-    safeMinuend <= 64 &&
-    safeSubtrahend >= 2 &&
-    safeSubtrahend <= 10 &&
-    (safeSubtrahend === 10 || safeMinuend % 10 < safeSubtrahend)
+    safeMinuend <= 99 &&
+    safeSubtrahend >= 10 &&
+    safeSubtrahend <= 89 &&
+    safeMinuend - safeSubtrahend >= 10
   );
 }
 
@@ -431,7 +440,7 @@ export function createPerformanceAttempt(
   assertNonnegativeInteger(input.cardsRemainingAfter, "cardsRemainingAfter");
   assertFiniteNonnegative(input.elapsedMs, "elapsedMs");
   assertFiniteNonnegative(input.sessionElapsedMs, "sessionElapsedMs");
-  if (!LEVELS.includes(input.level)) {
+  if (!PERFORMANCE_LEVELS.includes(input.level)) {
     throw new TypeError("Unknown subtraction level.");
   }
   if (!INPUT_MODES.includes(input.inputMode)) {
@@ -561,7 +570,7 @@ export function createPerformanceSession(
   if (!PRESENTATION_MODES.includes(input.presentationMode)) {
     throw new TypeError("Unknown presentation mode.");
   }
-  if (!LEVELS.includes(input.level)) {
+  if (!PERFORMANCE_LEVELS.includes(input.level)) {
     throw new TypeError("Unknown subtraction level.");
   }
   if (!INPUT_MODES.includes(input.inputMode)) {
@@ -627,7 +636,7 @@ function isPerformanceAttempt(value: unknown): value is PerformanceAttempt {
     isLocalTimestamp(value) &&
     isNonnegativeInteger(value.sessionPosition) &&
     GAME_TYPES.includes(value.gameType as PerformanceGameType) &&
-    LEVELS.includes(value.level as PerformanceLevel) &&
+    PERFORMANCE_LEVELS.includes(value.level as PerformanceLevel) &&
     PRESENTATION_MODES.includes(
       value.presentationMode as PerformancePresentationMode,
     ) &&
@@ -686,7 +695,7 @@ function isSessionStart(value: unknown): value is PerformanceSessionStart {
     isValidEpoch(value.occurredAt) &&
     isLocalTimestamp(value) &&
     GAME_TYPES.includes(value.gameType as PerformanceGameType) &&
-    LEVELS.includes(value.level as PerformanceLevel) &&
+    PERFORMANCE_LEVELS.includes(value.level as PerformanceLevel) &&
     PRESENTATION_MODES.includes(
       value.presentationMode as PerformancePresentationMode,
     ) &&

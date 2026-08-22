@@ -51,7 +51,7 @@ test("the fact catalogue contains exactly the 36 borrow-required facts", () => {
 });
 
 test("B120 adds harder borrowing facts through 64 and occasional minus ten", () => {
-  assert.deepEqual(SUBTRACTION_LEVELS, ["B100", "B120"]);
+  assert.deepEqual(SUBTRACTION_LEVELS, ["B100", "B120", "B140"]);
   assert.equal(SUBTRACTION_FACTS_BY_LEVEL.B100, SUBTRACTION_FACTS);
 
   const facts = subtractionFactsForLevel("B120");
@@ -77,6 +77,100 @@ test("B120 adds harder borrowing facts through 64 and occasional minus ten", () 
   );
   assert.equal(requiresBorrow(64, 9), true);
   assert.equal(requiresBorrow(64, 10), false);
+});
+
+test("B140 is a compact, balanced two-digit subtraction catalogue", () => {
+  const config = SUBTRACTION_LEVEL_CONFIG.B140;
+  const facts = subtractionFactsForLevel("B140");
+
+  assert.deepEqual(config, {
+    label: "B140",
+    minuendMin: 20,
+    minuendMax: 99,
+    subtrahendMin: 10,
+    subtrahendMax: 89,
+    answerDigits: 2,
+    includesTenReview: false,
+    visualCopies: 1,
+    listenCopies: 1,
+  });
+  assert.equal(facts.length, 64);
+  assert.equal(new Set(facts.map((fact) => fact.factKey)).size, facts.length);
+
+  const borrowFacts = facts.filter((fact) =>
+    requiresBorrow(fact.minuend, fact.subtrahend),
+  );
+  assert.equal(borrowFacts.length, 32);
+  assert.equal(facts.length - borrowFacts.length, 32);
+
+  for (const fact of facts) {
+    assert.equal(fact.level, "B140");
+    assert.ok(fact.minuend >= 20 && fact.minuend <= 99);
+    assert.ok(fact.subtrahend >= 10 && fact.subtrahend <= 89);
+    assert.equal(fact.answer, fact.minuend - fact.subtrahend);
+    assert.ok(fact.answer >= 10 && fact.answer <= 89);
+  }
+
+  for (let decade = 2; decade <= 9; decade += 1) {
+    assert.equal(
+      facts.filter(
+        (fact) => Math.floor(fact.minuend / 10) === decade,
+      ).length,
+      8,
+    );
+  }
+
+  assert.equal(Math.min(...facts.map((fact) => fact.minuend)), 20);
+  assert.equal(Math.max(...facts.map((fact) => fact.minuend)), 99);
+  assert.equal(Math.min(...facts.map((fact) => fact.subtrahend)), 10);
+  assert.equal(Math.max(...facts.map((fact) => fact.subtrahend)), 89);
+  assert.equal(Math.min(...facts.map((fact) => fact.answer)), 10);
+  assert.equal(Math.max(...facts.map((fact) => fact.answer)), 89);
+  assert.equal(requiresBorrow(74, 29), true);
+  assert.equal(requiresBorrow(74, 21), false);
+});
+
+test("B140 decks ask each fact once per cycle with deterministic spacing", () => {
+  for (const mode of ["visual", "listen"]) {
+    const first = createBaseDeck(mode, {
+      level: "B140",
+      cycle: 1,
+      random: createSeededRandom(1_140),
+    });
+    const repeated = createBaseDeck(mode, {
+      level: "B140",
+      cycle: 1,
+      random: createSeededRandom(1_140),
+    });
+
+    assert.equal(first.length, 64);
+    assert.equal(new Set(first.map((card) => card.factKey)).size, 64);
+    assert.deepEqual(
+      first.map((card) => card.id),
+      repeated.map((card) => card.id),
+    );
+    assertFactSpacing(first);
+  }
+});
+
+test("finite B140 decks finish after exactly one compact catalogue", () => {
+  const deck = createSubtractionDeck({
+    level: "B140",
+    mode: "visual",
+    repeat: false,
+    random: createSeededRandom(14_064),
+  });
+  let count = 0;
+
+  while (!deck.snapshot().exhausted) {
+    const draw = deck.next();
+    assert.equal(draw.baseDeckSize, 64);
+    count += 1;
+    deck.recordOutcome(draw.card, { correct: true, elapsedMs: 900 });
+  }
+
+  assert.equal(count, 64);
+  assert.equal(deck.snapshot().cycle, 1);
 });
 
 test("B120 uses one shuffled card per fact and balances layouts over cycles", () => {

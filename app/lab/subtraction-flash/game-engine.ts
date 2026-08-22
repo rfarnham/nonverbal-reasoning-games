@@ -4,7 +4,7 @@ export const REVIEW_SPACING = 4;
 export const ANSWER_VALUES = [2, 3, 4, 5, 6, 7, 8, 9] as const;
 export const VISUAL_ORIENTATIONS = ["horizontal", "vertical"] as const;
 export const LISTEN_COPIES = 3;
-export const SUBTRACTION_LEVELS = ["B100", "B120"] as const;
+export const SUBTRACTION_LEVELS = ["B100", "B120", "B140"] as const;
 
 export type AnswerValue = (typeof ANSWER_VALUES)[number];
 export type SubmittedAnswer = number;
@@ -47,6 +47,17 @@ export const SUBTRACTION_LEVEL_CONFIG: Readonly<
     subtrahendMax: 10,
     answerDigits: 2,
     includesTenReview: true,
+    visualCopies: 1,
+    listenCopies: 1,
+  }),
+  B140: Object.freeze({
+    label: "B140",
+    minuendMin: 20,
+    minuendMax: 99,
+    subtrahendMin: 10,
+    subtrahendMax: 89,
+    answerDigits: 2,
+    includesTenReview: false,
     visualCopies: 1,
     listenCopies: 1,
   }),
@@ -126,9 +137,95 @@ export function requiresBorrow(minuend: number, subtrahend: number): boolean {
     Number.isInteger(subtrahend) &&
     minuend >= 11 &&
     subtrahend >= 2 &&
-    subtrahend <= 10 &&
     minuend > subtrahend &&
     minuend % 10 < subtrahend % 10
+  );
+}
+
+/**
+ * B140 deliberately uses a compact, authored fact catalogue rather than the
+ * several thousand mathematically valid two-digit subtraction facts. The 64
+ * pairs cover every minuend decade, contain 32 borrow and 32 non-borrow facts,
+ * and include both ends of each configured operand/result range.
+ */
+const B140_OPERAND_PAIRS = [
+  [20, 10],
+  [21, 10],
+  [22, 11],
+  [23, 11],
+  [24, 12],
+  [25, 13],
+  [28, 14],
+  [29, 13],
+  [30, 14],
+  [31, 12],
+  [32, 18],
+  [33, 23],
+  [36, 12],
+  [37, 18],
+  [38, 25],
+  [39, 25],
+  [40, 22],
+  [41, 11],
+  [43, 32],
+  [44, 28],
+  [45, 23],
+  [46, 17],
+  [47, 22],
+  [48, 19],
+  [50, 10],
+  [52, 35],
+  [53, 25],
+  [54, 31],
+  [55, 30],
+  [56, 37],
+  [57, 18],
+  [59, 36],
+  [61, 15],
+  [62, 31],
+  [63, 36],
+  [64, 21],
+  [65, 16],
+  [66, 48],
+  [68, 19],
+  [69, 47],
+  [70, 47],
+  [71, 41],
+  [72, 31],
+  [73, 28],
+  [74, 29],
+  [75, 18],
+  [76, 19],
+  [79, 44],
+  [81, 49],
+  [82, 36],
+  [83, 56],
+  [84, 56],
+  [85, 22],
+  [87, 17],
+  [88, 29],
+  [89, 23],
+  [90, 77],
+  [91, 56],
+  [92, 11],
+  [93, 17],
+  [94, 67],
+  [96, 78],
+  [99, 10],
+  [99, 89],
+] as const satisfies readonly (readonly [number, number])[];
+
+function createB140Facts(
+  config: SubtractionLevelConfig,
+): readonly SubtractionFact[] {
+  return Object.freeze(
+    B140_OPERAND_PAIRS.map(([minuend, subtrahend]) => ({
+      level: config.label,
+      factKey: `${minuend}-${subtrahend}`,
+      minuend,
+      subtrahend,
+      answer: minuend - subtrahend,
+    })),
   );
 }
 
@@ -163,6 +260,7 @@ export const SUBTRACTION_FACTS_BY_LEVEL: Readonly<
 > = Object.freeze({
   B100: createFacts(SUBTRACTION_LEVEL_CONFIG.B100),
   B120: createFacts(SUBTRACTION_LEVEL_CONFIG.B120),
+  B140: createB140Facts(SUBTRACTION_LEVEL_CONFIG.B140),
 });
 
 /** The original catalogue remains a B100 alias for older callers. */

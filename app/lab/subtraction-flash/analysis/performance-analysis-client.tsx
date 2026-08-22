@@ -23,6 +23,7 @@ import {
   type NormalizedPerformanceAttempt,
 } from "../performance-analytics";
 import {
+  PERFORMANCE_LEVELS,
   loadPerformanceLogDiagnostic,
   type PerformanceInputMode,
   type PerformanceLevel,
@@ -67,9 +68,9 @@ const DEFAULT_FILTERS: FilterState = {
 const DAY_MS = 24 * 60 * 60 * 1_000;
 const MINUENDS = [
   ...Array.from({ length: 8 }, (_, index) => index + 11),
-  ...Array.from({ length: 45 }, (_, index) => index + 20),
+  ...Array.from({ length: 80 }, (_, index) => index + 20),
 ];
-const SUBTRAHENDS = [2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
+const SUBTRAHENDS = Array.from({ length: 88 }, (_, index) => index + 2);
 
 function ArrowLeftIcon() {
   return (
@@ -741,8 +742,9 @@ export function PerformanceAnalysisClient() {
                     onChange={(event) => updateFilter("level", event.target.value as LevelFilter)}
                   >
                     <option value="all">All levels</option>
-                    <option value="B100">B100</option>
-                    <option value="B120">B120</option>
+                    {PERFORMANCE_LEVELS.map((level) => (
+                      <option key={level} value={level}>{level}</option>
+                    ))}
                   </select>
                 </label>
                 <label>

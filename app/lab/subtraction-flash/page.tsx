@@ -202,6 +202,14 @@ const SESSION_DESCRIPTIONS: Record<SessionMode, string> = {
   "deck-sprint": "Finish one shuffled deck",
 };
 
+function levelSupportsListening(level: SubtractionLevel): boolean {
+  return level === "B100";
+}
+
+function levelSupportsTrace(level: SubtractionLevel): boolean {
+  return level === "B100";
+}
+
 function profileMutationCanWrite(status: string): boolean {
   return ![
     "corrupt",
@@ -932,7 +940,7 @@ function speechErrorMessage(
   }
   return {
     kind: "retry",
-    message: "Didn’t hear 2–9",
+    message: "Didn’t hear the answer",
     transcript: null,
   };
 }
@@ -1080,7 +1088,7 @@ function SpeechAnswer({
           if (!result?.isFinal || !transcript) continue;
           setSpeechState({
             kind: "listening",
-            message: "Say one digit, 2–9",
+            message: "Say the answer",
             transcript,
           });
           break;
@@ -1091,7 +1099,7 @@ function SpeechAnswer({
         if (recognitionToken !== token || !acceptingRef.current) return;
         setSpeechState({
           kind: "listening",
-          message: "Say one digit, 2–9",
+          message: "Say the answer",
           transcript: null,
         });
       };
@@ -1567,6 +1575,7 @@ export default function SubtractionFlashPage() {
       if (!soundEnabledRef.current || round.selectedAnswer !== null) return;
 
       const cueId = subtractionNarrationCueId(round.draw.card);
+      const promptTranscript = `${round.draw.card.minuend} minus ${round.draw.card.subtrahend}`;
       speechAnswerGate.beginPrompt(
         speechAnswerRoundId(
           sessionIdRef.current,
@@ -1574,7 +1583,7 @@ export default function SubtractionFlashPage() {
           round.draw.card.id,
           round.attemptOrdinal,
         ),
-        SUBTRACTION_QUESTION_NARRATION.clips[cueId].transcript,
+        promptTranscript,
       );
       const playbackToken = playbackTokenRef.current + 1;
       playbackTokenRef.current = playbackToken;
@@ -1975,7 +1984,12 @@ export default function SubtractionFlashPage() {
   const handleAnswerModeChange = useCallback(
     (nextMode: AnswerMode) => {
       if (sessionPhaseRef.current !== "choosing") return;
-      if (selectedLevelRef.current === "B120" && nextMode === "trace") return;
+      if (
+        !levelSupportsTrace(selectedLevelRef.current) &&
+        nextMode === "trace"
+      ) {
+        return;
+      }
       if (nextMode === "speak") primeMicrophonePermission();
       selectedAnswerModeRef.current = nextMode;
       setAnswerMode(nextMode);
@@ -1993,11 +2007,13 @@ export default function SubtractionFlashPage() {
       }
       selectedLevelRef.current = nextLevel;
       setSelectedLevel(nextLevel);
-      if (nextLevel === "B120") {
+      if (!levelSupportsListening(nextLevel)) {
         if (modeRef.current === "listen") {
           modeRef.current = "visual";
           setMode("visual");
         }
+      }
+      if (!levelSupportsTrace(nextLevel)) {
         if (selectedAnswerModeRef.current === "trace") {
           selectedAnswerModeRef.current = null;
           setAnswerMode(null);
@@ -2102,7 +2118,12 @@ export default function SubtractionFlashPage() {
       stopSpeaking();
 
       const activeMode = modeRef.current;
-      if (chosenLevel === "B120" && activeMode === "listen") return;
+      if (!levelSupportsListening(chosenLevel) && activeMode === "listen") {
+        return;
+      }
+      if (!levelSupportsTrace(chosenLevel) && chosenAnswerMode === "trace") {
+        return;
+      }
       const now = performance.now();
       const pauseReasons = pauseReasonsRef.current;
       pauseReasons.clear();
@@ -2198,7 +2219,8 @@ export default function SubtractionFlashPage() {
       if (
         nextMode === modeRef.current ||
         sessionPhaseRef.current !== "choosing" ||
-        (selectedLevelRef.current === "B120" && nextMode === "listen")
+        (!levelSupportsListening(selectedLevelRef.current) &&
+          nextMode === "listen")
       ) {
         return;
       }
@@ -2837,11 +2859,21 @@ export default function SubtractionFlashPage() {
                       className={styles.setupOption}
                       type="button"
                       aria-pressed={mode === "listen"}
-                      disabled={!interactionReady || selectedLevel === "B120"}
+                      aria-label={
+                        levelSupportsListening(selectedLevel)
+                          ? "Listen"
+                          : "Listen — B100 only"
+                      }
+                      disabled={
+                        !interactionReady ||
+                        !levelSupportsListening(selectedLevel)
+                      }
                       onClick={() => handleModeChange("listen")}
                     >
                       <SpeakerIcon />
-                      Listen
+                      {levelSupportsListening(selectedLevel)
+                        ? "Listen"
+                        : "Listen · B100 only"}
                     </button>
                   </div>
                 </fieldset>
@@ -2872,11 +2904,20 @@ export default function SubtractionFlashPage() {
                       className={styles.setupOption}
                       type="button"
                       aria-pressed={answerMode === "trace"}
-                      disabled={!interactionReady || selectedLevel === "B120"}
+                      aria-label={
+                        levelSupportsTrace(selectedLevel)
+                          ? "Trace"
+                          : "Trace — B100 only"
+                      }
+                      disabled={
+                        !interactionReady || !levelSupportsTrace(selectedLevel)
+                      }
                       onClick={() => handleAnswerModeChange("trace")}
                     >
                       <TraceIcon />
-                      Trace
+                      {levelSupportsTrace(selectedLevel)
+                        ? "Trace"
+                        : "Trace · B100 only"}
                     </button>
                     <button
                       className={styles.setupOption}

@@ -10,8 +10,12 @@ import {
   normalizePerformanceAttempts,
 } from "../app/lab/subtraction-flash/performance-analytics.ts";
 import {
+  createBorrowFlashProfileStorage,
+} from "../app/lab/subtraction-flash/borrow-flash-profiles.ts";
+import {
   PERFORMANCE_SCHEMA_VERSION,
   PERFORMANCE_LEGACY_STORAGE_KEY,
+  PERFORMANCE_LEVELS,
   PERFORMANCE_STORAGE_KEY,
   appendPerformanceAttempt,
   createPerformanceAttempt,
@@ -31,6 +35,10 @@ class MemoryStorage {
 
   setItem(key, value) {
     this.values.set(key, String(value));
+  }
+
+  removeItem(key) {
+    this.values.delete(key);
   }
 }
 
@@ -458,6 +466,126 @@ test("B120 accepts borrowing facts through 64 and the explicit minus-ten excepti
       cardId: "visual:1:64-2:1",
     }),
     /selected level/,
+  );
+});
+
+test("B140 accepts two-digit operands and answers with and without borrowing", () => {
+  assert.deepEqual(PERFORMANCE_LEVELS, ["B100", "B120", "B140"]);
+  for (const fact of [
+    { minuend: 99, subtrahend: 10 },
+    { minuend: 84, subtrahend: 32 },
+    { minuend: 82, subtrahend: 47 },
+    { minuend: 99, subtrahend: 89 },
+    { minuend: 20, subtrahend: 10 },
+  ]) {
+    const expectedAnswer = fact.minuend - fact.subtrahend;
+    const accepted = coreAttempt({
+      level: "B140",
+      ...fact,
+      expectedAnswer,
+      submittedAnswer: expectedAnswer,
+      factKey: `${fact.minuend}-${fact.subtrahend}`,
+      cardId: `visual:1:${fact.minuend}-${fact.subtrahend}:1`,
+    });
+    assert.equal(accepted.level, "B140");
+    assert.equal(accepted.expectedAnswer, expectedAnswer);
+  }
+
+  for (const fact of [
+    { minuend: 19, subtrahend: 10 },
+    { minuend: 100, subtrahend: 10 },
+    { minuend: 82, subtrahend: 9 },
+    { minuend: 99, subtrahend: 99 },
+    { minuend: 78, subtrahend: 82 },
+    { minuend: 82, subtrahend: 73 },
+  ]) {
+    const expectedAnswer = fact.minuend - fact.subtrahend;
+    assert.throws(
+      () => coreAttempt({
+        level: "B140",
+        ...fact,
+        expectedAnswer,
+        submittedAnswer: expectedAnswer,
+        factKey: `${fact.minuend}-${fact.subtrahend}`,
+        cardId: `visual:1:${fact.minuend}-${fact.subtrahend}:1`,
+      }),
+      /selected level/,
+    );
+  }
+});
+
+test("B140 logs and analysis remain isolated to the selected profile", () => {
+  const deviceStorage = new MemoryStorage();
+  const firstProfile = createBorrowFlashProfileStorage(
+    "profile-first1234",
+    deviceStorage,
+  );
+  const secondProfile = createBorrowFlashProfileStorage(
+    "profile-second123",
+    deviceStorage,
+  );
+  assert.ok(firstProfile);
+  assert.ok(secondProfile);
+
+  const session = createPerformanceSession({
+    sessionId: "same-session-id",
+    gameType: "deck-sprint",
+    level: "B140",
+    presentationMode: "visual",
+    inputMode: "tap",
+    baseDeckSize: 64,
+    startedAt: BASE_TIME,
+  });
+  assert.equal(startPerformanceSession(session, firstProfile).ok, true);
+  assert.equal(startPerformanceSession(session, secondProfile).ok, true);
+
+  const firstAttempt = coreAttempt({
+    id: "same-attempt-id",
+    sessionId: session.sessionId,
+    gameType: session.gameType,
+    level: "B140",
+    minuend: 84,
+    subtrahend: 32,
+    expectedAnswer: 52,
+    submittedAnswer: 52,
+    factKey: "84-32",
+    cardId: "B140:visual:1:84-32:horizontal",
+  });
+  const secondAttempt = coreAttempt({
+    id: "same-attempt-id",
+    sessionId: session.sessionId,
+    gameType: session.gameType,
+    level: "B140",
+    minuend: 82,
+    subtrahend: 47,
+    expectedAnswer: 35,
+    submittedAnswer: 34,
+    correct: false,
+    factKey: "82-47",
+    cardId: "B140:visual:1:82-47:horizontal",
+  });
+  assert.equal(appendPerformanceAttempt(firstAttempt, firstProfile).ok, true);
+  assert.equal(appendPerformanceAttempt(secondAttempt, secondProfile).ok, true);
+
+  const firstRows = loadPerformanceLogDiagnostic(firstProfile).log?.attempts ?? [];
+  const secondRows = loadPerformanceLogDiagnostic(secondProfile).log?.attempts ?? [];
+  assert.deepEqual(firstRows.map(({ factKey }) => factKey), ["84-32"]);
+  assert.deepEqual(secondRows.map(({ factKey }) => factKey), ["82-47"]);
+  assert.equal(deviceStorage.getItem(PERFORMANCE_STORAGE_KEY), null);
+
+  assert.deepEqual(
+    filterPerformanceAttempts(normalizePerformanceAttempts(firstRows), {
+      levels: ["B140"],
+      minuends: [84],
+      subtrahends: [32],
+    }).map(({ factKey }) => factKey),
+    ["84-32"],
+  );
+  assert.equal(
+    filterPerformanceAttempts(normalizePerformanceAttempts(firstRows), {
+      levels: ["B120"],
+    }).length,
+    0,
   );
 });
 

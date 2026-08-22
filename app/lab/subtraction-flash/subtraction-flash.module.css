@@ -112,7 +112,7 @@
 .levelSwitch {
   width: fit-content;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 4px;
   justify-self: center;
   padding: 4px;
@@ -2304,6 +2304,17 @@
 
   .topbarActions {
     gap: 5px;
+  }
+
+  .levelSwitch {
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .levelButton {
+    min-width: 0;
+    padding-inline: 7px;
+    font-size: 0.78rem;
   }
 
   .profileList {
