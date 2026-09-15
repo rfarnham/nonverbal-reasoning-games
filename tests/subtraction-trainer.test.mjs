@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { advance, beginSession, createPlan, currentProblem, difficultyWeights, explain, features, fingerprint, freshProgress, meetsTarget,
+import { advance, beginSession, createPlan, canFinishEarly, finishEarly, currentProblem, difficultyWeights, explain, features, fingerprint, freshProgress, meetsTarget,
   recordAnswer, retryAnswer, TIERS, TIER_INFO, validProblem } from "../app/lab/subtraction-trainer/engine.ts";
 import { loadProgress, parseProgress, saveProgress, STORAGE_KEY } from "../app/lab/subtraction-trainer/storage.ts";
-import { answerSlots, columnCenter, inkRegion } from "../app/lab/subtraction-trainer/ink.ts";
+import { answerSlots, columnCenter, inkRegion, readyToRead } from "../app/lab/subtraction-trainer/ink.ts";
 
 const now = 1700000000000;
 const fast = { elapsedMs: 1500, firstInkMs: 700, recognitionMs: 600, scratch: false, reliable: true };
@@ -156,4 +156,76 @@ test("scratch ink is excluded and answer slots support any right-aligned answer 
   assert.equal(answerSlots([stroke(-1)], 3), null);
   assert.equal(inkRegion({ x: columnCenter(0, 3), y: 100 }, 3), -1);
   assert.equal(inkRegion({ x: columnCenter(2, 3), y: 300 }, 3), 2);
+});
+
+test("stars reward each solved question once, including a correct retry, without changing accuracy", () => {
+  let p = beginSession(freshProgress(), 1, "practice", now);
+  const q = currentProblem(p.active);
+  p = recordAnswer(p, q.top - q.bottom + 1, fast, now);
+  assert.equal(p.stars, 0);
+  p = recordAnswer(retryAnswer(p), q.top - q.bottom, fast, now);
+  assert.equal(p.stars, 1);
+  assert.equal(p.history[0].correct, false);
+  assert.equal(recordAnswer(p, q.top - q.bottom, fast, now).stars, 1);
+  p = advance(p, now, true);
+  p = recordAnswer(p, q.top - q.bottom, fast, now);
+  assert.equal(p.stars, 1, "redemption does not award the same question twice");
+  p = advance(p, now);
+  p = finishSession(beginSession(p, 1, "practice", now));
+  assert.equal(p.stars, 17, "a new practice can earn stars");
+  assert.equal(parseProgress(JSON.stringify(p)).stars, 17);
+});
+test("every fifth solved question crosses exactly one celebration milestone", () => {
+  let p = beginSession(freshProgress(), 1, "practice", now), milestones = [];
+  for (let i = 1; i <= 16; i++) {
+    p = solve(p);
+    if (p.stars % 5 === 0) milestones.push(p.stars);
+  }
+  assert.deepEqual(milestones, [5, 10, 15]);
+  assert.equal(p.stars, 16);
+});
+test("legacy saves retain learning records and safely initialize stars", () => {
+  let p = beginSession(freshProgress(), 1, "practice", now);
+  p = solve(p);
+  const legacy = structuredClone(p);
+  delete legacy.stars; delete legacy.active.starred;
+  const restored = parseProgress(JSON.stringify(legacy));
+  assert.equal(restored.stars, 0);
+  assert.deepEqual(restored.active.starred, [p.active.plan[0].id]);
+  assert.deepEqual(restored.history, p.history);
+  assert.equal(restored.active.index, 1);
+  assert.equal(solve(restored).stars, 1);
+  for (const value of [-1, 1.5, "5", null]) {
+    const bad = structuredClone(p); bad.stars = value;
+    assert.equal(parseProgress(JSON.stringify(bad)), null);
+  }
+  const bad = structuredClone(p); bad.active.starred.push("not-a-question");
+  assert.equal(parseProgress(JSON.stringify(bad)), null);
+});
+test("pausing between auto-advanced questions can finish without scoring the untouched one", () => {
+  let p = beginSession(freshProgress(), 1, "practice", now);
+  assert.equal(canFinishEarly(p.active), false);
+  assert.equal(finishEarly(p, now), p);
+  p = solve(p, { wrongAt: 0 });
+  assert.equal(canFinishEarly(p.active), true);
+  p = finishEarly(p, now);
+  assert.equal(p.active.review.length, 1);
+  p = solve(p);
+  assert.equal(p.active.complete, true);
+  assert.equal(p.history.length, 1);
+  assert.equal(p.stars, 1);
+  assert.equal(p.unlocked, 1);
+  assert.deepEqual(parseProgress(JSON.stringify(p)), p);
+});
+test("auto-read waits for complete columns in either writing direction and ignores scratch ink", () => {
+  const ink = (...columns) => columns.map(region => ({ region, points: [{ x: 180, y: 300 }] }));
+  assert.equal(readyToRead(ink(-1), 1, 1), false);
+  assert.equal(readyToRead(ink(-1, 0), 1, 1), true);
+  assert.equal(readyToRead(ink(2), 3, 3), false, "ones alone must never submit a three-digit answer");
+  assert.equal(readyToRead(ink(2, 1), 3, 3), false);
+  assert.equal(readyToRead(ink(2, 1, 0), 3, 3), true);
+  assert.equal(readyToRead(ink(0, 1), 3, 3), false);
+  assert.equal(readyToRead(ink(0, 2), 3, 3), false);
+  assert.equal(readyToRead(ink(0, 1, 2), 3, 3), true);
+  assert.equal(readyToRead(ink(2), 3, 1), true, "short right-aligned answers remain valid");
 });

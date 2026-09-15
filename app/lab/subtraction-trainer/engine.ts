@@ -33,6 +33,7 @@ export interface Session {
   lastAnswer: number | null; startedAt: number; activeMs: number;
   complete: boolean; promoted: boolean;
   ink: Stroke[];
+  starred: string[];
 }
 export interface Summary {
   id: number; tier: Tier; kind: Session["kind"]; at: number; correct: number;
@@ -41,11 +42,12 @@ export interface Summary {
 export interface Progress {
   version: 1; name: string; seed: number; nextId: number; unlocked: Tier;
   mastered: Tier[]; history: Attempt[]; summaries: Summary[]; active: Session | null;
+  stars: number;
 }
 
 export function freshProgress(seed = 817263): Progress {
   return { version: 1, name: "Player", seed: seed >>> 0, nextId: 1,
-    unlocked: 1, mastered: [], history: [], summaries: [], active: null };
+    unlocked: 1, mastered: [], history: [], summaries: [], active: null, stars: 0 };
 }
 export function randomSource(seed: number): () => number {
   let value = seed >>> 0;
@@ -203,7 +205,7 @@ export function beginSession(progress: Progress, tier: Tier, kind: Session["kind
   const plan = createPlan(progress, tier, kind, now);
   return { ...progress, nextId: progress.nextId + 1, active: {
     id: progress.nextId, tier, kind, plan, index: 0, phase: "answer", results: [], review: null,
-    reviewIndex: 0, lastAnswer: null, startedAt: now, activeMs: 0, complete: false, promoted: false, ink: [],
+    reviewIndex: 0, lastAnswer: null, startedAt: now, activeMs: 0, complete: false, promoted: false, ink: [], starred: [],
   } };
 }
 export function currentProblem(s: Session): Problem {
@@ -224,9 +226,13 @@ export function recordAnswer(progress: Progress, answer: number, evidence: Evide
   const problem = currentProblem(s);
   const correct = answer === problem.top - problem.bottom;
   const first = !s.review && !s.results.some(a => a.problem.id === problem.id);
+  // Solving after a mistake earns a star too. Redemption and duplicate callbacks
+  // cannot award a second star for the same question in this session.
+  const award = correct && !s.starred.includes(problem.id);
   const attempt: Attempt = { ...evidence, problem, answer, correct, at, sessionId: s.id };
-  return { ...progress, history: first ? [...progress.history, attempt].slice(-2000) : progress.history,
+  return { ...progress, stars: progress.stars + Number(award), history: first ? [...progress.history, attempt].slice(-2000) : progress.history,
     active: { ...s, phase: correct ? "correct" : "wrong", lastAnswer: answer,
+      starred: award ? [...s.starred, problem.id] : s.starred,
       results: first ? [...s.results, attempt] : s.results } };
 }
 export function retryAnswer(progress: Progress): Progress {
@@ -263,6 +269,18 @@ export function advance(progress: Progress, at: number, endEarly = false): Progr
 export function addActiveTime(progress: Progress, ms: number): Progress {
   if (!progress.active || progress.active.complete || !Number.isFinite(ms) || ms < 0) return progress;
   return { ...progress, active: { ...progress.active, activeMs: progress.active.activeMs + ms } };
+}
+/** A pause can end between questions without recording the untouched next one. */
+export function canFinishEarly(s: Session): boolean {
+  return !s.complete && !s.review && (s.phase === "correct" ||
+    (s.phase === "answer" && s.index > 0 && s.results.length === s.index));
+}
+export function finishEarly(progress: Progress, at: number): Progress {
+  const s = progress.active;
+  if (!s || !canFinishEarly(s)) return progress;
+  if (s.phase === "correct") return advance(progress, at, true);
+  const index = s.index - 1, p = s.plan[index];
+  return advance({ ...progress, active: { ...s, index, phase: "correct", lastAnswer: p.top - p.bottom, ink: [] } }, at, true);
 }
 /** Only exact local relations are described; errors are never diagnosed from one guess. */
 export function explain(p: Problem): string[] {

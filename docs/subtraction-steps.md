@@ -48,35 +48,56 @@ stroke is associated with scratch space or an answer column. A stroke that
 crosses region boundaries becomes scratch ink. Digit recognition receives only
 strokes from the chosen answer column, never printed text or scratch marks.
 
-The learner writes right-aligned answers, in either direction, and taps Check.
-An explicit readback confirms the recognized number before arithmetic is
-evaluated. Rejecting a readback redraws the answer without scoring a math error.
-The interface has no typed, traced, spoken, or multiple-choice answer mode.
+The child sees the vertical question, a small lifetime star total, Pause, and
+an eraser. Titles, tier labels, progress bars, instructions, parent reports,
+and navigation are kept off the active practice screen. Pause exposes session
+details and an early-finish action between solved questions.
+
+The learner writes right-aligned answers, in either direction. Like Borrow
+Flash, recognition starts 560 ms after the last pen lift; there are no Check,
+confirmation, or Next buttons. It waits until the required number of answer
+columns have ink, so thinking between columns cannot submit an unfinished
+answer. An unfinished answer gets a short “Keep going” cue after two seconds,
+without recording a math error. Only completion uses the calculated answer length; glyph recognition
+never receives the expected digits. The visible answer boxes retain their
+fixed tier width. Low-confidence readings clear only the answer and ask for a
+redraw, without scoring a math error. Starting another stroke invalidates any
+pending read. The interface has no typed, traced, spoken, or choice answer mode.
 
 Response time runs from the fully rendered question to the final answer pen
 lift. It includes thinking and any notes made before completing the answer, but
-excludes Check/confirmation taps and recognition processing. First-ink and
+excludes the handwriting debounce, recognition processing, and transitions. First-ink and
 recognition durations are also retained. Pauses, backgrounding, reloads,
 rejected recognition, and low-confidence readings exclude the response from a
 speed gate. The same question remains answerable. Recognition has bounded
-timeouts and recoverable errors. No answer-aware recognition heuristic is used.
+timeouts and recoverable errors. The recognized number is never changed to match the expected answer.
 
 Borrow marks are permitted, counted in writing time, and never independently
 invalidate a gate. Parent reporting includes how often scratch ink occurred.
 Scratch ink does not diagnose a particular strategy.
 
-Correct answers play the shared earcon, show the result with ordered column
-steps, and focus Next. Incorrect answers identify the differing columns and
-show the correct calculation, then allow Try again after 2.2 seconds (1.3 with
-reduced motion). Input locks during feedback. Reduced motion removes step
-transitions. The same sound preference and local audio helper are used across
-the suite.
+Correct answers play the shared earcon, briefly show a check, and advance after
+320 ms. Incorrect answers identify the differing columns and the recognized
+number, then automatically clear the answer for retry after 2.2 seconds (1.3
+with reduced motion), preserving borrow marks. Full column explanations remain
+in historical review. Input locks during feedback; pausing or backgrounding
+cancels pending recognition and advancement until practice resumes.
+
+Each newly solved question earns one decorative star, including a successful
+retry. Redemption of that same question cannot award another. Every fifth star
+shows five small stars for 950 ms before automatically advancing. The cadence
+continues across sessions, and reduced motion shows a static celebration for
+the same duration. Stars do not affect gates, timing, accuracy, or difficulty.
+The same sound preference and local audio helper are used across the suite.
 
 ## Persistence and review
 
 `spatial-gym:subtraction-trainer:v1` stores one named learner, seed, mastery,
 active plan, cursor, ink, first responses, review queue, active practice time,
-the latest 2,000 first attempts, and the latest 40 session summaries. Saves
+a lifetime star count, per-session awarded question IDs, the latest 2,000 first
+attempts, and the latest 40 session summaries. Existing saves migrate in place
+with zero initial stars, preserving all learning records and avoiding replay
+awards for already-solved questions. Saves
 occur on completed strokes, answers, transitions, every five active seconds,
 and page hiding. Reload restores the exact problem and review position, pauses
 play, and makes the interrupted response ineligible for timing.
@@ -104,8 +125,8 @@ mean and total time can be compared with real worksheet performance.
 
 The reported practice reference, 90 questions in 10 minutes, implies about
 6.67 seconds per question overall. The seven-second gate is an intermediate
-training target, not a claim of worksheet readiness. The app's confirmations,
-feedback, question distribution, and transitions differ from paper. These are
+training target, not a claim of worksheet readiness. The app's
+feedback, question distribution, and automatic transitions differ from paper. These are
 practice measurements, not validated cognitive or diagnostic scores.
 
 ## Scope decisions
@@ -114,7 +135,10 @@ The direct product brief defines this lab's five tiers, timed fluency gates,
 draw-only answers, and purposeful repeated practice. These are explicit
 exceptions to the general game suite's four difficulties, Campaign/Infinite
 structure, non-repeating sessions, and non-fine-motor answer alternative.
-Navigation and controls still support keyboard focus and activation. The lab
+The later product decision explicitly replaces deliberate per-answer controls
+with automatic submission, retry, and advancement, and hides the shared top
+bar during active practice. Navigation and controls still support keyboard
+focus and activation. The lab
 is linked from the homepage and README, without registering as a Journey game.
 
 ## Validation
@@ -122,7 +146,8 @@ is linked from the homepage and README, without registering as a Journey game.
 - `tests/subtraction-trainer.test.mjs`: 400 seeded sessions per tier, 32,000
   questions, all five tiers, borrowing arithmetic, advancement boundaries,
   retry invariance, redemption, repeat mastery, benchmarking, storage failure
-  and resume cases, and scratch/answer isolation.
+  and resume cases, scratch/answer isolation, incomplete-column waiting, star
+  award idempotence, legacy save migration, and paused early completion.
 - `tests/static-export.test.mjs`: refresh-safe exported route and home link.
 - Browser QA: actual drawn digits through the local model, scratch exclusion,
   one- and three-digit answers, incorrect feedback and retry, redemption,

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createGameAudioContext, playFeedbackEarcon, readSoundPreference, writeSoundPreference } from "@/lib/game-audio";
 import { warmDigitRecognizer } from "../subtraction-flash/digit-recognition";
-import { addActiveTime, advance, beginSession, currentProblem, differenceFeedback, explain, features, freshProgress,
+import { addActiveTime, advance, beginSession, canFinishEarly, finishEarly, currentProblem, differenceFeedback, explain, features, freshProgress,
   PATTERN_NAMES, recordAnswer, retryAnswer, TIER_INFO, TIERS, type Attempt, type Evidence, type Problem, type Progress, type Tier } from "./engine";
 import { loadProgress, saveProgress } from "./storage";
 import { Calculation, Workspace } from "./workspace";
@@ -28,7 +28,7 @@ function ParentReport({ progress, onName }: { progress: Progress; onName(name: s
     <div className={styles.parentBody}>
       <label className={styles.name}>Learner name <input aria-label="Learner name" maxLength={24} defaultValue={progress.name}
         onBlur={e => onName(e.currentTarget.value.trim() || "Player")} /></label>
-      <p>Only first attempts affect accuracy and advancement. Writing time includes thinking and borrow marks; it excludes recognition and confirmation. Uncertain readings, interruptions, and corrections never qualify for a speed gate.</p>
+      <p>Only first attempts affect accuracy and advancement. Writing time includes thinking and borrow marks; it excludes handwriting recognition and automatic transitions. Uncertain readings, interruptions, and corrections never qualify for a speed gate.</p>
       <div className={styles.tableScroll}><table><caption>Progress by tier</caption><thead><tr><th>Tier</th><th>First try</th><th>Writing time¹</th><th>Target</th><th>Status</th></tr></thead><tbody>
         {TIERS.map(t => { const all = history.filter(a => a.problem.tier === t), reliable = all.filter(a => a.reliable);
           const mean = reliable.length ? reliable.reduce((n, a) => n + a.elapsedMs, 0) / reliable.length : null;
@@ -73,11 +73,11 @@ export default function TrainerPage() {
   const [away, setAway] = useState(false);
   const [timingAllowed, setTimingAllowed] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
-  const [retryReady, setRetryReady] = useState(false);
+  const [celebrating, setCelebrating] = useState(false);
   const [inspected, setInspected] = useState<Attempt | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const originFocus = useRef<HTMLElement | null>(null);
-  const nextFocus = useRef<HTMLButtonElement>(null);
+  const resumeFocus = useRef<HTMLButtonElement>(null);
   const resultsFocus = useRef<HTMLHeadingElement>(null);
   const clock = useRef<number | null>(null);
 
@@ -108,6 +108,7 @@ export default function TrainerPage() {
   }, []);
   const session = progress.active;
   const active = Boolean(session && !session.complete);
+  const phase = session?.phase;
   useEffect(() => {
     if (!active || paused || away || inspected) { clock.current = null; return; }
     clock.current = performance.now();
@@ -125,12 +126,20 @@ export default function TrainerPage() {
   }, [update]);
   useEffect(() => {
     if (session?.complete) resultsFocus.current?.focus();
-    else if (session?.phase === "correct") nextFocus.current?.focus();
-    if (session?.phase !== "wrong") return;
-    const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 1300 : 2200;
-    const timer = setTimeout(() => { setRetryReady(true); nextFocus.current?.focus(); }, delay);
+    if (paused) resumeFocus.current?.focus();
+    if (!active || paused || away || !phase || phase === "answer") return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const delay = phase === "correct" ? celebrating ? 950 : 320 : reduced ? 1300 : 2200;
+    const timer = setTimeout(() => {
+      if (phase === "correct") {
+        setCelebrating(false); setTimingAllowed(true); setRetryKey(0);
+        update(p => advance(p, Date.now()));
+      } else {
+        setTimingAllowed(false); setRetryKey(k => k + 1); update(retryAnswer);
+      }
+    }, delay);
     return () => clearTimeout(timer);
-  }, [session?.phase, session?.complete]);
+  }, [active, paused, away, phase, session?.complete, session?.index, session?.reviewIndex, celebrating, update]);
   useEffect(() => {
     if (inspected) dialog.current?.showModal();
   }, [inspected]);
@@ -145,60 +154,65 @@ export default function TrainerPage() {
     if (next) primeAudio();
   }
   function begin(kind: "practice" | "benchmark" = "practice") {
-    primeAudio(); setTimingAllowed(true); setPaused(false); setRetryKey(0);
+    primeAudio(); setTimingAllowed(true); setPaused(false); setRetryKey(0); setCelebrating(false);
     try { update(p => beginSession(p, kind === "benchmark" ? 5 : selected, kind, Date.now())); }
     catch { setWarning("We couldn’t prepare this practice. Your progress is safe; try again."); }
   }
   function answer(value: number, evidence: Evidence) {
     const s = data.current.active;
     if (!s || s.phase !== "answer") return;
-    primeAudio(); setRetryReady(false);
+    primeAudio();
+    const before = data.current.stars;
     const p = currentProblem(s), correct = value === p.top - p.bottom;
     update(state => recordAnswer(state, value, evidence, Date.now()));
+    setCelebrating(data.current.stars > before && data.current.stars % 5 === 0);
     if (soundRef.current && audio.current) playFeedbackEarcon(audio.current, correct);
   }
-  function next(endEarly = false) { setTimingAllowed(true); setRetryKey(0); update(p => advance(p, Date.now(), endEarly)); }
-  function retry() { setRetryReady(false); setTimingAllowed(false); setRetryKey(k => k + 1); update(retryAnswer); }
   function pause() { update(p => p); clock.current = null; setTimingAllowed(false); setPaused(true); }
   function closeReview() { dialog.current?.close(); setInspected(null); requestAnimationFrame(() => originFocus.current?.focus()); }
   const problem = session && !session.complete ? currentProblem(session) : null;
   const lastSummary = progress.summaries.at(-1);
+  const childMode = active && !paused && !away;
 
-  return <div className={styles.shell}>
-    <header className={styles.topbar}>
+  return <div className={`${styles.shell} ${childMode ? styles.childMode : ""}`}>
+    {!childMode && <header className={styles.topbar}>
       <Link href="/">← All games</Link><span>Subtraction Steps</span>
       <button type="button" aria-pressed={sound} aria-label={`Sound ${sound ? "on" : "off"}`} onClick={toggleSound}>{sound ? "♪ Sound on" : "♪ Sound off"}</button>
-    </header>
+    </header>}
     <main className={styles.main}>
-      {warning && <p role="status" className={styles.warning}>{warning}</p>}
+      {warning && !childMode && <p role="status" className={styles.warning}>{warning}</p>}
       {!loaded ? <p role="status">Opening your practice…</p> : active && session && problem ? <>
-        <div className={styles.sessionHeading}><div><p className={styles.kicker}>{session.review ? "Here’s your chance at redemption" : session.kind === "benchmark" ? "Worksheet readiness check" : `Tier ${session.tier} · ${TIER_INFO[session.tier].title}`}</p>
-          <h1>{session.review ? "Make it yours." : problem.purpose === "check" ? "Find your flow." : "One step at a time."}</h1></div>
-          <button type="button" onClick={pause} disabled={paused}>Pause</button></div>
-        <div className={styles.progressLine}><span>{session.review ? `Review ${session.reviewIndex + 1} of ${session.review.length}` : `Question ${session.index + 1} of ${session.plan.length}`}</span>
-          <span>{session.review ? "Practice without a time target" : problem.purpose === "check" ? `Progress check · ${session.index - 7} of 8` : problem.purpose === "review" ? "A little review" : "Draw your answer"}</span></div>
-        <progress className={styles.progress} aria-label={session.review ? "Mistake review progress" : "Practice progress"}
-          max={session.review ? session.review.length : session.plan.length} value={session.review ? session.reviewIndex : session.index} />
-        {paused || away ? <section className={styles.pause} aria-label="Practice paused"><span className={styles.bigSymbol}>Ⅱ</span><h2>Take your time.</h2>
-          <p>Your place and writing are saved. This question won’t count toward a speed gate after a pause.</p>
-          <button type="button" className={styles.primary} disabled={away} onClick={() => { setPaused(false); setTimingAllowed(false); }}>Continue practice</button>
-        </section> : <section className={styles.play} aria-label="Subtraction workspace">
-          <Workspace key={`${problem.id}:${Boolean(session.review)}:${retryKey}`} problem={problem} initialInk={session.ink}
-            disabled={session.phase !== "answer"} timingAllowed={timingAllowed}
-            onInk={ink => update(p => p.active ? { ...p, active: { ...p.active, ink } } : p)} onAnswer={answer} />
-          {session.phase !== "answer" && <div className={`${styles.feedback} ${session.phase === "correct" ? styles.correct : styles.incorrect}`}>
-            <p className={styles.feedbackTitle} role="status">{session.phase === "correct" ? "✓ Correct" : `✕ ${differenceFeedback(problem, session.lastAnswer!)}`}</p>
-            {session.phase === "wrong" && <p>You wrote {session.lastAnswer}. The difference is <strong>{problem.top - problem.bottom}</strong>.</p>}
-            <Teaching problem={problem} />
-            {session.phase === "correct" ? <div className={styles.actions}>
-              <button type="button" ref={nextFocus} className={styles.primary} onClick={() => next()}>{session.review ? session.reviewIndex + 1 === session.review.length ? "Finish review" : "Next" : session.index + 1 === session.plan.length ? session.results.some(a => !a.correct) ? "Review Mistakes" : "Results" : "Next"}</button>
-              {!session.review && session.index + 1 < session.plan.length && <button type="button" onClick={() => next(true)}>Finish practice</button>}
-            </div> : <button type="button" ref={nextFocus} disabled={!retryReady} className={styles.primary} onClick={retry}>{retryReady ? "Try again" : "Take a look…"}</button>}
-          </div>}
-        </section>}
-        <p className={styles.small}>Only first tries change your score. Notes and borrow marks are always welcome.</p>
+        {paused || away ? <section className={styles.pause} aria-label="Practice paused">
+          <h1>Practice paused</h1>
+          <p>★ {progress.stars} stars · Tier {session.tier} · {session.review ? `Review ${session.reviewIndex + 1} of ${session.review.length}` : `Question ${session.index + 1} of ${session.plan.length}`}</p>
+          <p>Write below the line. Answers are checked automatically. Use the whole question area for borrow marks.</p>
+          <div className={styles.actions}>
+            <button ref={resumeFocus} type="button" className={styles.primary} disabled={away} onClick={() => { primeAudio(); setPaused(false); setTimingAllowed(false); }}>Continue practice</button>
+            {canFinishEarly(session) && <button type="button" onClick={() => {
+              update(p => finishEarly(p, Date.now())); setCelebrating(false); setPaused(false); setTimingAllowed(false);
+            }}>Finish practice</button>}
+          </div>
+          <ParentReport progress={progress} onName={name => update(p => ({ ...p, name }))} />
+        </section> : <>
+          <h1 className={styles.srOnly}>Subtraction practice</h1>
+          <div className={styles.quietBar}>
+            <button type="button" onClick={pause} aria-label="Pause practice" title="Pause practice"><span aria-hidden="true">Ⅱ</span></button>
+            <span className={styles.stars} role="status" aria-label={`${progress.stars} stars earned`}><span aria-hidden="true">★</span> {progress.stars}</span>
+          </div>
+          <section className={styles.play} aria-label="Subtraction workspace">
+            <Workspace key={`${problem.id}:${Boolean(session.review)}:${retryKey}`} problem={problem} initialInk={session.ink}
+              disabled={session.phase !== "answer"} timingAllowed={timingAllowed}
+              onInk={ink => update(p => p.active ? { ...p, active: { ...p.active, ink } } : p)} onAnswer={answer} />
+            {session.phase === "correct" && <div className={celebrating ? styles.celebration : styles.quickCorrect} role="status">
+              {celebrating ? <><span className={styles.starBurst} aria-hidden="true">★ ★ ★ ★ ★</span><span>Five more stars!</span></> : <><span aria-hidden="true">✓</span><span className={styles.srOnly}>Correct</span></>}
+            </div>}
+            {session.phase === "wrong" && <div className={styles.quickWrong} role="status">
+              <strong>✕ {differenceFeedback(problem, session.lastAnswer!)}</strong><span>You wrote {session.lastAnswer}. Try again.</span>
+            </div>}
+          </section>
+        </>}
       </> : session?.complete && lastSummary ? <section className={styles.results}>
-        <span className={styles.bigSymbol}>✓</span><p className={styles.kicker}>Practice complete</p>
+        <span className={styles.bigSymbol}>★</span><p className={styles.kicker}>Practice complete · {progress.stars} stars earned</p>
         <h1 ref={resultsFocus} tabIndex={-1}>{session.promoted ? session.tier === 5 ? "All five tiers achieved!" : `Tier ${session.tier} achieved!` : "Every step counts."}</h1>
         <p>{session.promoted ? "Eight varied answers, correct first time and within your target. Beautifully done." : "You showed up, practiced, and finished. Your next session will build on this work."}</p>
         <div className={styles.summaryStats}><div><strong>{lastSummary.correct}/{lastSummary.total}</strong><span>Correct first try</span></div><div><strong>{duration(lastSummary.activeMs)}</strong><span>Active practice</span></div></div>
@@ -212,10 +226,10 @@ export default function TrainerPage() {
       </section> : <>
         <section className={styles.welcome}><p className={styles.kicker}>A little practice. A little smoother.</p><h1>Subtraction,<br /><em>step by step.</em></h1>
           <p>Write your answers. Work on what needs practice.<br />Grow through five small steps.</p>
-          <div className={styles.example}><div><span className={styles.kicker}>Example</span><h2>Write below the line.</h2><p>Use the whole page for notes and borrow marks. Tap Check when you’re done.</p><span className={styles.exampleCheck}>✓ 8 minus 3 is 5</span></div>
+          <div className={styles.example}><div><span className={styles.kicker}>Example</span><h2>Write below the line.</h2><p>Use the whole page for borrow marks. Your written answer is checked automatically.</p><span className={styles.exampleCheck}>✓ 8 minus 3 is 5</span></div>
             <div className={styles.examplePaper}><Calculation problem={EXAMPLE} solved example /></div></div>
         </section>
-        <section className={styles.choose} aria-labelledby="tier-heading"><h2 id="tier-heading">Your next step{progress.name !== "Player" ? `, ${progress.name}` : ""}</h2>
+        <section className={styles.choose} aria-labelledby="tier-heading"><p className={styles.savedStars}>★ {progress.stars} stars earned</p><h2 id="tier-heading">Your next step{progress.name !== "Player" ? `, ${progress.name}` : ""}</h2>
           <nav className={styles.tiers} aria-label="Practice tiers">{TIERS.map(t => <button key={t} type="button" disabled={t > progress.unlocked} aria-current={selected === t ? "step" : undefined}
             aria-pressed={selected === t} onClick={() => setSelected(t)}><span>{progress.mastered.includes(t) ? "✓" : t > progress.unlocked ? "○" : t}</span>{TIER_INFO[t].title}</button>)}</nav>
           <p>{TIER_INFO[selected].detail} · 16 questions, with a little review.</p>
@@ -226,7 +240,7 @@ export default function TrainerPage() {
         </section>
         <ParentReport progress={progress} onName={name => update(p => ({ ...p, name }))} />
       </>}
-      <footer className={styles.footer}><span>Private practice · Saved on this device</span><Link href="/lab/subtraction-flash/">Borrow Flash →</Link></footer>
+      {!childMode && <footer className={styles.footer}><span>Private practice · Saved on this device</span><Link href="/lab/subtraction-flash/">Borrow Flash →</Link></footer>}
     </main>
     <dialog ref={dialog} className={styles.dialog} onCancel={e => { e.preventDefault(); closeReview(); }} aria-labelledby="history-title">
       {inspected && <><h2 id="history-title">Question review</h2><p>{inspected.correct ? "✓ Correct" : "✕ Incorrect"} on the first try · You wrote {inspected.answer}</p>

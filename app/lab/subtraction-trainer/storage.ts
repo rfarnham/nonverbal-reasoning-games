@@ -27,6 +27,8 @@ function session(v: unknown): v is Session {
     (s.region as number) >= -1 && (s.region as number) <= 2 && Array.isArray(s.points) && s.points.length > 0 && s.points.length <= 512 &&
     s.points.every(p => object(p) && finite(p.x) && p.x <= 360 && finite(p.y) && p.y <= 420))) return false;
   const plan = v.plan as Problem[], results = v.results as Attempt[];
+  if (v.starred !== undefined && (!Array.isArray(v.starred) || new Set(v.starred).size !== v.starred.length ||
+    !v.starred.every(id => results.some(a => a.problem.id === id)))) return false;
   if (results.length < v.index) return false;
   if (new Set(plan.map(p => `${p.top}-${p.bottom}`)).size !== plan.length || new Set(plan.map(p => p.id)).size !== plan.length) return false;
   if (results.some((a, i) => a.sessionId !== v.id || JSON.stringify(a.problem) !== JSON.stringify(plan[i]))) return false;
@@ -50,6 +52,7 @@ export function parseProgress(raw: string): Progress | null {
     if (raw.length > 2_000_000) return null;
     const v: unknown = JSON.parse(raw);
     if (!object(v) || v.version !== 1 || typeof v.name !== "string" || !v.name.trim() || v.name.length > 24 ||
+      (v.stars !== undefined && !integer(v.stars)) ||
       !integer(v.seed) || v.seed > 4294967295 || !integer(v.nextId) || v.nextId < 1 || !tier(v.unlocked) ||
       !Array.isArray(v.mastered) || !v.mastered.every(tier) || new Set(v.mastered).size !== v.mastered.length ||
       !Array.isArray(v.history) || v.history.length > 2000 || !v.history.every(attempt) ||
@@ -62,6 +65,14 @@ export function parseProgress(raw: string): Progress | null {
       if (!object(s) || !integer(s.id) || s.id >= v.nextId || !tier(s.tier) || !["practice", "benchmark"].includes(String(s.kind)) ||
         !finite(s.at) || !integer(s.correct) || !integer(s.total) || s.total > 30 || s.correct > s.total ||
         !finite(s.activeMs) || !(s.meanMs === null || finite(s.meanMs)) || typeof s.promoted !== "boolean") return null;
+    }
+    // Additive migration: keep existing learning records and start the new star
+    // total at zero. Already-solved legacy questions cannot earn replay awards.
+    v.stars ??= 0;
+    const active = v.active as Session | null;
+    if (active && active.starred === undefined) {
+      active.starred = active.results.filter((_, i) =>
+        active.review !== null || i < active.index || active.phase === "correct").map(a => a.problem.id);
     }
     return v as unknown as Progress;
   } catch { return null; }
