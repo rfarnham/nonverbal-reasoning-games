@@ -276,8 +276,9 @@ Journey is a suite-wide progression layer over the canonical games. It does
 not replace Campaign or Infinite, and playing a game directly from the shelf
 MUST NOT change Journey progress, XP, or Journey mistake history.
 
-The homepage MUST make **Start Journey** or **Continue Journey** its prominent
-primary action. The game shelf remains available for standalone play.
+The homepage MUST make the new Math Kangaroo Worlds adventure its prominent
+primary action. **Start Journey** or **Continue Journey** remains available as
+a secondary action, and the game shelf remains available for standalone play.
 
 Journey is generic:
 

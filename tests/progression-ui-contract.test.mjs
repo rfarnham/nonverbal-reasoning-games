@@ -27,11 +27,13 @@ async function discoveredGameSlugs() {
   return slugs.sort();
 }
 
-test("homepage Journey CTA is prominent while the standalone shelf remains", async () => {
+test("homepage promotes Math World while Journey and the standalone shelf remain", async () => {
   const home = await source("app/page.tsx");
   const cta = await source("components/progression/JourneyHomeCta.tsx");
-  assert.match(home, /<JourneyHomeCta\s*\/>/);
-  assert.match(cta, /button button-primary journey-home-cta/);
+  assert.match(home, /className="button button-primary math-world-home-cta" href="\/math-world\/"/);
+  assert.match(home, /<JourneyHomeCta secondary\s*\/>/);
+  assert.match(cta, /secondary = false/);
+  assert.match(cta, /secondary \? "button-secondary" : "button-primary"/);
   assert.match(cta, /href="\/journey\/"/);
   assert.match(home, /games\.map/);
   assert.match(home, /href=\{game\.href\}/);
