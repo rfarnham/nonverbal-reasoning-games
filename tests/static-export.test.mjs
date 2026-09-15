@@ -21,6 +21,7 @@ test("exports the catalog and implemented game routes as refresh-safe pages", as
     ),
     access(new URL("lab/subtraction-flash/index.html", outputRoot)),
     access(new URL("lab/math-kangaroo/index.html", outputRoot)),
+    access(new URL("math-world/index.html", outputRoot)),
     access(new URL("404.html", outputRoot)),
   ]);
 
@@ -37,6 +38,7 @@ test("exports the catalog and implemented game routes as refresh-safe pages", as
     braceletGame,
     subtractionLab,
     mathKangarooLab,
+    mathWorld,
   ] = await Promise.all([
     readOutput("index.html"),
     readOutput("games/rotation-match/index.html"),
@@ -50,6 +52,7 @@ test("exports the catalog and implemented game routes as refresh-safe pages", as
     readOutput("games/bracelet-search/index.html"),
     readOutput("lab/subtraction-flash/index.html"),
     readOutput("lab/math-kangaroo/index.html"),
+    readOutput("math-world/index.html"),
   ]);
 
   assert.match(home, /Spatial Gym/);
@@ -111,6 +114,9 @@ test("exports the catalog and implemented game routes as refresh-safe pages", as
   assert.match(mathKangarooLab, /Choose your pool/);
   assert.match(mathKangarooLab, /All spatial types/);
   assert.match(subtractionLab, /Borrow Flash/);
+  assert.match(home, /Explore Counting Coast/);
+  assert.match(mathWorld, /Counting Coast/);
+  assert.match(mathWorld, /Math Kangaroo Worlds/);
   assert.doesNotMatch(home, /codex-preview|Your site is taking shape/i);
 });
 
@@ -128,6 +134,7 @@ test("applies the GitHub Pages project base path to internal assets and links", 
     braceletGame,
     subtractionLab,
     mathKangarooLab,
+    mathWorld,
   ] = await Promise.all([
     readOutput("index.html"),
     readOutput("games/pattern-matrix/index.html"),
@@ -140,6 +147,7 @@ test("applies the GitHub Pages project base path to internal assets and links", 
     readOutput("games/bracelet-search/index.html"),
     readOutput("lab/subtraction-flash/index.html"),
     readOutput("lab/math-kangaroo/index.html"),
+    readOutput("math-world/index.html"),
   ]);
 
   for (const { slug } of packages) {
@@ -155,6 +163,7 @@ test("applies the GitHub Pages project base path to internal assets and links", 
     home,
     new RegExp(`href=["']${basePath}/lab/subtraction-flash/`),
   );
+  assert.match(home, new RegExp(`href=["']${basePath}/math-world/`));
   assert.match(patternGame, new RegExp(`href=["']${basePath}/["']`));
   assert.match(patternGame, new RegExp(`["']${basePath}/_next/`));
   assert.match(libraGame, new RegExp(`href=["']${basePath}/["']`));
@@ -175,6 +184,7 @@ test("applies the GitHub Pages project base path to internal assets and links", 
   assert.match(mathKangarooLab, new RegExp(`["']${basePath}/_next/`));
   assert.match(subtractionLab, new RegExp(`href=["']${basePath}/["']`));
   assert.match(subtractionLab, new RegExp(`["']${basePath}/_next/`));
+  assert.match(mathWorld, new RegExp(`["']${basePath}/_next/`));
   assert.doesNotMatch(home, /(?:href|src)=["']\/_next\//);
   assert.doesNotMatch(patternGame, /(?:href|src)=["']\/_next\//);
   assert.doesNotMatch(libraGame, /(?:href|src)=["']\/_next\//);
@@ -186,6 +196,7 @@ test("applies the GitHub Pages project base path to internal assets and links", 
   assert.doesNotMatch(braceletGame, /(?:href|src)=["']\/_next\//);
   assert.doesNotMatch(mathKangarooLab, /(?:href|src)=["']\/_next\//);
   assert.doesNotMatch(subtractionLab, /(?:href|src)=["']\/_next\//);
+  assert.doesNotMatch(mathWorld, /(?:href|src)=["']\/_next\//);
 });
 
 test("ships project metadata and contributor documentation", async () => {

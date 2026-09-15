@@ -209,6 +209,17 @@ a {
   font-size: 1rem;
 }
 
+.math-world-home-cta {
+  min-height: 60px;
+  padding-inline: 27px;
+  font-size: 1rem;
+  box-shadow: 5px 5px 0 #f3bd4e;
+}
+
+.math-world-home-cta:hover {
+  box-shadow: 7px 7px 0 #f3bd4e;
+}
+
 .button-secondary {
   background: transparent;
 }

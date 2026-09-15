@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "contentVersion": "counting-coast.2026-08-09.1",
+  "catalogueRunId": "catalogue-c08d01a42b45e1116a6591dd",
+  "questionIdsByStop": {
+    "counting-cove": [
+      "canada-2015-grades-1-2-q02",
+      "usa-2007-grades-1-2-q02",
+      "think300-l1-2-5-points-q004",
+      "eric-canada-2013-g12-q10"
+    ],
+    "number-bridge": [
+      "usa-2005-grades-1-2-q03",
+      "eric-canada-2013-g12-q04",
+      "think300-l1-2-5-points-q007",
+      "canada-2015-grades-1-2-q12"
+    ],
+    "digit-dunes": [
+      "usa-2020-grades-1-2-q07",
+      "think300-l1-2-4-points-q011",
+      "eric-canada-2013-g12-q11",
+      "usa-2006-grades-1-2-q03"
+    ],
+    "orchard-market": [
+      "usa-2019-grades-1-2-q08",
+      "think300-l1-2-5-points-q022",
+      "eric-canada-2013-g12-q18",
+      "usa-2007-grades-1-2-q04"
+    ],
+    "shape-shore": [
+      "think300-l1-2-4-points-q003",
+      "usa-2020-grades-1-2-q03",
+      "eric-canada-2013-g12-q14",
+      "usa-2007-grades-1-2-q05"
+    ],
+    "puzzle-cliffs": [
+      "think300-l1-2-4-points-q005",
+      "canada-2015-grades-1-2-q18",
+      "usa-2015-grades-1-2-q22",
+      "think300-l1-2-4-points-q006"
+    ],
+    "coin-harbor": [
+      "usa-2005-grades-1-2-q01",
+      "eric-canada-2013-g12-q05",
+      "think300-l1-2-5-points-q006",
+      "usa-2006-grades-1-2-q06"
+    ],
+    "clock-tower": [
+      "think300-l1-2-5-points-q008",
+      "usa-2015-grades-1-2-q07",
+      "think300-l1-2-5-points-q011",
+      "usa-2007-grades-1-2-q08"
+    ],
+    "lighthouse-crossroads": [
+      "think300-l1-2-5-points-q009",
+      "usa-2016-grades-1-2-q22",
+      "usa-2006-grades-1-2-q13",
+      "think300-l1-2-4-points-q007",
+      "think300-l1-2-4-points-q031",
+      "usa-2006-grades-1-2-q09"
+    ]
+  }
+}

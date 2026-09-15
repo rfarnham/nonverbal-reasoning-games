@@ -84,11 +84,15 @@ export default function Home() {
             you <span className="hero-accent">see.</span>
           </h1>
           <p className="hero-lede">
-            Short, focused games for mental rotation, pattern spotting,
-            spatial memory, and visual logic. No account. No download.
+            Explore a new Math Kangaroo map adventure, or choose a focused
+            game for mental rotation, pattern spotting, and visual logic.
+            No account. No download.
           </p>
           <div className="hero-actions">
-            <JourneyHomeCta />
+            <Link className="button button-primary math-world-home-cta" href="/math-world/">
+              Explore Counting Coast <span aria-hidden="true">→</span>
+            </Link>
+            <JourneyHomeCta secondary />
             <a className="button button-secondary" href="#games">
               Pick a single game
             </a>
@@ -103,7 +107,7 @@ export default function Home() {
               <dd>minute sessions</dd>
             </div>
             <div>
-              <dt>3</dt>
+              <dt>4</dt>
               <dd>ways to play</dd>
             </div>
           </dl>

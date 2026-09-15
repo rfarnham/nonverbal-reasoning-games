@@ -8,7 +8,9 @@ import {
   loadProgressionStateDiagnostic,
 } from "@/lib/progression";
 
-export function JourneyHomeCta() {
+export function JourneyHomeCta({
+  secondary = false,
+}: Readonly<{ secondary?: boolean }>) {
   const [label, setLabel] = useState("Start your Journey");
 
   useEffect(() => {
@@ -30,7 +32,10 @@ export function JourneyHomeCta() {
   }, []);
 
   return (
-    <Link className="button button-primary journey-home-cta" href="/journey/">
+    <Link
+      className={`button ${secondary ? "button-secondary" : "button-primary"} journey-home-cta`}
+      href="/journey/"
+    >
       {label}
       <span aria-hidden="true">→</span>
     </Link>

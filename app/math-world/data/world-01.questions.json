@@ -1,0 +1,2172 @@
+{
+  "schemaVersion": 1,
+  "contentVersion": "counting-coast.2026-08-09.1",
+  "catalogueRunId": "catalogue-c08d01a42b45e1116a6591dd",
+  "ontologyVersion": "mk-map-ontology.v1",
+  "questions": [
+    {
+      "id": "canada-2015-grades-1-2-q02",
+      "stopId": "counting-cove",
+      "prompt": "In Ryan\u2019s yard rabbits and squirrels left tracks in the snow. How many animals were there if each animal only walked through once?",
+      "choices": [
+        {
+          "label": "3",
+          "accessibleLabel": "Choice A: 3",
+          "visualOnly": false
+        },
+        {
+          "label": "4",
+          "accessibleLabel": "Choice B: 4",
+          "visualOnly": false
+        },
+        {
+          "label": "5",
+          "accessibleLabel": "Choice C: 5",
+          "visualOnly": false
+        },
+        {
+          "label": "6",
+          "accessibleLabel": "Choice D: 6",
+          "visualOnly": false
+        },
+        {
+          "label": "7",
+          "accessibleLabel": "Choice E: 7",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 2,
+      "presentation": "semantic",
+      "asset": {
+        "src": "/math-world/questions/canada-2015-grades-1-2-q02.webp",
+        "width": 1000,
+        "height": 417,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2015,
+        "gradeBand": "1-2",
+        "questionNumber": 2,
+        "sourceLabel": "Math Kangaroo 2015, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "number_arithmetic",
+        "districtId": "count-compare",
+        "skillIds": [
+          "cnt_counting_cardinality"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "usa-2007-grades-1-2-q02",
+      "stopId": "counting-cove",
+      "prompt": "Which number is covered with the question mark?",
+      "choices": [
+        {
+          "label": "1",
+          "accessibleLabel": "Choice A: 1",
+          "visualOnly": false
+        },
+        {
+          "label": "2",
+          "accessibleLabel": "Choice B: 2",
+          "visualOnly": false
+        },
+        {
+          "label": "3",
+          "accessibleLabel": "Choice C: 3",
+          "visualOnly": false
+        },
+        {
+          "label": "4",
+          "accessibleLabel": "Choice D: 4",
+          "visualOnly": false
+        },
+        {
+          "label": "5",
+          "accessibleLabel": "Choice E: 5",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 1,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/usa-2007-grades-1-2-q02.webp",
+        "width": 1000,
+        "height": 150,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2007,
+        "gradeBand": "1-2",
+        "questionNumber": 2,
+        "sourceLabel": "Math Kangaroo 2007, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "number_arithmetic",
+        "districtId": "count-compare",
+        "skillIds": [
+          "cnt_place_value"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "think300-l1-2-5-points-q004",
+      "stopId": "counting-cove",
+      "prompt": "The three tokens with the question mark have the same number. The sum of the five tokens shown is 35. What is the value of one of the missing numbers? 13 + ? + ? + ? + 7 = 35",
+      "choices": [
+        {
+          "label": "10",
+          "accessibleLabel": "Choice A: 10",
+          "visualOnly": false
+        },
+        {
+          "label": "8",
+          "accessibleLabel": "Choice B: 8",
+          "visualOnly": false
+        },
+        {
+          "label": "6",
+          "accessibleLabel": "Choice C: 6",
+          "visualOnly": false
+        },
+        {
+          "label": "5",
+          "accessibleLabel": "Choice D: 5",
+          "visualOnly": false
+        },
+        {
+          "label": "4",
+          "accessibleLabel": "Choice E: 4",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 3,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/think300-l1-2-5-points-q004.webp",
+        "width": 1000,
+        "height": 441,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2024,
+        "gradeBand": "1-2",
+        "questionNumber": 4,
+        "sourceLabel": "Math Kangaroo 2024, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "number_arithmetic",
+        "districtId": "count-compare",
+        "skillIds": [
+          "cnt_whole_addition_subtraction"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "eric-canada-2013-g12-q10",
+      "stopId": "counting-cove",
+      "prompt": "I am a number. If you count by tens you will say my name. I am not ten. If you add me to 30, you will get a number less than 60. Who am I?",
+      "choices": [
+        {
+          "label": "20",
+          "accessibleLabel": "Choice A: 20",
+          "visualOnly": false
+        },
+        {
+          "label": "30",
+          "accessibleLabel": "Choice B: 30",
+          "visualOnly": false
+        },
+        {
+          "label": "40",
+          "accessibleLabel": "Choice C: 40",
+          "visualOnly": false
+        },
+        {
+          "label": "50",
+          "accessibleLabel": "Choice D: 50",
+          "visualOnly": false
+        },
+        {
+          "label": "60",
+          "accessibleLabel": "Choice E: 60",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 0,
+      "presentation": "semantic",
+      "asset": {
+        "src": "/math-world/questions/eric-canada-2013-g12-q10.webp",
+        "width": 900,
+        "height": 84,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2013,
+        "gradeBand": "1-2",
+        "questionNumber": 10,
+        "sourceLabel": "Math Kangaroo 2013, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "number_arithmetic",
+        "districtId": "count-compare",
+        "skillIds": [
+          "cnt_counting_cardinality",
+          "cnt_place_value",
+          "cnt_whole_addition_subtraction"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "usa-2005-grades-1-2-q03",
+      "stopId": "number-bridge",
+      "prompt": "Only one digit from 1 to 9 is repeated three times in this drawing. The rest of the digits are repeated twice. Which digit is repeated three times?",
+      "choices": [
+        {
+          "label": "9",
+          "accessibleLabel": "Choice A: 9",
+          "visualOnly": false
+        },
+        {
+          "label": "8",
+          "accessibleLabel": "Choice B: 8",
+          "visualOnly": false
+        },
+        {
+          "label": "3",
+          "accessibleLabel": "Choice C: 3",
+          "visualOnly": false
+        },
+        {
+          "label": "4",
+          "accessibleLabel": "Choice D: 4",
+          "visualOnly": false
+        },
+        {
+          "label": "7",
+          "accessibleLabel": "Choice E: 7",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 4,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/usa-2005-grades-1-2-q03.webp",
+        "width": 1000,
+        "height": 177,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2005,
+        "gradeBand": "1-2",
+        "questionNumber": 3,
+        "sourceLabel": "Math Kangaroo 2005, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "number_arithmetic",
+        "districtId": "join-separate",
+        "skillIds": [
+          "cnt_place_value"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "eric-canada-2013-g12-q04",
+      "stopId": "number-bridge",
+      "prompt": "A lot of babies were born in the zoo last year: two baby lions, three baby dolphins and four baby eagles. How many legs do all these babies have altogether?",
+      "choices": [
+        {
+          "label": "20",
+          "accessibleLabel": "Choice A: 20",
+          "visualOnly": false
+        },
+        {
+          "label": "18",
+          "accessibleLabel": "Choice B: 18",
+          "visualOnly": false
+        },
+        {
+          "label": "16",
+          "accessibleLabel": "Choice C: 16",
+          "visualOnly": false
+        },
+        {
+          "label": "14",
+          "accessibleLabel": "Choice D: 14",
+          "visualOnly": false
+        },
+        {
+          "label": "12",
+          "accessibleLabel": "Choice E: 12",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 2,
+      "presentation": "semantic",
+      "asset": {
+        "src": "/math-world/questions/eric-canada-2013-g12-q04.webp",
+        "width": 900,
+        "height": 100,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2013,
+        "gradeBand": "1-2",
+        "questionNumber": 4,
+        "sourceLabel": "Math Kangaroo 2013, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "number_arithmetic",
+        "districtId": "join-separate",
+        "skillIds": [
+          "cnt_counting_cardinality",
+          "cnt_whole_addition_subtraction"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "think300-l1-2-5-points-q007",
+      "stopId": "number-bridge",
+      "prompt": "An ice-cream, a cupcake, and a pudding combo costs 23 collars. Dora bought 2 ice-creams and 1 cupcake and she spent 24 dollars. James bought 3 ice-creams, 2 cupcakes and 1 pudding. Tim bought 3 cupcakes, 1 pudding and 1 ice-cream. James spent 4 more dollars than Tim. How much does a cupcake cost?",
+      "choices": [
+        {
+          "label": "12 dollars",
+          "accessibleLabel": "Choice A: 12 dollars",
+          "visualOnly": false
+        },
+        {
+          "label": "10 dollars",
+          "accessibleLabel": "Choice B: 10 dollars",
+          "visualOnly": false
+        },
+        {
+          "label": "8 dollars",
+          "accessibleLabel": "Choice C: 8 dollars",
+          "visualOnly": false
+        },
+        {
+          "label": "6 dollars",
+          "accessibleLabel": "Choice D: 6 dollars",
+          "visualOnly": false
+        },
+        {
+          "label": "5 dollars",
+          "accessibleLabel": "Choice E: 5 dollars",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 1,
+      "presentation": "semantic",
+      "asset": {
+        "src": "/math-world/questions/think300-l1-2-5-points-q007.webp",
+        "width": 1000,
+        "height": 412,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2024,
+        "gradeBand": "1-2",
+        "questionNumber": 7,
+        "sourceLabel": "Math Kangaroo 2024, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "number_arithmetic",
+        "districtId": "join-separate",
+        "skillIds": [
+          "cnt_counting_cardinality",
+          "cnt_money_value"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "canada-2015-grades-1-2-q12",
+      "stopId": "number-bridge",
+      "prompt": "What is the minimum number of shapes that must be removed so that only shapes of one type will remain?",
+      "choices": [
+        {
+          "label": "4",
+          "accessibleLabel": "Choice A: 4",
+          "visualOnly": false
+        },
+        {
+          "label": "5",
+          "accessibleLabel": "Choice B: 5",
+          "visualOnly": false
+        },
+        {
+          "label": "6",
+          "accessibleLabel": "Choice C: 6",
+          "visualOnly": false
+        },
+        {
+          "label": "9",
+          "accessibleLabel": "Choice D: 9",
+          "visualOnly": false
+        },
+        {
+          "label": "10",
+          "accessibleLabel": "Choice E: 10",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 3,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/canada-2015-grades-1-2-q12.webp",
+        "width": 1000,
+        "height": 231,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2015,
+        "gradeBand": "1-2",
+        "questionNumber": 12,
+        "sourceLabel": "Math Kangaroo 2015, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "number_arithmetic",
+        "districtId": "join-separate",
+        "skillIds": [
+          "cnt_counting_cardinality",
+          "cnt_two_dimensional_shapes",
+          "cnt_whole_addition_subtraction",
+          "rsn_case_analysis",
+          "rsn_constraint_propagation"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "usa-2020-grades-1-2-q07",
+      "stopId": "digit-dunes",
+      "prompt": "Anna draws a picture of some shapes. Her picture contains 3 black triangles and fewer than 4 squares. Which could be Anna's picture?",
+      "choices": [
+        {
+          "label": "answer image A",
+          "accessibleLabel": "Choice A: answer image A",
+          "visualOnly": false
+        },
+        {
+          "label": "answer image B",
+          "accessibleLabel": "Choice B: answer image B",
+          "visualOnly": false
+        },
+        {
+          "label": "answer image C",
+          "accessibleLabel": "Choice C: answer image C",
+          "visualOnly": false
+        },
+        {
+          "label": "answer image D",
+          "accessibleLabel": "Choice D: answer image D",
+          "visualOnly": false
+        },
+        {
+          "label": "answer image E",
+          "accessibleLabel": "Choice E: answer image E",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 4,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/usa-2020-grades-1-2-q07.webp",
+        "width": 1000,
+        "height": 1366,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2020,
+        "gradeBand": "1-2",
+        "questionNumber": 7,
+        "sourceLabel": "Math Kangaroo 2020, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "number_arithmetic",
+        "districtId": "number-digit-structure",
+        "skillIds": [
+          "cnt_two_dimensional_shapes",
+          "cnt_whole_addition_subtraction",
+          "rsn_case_analysis",
+          "rsn_constraint_propagation"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "think300-l1-2-4-points-q011",
+      "stopId": "digit-dunes",
+      "prompt": "The bunny went to its food following a path, as shown. Along its journey, it had to make a total of 3 right turns and 3 left turns. Which path did the bunny follow?",
+      "choices": [
+        {
+          "label": "A",
+          "accessibleLabel": "Choice A. Refer to the original question card.",
+          "visualOnly": true
+        },
+        {
+          "label": "B",
+          "accessibleLabel": "Choice B. Refer to the original question card.",
+          "visualOnly": true
+        },
+        {
+          "label": "C",
+          "accessibleLabel": "Choice C. Refer to the original question card.",
+          "visualOnly": true
+        },
+        {
+          "label": "D",
+          "accessibleLabel": "Choice D. Refer to the original question card.",
+          "visualOnly": true
+        },
+        {
+          "label": "E",
+          "accessibleLabel": "Choice E. Refer to the original question card.",
+          "visualOnly": true
+        }
+      ],
+      "correctIndex": 0,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/think300-l1-2-4-points-q011.webp",
+        "width": 1000,
+        "height": 581,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2024,
+        "gradeBand": "1-2",
+        "questionNumber": 11,
+        "sourceLabel": "Math Kangaroo 2024, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "number_arithmetic",
+        "districtId": "number-digit-structure",
+        "skillIds": [
+          "cnt_whole_addition_subtraction"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "eric-canada-2013-g12-q11",
+      "stopId": "digit-dunes",
+      "prompt": "There is a house on each corner of the streets shown on the map. Two new houses will be built on each street between the corner houses. How many houses will there be in all?",
+      "choices": [
+        {
+          "label": "8",
+          "accessibleLabel": "Choice A: 8",
+          "visualOnly": false
+        },
+        {
+          "label": "12",
+          "accessibleLabel": "Choice B: 12",
+          "visualOnly": false
+        },
+        {
+          "label": "16",
+          "accessibleLabel": "Choice C: 16",
+          "visualOnly": false
+        },
+        {
+          "label": "20",
+          "accessibleLabel": "Choice D: 20",
+          "visualOnly": false
+        },
+        {
+          "label": "Other answer",
+          "accessibleLabel": "Choice E: Other answer",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 1,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/eric-canada-2013-g12-q11.webp",
+        "width": 900,
+        "height": 186,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2013,
+        "gradeBand": "1-2",
+        "questionNumber": 11,
+        "sourceLabel": "Math Kangaroo 2013, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "number_arithmetic",
+        "districtId": "number-digit-structure",
+        "skillIds": [
+          "cnt_counting_cardinality"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "usa-2006-grades-1-2-q03",
+      "stopId": "digit-dunes",
+      "prompt": "Calculate the sum of the numbers in the circle.",
+      "choices": [
+        {
+          "label": "12",
+          "accessibleLabel": "Choice A: 12",
+          "visualOnly": false
+        },
+        {
+          "label": "18",
+          "accessibleLabel": "Choice B: 18",
+          "visualOnly": false
+        },
+        {
+          "label": "14",
+          "accessibleLabel": "Choice C: 14",
+          "visualOnly": false
+        },
+        {
+          "label": "13",
+          "accessibleLabel": "Choice D: 13",
+          "visualOnly": false
+        },
+        {
+          "label": "45",
+          "accessibleLabel": "Choice E: 45",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 3,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/usa-2006-grades-1-2-q03.webp",
+        "width": 1000,
+        "height": 117,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2006,
+        "gradeBand": "1-2",
+        "questionNumber": 3,
+        "sourceLabel": "Math Kangaroo 2006, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "number_arithmetic",
+        "districtId": "number-digit-structure",
+        "skillIds": [
+          "cnt_arithmetic_expressions",
+          "cnt_two_dimensional_shapes",
+          "cnt_whole_addition_subtraction"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "usa-2019-grades-1-2-q08",
+      "stopId": "orchard-market",
+      "prompt": "Two apples say, \u2018Together, we cost 6 cents.\u2019 Two pears say, \u2018Together, we cost 8 cents.\u2019 How much do one pear and one apple cost together?",
+      "choices": [
+        {
+          "label": "5 cents",
+          "accessibleLabel": "Choice A: 5 cents",
+          "visualOnly": false
+        },
+        {
+          "label": "6 cents",
+          "accessibleLabel": "Choice B: 6 cents",
+          "visualOnly": false
+        },
+        {
+          "label": "7 cents",
+          "accessibleLabel": "Choice C: 7 cents",
+          "visualOnly": false
+        },
+        {
+          "label": "8 cents",
+          "accessibleLabel": "Choice D: 8 cents",
+          "visualOnly": false
+        },
+        {
+          "label": "9 cents",
+          "accessibleLabel": "Choice E: 9 cents",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 2,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/usa-2019-grades-1-2-q08.webp",
+        "width": 1000,
+        "height": 1366,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2019,
+        "gradeBand": "1-2",
+        "questionNumber": 8,
+        "sourceLabel": "Math Kangaroo 2019, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "number_arithmetic",
+        "districtId": "join-separate",
+        "skillIds": [
+          "cnt_counting_cardinality",
+          "cnt_money_value"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "think300-l1-2-5-points-q022",
+      "stopId": "orchard-market",
+      "prompt": "The three tokens with the question mark have the same number. The sum of the five tokens shown is 36. What is the value of one of the missing numbers? 9 + ? + ? + ? + 3 = 36",
+      "choices": [
+        {
+          "label": "4",
+          "accessibleLabel": "Choice A: 4",
+          "visualOnly": false
+        },
+        {
+          "label": "5",
+          "accessibleLabel": "Choice B: 5",
+          "visualOnly": false
+        },
+        {
+          "label": "6",
+          "accessibleLabel": "Choice C: 6",
+          "visualOnly": false
+        },
+        {
+          "label": "7",
+          "accessibleLabel": "Choice D: 7",
+          "visualOnly": false
+        },
+        {
+          "label": "8",
+          "accessibleLabel": "Choice E: 8",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 4,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/think300-l1-2-5-points-q022.webp",
+        "width": 1000,
+        "height": 388,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2024,
+        "gradeBand": "1-2",
+        "questionNumber": 22,
+        "sourceLabel": "Math Kangaroo 2024, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "number_arithmetic",
+        "districtId": "join-separate",
+        "skillIds": [
+          "cnt_whole_addition_subtraction"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "eric-canada-2013-g12-q18",
+      "stopId": "orchard-market",
+      "prompt": "In a park there are babies in four-wheel strollers and children on two-wheel bikes. Paula counted 12 wheels in total. There are 4 strollers and bikes altogether. How many two-wheel bikes are there?",
+      "choices": [
+        {
+          "label": "1",
+          "accessibleLabel": "Choice A: 1",
+          "visualOnly": false
+        },
+        {
+          "label": "2",
+          "accessibleLabel": "Choice B: 2",
+          "visualOnly": false
+        },
+        {
+          "label": "3",
+          "accessibleLabel": "Choice C: 3",
+          "visualOnly": false
+        },
+        {
+          "label": "4",
+          "accessibleLabel": "Choice D: 4",
+          "visualOnly": false
+        },
+        {
+          "label": "Other number",
+          "accessibleLabel": "Choice E: Other number",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 1,
+      "presentation": "semantic",
+      "asset": {
+        "src": "/math-world/questions/eric-canada-2013-g12-q18.webp",
+        "width": 900,
+        "height": 336,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2013,
+        "gradeBand": "1-2",
+        "questionNumber": 18,
+        "sourceLabel": "Math Kangaroo 2013, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "number_arithmetic",
+        "districtId": "join-separate",
+        "skillIds": [
+          "cnt_counting_cardinality",
+          "cnt_whole_addition_subtraction"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "usa-2007-grades-1-2-q04",
+      "stopId": "orchard-market",
+      "prompt": "Find the value of each letter R, A, C and place the letters in increasing order according to their values. Which word do you get? 7 \u2013 2 = R 1 + 3 = A 10 \u2013 8 = C",
+      "choices": [
+        {
+          "label": "CAR",
+          "accessibleLabel": "Choice A: CAR",
+          "visualOnly": false
+        },
+        {
+          "label": "RAC",
+          "accessibleLabel": "Choice B: RAC",
+          "visualOnly": false
+        },
+        {
+          "label": "ARC",
+          "accessibleLabel": "Choice C: ARC",
+          "visualOnly": false
+        },
+        {
+          "label": "CRA",
+          "accessibleLabel": "Choice D: CRA",
+          "visualOnly": false
+        },
+        {
+          "label": "ARAC",
+          "accessibleLabel": "Choice E: ARAC",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 0,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/usa-2007-grades-1-2-q04.webp",
+        "width": 1000,
+        "height": 289,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2007,
+        "gradeBand": "1-2",
+        "questionNumber": 4,
+        "sourceLabel": "Math Kangaroo 2007, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "number_arithmetic",
+        "districtId": "join-separate",
+        "skillIds": [
+          "cnt_whole_addition_subtraction",
+          "rsn_constraint_propagation"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "think300-l1-2-4-points-q003",
+      "stopId": "shape-shore",
+      "prompt": "How many circles can you see from above?",
+      "choices": [
+        {
+          "label": "5",
+          "accessibleLabel": "Choice A: 5",
+          "visualOnly": false
+        },
+        {
+          "label": "4",
+          "accessibleLabel": "Choice B: 4",
+          "visualOnly": false
+        },
+        {
+          "label": "3",
+          "accessibleLabel": "Choice C: 3",
+          "visualOnly": false
+        },
+        {
+          "label": "2",
+          "accessibleLabel": "Choice D: 2",
+          "visualOnly": false
+        },
+        {
+          "label": "1",
+          "accessibleLabel": "Choice E: 1",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 2,
+      "presentation": "semantic",
+      "asset": {
+        "src": "/math-world/questions/think300-l1-2-4-points-q003.webp",
+        "width": 1000,
+        "height": 368,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2024,
+        "gradeBand": "1-2",
+        "questionNumber": 3,
+        "sourceLabel": "Math Kangaroo 2024, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "geometry_spatial",
+        "districtId": "shape-properties",
+        "skillIds": [
+          "cnt_counting_cardinality",
+          "cnt_two_dimensional_shapes"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.45
+      }
+    },
+    {
+      "id": "usa-2020-grades-1-2-q03",
+      "stopId": "shape-shore",
+      "prompt": "Nelly arranged the 4 pieces to make a picture of a kangaroo. How are the pieces arranged?",
+      "choices": [
+        {
+          "label": "answer image A",
+          "accessibleLabel": "Choice A: answer image A",
+          "visualOnly": false
+        },
+        {
+          "label": "answer image B",
+          "accessibleLabel": "Choice B: answer image B",
+          "visualOnly": false
+        },
+        {
+          "label": "answer image C",
+          "accessibleLabel": "Choice C: answer image C",
+          "visualOnly": false
+        },
+        {
+          "label": "answer image D",
+          "accessibleLabel": "Choice D: answer image D",
+          "visualOnly": false
+        },
+        {
+          "label": "answer image E",
+          "accessibleLabel": "Choice E: answer image E",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 0,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/usa-2020-grades-1-2-q03.webp",
+        "width": 1000,
+        "height": 1366,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2020,
+        "gradeBand": "1-2",
+        "questionNumber": 3,
+        "sourceLabel": "Math Kangaroo 2020, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "geometry_spatial",
+        "districtId": "shape-properties",
+        "skillIds": [
+          "cnt_spatial_composition",
+          "rsn_constraint_propagation",
+          "rsn_decomposition_recomposition"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.45
+      }
+    },
+    {
+      "id": "eric-canada-2013-g12-q14",
+      "stopId": "shape-shore",
+      "prompt": "Ann has many T-shaped pieces made from four square cells. She puts as many as possible into the shown 4 by 4 square. How many cells are left empty?",
+      "choices": [
+        {
+          "label": "0",
+          "accessibleLabel": "Choice A: 0",
+          "visualOnly": false
+        },
+        {
+          "label": "1",
+          "accessibleLabel": "Choice B: 1",
+          "visualOnly": false
+        },
+        {
+          "label": "2",
+          "accessibleLabel": "Choice C: 2",
+          "visualOnly": false
+        },
+        {
+          "label": "3",
+          "accessibleLabel": "Choice D: 3",
+          "visualOnly": false
+        },
+        {
+          "label": "4",
+          "accessibleLabel": "Choice E: 4",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 0,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/eric-canada-2013-g12-q14.webp",
+        "width": 900,
+        "height": 158,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2013,
+        "gradeBand": "1-2",
+        "questionNumber": 14,
+        "sourceLabel": "Math Kangaroo 2013, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "geometry_spatial",
+        "districtId": "shape-properties",
+        "skillIds": [
+          "cnt_coordinates_grids",
+          "cnt_counting_cardinality",
+          "cnt_two_dimensional_shapes"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "usa-2007-grades-1-2-q05",
+      "stopId": "shape-shore",
+      "prompt": "Which elf does not appear in the big picture?",
+      "choices": [
+        {
+          "label": "answer image A",
+          "accessibleLabel": "Choice A: answer image A",
+          "visualOnly": false
+        },
+        {
+          "label": "answer image B",
+          "accessibleLabel": "Choice B: answer image B",
+          "visualOnly": false
+        },
+        {
+          "label": "answer image C",
+          "accessibleLabel": "Choice C: answer image C",
+          "visualOnly": false
+        },
+        {
+          "label": "answer image D",
+          "accessibleLabel": "Choice D: answer image D",
+          "visualOnly": false
+        },
+        {
+          "label": "answer image E",
+          "accessibleLabel": "Choice E: answer image E",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 3,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/usa-2007-grades-1-2-q05.webp",
+        "width": 1000,
+        "height": 289,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2007,
+        "gradeBand": "1-2",
+        "questionNumber": 5,
+        "sourceLabel": "Math Kangaroo 2007, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "geometry_spatial",
+        "districtId": "shape-properties",
+        "skillIds": [
+          "cnt_two_dimensional_shapes"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "think300-l1-2-4-points-q005",
+      "stopId": "puzzle-cliffs",
+      "prompt": "Which option shows the view from above this stack of blocks?",
+      "choices": [
+        {
+          "label": "A",
+          "accessibleLabel": "Choice A. Refer to the original question card.",
+          "visualOnly": true
+        },
+        {
+          "label": "B",
+          "accessibleLabel": "Choice B. Refer to the original question card.",
+          "visualOnly": true
+        },
+        {
+          "label": "C",
+          "accessibleLabel": "Choice C. Refer to the original question card.",
+          "visualOnly": true
+        },
+        {
+          "label": "D",
+          "accessibleLabel": "Choice D. Refer to the original question card.",
+          "visualOnly": true
+        },
+        {
+          "label": "E",
+          "accessibleLabel": "Choice E. Refer to the original question card.",
+          "visualOnly": true
+        }
+      ],
+      "correctIndex": 4,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/think300-l1-2-4-points-q005.webp",
+        "width": 1000,
+        "height": 606,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2024,
+        "gradeBand": "1-2",
+        "questionNumber": 5,
+        "sourceLabel": "Math Kangaroo 2024, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "geometry_spatial",
+        "districtId": "compose-dissect-tile",
+        "skillIds": [
+          "cnt_geometric_transformations",
+          "cnt_three_dimensional_solids"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "canada-2015-grades-1-2-q18",
+      "stopId": "puzzle-cliffs",
+      "prompt": "The following six shapes were drawn on the six walls of a cube: . Below is what you see if looking at this cube from two positions. Which shape is opposite to the Canadian Math Kangaroo logo ?",
+      "choices": [
+        {
+          "label": "A",
+          "accessibleLabel": "Choice A. Refer to the original question card.",
+          "visualOnly": true
+        },
+        {
+          "label": "B",
+          "accessibleLabel": "Choice B. Refer to the original question card.",
+          "visualOnly": true
+        },
+        {
+          "label": "C",
+          "accessibleLabel": "Choice C. Refer to the original question card.",
+          "visualOnly": true
+        },
+        {
+          "label": "D",
+          "accessibleLabel": "Choice D. Refer to the original question card.",
+          "visualOnly": true
+        },
+        {
+          "label": "E",
+          "accessibleLabel": "Choice E. Refer to the original question card.",
+          "visualOnly": true
+        }
+      ],
+      "correctIndex": 0,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/canada-2015-grades-1-2-q18.webp",
+        "width": 1000,
+        "height": 617,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2015,
+        "gradeBand": "1-2",
+        "questionNumber": 18,
+        "sourceLabel": "Math Kangaroo 2015, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "geometry_spatial",
+        "districtId": "compose-dissect-tile",
+        "skillIds": [
+          "cnt_three_dimensional_solids",
+          "cnt_two_dimensional_shapes"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "usa-2015-grades-1-2-q22",
+      "stopId": "puzzle-cliffs",
+      "prompt": "One of the six stickers shown was placed on each of the six faces of a die. The die is shown in two positions. Which picture is on the face opposite the face with the kangaroo sticker?",
+      "choices": [
+        {
+          "label": "answer image A",
+          "accessibleLabel": "Choice A: answer image A",
+          "visualOnly": false
+        },
+        {
+          "label": "answer image B",
+          "accessibleLabel": "Choice B: answer image B",
+          "visualOnly": false
+        },
+        {
+          "label": "answer image C",
+          "accessibleLabel": "Choice C: answer image C",
+          "visualOnly": false
+        },
+        {
+          "label": "answer image D",
+          "accessibleLabel": "Choice D: answer image D",
+          "visualOnly": false
+        },
+        {
+          "label": "answer image E",
+          "accessibleLabel": "Choice E: answer image E",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 1,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/usa-2015-grades-1-2-q22.webp",
+        "width": 1000,
+        "height": 1366,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2015,
+        "gradeBand": "1-2",
+        "questionNumber": 22,
+        "sourceLabel": "Math Kangaroo 2015, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "geometry_spatial",
+        "districtId": "compose-dissect-tile",
+        "skillIds": [
+          "cnt_two_dimensional_shapes"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "think300-l1-2-4-points-q006",
+      "stopId": "puzzle-cliffs",
+      "prompt": "This card is lying on the table. It is flipped over its top edge then flipped over its left edge, as shown in the picture. ? What does the card look like after the two flips?",
+      "choices": [
+        {
+          "label": "A",
+          "accessibleLabel": "Choice A. Refer to the original question card.",
+          "visualOnly": true
+        },
+        {
+          "label": "B",
+          "accessibleLabel": "Choice B. Refer to the original question card.",
+          "visualOnly": true
+        },
+        {
+          "label": "C",
+          "accessibleLabel": "Choice C. Refer to the original question card.",
+          "visualOnly": true
+        },
+        {
+          "label": "D",
+          "accessibleLabel": "Choice D. Refer to the original question card.",
+          "visualOnly": true
+        },
+        {
+          "label": "E",
+          "accessibleLabel": "Choice E. Refer to the original question card.",
+          "visualOnly": true
+        }
+      ],
+      "correctIndex": 2,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/think300-l1-2-4-points-q006.webp",
+        "width": 1000,
+        "height": 555,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2024,
+        "gradeBand": "1-2",
+        "questionNumber": 6,
+        "sourceLabel": "Math Kangaroo 2024, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "geometry_spatial",
+        "districtId": "compose-dissect-tile",
+        "skillIds": [
+          "cnt_geometric_transformations",
+          "cnt_symmetry"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "usa-2005-grades-1-2-q01",
+      "stopId": "coin-harbor",
+      "prompt": "In the enchanted garden of the Green King, there are apple trees that grow golden apples. Every day, 5 golden apples become ripe on each tree, and at the end of each day they fall from the trees. Today, the Green Gardener picked up 20 ripe apples that fell under the trees last night. How many apple trees that grow golden apples are there in the garden?",
+      "choices": [
+        {
+          "label": "4",
+          "accessibleLabel": "Choice A: 4",
+          "visualOnly": false
+        },
+        {
+          "label": "5",
+          "accessibleLabel": "Choice B: 5",
+          "visualOnly": false
+        },
+        {
+          "label": "6",
+          "accessibleLabel": "Choice C: 6",
+          "visualOnly": false
+        },
+        {
+          "label": "7",
+          "accessibleLabel": "Choice D: 7",
+          "visualOnly": false
+        },
+        {
+          "label": "8",
+          "accessibleLabel": "Choice E: 8",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 0,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/usa-2005-grades-1-2-q01.webp",
+        "width": 1000,
+        "height": 164,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2005,
+        "gradeBand": "1-2",
+        "questionNumber": 1,
+        "sourceLabel": "Math Kangaroo 2005, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "measurement_time",
+        "districtId": "money-value",
+        "skillIds": [
+          "cnt_counting_cardinality",
+          "cnt_time_calendar"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "eric-canada-2013-g12-q05",
+      "stopId": "coin-harbor",
+      "prompt": "Several students want to plant 20 tulips in the school garden. It takes ten minutes for them to plant five tulips. They started at 9:00 in the morning. At what time will they finish planting all 20 tulips?",
+      "choices": [
+        {
+          "label": "9:10",
+          "accessibleLabel": "Choice A: 9:10",
+          "visualOnly": false
+        },
+        {
+          "label": "9:20",
+          "accessibleLabel": "Choice B: 9:20",
+          "visualOnly": false
+        },
+        {
+          "label": "9:40",
+          "accessibleLabel": "Choice C: 9:40",
+          "visualOnly": false
+        },
+        {
+          "label": "9:50",
+          "accessibleLabel": "Choice D: 9:50",
+          "visualOnly": false
+        },
+        {
+          "label": "10:00",
+          "accessibleLabel": "Choice E: 10:00",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 2,
+      "presentation": "semantic",
+      "asset": {
+        "src": "/math-world/questions/eric-canada-2013-g12-q05.webp",
+        "width": 900,
+        "height": 128,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2013,
+        "gradeBand": "1-2",
+        "questionNumber": 5,
+        "sourceLabel": "Math Kangaroo 2013, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "measurement_time",
+        "districtId": "money-value",
+        "skillIds": [
+          "cnt_time_calendar"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "think300-l1-2-5-points-q006",
+      "stopId": "coin-harbor",
+      "prompt": "A dog, a cat and a monkey together weigh 20 pounds. Two cats and two monkeys weigh 18 pounds. A dog and 3 monkeys together weigh 3 pounds less than a cat, a dog and one monkey. How much does a cat weigh?",
+      "choices": [
+        {
+          "label": "3 pounds",
+          "accessibleLabel": "Choice A: 3 pounds",
+          "visualOnly": false
+        },
+        {
+          "label": "4 pounds",
+          "accessibleLabel": "Choice B: 4 pounds",
+          "visualOnly": false
+        },
+        {
+          "label": "6 pounds",
+          "accessibleLabel": "Choice C: 6 pounds",
+          "visualOnly": false
+        },
+        {
+          "label": "7 pounds",
+          "accessibleLabel": "Choice D: 7 pounds",
+          "visualOnly": false
+        },
+        {
+          "label": "8 pounds",
+          "accessibleLabel": "Choice E: 8 pounds",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 3,
+      "presentation": "semantic",
+      "asset": {
+        "src": "/math-world/questions/think300-l1-2-5-points-q006.webp",
+        "width": 1000,
+        "height": 366,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2024,
+        "gradeBand": "1-2",
+        "questionNumber": 6,
+        "sourceLabel": "Math Kangaroo 2024, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "measurement_time",
+        "districtId": "money-value",
+        "skillIds": [
+          "cnt_counting_cardinality",
+          "cnt_measurement_units",
+          "cnt_whole_addition_subtraction"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.5
+      }
+    },
+    {
+      "id": "usa-2006-grades-1-2-q06",
+      "stopId": "coin-harbor",
+      "prompt": "How many meters does Ingo walk if he starts from A and goes through B, C, D, and back to A along the shown route?",
+      "choices": [
+        {
+          "label": "15 m",
+          "accessibleLabel": "Choice A: 15 m",
+          "visualOnly": false
+        },
+        {
+          "label": "30 m",
+          "accessibleLabel": "Choice B: 30 m",
+          "visualOnly": false
+        },
+        {
+          "label": "45 m",
+          "accessibleLabel": "Choice C: 45 m",
+          "visualOnly": false
+        },
+        {
+          "label": "50 m",
+          "accessibleLabel": "Choice D: 50 m",
+          "visualOnly": false
+        },
+        {
+          "label": "60 m",
+          "accessibleLabel": "Choice E: 60 m",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 4,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/usa-2006-grades-1-2-q06.webp",
+        "width": 1000,
+        "height": 234,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2006,
+        "gradeBand": "1-2",
+        "questionNumber": 6,
+        "sourceLabel": "Math Kangaroo 2006, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "measurement_time",
+        "districtId": "money-value",
+        "skillIds": [
+          "cnt_counting_cardinality",
+          "cnt_length_distance"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "think300-l1-2-5-points-q008",
+      "stopId": "clock-tower",
+      "prompt": "A baby elephant, a cheetah, and a tiger weigh 78 pounds in total. A baby elephant and two cheetahs weigh 68 pounds. A tiger and 4 cheetahs weigh 3 pounds less than a baby elephant, a cheetah and a tiger. How much does a tiger weigh?",
+      "choices": [
+        {
+          "label": "13 pounds",
+          "accessibleLabel": "Choice A: 13 pounds",
+          "visualOnly": false
+        },
+        {
+          "label": "23 pounds",
+          "accessibleLabel": "Choice B: 23 pounds",
+          "visualOnly": false
+        },
+        {
+          "label": "33 pounds",
+          "accessibleLabel": "Choice C: 33 pounds",
+          "visualOnly": false
+        },
+        {
+          "label": "42 pounds",
+          "accessibleLabel": "Choice D: 42 pounds",
+          "visualOnly": false
+        },
+        {
+          "label": "43 pounds",
+          "accessibleLabel": "Choice E: 43 pounds",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 1,
+      "presentation": "semantic",
+      "asset": {
+        "src": "/math-world/questions/think300-l1-2-5-points-q008.webp",
+        "width": 1000,
+        "height": 513,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2024,
+        "gradeBand": "1-2",
+        "questionNumber": 8,
+        "sourceLabel": "Math Kangaroo 2024, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "measurement_time",
+        "districtId": "clock-calendar",
+        "skillIds": [
+          "cnt_counting_cardinality",
+          "cnt_measurement_units",
+          "cnt_whole_addition_subtraction"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.5
+      }
+    },
+    {
+      "id": "usa-2015-grades-1-2-q07",
+      "stopId": "clock-tower",
+      "prompt": "Half of a movie lasts half an hour. How long does the whole movie last?",
+      "choices": [
+        {
+          "label": "15 minutes",
+          "accessibleLabel": "Choice A: 15 minutes",
+          "visualOnly": false
+        },
+        {
+          "label": "half an hour",
+          "accessibleLabel": "Choice B: half an hour",
+          "visualOnly": false
+        },
+        {
+          "label": "1 hour",
+          "accessibleLabel": "Choice C: 1 hour",
+          "visualOnly": false
+        },
+        {
+          "label": "2 hours",
+          "accessibleLabel": "Choice D: 2 hours",
+          "visualOnly": false
+        },
+        {
+          "label": "40 minutes",
+          "accessibleLabel": "Choice E: 40 minutes",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 2,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/usa-2015-grades-1-2-q07.webp",
+        "width": 1000,
+        "height": 1366,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2015,
+        "gradeBand": "1-2",
+        "questionNumber": 7,
+        "sourceLabel": "Math Kangaroo 2015, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "measurement_time",
+        "districtId": "clock-calendar",
+        "skillIds": [
+          "cnt_fractions_part_whole",
+          "cnt_time_calendar"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.45
+      }
+    },
+    {
+      "id": "think300-l1-2-5-points-q011",
+      "stopId": "clock-tower",
+      "prompt": "An elephant weighs as much as two tigers, and a tiger weighs as much as 8 cats. How many cats weigh the same as an elephant?",
+      "choices": [
+        {
+          "label": "8",
+          "accessibleLabel": "Choice A: 8",
+          "visualOnly": false
+        },
+        {
+          "label": "10",
+          "accessibleLabel": "Choice B: 10",
+          "visualOnly": false
+        },
+        {
+          "label": "12",
+          "accessibleLabel": "Choice C: 12",
+          "visualOnly": false
+        },
+        {
+          "label": "16",
+          "accessibleLabel": "Choice D: 16",
+          "visualOnly": false
+        },
+        {
+          "label": "24",
+          "accessibleLabel": "Choice E: 24",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 3,
+      "presentation": "semantic",
+      "asset": {
+        "src": "/math-world/questions/think300-l1-2-5-points-q011.webp",
+        "width": 1000,
+        "height": 585,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2024,
+        "gradeBand": "1-2",
+        "questionNumber": 11,
+        "sourceLabel": "Math Kangaroo 2024, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "measurement_time",
+        "districtId": "clock-calendar",
+        "skillIds": [
+          "cnt_counting_cardinality",
+          "cnt_measurement_units"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "usa-2007-grades-1-2-q08",
+      "stopId": "clock-tower",
+      "prompt": "The road sign shows the distance between villages. How far is it from Beh\u0103ie\u015fti to Morm\u0103ie\u015fti?",
+      "choices": [
+        {
+          "label": "9 km",
+          "accessibleLabel": "Choice A: 9 km",
+          "visualOnly": false
+        },
+        {
+          "label": "6 km",
+          "accessibleLabel": "Choice B: 6 km",
+          "visualOnly": false
+        },
+        {
+          "label": "8 km",
+          "accessibleLabel": "Choice C: 8 km",
+          "visualOnly": false
+        },
+        {
+          "label": "11 km",
+          "accessibleLabel": "Choice D: 11 km",
+          "visualOnly": false
+        },
+        {
+          "label": "17 km",
+          "accessibleLabel": "Choice E: 17 km",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 0,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/usa-2007-grades-1-2-q08.webp",
+        "width": 1000,
+        "height": 188,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2007,
+        "gradeBand": "1-2",
+        "questionNumber": 8,
+        "sourceLabel": "Math Kangaroo 2007, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "measurement_time",
+        "districtId": "clock-calendar",
+        "skillIds": [
+          "cnt_length_distance"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "think300-l1-2-5-points-q009",
+      "stopId": "lighthouse-crossroads",
+      "prompt": "A blue shirt, a grey skirt and a pair of black pants costs 95 dollars. Tina Woborudgh Pt trwoob bllueem shsirt s( Oanpd ea grraeyt isokirnt.) She spent 71 dollars. George bought a blue shirt for himself, and bought 3 pairs of black pants for his brothers. He spent 85 more dollars than Tina. How much is the price of one pair of black pants?",
+      "choices": [
+        {
+          "label": "21 dollars",
+          "accessibleLabel": "Choice A: 21 dollars",
+          "visualOnly": false
+        },
+        {
+          "label": "29 dollars",
+          "accessibleLabel": "Choice B: 29 dollars",
+          "visualOnly": false
+        },
+        {
+          "label": "35 dollars",
+          "accessibleLabel": "Choice C: 35 dollars",
+          "visualOnly": false
+        },
+        {
+          "label": "45 dollars",
+          "accessibleLabel": "Choice D: 45 dollars",
+          "visualOnly": false
+        },
+        {
+          "label": "49 dollars",
+          "accessibleLabel": "Choice E: 49 dollars",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 3,
+      "presentation": "semantic",
+      "asset": {
+        "src": "/math-world/questions/think300-l1-2-5-points-q009.webp",
+        "width": 1000,
+        "height": 425,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2024,
+        "gradeBand": "1-2",
+        "questionNumber": 9,
+        "sourceLabel": "Math Kangaroo 2024, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "number_arithmetic",
+        "districtId": "mixed-expedition",
+        "skillIds": [
+          "cnt_counting_cardinality",
+          "cnt_money_value"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "usa-2016-grades-1-2-q22",
+      "stopId": "lighthouse-crossroads",
+      "prompt": "In the picture you see 4 ladybugs. Each one sits on a flower. The flower on which a ladybug sits has as many leaves as the difference of the dots on the ladybug's wings, and as many petals as the sum of the dots on its wings. Which of the following flowers has no ladybug on it?",
+      "choices": [
+        {
+          "label": "answer image A",
+          "accessibleLabel": "Choice A: answer image A",
+          "visualOnly": false
+        },
+        {
+          "label": "answer image B",
+          "accessibleLabel": "Choice B: answer image B",
+          "visualOnly": false
+        },
+        {
+          "label": "answer image C",
+          "accessibleLabel": "Choice C: answer image C",
+          "visualOnly": false
+        },
+        {
+          "label": "answer image D",
+          "accessibleLabel": "Choice D: answer image D",
+          "visualOnly": false
+        },
+        {
+          "label": "answer image E",
+          "accessibleLabel": "Choice E: answer image E",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 4,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/usa-2016-grades-1-2-q22.webp",
+        "width": 1000,
+        "height": 1366,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2016,
+        "gradeBand": "1-2",
+        "questionNumber": 22,
+        "sourceLabel": "Math Kangaroo 2016, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "number_arithmetic",
+        "districtId": "mixed-expedition",
+        "skillIds": [
+          "cnt_whole_addition_subtraction"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "usa-2006-grades-1-2-q13",
+      "stopId": "lighthouse-crossroads",
+      "prompt": "How far does Cristi live from Andra on the shown street?",
+      "choices": [
+        {
+          "label": "170 m",
+          "accessibleLabel": "Choice A: 170 m",
+          "visualOnly": false
+        },
+        {
+          "label": "200 m",
+          "accessibleLabel": "Choice B: 200 m",
+          "visualOnly": false
+        },
+        {
+          "label": "250 m",
+          "accessibleLabel": "Choice C: 250 m",
+          "visualOnly": false
+        },
+        {
+          "label": "150 m",
+          "accessibleLabel": "Choice D: 150 m",
+          "visualOnly": false
+        },
+        {
+          "label": "80 m",
+          "accessibleLabel": "Choice E: 80 m",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 4,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/usa-2006-grades-1-2-q13.webp",
+        "width": 1000,
+        "height": 257,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2006,
+        "gradeBand": "1-2",
+        "questionNumber": 13,
+        "sourceLabel": "Math Kangaroo 2006, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "geometry_spatial",
+        "districtId": "mixed-expedition",
+        "skillIds": [
+          "cnt_two_dimensional_shapes"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "think300-l1-2-4-points-q007",
+      "stopId": "lighthouse-crossroads",
+      "prompt": "This card is lying on the table. It is flipped over its right edge then flipped over its top edge, as shown in the picture. ? What does the card look like after the two flips?",
+      "choices": [
+        {
+          "label": "A",
+          "accessibleLabel": "Choice A. Refer to the original question card.",
+          "visualOnly": true
+        },
+        {
+          "label": "B",
+          "accessibleLabel": "Choice B. Refer to the original question card.",
+          "visualOnly": true
+        },
+        {
+          "label": "C",
+          "accessibleLabel": "Choice C. Refer to the original question card.",
+          "visualOnly": true
+        },
+        {
+          "label": "D",
+          "accessibleLabel": "Choice D. Refer to the original question card.",
+          "visualOnly": true
+        },
+        {
+          "label": "E",
+          "accessibleLabel": "Choice E. Refer to the original question card.",
+          "visualOnly": true
+        }
+      ],
+      "correctIndex": 1,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/think300-l1-2-4-points-q007.webp",
+        "width": 1000,
+        "height": 687,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2024,
+        "gradeBand": "1-2",
+        "questionNumber": 7,
+        "sourceLabel": "Math Kangaroo 2024, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "geometry_spatial",
+        "districtId": "mixed-expedition",
+        "skillIds": [
+          "cnt_geometric_transformations",
+          "cnt_symmetry"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.6
+      }
+    },
+    {
+      "id": "think300-l1-2-4-points-q031",
+      "stopId": "lighthouse-crossroads",
+      "prompt": "How many pears weigh as much as one apple?",
+      "choices": [
+        {
+          "label": "1",
+          "accessibleLabel": "Choice A: 1",
+          "visualOnly": false
+        },
+        {
+          "label": "2",
+          "accessibleLabel": "Choice B: 2",
+          "visualOnly": false
+        },
+        {
+          "label": "3",
+          "accessibleLabel": "Choice C: 3",
+          "visualOnly": false
+        },
+        {
+          "label": "4",
+          "accessibleLabel": "Choice D: 4",
+          "visualOnly": false
+        },
+        {
+          "label": "5",
+          "accessibleLabel": "Choice E: 5",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 1,
+      "presentation": "semantic",
+      "asset": {
+        "src": "/math-world/questions/think300-l1-2-4-points-q031.webp",
+        "width": 1000,
+        "height": 497,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2024,
+        "gradeBand": "1-2",
+        "questionNumber": 31,
+        "sourceLabel": "Math Kangaroo 2024, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "measurement_time",
+        "districtId": "mixed-expedition",
+        "skillIds": [
+          "cnt_counting_cardinality",
+          "cnt_measurement_units"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.45
+      }
+    },
+    {
+      "id": "usa-2006-grades-1-2-q09",
+      "stopId": "lighthouse-crossroads",
+      "prompt": "Lucy, Maria and Anna have a meeting at 12:30. Lucy's walk takes 10 minutes, Maria's takes a quarter of an hour, and Anna's takes 40 minutes. At what time must the person with the longest walk leave home?",
+      "choices": [
+        {
+          "label": "12:00",
+          "accessibleLabel": "Choice A: 12:00",
+          "visualOnly": false
+        },
+        {
+          "label": "12:10",
+          "accessibleLabel": "Choice B: 12:10",
+          "visualOnly": false
+        },
+        {
+          "label": "12:15",
+          "accessibleLabel": "Choice C: 12:15",
+          "visualOnly": false
+        },
+        {
+          "label": "12:20",
+          "accessibleLabel": "Choice D: 12:20",
+          "visualOnly": false
+        },
+        {
+          "label": "11:50",
+          "accessibleLabel": "Choice E: 11:50",
+          "visualOnly": false
+        }
+      ],
+      "correctIndex": 4,
+      "presentation": "source-card",
+      "asset": {
+        "src": "/math-world/questions/usa-2006-grades-1-2-q09.webp",
+        "width": 1000,
+        "height": 141,
+        "alt": "Original Math Kangaroo question card. Answer using the five accessible choices below."
+      },
+      "source": {
+        "year": 2006,
+        "gradeBand": "1-2",
+        "questionNumber": 9,
+        "sourceLabel": "Math Kangaroo 2006, Grades 1\u20132"
+      },
+      "curriculum": {
+        "realmId": "measurement_time",
+        "districtId": "mixed-expedition",
+        "skillIds": [
+          "cnt_fractions_part_whole",
+          "cnt_time_calendar"
+        ],
+        "placementVersion": "mk-map-ontology.v1",
+        "placementStatus": "provisional-playtest",
+        "proposalConfidence": 0.45
+      }
+    }
+  ]
+}

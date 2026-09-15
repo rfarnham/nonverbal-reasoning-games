@@ -1,0 +1,228 @@
+{
+  "schemaVersion": 1,
+  "ontologyVersion": "mk-map-ontology.v1",
+  "status": "approved-static-placement",
+  "approvedAt": "2026-08-09",
+  "approvalScope": "Product geography, static sequencing, and descriptive question placement. This is not a mastery model or psychometric validation.",
+  "hierarchies": {
+    "curriculum": ["realm", "district", "skill", "stage"],
+    "geography": ["chapter", "world", "zone", "stop", "question"]
+  },
+  "stages": [
+    { "id": "s1", "label": "concrete" },
+    { "id": "s2", "label": "direct" },
+    { "id": "s3", "label": "structured" },
+    { "id": "s4", "label": "integrated" },
+    { "id": "s5", "label": "novel" }
+  ],
+  "realms": [
+    {
+      "id": "number_arithmetic",
+      "label": "Number & Operations",
+      "icon": "123",
+      "accent": "#f3bd4e",
+      "geographyGrammar": ["terraces", "markets", "bridges", "stacked markers"],
+      "districts": [
+        {
+          "id": "count-compare",
+          "label": "Count & Compare",
+          "skillSequence": ["cnt_counting_cardinality", "cnt_order_magnitude", "cnt_integers_absolute_value"]
+        },
+        {
+          "id": "join-separate",
+          "label": "Join & Separate",
+          "skillSequence": ["cnt_whole_addition_subtraction", "cnt_arithmetic_expressions", "cnt_integer_operations"]
+        },
+        {
+          "id": "equal-groups-sharing",
+          "label": "Equal Groups & Sharing",
+          "skillSequence": ["cnt_whole_multiplication_division", "cnt_ratio_proportion", "cnt_rates_percent"]
+        },
+        {
+          "id": "equal-parts-fractions",
+          "label": "Equal Parts & Fractions",
+          "skillSequence": ["cnt_fractions_part_whole", "cnt_fraction_equivalence_comparison", "cnt_fraction_operations", "cnt_decimals_percent"]
+        },
+        {
+          "id": "number-digit-structure",
+          "label": "Number & Digit Structure",
+          "skillSequence": ["cnt_place_value", "cnt_digit_constraints", "cnt_parity", "cnt_factors_multiples", "cnt_prime_factorization", "cnt_divisibility", "cnt_remainders_cycles", "cnt_powers_roots"]
+        }
+      ]
+    },
+    {
+      "id": "patterns_algebra",
+      "label": "Patterns & Algebra",
+      "icon": "↗",
+      "accent": "#f06f5f",
+      "geographyGrammar": ["mosaics", "clockwork gardens", "repeating lanterns", "signal towers"],
+      "districts": [
+        {
+          "id": "repeat-grow",
+          "label": "Repeat & Grow",
+          "skillSequence": ["cnt_visual_patterns", "cnt_numeric_patterns_sequences", "cnt_recursive_sequences"]
+        },
+        {
+          "id": "equality-missing-values",
+          "label": "Equality & Missing Values",
+          "skillSequence": ["cnt_unknowns_equations", "cnt_algebraic_expressions", "cnt_inequalities_bounds", "cnt_systems_relations"]
+        },
+        {
+          "id": "tables-codes-correspondence",
+          "label": "Tables, Codes & Correspondence",
+          "skillSequence": ["cnt_symbol_codes", "cnt_functional_relationships"]
+        },
+        {
+          "id": "order-rank-relations",
+          "label": "Order, Rank & Relations",
+          "skillSequence": ["cnt_order_rank_chains", "cnt_relational_dependencies"]
+        }
+      ]
+    },
+    {
+      "id": "logic_constraints",
+      "label": "Logic & Constraints",
+      "icon": "◇",
+      "accent": "#1679d2",
+      "geographyGrammar": ["maze walls", "citadels", "gates", "keys"],
+      "districts": [
+        {
+          "id": "clues-ordering",
+          "label": "Clues & Ordering",
+          "skillSequence": ["cnt_multi_clue_ordering", "cnt_truth_consistency"]
+        },
+        {
+          "id": "constraint-placement",
+          "label": "Constraint Placement",
+          "skillSequence": ["cnt_assignment_constraints", "cnt_adjacency_capacity_constraints"]
+        },
+        {
+          "id": "work-backward",
+          "label": "Work Backward",
+          "skillSequence": ["cnt_state_reversal", "cnt_multistep_processes"]
+        },
+        {
+          "id": "elimination-invariants",
+          "label": "Elimination & Invariants",
+          "skillSequence": ["cnt_possible_impossible", "cnt_invariant_structure"]
+        }
+      ]
+    },
+    {
+      "id": "counting_combinatorics",
+      "label": "Possibilities, Chance & Data",
+      "icon": "⑂",
+      "accent": "#e56b91",
+      "geographyGrammar": ["branching rivers", "rail junctions", "harbors", "route networks"],
+      "districts": [
+        {
+          "id": "arrangements-selections",
+          "label": "Arrangements & Selections",
+          "skillSequence": ["cnt_combinatorial_counting", "cnt_arrangements_selections", "cnt_permutations_combinations"]
+        },
+        {
+          "id": "systematic-counting",
+          "label": "Systematic Counting",
+          "skillSequence": ["rsn_systematic_enumeration", "prc_organize_cases_table", "prc_tree_diagram_enumeration", "prc_inclusion_exclusion"]
+        },
+        {
+          "id": "paths-networks",
+          "label": "Paths & Networks",
+          "skillSequence": ["cnt_paths_networks", "prc_grid_path_counting", "cnt_graph_connectivity"]
+        },
+        {
+          "id": "chance-outcomes",
+          "label": "Chance & Outcomes",
+          "skillSequence": ["cnt_sample_spaces", "cnt_elementary_probability", "cnt_conditional_probability", "cnt_data_interpretation"]
+        }
+      ]
+    },
+    {
+      "id": "geometry_spatial",
+      "label": "Shape & Space",
+      "icon": "△",
+      "accent": "#7767d7",
+      "geographyGrammar": ["crystal cliffs", "tiled beaches", "folded structures", "view towers"],
+      "districts": [
+        {
+          "id": "shape-properties",
+          "label": "Shape Properties",
+          "skillSequence": ["cnt_two_dimensional_shapes", "cnt_polygon_angle_structure", "cnt_congruence_similarity", "cnt_circle_geometry"]
+        },
+        {
+          "id": "compose-dissect-tile",
+          "label": "Compose, Dissect & Tile",
+          "skillSequence": ["cnt_spatial_composition", "cnt_tessellation_covering"]
+        },
+        {
+          "id": "turn-reflect-symmetry",
+          "label": "Turn, Reflect & Symmetry",
+          "skillSequence": ["cnt_angles_turns", "cnt_geometric_transformations", "cnt_symmetry"]
+        },
+        {
+          "id": "solids-stacks-views",
+          "label": "Solids, Stacks & Views",
+          "skillSequence": ["cnt_three_dimensional_solids", "cnt_nets_cross_sections", "cnt_volume_surface_area"]
+        },
+        {
+          "id": "position-direction",
+          "label": "Position & Direction",
+          "skillSequence": ["cnt_coordinates_grids", "cnt_coordinate_geometry", "cnt_viewpoint_navigation"]
+        }
+      ]
+    },
+    {
+      "id": "measurement_time",
+      "label": "Measurement & Modeling",
+      "icon": "◷",
+      "accent": "#35a999",
+      "geographyGrammar": ["observatories", "docks", "clocks", "scales"],
+      "districts": [
+        {
+          "id": "clock-calendar",
+          "label": "Clock & Calendar",
+          "skillSequence": ["cnt_time_calendar", "prc_elapsed_time"]
+        },
+        {
+          "id": "money-value",
+          "label": "Money & Value",
+          "skillSequence": ["cnt_money_value", "cnt_exchange_comparison"]
+        },
+        {
+          "id": "length-distance",
+          "label": "Length & Distance",
+          "skillSequence": ["cnt_length_distance", "cnt_rate_distance_time", "cnt_scale_reasoning"]
+        },
+        {
+          "id": "perimeter-area-covering",
+          "label": "Perimeter, Area & Covering",
+          "skillSequence": ["cnt_perimeter", "cnt_area", "cnt_composite_measure"]
+        },
+        {
+          "id": "weight-capacity-units",
+          "label": "Weight, Capacity & Units",
+          "skillSequence": ["cnt_measurement_units", "cnt_mass_capacity", "cnt_volume_capacity", "prc_unit_conversion"]
+        }
+      ]
+    }
+  ],
+  "routingStates": [
+    { "id": "mixed", "destination": "crossroads-or-culmination" },
+    { "id": "unknown", "destination": "playtest-placement-queue" }
+  ],
+  "nonGeographicFacets": [
+    "representation",
+    "reasoning-move",
+    "procedure",
+    "cognitive-demand",
+    "incidental-load",
+    "provenance"
+  ],
+  "placementPolicy": {
+    "onePrimaryLocation": true,
+    "secondarySkillsAllowed": true,
+    "reviewFlagsBlockRelease": false,
+    "prerequisiteEdgesGateProgress": false,
+    "staticWorldManifestDefinesOrder": true
+  }
+}
