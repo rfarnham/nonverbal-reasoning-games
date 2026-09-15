@@ -10,7 +10,12 @@ import {
   normalizePerformanceAttempts,
 } from "../app/lab/subtraction-flash/performance-analytics.ts";
 import {
+  createBorrowFlashProfileStorage,
+} from "../app/lab/subtraction-flash/borrow-flash-profiles.ts";
+import {
   PERFORMANCE_SCHEMA_VERSION,
+  PERFORMANCE_LEGACY_STORAGE_KEY,
+  PERFORMANCE_LEVELS,
   PERFORMANCE_STORAGE_KEY,
   appendPerformanceAttempt,
   createPerformanceAttempt,
@@ -31,6 +36,23 @@ class MemoryStorage {
   setItem(key, value) {
     this.values.set(key, String(value));
   }
+
+  removeItem(key) {
+    this.values.delete(key);
+  }
+}
+
+function withoutV2Fields(record) {
+  return Object.fromEntries(
+    Object.entries(record).filter(
+      ([key]) =>
+        key !== "level" &&
+        key !== "inputMode" &&
+        key !== "attemptOrdinal" &&
+        key !== "firstAttempt" &&
+        key !== "sessionLane",
+    ),
+  );
 }
 
 const BASE_TIME = new Date(2026, 0, 15, 9, 30).getTime();
@@ -44,7 +66,9 @@ function coreAttempt(changes = {}) {
     occurredAt: BASE_TIME + sessionPosition * 1_000,
     sessionPosition,
     gameType: "infinite",
+    level: "B100",
     presentationMode: "visual",
+    inputMode: "tap",
     orientation: "horizontal",
     inputSource: "tap",
     cardId: `visual:1:13-4:${sessionPosition}`,
@@ -76,7 +100,9 @@ function normalizedAttempt(changes = {}) {
     timeZone: "America/Los_Angeles",
     utcOffsetMinutes: -480,
     gameType: "infinite",
+    level: "B100",
     presentationMode: "visual",
+    inputMode: "tap",
     orientation: "horizontal",
     inputSource: "tap",
     minuend: 13,
@@ -111,7 +137,9 @@ test("storage appends strict session and attempt events without rewriting duplic
   const session = createPerformanceSession({
     sessionId: "run-1",
     gameType: "infinite",
+    level: "B100",
     presentationMode: "visual",
+    inputMode: "tap",
     baseDeckSize: 72,
     startedAt: BASE_TIME,
   });
@@ -140,6 +168,17 @@ test("storage appends strict session and attempt events without rewriting duplic
     status: "conflict",
   });
   assert.deepEqual(
+    appendPerformanceAttempt(
+      coreAttempt({
+        id: "run-1:wrong-configured-mode",
+        inputMode: "draw",
+        inputSource: "handwriting",
+      }),
+      storage,
+    ),
+    { ok: false, status: "conflict" },
+  );
+  assert.deepEqual(
     finishPerformanceSession(
       "run-1",
       {
@@ -164,11 +203,162 @@ test("storage appends strict session and attempt events without rewriting duplic
   assert.equal(loaded.log?.attempts.length, 1);
   assert.equal(loaded.log?.sessionEvents.length, 2);
   assert.equal(loaded.log?.attempts[0].rawRecognition, "nine, clearly");
+  assert.equal(loaded.log?.attempts[0].attemptOrdinal, 1);
+  assert.equal(loaded.log?.attempts[0].firstAttempt, true);
+  assert.equal(loaded.log?.attempts[0].sessionLane, "main");
 
   const csv = performanceAttemptsToCsv(undefined, storage);
   assert.match(csv, /date,time,time_zone/);
   assert.match(csv, /correct,true,1500/);
   assert.match(csv, /"nine, clearly"/);
+});
+
+test("raw retries and redemption stay stored while analysis scores only the first miss", () => {
+  const storage = new MemoryStorage();
+  assert.equal(
+    startPerformanceSession(
+      createPerformanceSession({
+        sessionId: "retry-run",
+        gameType: "infinite",
+        level: "B100",
+        presentationMode: "visual",
+        inputMode: "draw",
+        baseDeckSize: 72,
+        startedAt: BASE_TIME,
+      }),
+      storage,
+    ).ok,
+    true,
+  );
+
+  const shared = {
+    sessionId: "retry-run",
+    inputMode: "draw",
+    inputSource: "handwriting",
+    cardId: "visual:1:13-4:1",
+  };
+  const firstMiss = coreAttempt({
+    ...shared,
+    sessionPosition: 1,
+    submittedAnswer: 8,
+    correct: false,
+    attemptOrdinal: 1,
+    firstAttempt: true,
+    sessionLane: "main",
+    rawRecognition: "8",
+    recognitionConfidence: 0.94,
+  });
+  const retrySuccess = coreAttempt({
+    ...shared,
+    sessionPosition: 2,
+    submittedAnswer: 9,
+    correct: true,
+    attemptOrdinal: 2,
+    firstAttempt: false,
+    sessionLane: "retry",
+    rawRecognition: "9",
+    recognitionConfidence: 0.9,
+  });
+  const redemptionSuccess = coreAttempt({
+    ...shared,
+    sessionPosition: 3,
+    submittedAnswer: 9,
+    correct: true,
+    attemptOrdinal: 1,
+    firstAttempt: false,
+    sessionLane: "redemption",
+    isReview: true,
+    rawRecognition: "nine",
+    recognitionConfidence: 0.86,
+  });
+
+  for (const attempt of [firstMiss, retrySuccess, redemptionSuccess]) {
+    assert.equal(appendPerformanceAttempt(attempt, storage).ok, true);
+  }
+
+  const raw = loadPerformanceLogDiagnostic(storage).log?.attempts ?? [];
+  assert.equal(raw.length, 3);
+  assert.deepEqual(
+    raw.map(({ attemptOrdinal, firstAttempt, sessionLane, rawRecognition }) => ({
+      attemptOrdinal,
+      firstAttempt,
+      sessionLane,
+      rawRecognition,
+    })),
+    [
+      {
+        attemptOrdinal: 1,
+        firstAttempt: true,
+        sessionLane: "main",
+        rawRecognition: "8",
+      },
+      {
+        attemptOrdinal: 2,
+        firstAttempt: false,
+        sessionLane: "retry",
+        rawRecognition: "9",
+      },
+      {
+        attemptOrdinal: 1,
+        firstAttempt: false,
+        sessionLane: "redemption",
+        rawRecognition: "nine",
+      },
+    ],
+  );
+
+  const normalized = normalizePerformanceAttempts(raw, []);
+  assert.equal(normalized.length, 1);
+  assert.equal(normalized[0].correct, false);
+  assert.equal(buildLatencyDistribution(normalized).infinity.count, 1);
+
+  const [header, ...rows] = performanceAttemptsToCsv(raw, storage).split("\r\n");
+  assert.equal(rows.length, 3);
+  assert.match(header, /attempt_ordinal,first_attempt,session_lane/);
+  assert.match(rows[1], /retry/);
+  assert.match(rows[2], /redemption/);
+});
+
+test("attempt progress metadata rejects ambiguous scored retries", () => {
+  assert.throws(
+    () =>
+      coreAttempt({
+        attemptOrdinal: 2,
+        firstAttempt: true,
+        sessionLane: "retry",
+      }),
+    /Only ordinal 1 in the main lane/,
+  );
+  assert.throws(
+    () => coreAttempt({ attemptOrdinal: 0 }),
+    /positive integer/,
+  );
+});
+
+test("existing v2 rows gain first-attempt metadata without rewriting storage", () => {
+  const storage = new MemoryStorage();
+  const current = coreAttempt({ isReview: true });
+  const legacyV2 = Object.fromEntries(
+    Object.entries(current).filter(
+      ([key]) =>
+        key !== "attemptOrdinal" &&
+        key !== "firstAttempt" &&
+        key !== "sessionLane",
+    ),
+  );
+  const serialized = JSON.stringify({
+    schemaVersion: PERFORMANCE_SCHEMA_VERSION,
+    attempts: [legacyV2],
+    sessionEvents: [],
+  });
+  storage.setItem(PERFORMANCE_STORAGE_KEY, serialized);
+
+  const loaded = loadPerformanceLogDiagnostic(storage);
+  assert.equal(loaded.status, "loaded");
+  assert.equal(loaded.log?.attempts[0].attemptOrdinal, 1);
+  assert.equal(loaded.log?.attempts[0].firstAttempt, false);
+  assert.equal(loaded.log?.attempts[0].sessionLane, "redemption");
+  assert.equal(storage.getItem(PERFORMANCE_STORAGE_KEY), serialized);
 });
 
 test("corrupt and newer-schema storage is diagnosed and never overwritten", () => {
@@ -184,6 +374,219 @@ test("corrupt and newer-schema storage is diagnosed and never overwritten", () =
     assert.equal(appendPerformanceAttempt(coreAttempt(), storage).ok, false);
     assert.equal(storage.getItem(PERFORMANCE_STORAGE_KEY), raw);
   }
+});
+
+test("v1 logs migrate in memory and are preserved when v2 data is written", () => {
+  const storage = new MemoryStorage();
+  const currentAttempt = coreAttempt({
+    inputMode: "draw",
+    inputSource: "handwriting",
+  });
+  const currentSession = createPerformanceSession({
+    sessionId: "run-1",
+    gameType: "infinite",
+    level: "B100",
+    presentationMode: "visual",
+    inputMode: "draw",
+    baseDeckSize: 72,
+    startedAt: BASE_TIME,
+  });
+  const legacyAttempt = withoutV2Fields(currentAttempt);
+  const legacySession = withoutV2Fields(currentSession);
+  const legacyRaw = JSON.stringify({
+    schemaVersion: 1,
+    attempts: [legacyAttempt],
+    sessionEvents: [legacySession],
+  });
+  storage.setItem(PERFORMANCE_LEGACY_STORAGE_KEY, legacyRaw);
+
+  const migrated = loadPerformanceLogDiagnostic(storage);
+  assert.equal(migrated.status, "loaded");
+  assert.equal(migrated.log?.schemaVersion, PERFORMANCE_SCHEMA_VERSION);
+  assert.equal(migrated.log?.attempts[0].level, "B100");
+  assert.equal(migrated.log?.attempts[0].inputMode, "draw");
+  assert.equal(migrated.log?.sessionEvents[0].inputMode, "draw");
+  assert.equal(storage.getItem(PERFORMANCE_STORAGE_KEY), null);
+
+  const b120Session = createPerformanceSession({
+    sessionId: "run-b120",
+    gameType: "infinite",
+    level: "B120",
+    presentationMode: "visual",
+    inputMode: "speak",
+    baseDeckSize: 100,
+    startedAt: BASE_TIME + 1_000,
+  });
+  assert.equal(startPerformanceSession(b120Session, storage).ok, true);
+  const b120Attempt = createPerformanceAttempt({
+    ...coreAttempt({
+      id: "run-b120:1",
+      sessionId: "run-b120",
+      sessionPosition: 2,
+      level: "B120",
+      inputMode: "speak",
+      inputSource: "speech",
+      cardId: "visual:1:64-10:2",
+      factKey: "64-10",
+      minuend: 64,
+      subtrahend: 10,
+      expectedAnswer: 54,
+      submittedAnswer: 54,
+    }),
+  });
+  assert.equal(appendPerformanceAttempt(b120Attempt, storage).ok, true);
+  assert.equal(storage.getItem(PERFORMANCE_LEGACY_STORAGE_KEY), legacyRaw);
+  const persistedV2 = JSON.parse(storage.getItem(PERFORMANCE_STORAGE_KEY));
+  assert.equal(persistedV2.schemaVersion, 2);
+  assert.equal(persistedV2.attempts.length, 2);
+  assert.equal(persistedV2.sessionEvents.length, 2);
+});
+
+test("B120 accepts borrowing facts through 64 and the explicit minus-ten exception", () => {
+  const accepted = coreAttempt({
+    level: "B120",
+    minuend: 64,
+    subtrahend: 10,
+    expectedAnswer: 54,
+    submittedAnswer: 54,
+    factKey: "64-10",
+    cardId: "visual:1:64-10:1",
+  });
+  assert.equal(accepted.level, "B120");
+  assert.equal(accepted.subtrahend, 10);
+
+  assert.throws(
+    () => coreAttempt({
+      level: "B120",
+      minuend: 64,
+      subtrahend: 2,
+      expectedAnswer: 62,
+      submittedAnswer: 62,
+      factKey: "64-2",
+      cardId: "visual:1:64-2:1",
+    }),
+    /selected level/,
+  );
+});
+
+test("B140 accepts two-digit operands and answers with and without borrowing", () => {
+  assert.deepEqual(PERFORMANCE_LEVELS, ["B100", "B120", "B140"]);
+  for (const fact of [
+    { minuend: 99, subtrahend: 10 },
+    { minuend: 84, subtrahend: 32 },
+    { minuend: 82, subtrahend: 47 },
+    { minuend: 99, subtrahend: 89 },
+    { minuend: 20, subtrahend: 10 },
+  ]) {
+    const expectedAnswer = fact.minuend - fact.subtrahend;
+    const accepted = coreAttempt({
+      level: "B140",
+      ...fact,
+      expectedAnswer,
+      submittedAnswer: expectedAnswer,
+      factKey: `${fact.minuend}-${fact.subtrahend}`,
+      cardId: `visual:1:${fact.minuend}-${fact.subtrahend}:1`,
+    });
+    assert.equal(accepted.level, "B140");
+    assert.equal(accepted.expectedAnswer, expectedAnswer);
+  }
+
+  for (const fact of [
+    { minuend: 19, subtrahend: 10 },
+    { minuend: 100, subtrahend: 10 },
+    { minuend: 82, subtrahend: 9 },
+    { minuend: 99, subtrahend: 99 },
+    { minuend: 78, subtrahend: 82 },
+    { minuend: 82, subtrahend: 73 },
+  ]) {
+    const expectedAnswer = fact.minuend - fact.subtrahend;
+    assert.throws(
+      () => coreAttempt({
+        level: "B140",
+        ...fact,
+        expectedAnswer,
+        submittedAnswer: expectedAnswer,
+        factKey: `${fact.minuend}-${fact.subtrahend}`,
+        cardId: `visual:1:${fact.minuend}-${fact.subtrahend}:1`,
+      }),
+      /selected level/,
+    );
+  }
+});
+
+test("B140 logs and analysis remain isolated to the selected profile", () => {
+  const deviceStorage = new MemoryStorage();
+  const firstProfile = createBorrowFlashProfileStorage(
+    "profile-first1234",
+    deviceStorage,
+  );
+  const secondProfile = createBorrowFlashProfileStorage(
+    "profile-second123",
+    deviceStorage,
+  );
+  assert.ok(firstProfile);
+  assert.ok(secondProfile);
+
+  const session = createPerformanceSession({
+    sessionId: "same-session-id",
+    gameType: "deck-sprint",
+    level: "B140",
+    presentationMode: "visual",
+    inputMode: "tap",
+    baseDeckSize: 64,
+    startedAt: BASE_TIME,
+  });
+  assert.equal(startPerformanceSession(session, firstProfile).ok, true);
+  assert.equal(startPerformanceSession(session, secondProfile).ok, true);
+
+  const firstAttempt = coreAttempt({
+    id: "same-attempt-id",
+    sessionId: session.sessionId,
+    gameType: session.gameType,
+    level: "B140",
+    minuend: 84,
+    subtrahend: 32,
+    expectedAnswer: 52,
+    submittedAnswer: 52,
+    factKey: "84-32",
+    cardId: "B140:visual:1:84-32:horizontal",
+  });
+  const secondAttempt = coreAttempt({
+    id: "same-attempt-id",
+    sessionId: session.sessionId,
+    gameType: session.gameType,
+    level: "B140",
+    minuend: 82,
+    subtrahend: 47,
+    expectedAnswer: 35,
+    submittedAnswer: 34,
+    correct: false,
+    factKey: "82-47",
+    cardId: "B140:visual:1:82-47:horizontal",
+  });
+  assert.equal(appendPerformanceAttempt(firstAttempt, firstProfile).ok, true);
+  assert.equal(appendPerformanceAttempt(secondAttempt, secondProfile).ok, true);
+
+  const firstRows = loadPerformanceLogDiagnostic(firstProfile).log?.attempts ?? [];
+  const secondRows = loadPerformanceLogDiagnostic(secondProfile).log?.attempts ?? [];
+  assert.deepEqual(firstRows.map(({ factKey }) => factKey), ["84-32"]);
+  assert.deepEqual(secondRows.map(({ factKey }) => factKey), ["82-47"]);
+  assert.equal(deviceStorage.getItem(PERFORMANCE_STORAGE_KEY), null);
+
+  assert.deepEqual(
+    filterPerformanceAttempts(normalizePerformanceAttempts(firstRows), {
+      levels: ["B140"],
+      minuends: [84],
+      subtrahends: [32],
+    }).map(({ factKey }) => factKey),
+    ["84-32"],
+  );
+  assert.equal(
+    filterPerformanceAttempts(normalizePerformanceAttempts(firstRows), {
+      levels: ["B120"],
+    }).length,
+    0,
+  );
 });
 
 test("wrong answers are the infinity spike while summary timing is correct-only", () => {
@@ -258,6 +661,7 @@ test("normalization and filters combine Flash and adaptive attempt rows", () => 
     presentationMode: "listen",
     orientation: null,
     inputSource: "speech",
+    inputMode: "speak",
   });
   const adaptive = {
     id: "adaptive-1",
@@ -311,6 +715,8 @@ test("normalization and filters combine Flash and adaptive attempt rows", () => 
 
   const normalized = normalizePerformanceAttempts([flash], [adaptive]);
   assert.deepEqual(normalized.map((row) => row.gameType), ["two-minute", "adaptive"]);
+  assert.deepEqual(normalized.map((row) => row.level), ["B100", null]);
+  assert.deepEqual(normalized.map((row) => row.inputMode), ["speak", null]);
   assert.equal(normalized[1].inputSource, "handwriting");
   assert.equal(normalized[1].isReview, true);
 
@@ -329,6 +735,13 @@ test("normalization and filters combine Flash and adaptive attempt rows", () => 
     filterPerformanceAttempts(normalized, { presentationModes: ["listen"] }).length,
     1,
   );
+  assert.equal(
+    filterPerformanceAttempts(normalized, {
+      levels: ["B100"],
+      inputModes: ["speak"],
+    }).length,
+    1,
+  );
 });
 
 test("trace attempts round-trip through storage, filters, and CSV export", () => {
@@ -336,7 +749,9 @@ test("trace attempts round-trip through storage, filters, and CSV export", () =>
   const session = createPerformanceSession({
     sessionId: "trace-run",
     gameType: "infinite",
+    level: "B100",
     presentationMode: "visual",
+    inputMode: "trace",
     baseDeckSize: 72,
     startedAt: BASE_TIME,
   });
@@ -344,6 +759,7 @@ test("trace attempts round-trip through storage, filters, and CSV export", () =>
     id: "trace-run:1",
     sessionId: "trace-run",
     inputSource: "trace",
+    inputMode: "trace",
     elapsedMs: 5_875,
     slow: false,
   });
@@ -390,6 +806,8 @@ test("trace attempts round-trip through storage, filters, and CSV export", () =>
   const columns = header.split(",");
   const values = row.split(",");
   assert.equal(values[columns.indexOf("input_source")], "trace");
+  assert.equal(values[columns.indexOf("input_mode")], "trace");
+  assert.equal(values[columns.indexOf("level")], "B100");
 });
 
 test("rolling scrub frames are capped and reuse the fixed distribution bins", () => {

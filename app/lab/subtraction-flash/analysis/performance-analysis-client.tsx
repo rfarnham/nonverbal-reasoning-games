@@ -9,7 +9,10 @@ import {
   useState,
 } from "react";
 
-import { loadAdaptiveSubtractionProgressDiagnostic } from "../adaptive-storage";
+import {
+  createBorrowFlashProfileStorage,
+  loadBorrowFlashProfilesDiagnostic,
+} from "../borrow-flash-profiles";
 import {
   buildLatencyDistribution,
   buildRollingPerformanceFrames,
@@ -20,20 +23,24 @@ import {
   type NormalizedPerformanceAttempt,
 } from "../performance-analytics";
 import {
+  PERFORMANCE_LEVELS,
   loadPerformanceLogDiagnostic,
-  type PerformanceInputSource,
+  type PerformanceInputMode,
+  type PerformanceLevel,
   type PerformanceLoadStatus,
 } from "../performance-storage";
 import styles from "./performance-analysis.module.css";
 
 type DateRange = "all" | "7" | "30" | "90";
-type GameFilter = "all" | AnalyticsGameType;
-type PresentationFilter = "all" | "visual" | "listen" | "adaptive";
-type InputFilter = "all" | PerformanceInputSource | "adaptive";
+type GameFilter = "all" | Exclude<AnalyticsGameType, "adaptive">;
+type PresentationFilter = "all" | "visual" | "listen";
+type LevelFilter = "all" | PerformanceLevel;
+type InputFilter = "all" | PerformanceInputMode;
 
 type FilterState = Readonly<{
   dateRange: DateRange;
   gameType: GameFilter;
+  level: LevelFilter;
   presentation: PresentationFilter;
   input: InputFilter;
   minuend: "all" | `${number}`;
@@ -41,16 +48,17 @@ type FilterState = Readonly<{
 }>;
 
 type LoadState = Readonly<{
+  profileId: string;
+  profileName: string;
+  profileMessage: string | null;
   attempts: readonly NormalizedPerformanceAttempt[];
   coreStatus: PerformanceLoadStatus;
-  adaptiveStatus: ReturnType<
-    typeof loadAdaptiveSubtractionProgressDiagnostic
-  >["status"];
 }>;
 
 const DEFAULT_FILTERS: FilterState = {
   dateRange: "all",
   gameType: "all",
+  level: "all",
   presentation: "all",
   input: "all",
   minuend: "all",
@@ -58,8 +66,11 @@ const DEFAULT_FILTERS: FilterState = {
 };
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
-const MINUENDS = [11, 12, 13, 14, 15, 16, 17, 18] as const;
-const SUBTRAHENDS = [2, 3, 4, 5, 6, 7, 8, 9] as const;
+const MINUENDS = [
+  ...Array.from({ length: 8 }, (_, index) => index + 11),
+  ...Array.from({ length: 80 }, (_, index) => index + 20),
+];
+const SUBTRAHENDS = Array.from({ length: 88 }, (_, index) => index + 2);
 
 function ArrowLeftIcon() {
   return (
@@ -149,6 +160,7 @@ function gameLabel(gameType: AnalyticsGameType) {
 
 function storageIssues(load: LoadState): string[] {
   const issues: string[] = [];
+  if (load.profileMessage) issues.push(load.profileMessage);
   switch (load.coreStatus) {
     case "corrupt":
       issues.push("Some Flash performance data could not be read. It was left untouched.");
@@ -162,19 +174,6 @@ function storageIssues(load: LoadState): string[] {
     default:
       break;
   }
-  switch (load.adaptiveStatus) {
-    case "corrupt":
-      issues.push("Some adaptive practice data could not be read. It was left untouched.");
-      break;
-    case "unsupported":
-      issues.push("Adaptive results were saved by a newer version. They were left untouched.");
-      break;
-    case "unavailable":
-      issues.push("Browser storage is unavailable for adaptive practice results.");
-      break;
-    default:
-      break;
-  }
   return issues;
 }
 
@@ -184,8 +183,13 @@ function csvCell(value: string | number | boolean | null) {
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
-function normalizedAttemptsToCsv(attempts: readonly NormalizedPerformanceAttempt[]) {
+function normalizedAttemptsToCsv(
+  attempts: readonly NormalizedPerformanceAttempt[],
+  profile: Readonly<{ id: string; name: string }>,
+) {
   const headers = [
+    "profile_id",
+    "profile_name",
     "id",
     "source",
     "session_id",
@@ -196,7 +200,9 @@ function normalizedAttemptsToCsv(attempts: readonly NormalizedPerformanceAttempt
     "timestamp_ms",
     "occurred_at_iso",
     "game_type",
+    "level",
     "presentation_mode",
+    "input_mode",
     "orientation",
     "input_source",
     "minuend",
@@ -226,6 +232,8 @@ function normalizedAttemptsToCsv(attempts: readonly NormalizedPerformanceAttempt
     "recognition_processing_ms",
   ];
   const rows = attempts.map((attempt) => [
+    profile.id,
+    profile.name,
     attempt.id,
     attempt.source,
     attempt.sessionId,
@@ -236,7 +244,9 @@ function normalizedAttemptsToCsv(attempts: readonly NormalizedPerformanceAttempt
     attempt.timestamp,
     new Date(attempt.timestamp).toISOString(),
     attempt.gameType,
+    attempt.level,
     attempt.presentationMode,
+    attempt.inputMode,
     attempt.orientation,
     attempt.inputSource,
     attempt.minuend,
@@ -268,6 +278,16 @@ function normalizedAttemptsToCsv(attempts: readonly NormalizedPerformanceAttempt
   return [headers, ...rows]
     .map((row) => row.map((value) => csvCell(value)).join(","))
     .join("\r\n");
+}
+
+function safeFilenamePart(value: string): string {
+  const normalized = value
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  return normalized || "profile";
 }
 
 function DistributionChart({
@@ -498,15 +518,23 @@ export function PerformanceAnalysisClient() {
     const task = window.requestAnimationFrame(() => {
       headingRef.current?.focus();
       try {
-        const core = loadPerformanceLogDiagnostic();
-        const adaptive = loadAdaptiveSubtractionProgressDiagnostic();
+        const profiles = loadBorrowFlashProfilesDiagnostic();
+        const activeProfile = profiles.registry.profiles.find(
+          ({ id }) => id === profiles.registry.activeProfileId,
+        );
+        if (!activeProfile) {
+          throw new Error("The active Borrow Flash profile could not be found.");
+        }
+        const profileStorage = createBorrowFlashProfileStorage(
+          activeProfile.id,
+        );
+        const core = loadPerformanceLogDiagnostic(profileStorage);
         setLoad({
-          attempts: normalizePerformanceAttempts(
-            core.log?.attempts ?? [],
-            adaptive.progress.attemptEvents,
-          ),
+          profileId: activeProfile.id,
+          profileName: activeProfile.name,
+          profileMessage: profiles.message,
+          attempts: normalizePerformanceAttempts(core.log?.attempts ?? [], []),
           coreStatus: core.status,
-          adaptiveStatus: adaptive.status,
         });
       } catch {
         setLoadFailure("Results could not be loaded from this browser.");
@@ -520,14 +548,11 @@ export function PerformanceAnalysisClient() {
     const dayCount = filters.dateRange === "all" ? null : Number(filters.dateRange);
     const fromTimestamp = dayCount === null ? null : loadedAt - dayCount * DAY_MS;
     const gameTypes = filters.gameType === "all" ? undefined : [filters.gameType];
+    const levels = filters.level === "all" ? undefined : [filters.level];
     const presentationModes =
-      filters.presentation === "visual" || filters.presentation === "listen"
-        ? [filters.presentation]
-        : undefined;
-    const inputSources =
-      filters.input !== "all" && filters.input !== "adaptive"
-        ? [filters.input]
-        : undefined;
+      filters.presentation === "all" ? undefined : [filters.presentation];
+    const inputModes =
+      filters.input === "all" ? undefined : [filters.input];
     const minuends = filters.minuend === "all" ? undefined : [Number(filters.minuend)];
     const subtrahends = filters.subtrahend === "all"
       ? undefined
@@ -535,22 +560,13 @@ export function PerformanceAnalysisClient() {
     const filtered = filterPerformanceAttempts(load.attempts, {
       fromTimestamp,
       gameTypes,
+      levels,
       presentationModes,
-      inputSources,
+      inputModes,
       minuends,
       subtrahends,
     });
-    return filtered.filter((attempt) => {
-      if (filters.presentation === "adaptive" && attempt.source !== "adaptive") return false;
-      if (
-        (filters.presentation === "visual" || filters.presentation === "listen") &&
-        attempt.source === "adaptive"
-      ) {
-        return false;
-      }
-      if (filters.input === "adaptive" && attempt.source !== "adaptive") return false;
-      return true;
-    });
+    return filtered.filter((attempt) => attempt.source !== "adaptive");
   }, [filters, load, loadedAt]);
 
   const overall = useMemo(
@@ -620,16 +636,22 @@ export function PerformanceAnalysisClient() {
   };
 
   const exportCsv = () => {
-    const csv = normalizedAttemptsToCsv(filteredAttempts);
+    if (!load) return;
+    const csv = normalizedAttemptsToCsv(filteredAttempts, {
+      id: load.profileId,
+      name: load.profileName,
+    });
     const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
     link.href = url;
-    link.download = `subtraction-flash-performance-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `subtraction-flash-${safeFilenamePart(load.profileName)}-${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.append(link);
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
-    setExportMessage(`Downloaded ${filteredAttempts.length} filtered attempts.`);
+    setExportMessage(
+      `Downloaded ${filteredAttempts.length} filtered attempts for ${load.profileName}.`,
+    );
   };
 
   return (
@@ -644,7 +666,7 @@ export function PerformanceAnalysisClient() {
         </Link>
         <div className={styles.titleGroup}>
           <h1 ref={headingRef} tabIndex={-1}>Performance</h1>
-          <p>Saved only in this browser</p>
+          <p>{load ? `Profile: ${load.profileName}` : "Saved only in this browser"}</p>
         </div>
         <span aria-hidden="true" />
       </header>
@@ -669,6 +691,10 @@ export function PerformanceAnalysisClient() {
 
         {load ? (
           <>
+            <p className={styles.exportNote} role="status">
+              Analyzing <strong>{load.profileName}</strong>. Only this profile’s
+              saved Borrow Flash answers are included.
+            </p>
             <section className={styles.filters} aria-labelledby="filter-heading">
               <div className={styles.sectionHeading}>
                 <div>
@@ -707,7 +733,18 @@ export function PerformanceAnalysisClient() {
                     <option value="infinite">Infinite</option>
                     <option value="two-minute">2 minutes</option>
                     <option value="deck-sprint">Deck sprint</option>
-                    <option value="adaptive">Adaptive</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Level</span>
+                  <select
+                    value={filters.level}
+                    onChange={(event) => updateFilter("level", event.target.value as LevelFilter)}
+                  >
+                    <option value="all">All levels</option>
+                    {PERFORMANCE_LEVELS.map((level) => (
+                      <option key={level} value={level}>{level}</option>
+                    ))}
                   </select>
                 </label>
                 <label>
@@ -719,7 +756,6 @@ export function PerformanceAnalysisClient() {
                     <option value="all">All prompts</option>
                     <option value="visual">Cards</option>
                     <option value="listen">Listen</option>
-                    <option value="adaptive">Adaptive</option>
                   </select>
                 </label>
                 <label>
@@ -730,11 +766,9 @@ export function PerformanceAnalysisClient() {
                   >
                     <option value="all">All inputs</option>
                     <option value="tap">Tap</option>
-                    <option value="keyboard">Keyboard</option>
-                    <option value="handwriting">Draw / handwriting</option>
+                    <option value="draw">Draw</option>
                     <option value="trace">Trace</option>
-                    <option value="speech">Speak / speech</option>
-                    <option value="adaptive">Adaptive</option>
+                    <option value="speak">Speak</option>
                   </select>
                 </label>
                 <label>
@@ -857,7 +891,7 @@ export function PerformanceAnalysisClient() {
                     </button>
                   </div>
                   <p className={styles.exportNote} aria-live="polite">
-                    {exportMessage || "The download includes every filtered attempt and its detailed performance fields."}
+                    {exportMessage || `The download includes only ${load.profileName}’s filtered attempts and detailed performance fields.`}
                   </p>
                   <details className={styles.rawDetails}>
                     <summary>View raw rows</summary>
@@ -870,6 +904,7 @@ export function PerformanceAnalysisClient() {
                           <tr>
                             <th scope="col">Date &amp; time</th>
                             <th scope="col">Game</th>
+                            <th scope="col">Level</th>
                             <th scope="col">Problem</th>
                             <th scope="col">Answer</th>
                             <th scope="col">Result</th>
@@ -883,6 +918,7 @@ export function PerformanceAnalysisClient() {
                             <tr key={attempt.id}>
                               <td>{formatDateTime(attempt.timestamp)}</td>
                               <td>{gameLabel(attempt.gameType)}</td>
+                              <td>{attempt.level ?? "—"}</td>
                               <td>
                                 {attempt.minuend === null || attempt.subtrahend === null
                                   ? "—"
@@ -893,8 +929,13 @@ export function PerformanceAnalysisClient() {
                                 {attempt.correct ? "✓ Correct" : "× Wrong"}
                               </td>
                               <td>{formatSeconds(attempt.latencyMs, 2)}</td>
-                              <td>{attempt.source === "adaptive" ? "Adaptive" : attempt.presentationMode === "listen" ? "Listen" : "Cards"}</td>
-                              <td>{attempt.inputSource}</td>
+                              <td>{attempt.presentationMode === "listen" ? "Listen" : "Cards"}</td>
+                              <td>
+                                {attempt.inputMode ?? "—"}
+                                {attempt.inputMode && attempt.inputSource !== attempt.inputMode
+                                  ? ` · ${attempt.inputSource}`
+                                  : ""}
+                              </td>
                             </tr>
                           ))}
                         </tbody>

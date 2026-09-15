@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   createDigitSpeechRecognition,
   getSpeechRecognitionConstructor,
+  parseCanonicalSpokenAnswer,
   parseSpokenAnswer,
   readSpokenAnswer,
 } from "../app/lab/subtraction-flash/browser-speech.ts";
@@ -18,7 +19,7 @@ const pageSource = await readFile(
   "utf8",
 );
 
-test("spoken digits and constrained homophones parse to answers 2 through 9", () => {
+test("spoken digits and constrained homophones still parse to answers 2 through 9", () => {
   const examples = new Map([
     [2, ["2", "two", "to", "too", " TWO! "]],
     [3, ["3", "three"]],
@@ -37,23 +38,56 @@ test("spoken digits and constrained homophones parse to answers 2 through 9", ()
   }
 });
 
-test("spoken parsing rejects extra language, ambiguity, and out-of-range values", () => {
+test("spoken parsing accepts standalone numerals and English numbers through 99", () => {
+  const examples = new Map([
+    [0, ["0", "zero"]],
+    [1, ["1", "one"]],
+    [10, ["10", "ten"]],
+    [19, ["19", "nineteen"]],
+    [20, ["20", "twenty"]],
+    [21, ["21", "twenty one", "twenty-one"]],
+    [42, ["42", "forty two", " FORTY-TWO! "]],
+    [54, ["54", "fifty four"]],
+    [64, ["64", "sixty four"]],
+    [99, ["99", "ninety nine"]],
+  ]);
+
+  for (const [answer, transcripts] of examples) {
+    for (const transcript of transcripts) {
+      assert.equal(parseSpokenAnswer(transcript), answer, transcript);
+      assert.equal(
+        parseCanonicalSpokenAnswer(transcript),
+        answer,
+        `canonical ${transcript}`,
+      );
+    }
+  }
+});
+
+test("spoken parsing rejects extra language, malformed numbers, and out-of-range values", () => {
   const rejected = [
     "",
-    "one",
-    "ten",
-    "0",
-    "1",
     "the answer is four",
     "number seven",
     "four or five",
-    "twenty four",
-    "42",
+    "twenty and four",
+    "twenty ten",
+    "one hundred",
+    "100",
+    "004",
+    "-1",
+    "4.2",
     "tonight",
   ];
 
   for (const transcript of rejected) {
     assert.equal(parseSpokenAnswer(transcript), null, transcript);
+  }
+});
+
+test("canonical interim parsing rejects ambiguous homophones", () => {
+  for (const transcript of ["to", "too", "for", "fore", "ate"]) {
+    assert.equal(parseCanonicalSpokenAnswer(transcript), null, transcript);
   }
 });
 
@@ -132,6 +166,22 @@ test("answer reading returns the leading interim digit immediately", () => {
   });
 });
 
+test("answer reading returns a two-digit interim answer immediately", () => {
+  assert.deepEqual(
+    readStreamingSpokenAnswer({
+      resultIndex: 0,
+      results: resultList([
+        result([{ transcript: "forty two", confidence: 0.94 }], false),
+      ]),
+    }),
+    {
+      answer: 42,
+      confidence: 0.94,
+      transcript: "forty two",
+    },
+  );
+});
+
 test("interim reading never promotes a lower-ranked guess", () => {
   assert.equal(
     readStreamingSpokenAnswer({
@@ -197,7 +247,7 @@ test("final reading checks ranked alternatives", () => {
   );
 });
 
-test("answer reading returns null when no alternative is one digit", () => {
+test("answer reading returns null when no alternative is a standalone number", () => {
   assert.equal(
     readSpokenAnswer({
       resultIndex: 0,
@@ -249,6 +299,54 @@ test("the stream trims prompt results and accepts an overlapping answer", () => 
     confidence: 0.91,
     transcript: "seven",
   });
+});
+
+test("the stream normalizes a B120 prompt echo before trimming its answer", () => {
+  const gate = new SpokenAnswerStreamGate();
+  gate.beginRecognitionSession();
+  gate.beginPrompt("round-b120", "64 minus 10 equals");
+  gate.speechStarted();
+
+  assert.equal(
+    gate.read({
+      resultIndex: 0,
+      results: resultList([
+        result(
+          [
+            {
+              transcript: "sixty four minus ten equals",
+              confidence: 0.97,
+            },
+          ],
+          false,
+        ),
+      ]),
+    }),
+    null,
+  );
+
+  gate.updateRound("round-b120", true);
+  assert.deepEqual(
+    gate.read({
+      resultIndex: 0,
+      results: resultList([
+        result(
+          [
+            {
+              transcript: "sixty four minus ten equals fifty four",
+              confidence: 0.93,
+            },
+          ],
+          false,
+        ),
+      ]),
+    }),
+    {
+      answer: 54,
+      confidence: 0.93,
+      transcript: "fifty four",
+    },
+  );
 });
 
 test("the stream trims a prompt when its interim slot becomes the answer", () => {

@@ -272,7 +272,7 @@ test("the trace answers form a large compact 3-by-3 grid with one empty cell", (
 
   assert.match(
     pageSource,
-    /data-session-active=\{\s*!adaptiveOpen\s*&&\s*sessionPhase\s*!==\s*["']choosing["']\s*\}/s,
+    /data-session-active=\{sessionPhase\s*!==\s*["']choosing["']\}/s,
     "the compact landscape board is enabled only during a game session",
   );
   assert.match(

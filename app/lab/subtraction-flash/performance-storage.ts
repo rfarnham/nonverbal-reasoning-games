@@ -1,6 +1,8 @@
 export const PERFORMANCE_STORAGE_KEY =
+  "spatial-gym:subtraction-flash:performance:v2";
+export const PERFORMANCE_LEGACY_STORAGE_KEY =
   "spatial-gym:subtraction-flash:performance:v1";
-export const PERFORMANCE_SCHEMA_VERSION = 1 as const;
+export const PERFORMANCE_SCHEMA_VERSION = 2 as const;
 export const PERFORMANCE_SLOW_RESPONSE_MS = 4_000;
 
 export type PerformanceGameType =
@@ -9,6 +11,9 @@ export type PerformanceGameType =
   | "deck-sprint";
 export type PerformancePresentationMode = "visual" | "listen";
 export type PerformanceOrientation = "horizontal" | "vertical";
+export const PERFORMANCE_LEVELS = ["B100", "B120", "B140"] as const;
+export type PerformanceLevel = (typeof PERFORMANCE_LEVELS)[number];
+export type PerformanceInputMode = "tap" | "draw" | "trace" | "speak";
 export type PerformanceInputSource =
   | "tap"
   | "keyboard"
@@ -25,6 +30,7 @@ export type PerformanceSessionFinishReason =
   | "time"
   | "deck"
   | "abandoned";
+export type PerformanceSessionLane = "main" | "retry" | "redemption";
 
 export type PerformanceStorageLike = Pick<Storage, "getItem" | "setItem">;
 
@@ -42,7 +48,9 @@ export type PerformanceAttempt = Readonly<
     occurredAt: number;
     sessionPosition: number;
     gameType: PerformanceGameType;
+    level: PerformanceLevel;
     presentationMode: PerformancePresentationMode;
+    inputMode: PerformanceInputMode;
     orientation: PerformanceOrientation | null;
     inputSource: PerformanceInputSource;
     cardId: string;
@@ -54,6 +62,12 @@ export type PerformanceAttempt = Readonly<
     correct: boolean;
     elapsedMs: number;
     slow: boolean;
+    /** One-based submission number for the currently displayed question. */
+    attemptOrdinal: number;
+    /** True only for the original main-deck submission scored by analytics. */
+    firstAttempt: boolean;
+    /** The session segment in which this raw submission occurred. */
+    sessionLane: PerformanceSessionLane;
     isReview: boolean;
     reviewQueued: boolean;
     reinserted: boolean;
@@ -75,7 +89,9 @@ export type CreatePerformanceAttemptInput = Readonly<{
   occurredAt?: number;
   sessionPosition: number;
   gameType: PerformanceGameType;
+  level: PerformanceLevel;
   presentationMode: PerformancePresentationMode;
+  inputMode: PerformanceInputMode;
   orientation?: PerformanceOrientation | null;
   inputSource: PerformanceInputSource;
   cardId: string;
@@ -87,6 +103,9 @@ export type CreatePerformanceAttemptInput = Readonly<{
   correct?: boolean;
   elapsedMs: number;
   slow?: boolean;
+  attemptOrdinal?: number;
+  firstAttempt?: boolean;
+  sessionLane?: PerformanceSessionLane;
   isReview: boolean;
   reviewQueued?: boolean;
   reinserted?: boolean;
@@ -108,7 +127,9 @@ export type PerformanceSessionStart = Readonly<
     sessionId: string;
     occurredAt: number;
     gameType: PerformanceGameType;
+    level: PerformanceLevel;
     presentationMode: PerformancePresentationMode;
+    inputMode: PerformanceInputMode;
     baseDeckSize: number;
   }
 >;
@@ -116,7 +137,9 @@ export type PerformanceSessionStart = Readonly<
 export type CreatePerformanceSessionInput = Readonly<{
   sessionId: string;
   gameType: PerformanceGameType;
+  level: PerformanceLevel;
   presentationMode: PerformancePresentationMode;
+  inputMode: PerformanceInputMode;
   baseDeckSize: number;
   startedAt?: number;
 }>;
@@ -202,6 +225,12 @@ const PRESENTATION_MODES: readonly PerformancePresentationMode[] = [
   "visual",
   "listen",
 ];
+const INPUT_MODES: readonly PerformanceInputMode[] = [
+  "tap",
+  "draw",
+  "trace",
+  "speak",
+];
 const ORIENTATIONS: readonly PerformanceOrientation[] = [
   "horizontal",
   "vertical",
@@ -222,6 +251,11 @@ const FINISH_REASONS: readonly PerformanceSessionFinishReason[] = [
   "time",
   "deck",
   "abandoned",
+];
+const SESSION_LANES: readonly PerformanceSessionLane[] = [
+  "main",
+  "retry",
+  "redemption",
 ];
 const LOCAL_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const LOCAL_TIME_PATTERN = /^\d{2}:\d{2}:\d{2}\.\d{3}$/;
@@ -340,6 +374,59 @@ function inferredOutcomeReason(
   return null;
 }
 
+function isValidPerformanceFact(
+  level: PerformanceLevel,
+  minuend: unknown,
+  subtrahend: unknown,
+): boolean {
+  if (!Number.isSafeInteger(minuend) || !Number.isSafeInteger(subtrahend)) {
+    return false;
+  }
+  const safeMinuend = minuend as number;
+  const safeSubtrahend = subtrahend as number;
+  if (level === "B100") {
+    return (
+      safeMinuend >= 11 &&
+      safeMinuend <= 18 &&
+      safeSubtrahend >= 2 &&
+      safeSubtrahend <= 9 &&
+      safeMinuend % 10 < safeSubtrahend
+    );
+  }
+  if (level === "B120") {
+    return (
+      safeMinuend >= 20 &&
+      safeMinuend <= 64 &&
+      safeSubtrahend >= 2 &&
+      safeSubtrahend <= 10 &&
+      (safeSubtrahend === 10 || safeMinuend % 10 < safeSubtrahend)
+    );
+  }
+  return (
+    safeMinuend >= 20 &&
+    safeMinuend <= 99 &&
+    safeSubtrahend >= 10 &&
+    safeSubtrahend <= 89 &&
+    safeMinuend - safeSubtrahend >= 10
+  );
+}
+
+function inputSourceMatchesMode(
+  inputMode: PerformanceInputMode,
+  inputSource: PerformanceInputSource,
+): boolean {
+  switch (inputMode) {
+    case "tap":
+      return inputSource === "tap" || inputSource === "keyboard";
+    case "draw":
+      return inputSource === "handwriting";
+    case "trace":
+      return inputSource === "trace";
+    case "speak":
+      return inputSource === "speech";
+  }
+}
+
 export function createPerformanceAttempt(
   input: CreatePerformanceAttemptInput,
 ): PerformanceAttempt {
@@ -353,16 +440,16 @@ export function createPerformanceAttempt(
   assertNonnegativeInteger(input.cardsRemainingAfter, "cardsRemainingAfter");
   assertFiniteNonnegative(input.elapsedMs, "elapsedMs");
   assertFiniteNonnegative(input.sessionElapsedMs, "sessionElapsedMs");
-  if (
-    !Number.isSafeInteger(input.minuend) ||
-    input.minuend < 11 ||
-    input.minuend > 18 ||
-    !Number.isSafeInteger(input.subtrahend) ||
-    input.subtrahend < 2 ||
-    input.subtrahend > 9 ||
-    input.minuend % 10 >= input.subtrahend
-  ) {
-    throw new RangeError("Performance attempts must contain a borrowing fact from this game.");
+  if (!PERFORMANCE_LEVELS.includes(input.level)) {
+    throw new TypeError("Unknown subtraction level.");
+  }
+  if (!INPUT_MODES.includes(input.inputMode)) {
+    throw new TypeError("Unknown configured input mode.");
+  }
+  if (!isValidPerformanceFact(input.level, input.minuend, input.subtrahend)) {
+    throw new RangeError(
+      "Performance attempts must contain a fact allowed by the selected level.",
+    );
   }
   if (
     !Number.isSafeInteger(input.expectedAnswer) ||
@@ -387,11 +474,32 @@ export function createPerformanceAttempt(
   if (!INPUT_SOURCES.includes(input.inputSource)) {
     throw new TypeError("Unknown performance input source.");
   }
+  if (!inputSourceMatchesMode(input.inputMode, input.inputSource)) {
+    throw new TypeError("The input source does not match the configured input mode.");
+  }
   const correct = input.correct ?? input.submittedAnswer === input.expectedAnswer;
   if (correct !== (input.submittedAnswer === input.expectedAnswer)) {
     throw new RangeError("The correct flag must match the submitted answer.");
   }
   const slow = input.slow ?? input.elapsedMs > PERFORMANCE_SLOW_RESPONSE_MS;
+  const sessionLane =
+    input.sessionLane ?? (input.isReview ? "redemption" : "main");
+  if (!SESSION_LANES.includes(sessionLane)) {
+    throw new TypeError("Unknown performance session lane.");
+  }
+  const attemptOrdinal = input.attemptOrdinal ?? 1;
+  if (!Number.isSafeInteger(attemptOrdinal) || attemptOrdinal < 1) {
+    throw new RangeError("attemptOrdinal must be a positive integer.");
+  }
+  const firstAttempt =
+    input.firstAttempt ?? (sessionLane === "main" && attemptOrdinal === 1);
+  if (
+    firstAttempt !== (sessionLane === "main" && attemptOrdinal === 1)
+  ) {
+    throw new RangeError(
+      "Only ordinal 1 in the main lane can be the scored first attempt.",
+    );
+  }
   const outcomeReason =
     input.outcomeReason === undefined
       ? inferredOutcomeReason(correct, slow)
@@ -410,7 +518,7 @@ export function createPerformanceAttempt(
     throw new RangeError("Recognition measurements are outside their valid range.");
   }
   const id = input.id?.trim() ||
-    `${input.sessionId}:attempt:${input.sessionPosition}:${input.cardId}`;
+    `${input.sessionId}:attempt:${input.sessionPosition}:${input.cardId}:${sessionLane}:${attemptOrdinal}`;
   return {
     id,
     sessionId: input.sessionId.trim(),
@@ -418,7 +526,9 @@ export function createPerformanceAttempt(
     ...performanceLocalTimestamp(occurredAt),
     sessionPosition: input.sessionPosition,
     gameType: input.gameType,
+    level: input.level,
     presentationMode: input.presentationMode,
+    inputMode: input.inputMode,
     orientation: input.orientation ?? null,
     inputSource: input.inputSource,
     cardId: input.cardId.trim(),
@@ -430,6 +540,9 @@ export function createPerformanceAttempt(
     correct,
     elapsedMs: input.elapsedMs,
     slow,
+    attemptOrdinal,
+    firstAttempt,
+    sessionLane,
     isReview: input.isReview,
     reviewQueued: input.reviewQueued ?? outcomeReason !== null,
     reinserted: input.reinserted ?? false,
@@ -457,6 +570,12 @@ export function createPerformanceSession(
   if (!PRESENTATION_MODES.includes(input.presentationMode)) {
     throw new TypeError("Unknown presentation mode.");
   }
+  if (!PERFORMANCE_LEVELS.includes(input.level)) {
+    throw new TypeError("Unknown subtraction level.");
+  }
+  if (!INPUT_MODES.includes(input.inputMode)) {
+    throw new TypeError("Unknown configured input mode.");
+  }
   assertNonnegativeInteger(input.baseDeckSize, "baseDeckSize");
   const occurredAt = input.startedAt ?? Date.now();
   const sessionId = input.sessionId.trim();
@@ -467,31 +586,46 @@ export function createPerformanceSession(
     occurredAt,
     ...performanceLocalTimestamp(occurredAt),
     gameType: input.gameType,
+    level: input.level,
     presentationMode: input.presentationMode,
+    inputMode: input.inputMode,
     baseDeckSize: input.baseDeckSize,
   };
 }
 
 const ATTEMPT_KEYS = [
   "id", "sessionId", "occurredAt", "localDate", "localTime", "timeZone",
-  "utcOffsetMinutes", "sessionPosition", "gameType", "presentationMode",
-  "orientation", "inputSource", "cardId", "factKey", "minuend",
+  "utcOffsetMinutes", "sessionPosition", "gameType", "level",
+  "presentationMode", "inputMode", "orientation", "inputSource", "cardId", "factKey", "minuend",
   "subtrahend", "expectedAnswer", "submittedAnswer", "correct", "elapsedMs",
-  "slow", "isReview", "reviewQueued", "reinserted", "outcomeReason",
+  "slow", "attemptOrdinal", "firstAttempt", "sessionLane", "isReview",
+  "reviewQueued", "reinserted", "outcomeReason",
   "drawNumber", "cycle", "cardsRemainingAfter", "sessionElapsedMs",
   "rawRecognition", "recognitionConfidence", "recognitionMargin",
   "recognitionProcessingMs",
 ] as const;
 const SESSION_START_KEYS = [
   "id", "event", "sessionId", "occurredAt", "localDate", "localTime",
-  "timeZone", "utcOffsetMinutes", "gameType", "presentationMode",
-  "baseDeckSize",
+  "timeZone", "utcOffsetMinutes", "gameType", "level", "presentationMode",
+  "inputMode", "baseDeckSize",
 ] as const;
 const SESSION_FINISH_KEYS = [
   "id", "event", "sessionId", "occurredAt", "localDate", "localTime",
   "timeZone", "utcOffsetMinutes", "finishReason", "elapsedMs", "answered",
   "correct", "slow", "reviews", "baseDeckSize",
 ] as const;
+const V2_ATTEMPT_KEYS = ATTEMPT_KEYS.filter(
+  (key) =>
+    key !== "attemptOrdinal" &&
+    key !== "firstAttempt" &&
+    key !== "sessionLane",
+);
+const LEGACY_ATTEMPT_KEYS = V2_ATTEMPT_KEYS.filter(
+  (key) => key !== "level" && key !== "inputMode",
+);
+const LEGACY_SESSION_START_KEYS = SESSION_START_KEYS.filter(
+  (key) => key !== "level" && key !== "inputMode",
+);
 
 function isPerformanceAttempt(value: unknown): value is PerformanceAttempt {
   if (!isRecord(value) || !hasExactKeys(value, ATTEMPT_KEYS)) return false;
@@ -502,21 +636,25 @@ function isPerformanceAttempt(value: unknown): value is PerformanceAttempt {
     isLocalTimestamp(value) &&
     isNonnegativeInteger(value.sessionPosition) &&
     GAME_TYPES.includes(value.gameType as PerformanceGameType) &&
+    PERFORMANCE_LEVELS.includes(value.level as PerformanceLevel) &&
     PRESENTATION_MODES.includes(
       value.presentationMode as PerformancePresentationMode,
     ) &&
+    INPUT_MODES.includes(value.inputMode as PerformanceInputMode) &&
     (value.orientation === null ||
       ORIENTATIONS.includes(value.orientation as PerformanceOrientation)) &&
     INPUT_SOURCES.includes(value.inputSource as PerformanceInputSource) &&
+    inputSourceMatchesMode(
+      value.inputMode as PerformanceInputMode,
+      value.inputSource as PerformanceInputSource,
+    ) &&
     isText(value.cardId) &&
     isText(value.factKey) &&
-    Number.isSafeInteger(value.minuend) &&
-    (value.minuend as number) >= 11 &&
-    (value.minuend as number) <= 18 &&
-    Number.isSafeInteger(value.subtrahend) &&
-    (value.subtrahend as number) >= 2 &&
-    (value.subtrahend as number) <= 9 &&
-    (value.minuend as number) % 10 < (value.subtrahend as number) &&
+    isValidPerformanceFact(
+      value.level as PerformanceLevel,
+      value.minuend,
+      value.subtrahend,
+    ) &&
     Number.isSafeInteger(value.expectedAnswer) &&
     value.expectedAnswer ===
       (value.minuend as number) - (value.subtrahend as number) &&
@@ -525,6 +663,12 @@ function isPerformanceAttempt(value: unknown): value is PerformanceAttempt {
     value.correct === (value.submittedAnswer === value.expectedAnswer) &&
     isFiniteNonnegative(value.elapsedMs) &&
     typeof value.slow === "boolean" &&
+    isNonnegativeInteger(value.attemptOrdinal) &&
+    (value.attemptOrdinal as number) >= 1 &&
+    typeof value.firstAttempt === "boolean" &&
+    SESSION_LANES.includes(value.sessionLane as PerformanceSessionLane) &&
+    value.firstAttempt ===
+      (value.sessionLane === "main" && value.attemptOrdinal === 1) &&
     typeof value.isReview === "boolean" &&
     typeof value.reviewQueued === "boolean" &&
     typeof value.reinserted === "boolean" &&
@@ -551,9 +695,11 @@ function isSessionStart(value: unknown): value is PerformanceSessionStart {
     isValidEpoch(value.occurredAt) &&
     isLocalTimestamp(value) &&
     GAME_TYPES.includes(value.gameType as PerformanceGameType) &&
+    PERFORMANCE_LEVELS.includes(value.level as PerformanceLevel) &&
     PRESENTATION_MODES.includes(
       value.presentationMode as PerformancePresentationMode,
     ) &&
+    INPUT_MODES.includes(value.inputMode as PerformanceInputMode) &&
     isNonnegativeInteger(value.baseDeckSize)
   );
 }
@@ -578,6 +724,124 @@ function isSessionFinish(value: unknown): value is PerformanceSessionFinish {
     (value.reviews as number) <= (value.answered as number) &&
     isNonnegativeInteger(value.baseDeckSize)
   );
+}
+
+function legacyInputMode(inputSource: unknown): PerformanceInputMode {
+  switch (inputSource) {
+    case "handwriting":
+      return "draw";
+    case "trace":
+      return "trace";
+    case "speech":
+      return "speak";
+    default:
+      return "tap";
+  }
+}
+
+function legacyAttemptProgress(value: Record<string, unknown>): Readonly<{
+  attemptOrdinal: 1;
+  firstAttempt: boolean;
+  sessionLane: PerformanceSessionLane;
+}> {
+  const sessionLane: PerformanceSessionLane = value.isReview
+    ? "redemption"
+    : "main";
+  return {
+    attemptOrdinal: 1,
+    firstAttempt: sessionLane === "main",
+    sessionLane,
+  };
+}
+
+function migrateV2Attempt(value: unknown): PerformanceAttempt | null {
+  if (!isRecord(value) || !hasExactKeys(value, V2_ATTEMPT_KEYS)) {
+    return null;
+  }
+  const migrated = {
+    ...value,
+    ...legacyAttemptProgress(value),
+  };
+  return isPerformanceAttempt(migrated) ? migrated : null;
+}
+
+function migrateLegacyAttempt(value: unknown): PerformanceAttempt | null {
+  if (!isRecord(value) || !hasExactKeys(value, LEGACY_ATTEMPT_KEYS)) {
+    return null;
+  }
+  const migrated = {
+    ...value,
+    level: "B100",
+    inputMode: legacyInputMode(value.inputSource),
+    ...legacyAttemptProgress(value),
+  };
+  return isPerformanceAttempt(migrated) ? migrated : null;
+}
+
+function migrateV2PerformanceLog(value: unknown): PerformanceLog | null {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, ["schemaVersion", "attempts", "sessionEvents"]) ||
+    value.schemaVersion !== PERFORMANCE_SCHEMA_VERSION ||
+    !Array.isArray(value.attempts) ||
+    !Array.isArray(value.sessionEvents)
+  ) {
+    return null;
+  }
+  const attempts = value.attempts.map((attempt) =>
+    isPerformanceAttempt(attempt) ? attempt : migrateV2Attempt(attempt),
+  );
+  if (attempts.some((attempt) => attempt === null)) return null;
+  const migrated: PerformanceLog = {
+    schemaVersion: PERFORMANCE_SCHEMA_VERSION,
+    attempts: attempts as PerformanceAttempt[],
+    sessionEvents: value.sessionEvents as PerformanceSessionEvent[],
+  };
+  return isPerformanceLog(migrated) ? migrated : null;
+}
+
+function migrateLegacySessionStart(
+  value: unknown,
+  attempts: readonly PerformanceAttempt[],
+): PerformanceSessionStart | null {
+  if (!isRecord(value) || !hasExactKeys(value, LEGACY_SESSION_START_KEYS)) {
+    return null;
+  }
+  const sessionAttempt = attempts.find(
+    (attempt) => attempt.sessionId === value.sessionId,
+  );
+  const migrated = {
+    ...value,
+    level: "B100",
+    inputMode: sessionAttempt?.inputMode ?? "tap",
+  };
+  return isSessionStart(migrated) ? migrated : null;
+}
+
+function migrateLegacyPerformanceLog(value: unknown): PerformanceLog | null {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, ["schemaVersion", "attempts", "sessionEvents"]) ||
+    value.schemaVersion !== 1 ||
+    !Array.isArray(value.attempts) ||
+    !Array.isArray(value.sessionEvents)
+  ) {
+    return null;
+  }
+  const attempts = value.attempts.map(migrateLegacyAttempt);
+  if (attempts.some((attempt) => attempt === null)) return null;
+  const migratedAttempts = attempts as PerformanceAttempt[];
+  const sessionEvents = value.sessionEvents.map((event) => {
+    if (isSessionFinish(event)) return event;
+    return migrateLegacySessionStart(event, migratedAttempts);
+  });
+  if (sessionEvents.some((event) => event === null)) return null;
+  const migrated: PerformanceLog = {
+    schemaVersion: PERFORMANCE_SCHEMA_VERSION,
+    attempts: migratedAttempts,
+    sessionEvents: sessionEvents as PerformanceSessionEvent[],
+  };
+  return isPerformanceLog(migrated) ? migrated : null;
 }
 
 function isPerformanceLog(value: unknown): value is PerformanceLog {
@@ -626,6 +890,9 @@ export function loadPerformanceLogDiagnostic(
   let raw: string | null;
   try {
     raw = storage.getItem(PERFORMANCE_STORAGE_KEY);
+    if (raw === null) {
+      raw = storage.getItem(PERFORMANCE_LEGACY_STORAGE_KEY);
+    }
   } catch {
     return {
       status: "unavailable",
@@ -660,7 +927,12 @@ export function loadPerformanceLogDiagnostic(
       message: "Saved performance data uses a newer schema and was left untouched.",
     };
   }
-  if (!isPerformanceLog(parsed)) {
+  const migrated = migrateLegacyPerformanceLog(parsed);
+  if (migrated) {
+    return { status: "loaded", log: migrated, canWrite: true, message: null };
+  }
+  const migratedV2 = migrateV2PerformanceLog(parsed);
+  if (!migratedV2) {
     return {
       status: "corrupt",
       log: null,
@@ -668,7 +940,7 @@ export function loadPerformanceLogDiagnostic(
       message: "Saved performance data failed validation and was left untouched.",
     };
   }
-  return { status: "loaded", log: parsed, canWrite: true, message: null };
+  return { status: "loaded", log: migratedV2, canWrite: true, message: null };
 }
 
 function blockedWrite(status: PerformanceLoadStatus): PerformanceWriteResult {
@@ -704,6 +976,17 @@ export function appendPerformanceAttempt(
   }
   const diagnostic = loadPerformanceLogDiagnostic(storage);
   if (!diagnostic.log) return blockedWrite(diagnostic.status);
+  const sessionStart = diagnostic.log.sessionEvents.find(
+    (event): event is PerformanceSessionStart =>
+      event.event === "start" && event.sessionId === attempt.sessionId,
+  );
+  if (
+    sessionStart &&
+    (sessionStart.level !== attempt.level ||
+      sessionStart.inputMode !== attempt.inputMode)
+  ) {
+    return { ok: false, status: "conflict" };
+  }
   const existing = diagnostic.log.attempts.find((row) => row.id === attempt.id);
   if (existing) {
     return {
@@ -807,10 +1090,11 @@ export function finishPerformanceSession(
 
 const CSV_COLUMNS = [
   "date", "time", "time_zone", "utc_offset_minutes", "timestamp_ms",
-  "session_id", "session_position", "game_type", "presentation_mode",
-  "orientation", "input_source", "minuend", "subtrahend", "expected_answer",
+  "session_id", "session_position", "game_type", "level", "presentation_mode",
+  "input_mode", "orientation", "input_source", "minuend", "subtrahend", "expected_answer",
   "submitted_answer", "result", "correct", "time_taken_ms", "slow",
-  "is_review", "review_queued", "reinserted", "outcome_reason", "draw_number",
+  "attempt_ordinal", "first_attempt", "session_lane", "is_review",
+  "review_queued", "reinserted", "outcome_reason", "draw_number",
   "cycle", "cards_remaining_after", "session_elapsed_ms", "card_id", "fact_key",
   "raw_recognition", "recognition_confidence", "recognition_margin",
   "recognition_processing_ms", "attempt_id",
@@ -837,7 +1121,9 @@ export function performanceAttemptsToCsv(
       attempt.sessionId,
       attempt.sessionPosition,
       attempt.gameType,
+      attempt.level,
       attempt.presentationMode,
+      attempt.inputMode,
       attempt.orientation,
       attempt.inputSource,
       attempt.minuend,
@@ -848,6 +1134,9 @@ export function performanceAttemptsToCsv(
       attempt.correct,
       attempt.elapsedMs,
       attempt.slow,
+      attempt.attemptOrdinal,
+      attempt.firstAttempt,
+      attempt.sessionLane,
       attempt.isReview,
       attempt.reviewQueued,
       attempt.reinserted,
