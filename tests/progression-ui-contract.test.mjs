@@ -30,7 +30,9 @@ async function discoveredGameSlugs() {
 test("homepage promotes Math World while Journey and the standalone shelf remain", async () => {
   const home = await source("app/page.tsx");
   const cta = await source("components/progression/JourneyHomeCta.tsx");
-  assert.match(home, /className="button button-primary math-world-home-cta" href="\/math-world\/"/);
+  const worldCta = await source("components/MathWorldHomeLink.tsx");
+  assert.match(home, /<MathWorldHomeLink\s*\/>/);
+  assert.match(worldCta, /className="button button-primary math-world-home-cta"\s+href="\/math-world\/"/);
   assert.match(home, /<JourneyHomeCta secondary\s*\/>/);
   assert.match(cta, /secondary = false/);
   assert.match(cta, /secondary \? "button-secondary" : "button-primary"/);
