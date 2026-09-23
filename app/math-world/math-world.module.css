@@ -292,7 +292,7 @@
 .answerGrid {
   max-width: 980px;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--answer-count, 5), minmax(0, 1fr));
   grid-auto-rows: 1fr;
   gap: 12px;
   margin: 30px auto 0;
@@ -791,3 +791,26 @@
 .mapIntro h1:focus, .mapCompletion h2:focus { outline: none; }
 .worldShell[data-launch-phase="travel"] .mapAvatar, .worldShell[data-launch-phase="bounce"] .mapAvatar { will-change: top, left; }
 .worldShell[data-launch-phase="iris"] .mapIris { will-change: clip-path; }
+
+.worldNavigation { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-top: 24px; }
+.worldPicker { display: flex; align-items: flex-end; gap: 10px; min-width: 0; }
+.worldSelectLabel { display: grid; gap: 6px; min-width: 0; }
+.worldSelectLabel > span { color: var(--world-muted); font-size: .66rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.worldSelectLabel select { width: min(500px, 100%); max-width: 100%; min-height: 46px; padding: 9px 36px 9px 15px; border: 1px solid var(--world-line); border-radius: 12px; color: var(--world-ink); background: var(--world-panel); font: inherit; font-size: .82rem; font-weight: 750; cursor: pointer; text-overflow: ellipsis; }
+.worldArrow { width: 46px; height: 46px; flex: 0 0 46px; display: grid; place-items: center; border: 1px solid var(--world-line); border-radius: 50%; color: var(--world-ink); background: var(--world-panel); font: inherit; font-size: 1.2rem; cursor: pointer; }
+.worldArrow:disabled { color: #99a093; background: #f0f1e8; cursor: default; }
+.worldSequence { flex: 0 0 auto; padding-top: 20px; color: var(--world-muted); font-size: .76rem; font-weight: 700; }
+.worldSelectLabel select:focus-visible, .worldArrow:focus-visible { outline: 3px solid var(--world-blue); outline-offset: 4px; }
+@media (max-width: 820px) {
+  .worldNavigation { padding-top: 20px; }
+  .worldSequence { display: none; }
+  .worldPicker { width: 100%; }
+  .worldSelectLabel { flex: 1; }
+  .worldSelectLabel select { width: 100%; }
+}
+@media (max-width: 620px) {
+  .worldNavigation { padding-top: 18px; }
+  .worldPicker { gap: 7px; }
+  .worldSelectLabel select { font-size: .73rem; padding-left: 10px; padding-right: 24px; }
+  .worldArrow { width: 44px; height: 46px; flex-basis: 44px; }
+}

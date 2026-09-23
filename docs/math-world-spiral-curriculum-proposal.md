@@ -2,6 +2,8 @@
 
 **Proposal 0.3 for sequence review — 22 September 2026. Not an approved runtime manifest.**
 
+**Historical proposal:** the approved implementation now follows the [20-world spiral](math-world-20-world-curriculum.md), with four short stops per world and the restricted Grades 1–4 source pool. The four-pass outline below is retained for reference; it is not the current runtime sequence.
+
 The proposed road is **Counting 1 → Symmetry 1 → Addition & Subtraction 1 →
 Patterns 1 → the other concept worlds → Counting 2 → Symmetry 2 → …**.
 Each world has one primary concept. Returning to that concept introduces a

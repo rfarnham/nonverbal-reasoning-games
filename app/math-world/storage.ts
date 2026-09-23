@@ -1,18 +1,21 @@
 import {
   createInitialProgress,
   WORLD_PROGRESS_SCHEMA_VERSION,
+  canOpenRequiredStop,
+  canOpenWorld,
   type QuestionPhase,
   type StopAttempt,
   type WorldProgress,
 } from "./engine.ts";
-import { QUESTIONS_BY_STOP, REQUIRED_STOPS, WORLD_CONTENT_VERSION } from "./world-data.ts";
+import { QUESTIONS_BY_STOP, REQUIRED_STOPS, WORLD_CONTENT_VERSION, WORLD_DEFINITIONS, WORLD_MODE, worldForStop } from "./world-data.ts";
 import { loadProgressionState } from "../../lib/progression/persistence.ts";
 import { isJourneyTestProfile } from "../../lib/progression/test-mode.ts";
 import type { StorageLike } from "../../lib/progression/types.ts";
 
-const PROGRESS_KEY = "spatial-gym-math-world-progress";
-const PLAYTEST_PROGRESS_KEY = "spatial-gym-math-world-playtest-progress";
-const QA_KEY = "spatial-gym-math-world-qa";
+const PROGRESS_KEY = WORLD_MODE === "spiral-preview" ? "spatial-gym-math-world-spiral-progress" : "spatial-gym-math-world-progress";
+const PLAYTEST_PROGRESS_KEY = WORLD_MODE === "spiral-preview" ? "spatial-gym-math-world-spiral-playtest-progress" : "spatial-gym-math-world-playtest-progress";
+const LEGACY_QA_KEY = "spatial-gym-math-world-qa";
+const QA_KEY = `${LEGACY_QA_KEY}:${WORLD_MODE}:${WORLD_CONTENT_VERSION}`;
 const PHASES = new Set<QuestionPhase>([
   "answering",
   "wrong-review",
@@ -101,9 +104,9 @@ export function readWorldProgress(qaUnlocked = false): WorldProgress {
   try {
     const raw = window.localStorage.getItem(qaUnlocked ? PLAYTEST_PROGRESS_KEY : PROGRESS_KEY);
     if (!raw) return createInitialProgress();
-    const parsed = JSON.parse(raw) as Partial<WorldProgress>;
+    const parsed = JSON.parse(raw) as Partial<Omit<WorldProgress, "schemaVersion">> & { schemaVersion?: number };
     if (
-      parsed.schemaVersion !== WORLD_PROGRESS_SCHEMA_VERSION ||
+      (parsed.schemaVersion !== WORLD_PROGRESS_SCHEMA_VERSION && !(WORLD_MODE === "prototype" && parsed.schemaVersion === 1)) ||
       parsed.contentVersion !== WORLD_CONTENT_VERSION
     ) {
       return createInitialProgress();
@@ -120,8 +123,9 @@ export function readWorldProgress(qaUnlocked = false): WorldProgress {
         if (cleaned) stopAttempts[stopId] = cleaned;
       }
     }
-    return {
-      schemaVersion: 1,
+    const result: WorldProgress = {
+      schemaVersion: 2,
+      selectedWorldId: WORLD_DEFINITIONS.find(world => world.id === parsed.selectedWorldId)?.id ?? WORLD_DEFINITIONS[0].id,
       contentVersion: WORLD_CONTENT_VERSION,
       activeStopId:
         typeof parsed.activeStopId === "string" && Object.hasOwn(stopAttempts, parsed.activeStopId)
@@ -134,6 +138,10 @@ export function readWorldProgress(qaUnlocked = false): WorldProgress {
       completedStopIds,
       stopAttempts,
     };
+    const activeStopId = result.activeStopId && canOpenRequiredStop(result, result.activeStopId, qaUnlocked) ? result.activeStopId : null;
+    const checkpointStopId = result.checkpointStopId && result.completedStopIds.includes(result.checkpointStopId) ? result.checkpointStopId : null;
+    const selectedWorldId = worldForStop(activeStopId ?? checkpointStopId)?.id ?? (canOpenWorld(result, result.selectedWorldId, qaUnlocked) ? result.selectedWorldId : WORLD_DEFINITIONS[0].id);
+    return { ...result, activeStopId, checkpointStopId, selectedWorldId };
   } catch {
     return createInitialProgress();
   }
@@ -160,7 +168,7 @@ function emptyQaArchive(): QaArchive {
 
 export function readQaArchive(): QaArchive {
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(QA_KEY) ?? "null") as Partial<QaArchive> | null;
+    const parsed = JSON.parse(window.localStorage.getItem(QA_KEY) ?? window.localStorage.getItem(LEGACY_QA_KEY) ?? "null") as Partial<QaArchive> | null;
     if (
       !parsed ||
       parsed.schemaVersion !== 1 ||
@@ -216,7 +224,7 @@ export function downloadQaArchive(): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `counting-coast-qa-${new Date().toISOString().slice(0, 10)}.json`;
+  link.download = `math-worlds-qa-${new Date().toISOString().slice(0, 10)}.json`;
   link.click();
   URL.revokeObjectURL(url);
 }

@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type CSSProperties,
 } from "react";
 import {
   createGameAudioContext,
@@ -19,6 +20,8 @@ import {
   allowRetry,
   answerQuestion,
   createInitialProgress,
+  canOpenWorld,
+  selectWorld,
   leaveCheckpoint,
   startStop,
   stopFirstTryAccuracy,
@@ -37,6 +40,8 @@ import {
 import {
   QUESTIONS_BY_STOP,
   REQUIRED_STOPS,
+  WORLD_DEFINITIONS,
+  worldForStop,
   type MathStop,
   type WorldQuestion,
 } from "./world-data.ts";
@@ -62,6 +67,7 @@ function stopById(stopId: string | null): MathStop | null {
 function questionNeedsOpenCard(question: WorldQuestion): boolean {
   return (
     question.presentation === "source-card" ||
+    question.choices.some(choice => choice.visualOnly) ||
     /\b(shown|picture|drawing|diagram|tracks|figure|below|above|card|clock)\b/i.test(
       question.prompt,
     )
@@ -126,6 +132,9 @@ export default function MathWorldClient() {
   }, [hydrated, qaUnlocked]);
 
   const activeStop = stopById(progress.activeStopId);
+  const selectedWorld = (activeStop ? worldForStop(activeStop.id) : undefined)
+    ?? WORLD_DEFINITIONS.find(({ id }) => id === progress.selectedWorldId)
+    ?? WORLD_DEFINITIONS[0];
   const questions = activeStop
     ? (QUESTIONS_BY_STOP.get(activeStop.id) ?? [])
     : [];
@@ -175,6 +184,7 @@ export default function MathWorldClient() {
   }
 
   function handleAnswer(selectedIndex: number) {
+    if (!question || selectedIndex < 0 || selectedIndex >= question.choices.length) return;
     if (!activeStop || !question || !attempt || !["answering", "retry"].includes(attempt.phase)) {
       return;
     }
@@ -205,7 +215,7 @@ export default function MathWorldClient() {
       const index = LETTERS.indexOf(normalized as (typeof LETTERS)[number]);
       const numberIndex = Number.parseInt(event.key, 10) - 1;
       const selectedIndex = index >= 0 ? index : numberIndex;
-      if (selectedIndex >= 0 && selectedIndex < 5) {
+      if (selectedIndex >= 0 && selectedIndex < question.choices.length) {
         event.preventDefault();
         handleAnswer(selectedIndex);
       }
@@ -232,6 +242,16 @@ export default function MathWorldClient() {
     setInspectedStopId(null);
     setLastVisitedStopId(stopId);
     setProgress((current) => startStop(current, stopId, qaUnlocked));
+    resetViewport();
+  }
+
+  function chooseWorld(worldId: string) {
+    if (!canOpenWorld(progress, worldId, qaUnlocked)) return;
+    setInspectedStopId(null);
+    setLastVisitedStopId(null);
+    setQaOpen(false);
+    setZoomed(false);
+    setProgress((current) => selectWorld(current, worldId, qaUnlocked));
     resetViewport();
   }
 
@@ -283,7 +303,7 @@ export default function MathWorldClient() {
     return (
       <main className={styles.loadingShell}>
         <span className={styles.loadingKangaroo} aria-hidden="true">⌁</span>
-        <p>Opening Counting Coast…</p>
+        <p>Opening your adventure…</p>
       </main>
     );
   }
@@ -330,7 +350,7 @@ export default function MathWorldClient() {
         <main className={styles.courseShell}>
           <section className={styles.courseTopline} aria-label="Stop progress">
             <div>
-              <p className={styles.kicker}>{activeStop.districtLabel}</p>
+              <p className={styles.kicker}>World {selectedWorld.number} · {selectedWorld.concept} {selectedWorld.spiral}</p>
               <h1>{activeStop.label}</h1>
             </div>
             <div className={styles.questionProgress}>
@@ -351,7 +371,7 @@ export default function MathWorldClient() {
           <section className={styles.questionPanel} aria-labelledby="question-heading">
             <div className={styles.questionHeader}>
               <div>
-                <span className={styles.sourcePill}>Math Kangaroo · {question.source.year}</span>
+                <span className={styles.sourcePill}>{question.source.sourceKind === "practice" ? "Practice" : question.source.sourceKind === "mock" ? "Mock test" : "Math Kangaroo"} · {question.source.year}</span>
                 <h2 id="question-heading">Choose the best answer.</h2>
               </div>
               <button type="button" className={styles.flagButton} onClick={openQa}>
@@ -359,7 +379,7 @@ export default function MathWorldClient() {
               </button>
             </div>
 
-            <p className={question.presentation === "semantic" ? styles.questionPrompt : styles.srOnly}>
+            <p className={question.presentation === "semantic" || question.showPrompt ? styles.questionPrompt : styles.srOnly}>
               {question.prompt}
             </p>
 
@@ -390,7 +410,7 @@ export default function MathWorldClient() {
               </button>
             </details>
 
-            <div className={styles.answerGrid} aria-label="Answer choices">
+            <div className={styles.answerGrid} style={{ "--answer-count": question.choices.length } as CSSProperties} aria-label="Answer choices">
               {question.choices.map((choice, index) => {
                 const selected = attempt.selectedIndex === index;
                 const correct = attempt.phase === "correct" && index === question.correctIndex;
@@ -443,11 +463,13 @@ export default function MathWorldClient() {
             </div>
           </section>
 
-          <p className={styles.keyboardHint}>Keyboard: press A–E or 1–5 to answer.</p>
+          <p className={styles.keyboardHint}>Keyboard: press A–{LETTERS[question.choices.length - 1]} or 1–{question.choices.length} to answer.</p>
         </main>
       ) : (
         <WorldMap
-          key={qaUnlocked ? "playtest" : "adventure"}
+          key={`${qaUnlocked ? "playtest" : "adventure"}:${selectedWorld.id}`}
+          world={selectedWorld}
+          onChooseWorld={chooseWorld}
           avatarStopId={lastVisitedStopId}
           progress={progress}
           qaUnlocked={qaUnlocked}

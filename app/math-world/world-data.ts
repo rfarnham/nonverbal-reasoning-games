@@ -1,298 +1,88 @@
-import questionManifest from "./data/world-01.questions.json" with { type: "json" };
+import runtimeManifest from "./data/runtime.generated.json" with { type: "json" };
 
-export type RealmId =
-  | "number_arithmetic"
-  | "geometry_spatial"
-  | "measurement_time";
-
+export type RealmId = "number_arithmetic" | "geometry_spatial" | "measurement_time" | "logic_constraints";
+export type WorldDefinition = Readonly<{
+  id: string; number: number; title: string; concept: string; conceptId: string;
+  spiral: 1 | 2; theme: number; description: string; stopIds: readonly string[];
+}>;
 export type WorldQuestion = Readonly<{
-  id: string;
-  stopId: string;
-  prompt: string;
-  choices: readonly Readonly<{
-    label: string;
-    accessibleLabel: string;
-    visualOnly: boolean;
-  }>[];
-  correctIndex: number;
-  presentation: "semantic" | "source-card";
-  asset: Readonly<{
-    src: string;
-    width: number;
-    height: number;
-    alt: string;
-  }>;
+  id: string; worldId: string; stopId: string; prompt: string;
+  choices: readonly Readonly<{ label: string; accessibleLabel: string; visualOnly: boolean }>[];
+  correctIndex: number; presentation: "semantic" | "source-card"; showPrompt?: boolean;
+  asset: Readonly<{ src: string; width: number; height: number; alt: string; sha256?: string }>;
   source: Readonly<{
-    year: number;
-    gradeBand: string;
-    questionNumber: number;
-    sourceLabel: string;
+    year: number; gradeBand: string; questionNumber: number; sourceLabel: string;
+    pointTier?: 3 | 4 | 5; sourceFamily?: string; tierBasis?: string;
+    sourceKind?: "contest" | "practice" | "mock"; answerStatus?: string; contentVersion?: string;
   }>;
   curriculum: Readonly<{
-    realmId: RealmId;
-    districtId: string;
-    skillIds: readonly string[];
-    placementVersion: string;
-    placementStatus: "provisional-playtest";
-    proposalConfidence: number | null;
+    realmId: RealmId; districtId: string; skillIds: readonly string[];
+    placementVersion: string; placementStatus: "provisional-playtest" | "agent-reviewed";
+    proposalConfidence: number | null; primaryTopic?: string;
+    secondaryTopics?: readonly string[]; strategies?: readonly string[];
+    reasoningDemand?: number;
   }>;
 }>;
-
 export type MathStop = Readonly<{
-  id: string;
+  id: string; worldId: string; mapSlot: number;
   kind: "math-kangaroo" | "culmination";
-  label: string;
-  shortLabel: string;
-  description: string;
-  realmId: RealmId | "mixed";
-  districtLabel: string;
-  x: number;
-  y: number;
-  mobileX: number;
-  mobileY: number;
+  label: string; shortLabel: string; description: string;
+  realmId: RealmId | "mixed"; districtLabel: string;
+  x: number; y: number; mobileX: number; mobileY: number;
 }>;
-
 export type BreakStop = Readonly<{
-  id: string;
-  kind: "turbo" | "minigame";
-  label: string;
-  shortLabel: string;
-  description: string;
-  href: string;
-  afterStopId: string;
-  x: number;
-  y: number;
-  mobileX: number;
-  mobileY: number;
+  id: string; worldId: string; kind: "turbo" | "minigame";
+  label: string; shortLabel: string; description: string; href: string; afterStopId: string;
+  x: number; y: number; mobileX: number; mobileY: number;
 }>;
-
 export type WorldStop = MathStop | BreakStop;
-
 export const REALMS = {
-  number_arithmetic: {
-    label: "Number & Operations",
-    shortLabel: "Number Coast",
-    color: "#f3bd4e",
-    icon: "123",
-  },
-  geometry_spatial: {
-    label: "Shape & Space",
-    shortLabel: "Shape Cliffs",
-    color: "#7767d7",
-    icon: "◇",
-  },
-  measurement_time: {
-    label: "Measurement & Modeling",
-    shortLabel: "Clockwork Harbor",
-    color: "#35a999",
-    icon: "◷",
-  },
+  number_arithmetic: { label: "Number & Operations", shortLabel: "Number Coast", color: "#f3bd4e", icon: "123" },
+  geometry_spatial: { label: "Shape & Space", shortLabel: "Shape Cliffs", color: "#7767d7", icon: "◇" },
+  measurement_time: { label: "Measurement & Modeling", shortLabel: "Clockwork Harbor", color: "#35a999", icon: "◷" },
+  logic_constraints: { label: "Logic & Relationships", shortLabel: "Logic Lagoon", color: "#f06f5f", icon: "?" },
 } as const;
 
-export const REQUIRED_STOPS: readonly MathStop[] = [
-  {
-    id: "counting-cove",
-    kind: "math-kangaroo",
-    label: "Counting Cove",
-    shortLabel: "Cove",
-    description: "Count, compare, and notice what belongs together.",
-    realmId: "number_arithmetic",
-    districtLabel: "Count & Compare",
-    x: 10,
-    y: 73,
-    mobileX: 27,
-    mobileY: 89,
-  },
-  {
-    id: "number-bridge",
-    kind: "math-kangaroo",
-    label: "Number Bridge",
-    shortLabel: "Bridge",
-    description: "Use number relationships to cross the inlet.",
-    realmId: "number_arithmetic",
-    districtLabel: "Join & Separate",
-    x: 23,
-    y: 56,
-    mobileX: 70,
-    mobileY: 80,
-  },
-  {
-    id: "digit-dunes",
-    kind: "math-kangaroo",
-    label: "Digit Dunes",
-    shortLabel: "Dunes",
-    description: "Read the hidden structure inside numbers and digits.",
-    realmId: "number_arithmetic",
-    districtLabel: "Number & Digit Structure",
-    x: 35,
-    y: 76,
-    mobileX: 29,
-    mobileY: 70,
-  },
-  {
-    id: "orchard-market",
-    kind: "math-kangaroo",
-    label: "Orchard Market",
-    shortLabel: "Market",
-    description: "Join, separate, trade, and reason with quantities.",
-    realmId: "number_arithmetic",
-    districtLabel: "Join & Separate",
-    x: 45,
-    y: 51,
-    mobileX: 68,
-    mobileY: 60,
-  },
-  {
-    id: "shape-shore",
-    kind: "math-kangaroo",
-    label: "Shape Shore",
-    shortLabel: "Shore",
-    description: "Inspect corners, outlines, and shape properties.",
-    realmId: "geometry_spatial",
-    districtLabel: "Shape Properties",
-    x: 59,
-    y: 65,
-    mobileX: 27,
-    mobileY: 50,
-  },
-  {
-    id: "puzzle-cliffs",
-    kind: "math-kangaroo",
-    label: "Puzzle Cliffs",
-    shortLabel: "Cliffs",
-    description: "Compose, dissect, and turn visual pieces.",
-    realmId: "geometry_spatial",
-    districtLabel: "Compose, Dissect & Tile",
-    x: 68,
-    y: 44,
-    mobileX: 69,
-    mobileY: 40,
-  },
-  {
-    id: "coin-harbor",
-    kind: "math-kangaroo",
-    label: "Coin Harbor",
-    shortLabel: "Harbor",
-    description: "Compare value and make quantities meet.",
-    realmId: "measurement_time",
-    districtLabel: "Money & Value",
-    x: 80,
-    y: 54,
-    mobileX: 28,
-    mobileY: 30,
-  },
-  {
-    id: "clock-tower",
-    kind: "math-kangaroo",
-    label: "Clock Tower",
-    shortLabel: "Tower",
-    description: "Reason about clocks, calendars, and intervals.",
-    realmId: "measurement_time",
-    districtLabel: "Clock & Calendar",
-    x: 78,
-    y: 24,
-    mobileX: 68,
-    mobileY: 20,
-  },
-  {
-    id: "lighthouse-crossroads",
-    kind: "culmination",
-    label: "Kangaroo Lighthouse",
-    shortLabel: "Lighthouse",
-    description: "Bring the whole coast together in one final crossing.",
-    realmId: "mixed",
-    districtLabel: "Coastal Crossroads",
-    x: 90,
-    y: 21,
-    mobileX: 44,
-    mobileY: 10,
-  },
-] as const;
-
-export const BREAK_STOPS: readonly BreakStop[] = [
-  {
-    id: "turbo-wharf",
-    kind: "turbo",
-    label: "Turbo Wharf",
-    shortLabel: "Turbo",
-    description: "Optional fact-fluency sprint at the wharf.",
-    href: "/lab/subtraction-flash/",
-    afterStopId: "number-bridge",
-    x: 22,
-    y: 27,
-    mobileX: 23,
-    mobileY: 80,
-  },
-  {
-    id: "pattern-picnic",
-    kind: "minigame",
-    label: "Pattern Picnic",
-    shortLabel: "Minigame",
-    description: "Optional visual-pattern break beneath the palms.",
-    href: "/games/pattern-matrix/",
-    afterStopId: "shape-shore",
-    x: 51,
-    y: 23,
-    mobileX: 73,
-    mobileY: 50,
-  },
-] as const;
-
-export const WORLD_STOPS: readonly WorldStop[] = [
-  REQUIRED_STOPS[0],
-  REQUIRED_STOPS[1],
-  BREAK_STOPS[0],
-  REQUIRED_STOPS[2],
-  REQUIRED_STOPS[3],
-  REQUIRED_STOPS[4],
-  BREAK_STOPS[1],
-  REQUIRED_STOPS[5],
-  REQUIRED_STOPS[6],
-  REQUIRED_STOPS[7],
-  REQUIRED_STOPS[8],
-] as const;
-
-type RawManifest = Readonly<{
-  schemaVersion: number;
-  contentVersion: string;
-  catalogueRunId: string;
-  ontologyVersion: string;
-  questions: readonly WorldQuestion[];
+type RuntimeManifest = Readonly<{
+  schemaVersion: number; mode: "prototype" | "spiral-preview";
+  contentVersion: string; ontologyVersion: string;
+  worlds: readonly WorldDefinition[]; stops: readonly MathStop[];
+  breaks: readonly BreakStop[]; questions: readonly WorldQuestion[];
 }>;
-
-const manifest = questionManifest as unknown as RawManifest;
-
-if (manifest.schemaVersion !== 1 || !manifest.contentVersion.trim()) {
-  throw new Error("Invalid Math World question manifest.");
-}
-
-const requiredStopIds = new Set(REQUIRED_STOPS.map(({ id }) => id));
-const seenQuestionIds = new Set<string>();
-for (const question of manifest.questions) {
-  if (!requiredStopIds.has(question.stopId)) {
-    throw new Error(`Unknown Math World stop for ${question.id}.`);
-  }
-  if (seenQuestionIds.has(question.id)) {
-    throw new Error(`Duplicate Math World question: ${question.id}.`);
-  }
-  if (question.choices.length !== 5 || question.correctIndex < 0 || question.correctIndex > 4) {
-    throw new Error(`Invalid answer choices for ${question.id}.`);
-  }
-  seenQuestionIds.add(question.id);
-}
-
+const manifest = runtimeManifest as unknown as RuntimeManifest;
+if (manifest.schemaVersion !== 2 || !manifest.contentVersion.trim()) throw new Error("Invalid Math Worlds manifest.");
 export const WORLD_CONTENT_VERSION = manifest.contentVersion;
 export const WORLD_ONTOLOGY_VERSION = manifest.ontologyVersion;
+export const WORLD_MODE = manifest.mode;
+export const WORLD_DEFINITIONS = manifest.worlds;
+export const REQUIRED_STOPS = manifest.stops;
+export const BREAK_STOPS = manifest.breaks;
+export const WORLD_STOPS: readonly WorldStop[] = [...REQUIRED_STOPS, ...BREAK_STOPS];
 export const WORLD_QUESTIONS = manifest.questions;
-export const QUESTIONS_BY_STOP = new Map(
-  REQUIRED_STOPS.map((stop) => [
-    stop.id,
-    WORLD_QUESTIONS.filter((question) => question.stopId === stop.id),
-  ]),
-);
-
+export const QUESTIONS_BY_STOP = new Map(REQUIRED_STOPS.map(stop => [stop.id, WORLD_QUESTIONS.filter(question => question.stopId === stop.id)]));
+export function stopsForWorld(worldId: string): readonly MathStop[] { return REQUIRED_STOPS.filter(stop => stop.worldId === worldId); }
+export function breaksForWorld(worldId: string): readonly BreakStop[] { return BREAK_STOPS.filter(stop => stop.worldId === worldId); }
+export function worldForStop(stopId: string | null): WorldDefinition | undefined {
+  const stop = WORLD_STOPS.find(candidate => candidate.id === stopId);
+  return WORLD_DEFINITIONS.find(world => world.id === stop?.worldId);
+}
+const worldIds = new Set(WORLD_DEFINITIONS.map(world => world.id));
+const stopIds = new Set(REQUIRED_STOPS.map(stop => stop.id));
+const questionIds = new Set<string>();
+if (worldIds.size !== WORLD_DEFINITIONS.length || stopIds.size !== REQUIRED_STOPS.length || !worldIds.size) throw new Error("Duplicate or missing Math Worlds membership.");
+for (const world of WORLD_DEFINITIONS) {
+  const stops = stopsForWorld(world.id);
+  if (!stops.length || stops.map(stop => stop.id).join() !== world.stopIds.join()) throw new Error(`Invalid world path: ${world.id}.`);
+  if (new Set(stops.map(stop => stop.mapSlot)).size !== stops.length || stops.some(stop => !Number.isInteger(stop.mapSlot) || stop.mapSlot < 0 || stop.mapSlot > 8)) throw new Error(`Invalid map anchors: ${world.id}.`);
+  const count = stops.reduce((sum, stop) => sum + (QUESTIONS_BY_STOP.get(stop.id)?.length ?? 0), 0);
+  if (manifest.mode === "spiral-preview" && (count !== 24 || stops.length !== 4 || stops.some(stop => QUESTIONS_BY_STOP.get(stop.id)?.length !== 6))) throw new Error(`World must contain four stops of six questions: ${world.id}.`);
+}
+for (const question of WORLD_QUESTIONS) {
+  if (!stopIds.has(question.stopId) || worldForStop(question.stopId)?.id !== question.worldId || questionIds.has(question.id)) throw new Error(`Invalid question membership: ${question.id}.`);
+  if (![4,5].includes(question.choices.length) || !Number.isInteger(question.correctIndex) || question.correctIndex < 0 || question.correctIndex >= question.choices.length) throw new Error(`Invalid choices: ${question.id}.`);
+  if (manifest.mode === "spiral-preview" && !((question.source.gradeBand === "1-2" && [3,4,5].includes(question.source.pointTier ?? 0)) || (question.source.gradeBand === "3-4" && [3,4].includes(question.source.pointTier ?? 0)))) throw new Error(`Question outside curriculum scope: ${question.id}.`);
+  questionIds.add(question.id);
+}
 for (const stop of REQUIRED_STOPS) {
-  if ((QUESTIONS_BY_STOP.get(stop.id)?.length ?? 0) === 0) {
-    throw new Error(`Math World stop ${stop.id} has no questions.`);
-  }
+  if (!worldIds.has(stop.worldId) || !(QUESTIONS_BY_STOP.get(stop.id)?.length)) throw new Error(`Empty Math World stop: ${stop.id}.`);
 }

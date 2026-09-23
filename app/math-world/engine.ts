@@ -2,10 +2,13 @@ import {
   QUESTIONS_BY_STOP,
   REQUIRED_STOPS,
   WORLD_CONTENT_VERSION,
+  WORLD_DEFINITIONS,
+  worldForStop,
+  stopsForWorld,
   type WorldQuestion,
 } from "./world-data.ts";
 
-export const WORLD_PROGRESS_SCHEMA_VERSION = 1;
+export const WORLD_PROGRESS_SCHEMA_VERSION = 2;
 
 export type QuestionPhase = "answering" | "wrong-review" | "retry" | "correct";
 
@@ -18,7 +21,8 @@ export type StopAttempt = Readonly<{
 }>;
 
 export type WorldProgress = Readonly<{
-  schemaVersion: 1;
+  schemaVersion: 2;
+  selectedWorldId: string;
   contentVersion: string;
   activeStopId: string | null;
   checkpointStopId: string | null;
@@ -30,6 +34,7 @@ export function createInitialProgress(): WorldProgress {
   return {
     schemaVersion: WORLD_PROGRESS_SCHEMA_VERSION,
     contentVersion: WORLD_CONTENT_VERSION,
+    selectedWorldId: WORLD_DEFINITIONS[0].id,
     activeStopId: null,
     checkpointStopId: null,
     completedStopIds: [],
@@ -37,11 +42,24 @@ export function createInitialProgress(): WorldProgress {
   };
 }
 
-export function nextRequiredStopId(progress: WorldProgress): string | null {
+export function nextRequiredStopId(progress: WorldProgress, worldId?: string): string | null {
   return (
-    REQUIRED_STOPS.find(({ id }) => !progress.completedStopIds.includes(id))?.id ??
+    (worldId ? stopsForWorld(worldId) : REQUIRED_STOPS).find(({ id }) => !progress.completedStopIds.includes(id))?.id ??
     null
   );
+}
+
+export function canOpenWorld(progress: WorldProgress, worldId: string, qaUnlocked = false): boolean {
+  const index = WORLD_DEFINITIONS.findIndex(world => world.id === worldId);
+  if (index < 0) return false;
+  if (qaUnlocked) return true;
+  const next = worldForStop(nextRequiredStopId(progress));
+  return !next || index <= WORLD_DEFINITIONS.findIndex(world => world.id === next.id);
+}
+
+export function selectWorld(progress: WorldProgress, worldId: string, qaUnlocked = false): WorldProgress {
+  if (!canOpenWorld(progress, worldId, qaUnlocked)) return progress;
+  return { ...progress, selectedWorldId: worldId, activeStopId: null, checkpointStopId: null };
 }
 
 export function canOpenRequiredStop(
@@ -76,6 +94,7 @@ export function startStop(
   return {
     ...progress,
     activeStopId: stopId,
+    selectedWorldId: worldForStop(stopId)!.id,
     checkpointStopId: null,
     stopAttempts: qaUnlocked
       ? { [stopId]: attempt }

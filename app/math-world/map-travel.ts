@@ -27,13 +27,13 @@ export const mobileRoad = [
 
 // These are visual junctions, independent of a detour's progress unlock rule.
 export const desktopBonusRoad = [
-  { stopId: "turbo-wharf", junctionStopId: "number-bridge", path: "M276 414.4C248 373 246 273 264 199.8" },
-  { stopId: "pattern-picnic", junctionStopId: "orchard-market", path: "M540 377.4C554 297 574 230 612 170.2" },
+  { stopId: "turbo-wharf", junctionStopId: "number-bridge", junctionSlot: 1, path: "M276 414.4C248 373 246 273 264 199.8" },
+  { stopId: "pattern-picnic", junctionStopId: "orchard-market", junctionSlot: 3, path: "M540 377.4C554 297 574 230 612 170.2" },
 ];
 
 export const mobileBonusRoad = [
-  { stopId: "turbo-wharf", junctionStopId: "digit-dunes", path: "M116 672C71 695 82 736 92 768" },
-  { stopId: "pattern-picnic", junctionStopId: "shape-shore", path: "M108 480C176 458 252 482 292 480" },
+  { stopId: "turbo-wharf", junctionStopId: "digit-dunes", junctionSlot: 2, path: "M116 672C71 695 82 736 92 768" },
+  { stopId: "pattern-picnic", junctionStopId: "shape-shore", junctionSlot: 4, path: "M108 480C176 458 252 482 292 480" },
 ];
 
 const CURVE_SUBDIVISIONS = 160;
@@ -76,50 +76,59 @@ function sampleRoadSegment(path: string): MapTravelPoint[] {
 
 const desktopSamples = desktopRoad.map(sampleRoadSegment);
 const mobileSamples = mobileRoad.map(sampleRoadSegment);
-const desktopBonusSamples = new Map(desktopBonusRoad.map(({ stopId, path }) => [stopId, sampleRoadSegment(path)]));
-const mobileBonusSamples = new Map(mobileBonusRoad.map(({ stopId, path }) => [stopId, sampleRoadSegment(path)]));
+const desktopBonusSamples = desktopBonusRoad.map(({ path }) => sampleRoadSegment(path));
+const mobileBonusSamples = mobileBonusRoad.map(({ path }) => sampleRoadSegment(path));
 
 /**
- * Percentage coordinates along the actual coast road, including intermediate stops.
- * The caller controls duration, easing, reduced motion, and cancellation.
- * Optional destinations follow the required road to their painted branch junction.
- * Unknown IDs or optional origins have no route and return an empty array.
+ * Percentage coordinates along the actual island road, including unnumbered
+ * intermediate anchors. World data places four to nine real stops on these
+ * anchors; world IDs never affect geometry or introduce cross-world travel.
  */
 export function getMapTravelPoints(fromStopId: string, toStopId: string, mobile = false): MapTravelPoint[] {
-  const fromIndex = REQUIRED_STOPS.findIndex(({ id }) => id === fromStopId);
-  const toIndex = REQUIRED_STOPS.findIndex(({ id }) => id === toStopId);
-  if (fromIndex < 0) return [];
+  const origin = REQUIRED_STOPS.find(({ id }) => id === fromStopId);
+  const destination = REQUIRED_STOPS.find(({ id }) => id === toStopId)
+    ?? BREAK_STOPS.find(({ id }) => id === toStopId);
+  if (!origin || !destination || origin.worldId !== destination.worldId) return [];
 
   const width = mobile ? 400 : 1200;
   const height = mobile ? 960 : 740;
-  const branch = (mobile ? mobileBonusRoad : desktopBonusRoad).find(({ stopId }) => stopId === toStopId);
-  if (branch) {
-    const destination = BREAK_STOPS.find(({ id }) => id === toStopId)!;
-    const branchSamples = (mobile ? mobileBonusSamples : desktopBonusSamples).get(toStopId)!;
-    const points = getMapTravelPoints(fromStopId, branch.junctionStopId, mobile);
-    for (const point of branchSamples.slice(1, -1)) {
-      points.push({ x: point.x / width * 100, y: point.y / height * 100 });
+  const samples = mobile ? mobileSamples : desktopSamples;
+  const toPercentage = ({ x, y }: MapTravelPoint): MapTravelPoint => ({ x: x / width * 100, y: y / height * 100 });
+  const slotPoint = (slot: number): MapTravelPoint => {
+    const point = toPercentage(slot === samples.length ? samples.at(-1)!.at(-1)! : samples[slot][0]);
+    // Authored anchors are percentages; avoid tiny binary rounding drift at joins.
+    return { x: Math.round(point.x * 1e10) / 1e10, y: Math.round(point.y * 1e10) / 1e10 };
+  };
+  const betweenSlots = (fromSlot: number, toSlot: number): MapTravelPoint[] => {
+    if (fromSlot < 0 || fromSlot > samples.length || toSlot < 0 || toSlot > samples.length) return [];
+    if (fromSlot === toSlot) return [slotPoint(fromSlot)];
+    const first = Math.min(fromSlot, toSlot);
+    const last = Math.max(fromSlot, toSlot);
+    const points: MapTravelPoint[] = [slotPoint(first)];
+    for (let slot = first; slot < last; slot += 1) {
+      points.push(...samples[slot].slice(1, -1).map(toPercentage), slotPoint(slot + 1));
     }
-    points.push(mobile ? { x: destination.mobileX, y: destination.mobileY } : { x: destination.x, y: destination.y });
+    return fromSlot > toSlot ? points.reverse() : points;
+  };
+  const pointForStop = (stop: typeof origin | typeof destination): MapTravelPoint => mobile
+    ? { x: stop.mobileX, y: stop.mobileY }
+    : { x: stop.x, y: stop.y };
+
+  if (destination.kind === "turbo" || destination.kind === "minigame") {
+    const branchIndex = destination.kind === "turbo" ? 0 : 1;
+    const branch = (mobile ? mobileBonusRoad : desktopBonusRoad)[branchIndex];
+    const branchSamples = (mobile ? mobileBonusSamples : desktopBonusSamples)[branchIndex];
+    const points = betweenSlots(origin.mapSlot, branch.junctionSlot);
+    points.push(...branchSamples.slice(1, -1).map(toPercentage), pointForStop(destination));
+    points[0] = pointForStop(origin);
     return points;
   }
-  if (toIndex < 0) return [];
 
-  const stopPoint = (index: number): MapTravelPoint => {
-    const stop = REQUIRED_STOPS[index];
-    return mobile ? { x: stop.mobileX, y: stop.mobileY } : { x: stop.x, y: stop.y };
-  };
-  if (fromIndex === toIndex) return [stopPoint(fromIndex)];
-
-  const samples = mobile ? mobileSamples : desktopSamples;
-  const first = Math.min(fromIndex, toIndex);
-  const last = Math.max(fromIndex, toIndex);
-  const points: MapTravelPoint[] = [stopPoint(first)];
-  for (let index = first; index < last; index += 1) {
-    for (const point of samples[index].slice(1, -1)) {
-      points.push({ x: point.x / width * 100, y: point.y / height * 100 });
-    }
-    points.push(stopPoint(index + 1));
+  if (!("mapSlot" in destination)) return [];
+  const points = betweenSlots(origin.mapSlot, destination.mapSlot);
+  if (points.length > 0) {
+    points[0] = pointForStop(origin);
+    points[points.length - 1] = pointForStop(destination);
   }
-  return fromIndex > toIndex ? points.reverse() : points;
+  return points;
 }

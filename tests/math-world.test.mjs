@@ -7,6 +7,8 @@ import {
   allowRetry,
   answerQuestion,
   canOpenRequiredStop,
+  canOpenWorld,
+  selectWorld,
   completeStop,
   createInitialProgress,
   nextRequiredStopId,
@@ -18,9 +20,14 @@ import {
   REQUIRED_STOPS,
   WORLD_QUESTIONS,
   WORLD_STOPS,
+  WORLD_DEFINITIONS,
+  WORLD_MODE,
+  stopsForWorld,
 } from "../app/math-world/world-data.ts";
 import {
   readWorldPlaytestMode,
+  readQaArchive,
+  writeQaRecord,
   readWorldProgress,
   writeWorldProgress,
 } from "../app/math-world/storage.ts";
@@ -88,27 +95,44 @@ test("the approved map ontology has six realms and 27 stable districts", async (
   assert.equal(ontology.placementPolicy.prerequisiteEdgesGateProgress, false);
 
   const knownDistricts = new Set(districts.map(({ id }) => id));
-  for (const question of WORLD_QUESTIONS) {
+  for (const question of WORLD_MODE === "prototype" ? WORLD_QUESTIONS : []) {
     if (question.curriculum.districtId !== "mixed-expedition") {
       assert.equal(knownDistricts.has(question.curriculum.districtId), true);
     }
   }
 });
 
-test("Counting Coast is mostly Math Kangaroo and every required stop has content", () => {
-  assert.equal(REQUIRED_STOPS.length, 9);
-  assert.equal(BREAK_STOPS.length, 2);
-  assert.ok(REQUIRED_STOPS.length / WORLD_STOPS.length >= 0.7);
-  assert.equal(WORLD_QUESTIONS.length, 38);
-
-  for (const stop of REQUIRED_STOPS) {
-    const questions = QUESTIONS_BY_STOP.get(stop.id) ?? [];
-    assert.equal(
-      questions.length,
-      stop.kind === "culmination" ? 6 : 4,
-      `${stop.id} has its authored static question count`,
-    );
+test("the authored worlds have bounded, nonempty question stops", async () => {
+  if (WORLD_MODE === "prototype") {
+    assert.equal(WORLD_DEFINITIONS.length, 1);
+    assert.equal(REQUIRED_STOPS.length, 9);
+    assert.equal(BREAK_STOPS.length, 2);
+    assert.equal(WORLD_QUESTIONS.length, 38);
+    for (const stop of REQUIRED_STOPS) {
+      assert.equal(QUESTIONS_BY_STOP.get(stop.id).length, stop.kind === "culmination" ? 6 : 4);
+    }
+    return;
   }
+  assert.equal(WORLD_DEFINITIONS.length, 20);
+  const taxonomy = JSON.parse(await readFile(new URL("../content/math-world/competition-math-taxonomy.v1.0.0.proposed.json", import.meta.url), "utf8"));
+  const topics = new Set(taxonomy.domains.flatMap(domain => domain.topics.map(topic => topic.id)));
+  const conceptPasses = new Set();
+  for (const world of WORLD_DEFINITIONS) {
+    conceptPasses.add(`${world.conceptId}:${world.spiral}`);
+    const stops = stopsForWorld(world.id);
+    assert.deepEqual(stops.map(stop => stop.id), world.stopIds);
+    const questions = stops.flatMap(stop => QUESTIONS_BY_STOP.get(stop.id));
+    assert.equal(questions.length, 24);
+    assert.equal(stops.length, 4);
+    for (const stop of stops) assert.equal(QUESTIONS_BY_STOP.get(stop.id).length, 6);
+    for (const question of questions) {
+      assert.equal(question.worldId, world.id);
+      assert.ok(topics.has(question.curriculum.primaryTopic));
+      assert.ok(question.source.gradeBand === "1-2" ? [3,4,5].includes(question.source.pointTier) : question.source.gradeBand === "3-4" && [3,4].includes(question.source.pointTier));
+    }
+  }
+  assert.equal(conceptPasses.size, 20);
+  assert.equal(WORLD_STOPS.length, REQUIRED_STOPS.length + BREAK_STOPS.length);
 });
 
 test("the frozen world package contains unique, mechanically playable questions", async () => {
@@ -116,10 +140,10 @@ test("the frozen world package contains unique, mechanically playable questions"
   for (const question of WORLD_QUESTIONS) {
     assert.equal(ids.has(question.id), false, question.id);
     ids.add(question.id);
-    assert.equal(question.choices.length, 5);
-    assert.ok(question.correctIndex >= 0 && question.correctIndex < 5);
+    assert.ok([4, 5].includes(question.choices.length));
+    assert.ok(question.correctIndex >= 0 && question.correctIndex < question.choices.length);
     assert.ok(question.prompt.trim());
-    assert.equal(question.curriculum.placementStatus, "provisional-playtest");
+    assert.equal(question.curriculum.placementStatus, WORLD_MODE === "prototype" ? "provisional-playtest" : "agent-reviewed");
     assert.ok(question.curriculum.realmId);
     assert.ok(question.source.year >= 2000);
     await access(
@@ -128,7 +152,7 @@ test("the frozen world package contains unique, mechanically playable questions"
   }
 
   const runtime = await readFile(
-    new URL("../app/math-world/data/world-01.questions.json", import.meta.url),
+    new URL("../app/math-world/data/runtime.generated.json", import.meta.url),
     "utf8",
   );
   assert.doesNotMatch(runtime, /protected_payload|answer_key_ref|local_ref|\/Users\//);
@@ -144,7 +168,7 @@ test("wrong answers retry in place and only a solved final question completes a 
   assert.equal(nextRequiredStopId(progress), stop.id);
   assert.equal(canOpenRequiredStop(progress, REQUIRED_STOPS[1].id), false);
 
-  const wrongIndex = (question.correctIndex + 1) % 5;
+  const wrongIndex = (question.correctIndex + 1) % question.choices.length;
   progress = answerQuestion(progress, stop.id, question, wrongIndex);
   assert.equal(progress.stopAttempts[stop.id].phase, "wrong-review");
   assert.equal(progress.stopAttempts[stop.id].questionIndex, 0);
@@ -182,7 +206,7 @@ test("test mode opens every real stop, replaces unfinished runs, and replays com
 
   let progress = startStop(initial, firstStop.id, true);
   const firstQuestion = QUESTIONS_BY_STOP.get(firstStop.id)[0];
-  progress = answerQuestion(progress, firstStop.id, firstQuestion, (firstQuestion.correctIndex + 1) % 5);
+  progress = answerQuestion(progress, firstStop.id, firstQuestion, (firstQuestion.correctIndex + 1) % firstQuestion.choices.length);
   assert.equal(progress.stopAttempts[firstStop.id].phase, "wrong-review");
   progress = startStop(progress, finalStop.id, true);
   assert.equal(progress.activeStopId, finalStop.id);
@@ -212,7 +236,7 @@ test("test mode keeps canonical question validation and requires solving the ent
   assert.equal(answerQuestion(progress, REQUIRED_STOPS[0].id, question, question.correctIndex), progress);
   assert.equal(completeStop(progress, stop.id), progress);
 
-  const wrongIndex = (question.correctIndex + 1) % 5;
+  const wrongIndex = (question.correctIndex + 1) % question.choices.length;
   const forgedQuestion = { ...question, correctIndex: wrongIndex };
   assert.equal(answerQuestion(progress, stop.id, forgedQuestion, wrongIndex).stopAttempts[stop.id].phase, "wrong-review");
   const answered = answerQuestion(progress, stop.id, question, question.correctIndex);
@@ -252,12 +276,12 @@ test("playtest reloads independently and never writes normal progress or Journey
   const firstStop = REQUIRED_STOPS[0];
   const normalProgress = startStop(createInitialProgress(), firstStop.id);
   writeWorldProgress(normalProgress);
-  const normalSave = storage.getItem("spatial-gym-math-world-progress");
+  const normalSave = storage.getItem(WORLD_MODE === "prototype" ? "spatial-gym-math-world-progress" : "spatial-gym-math-world-spiral-progress");
 
   const finalStop = REQUIRED_STOPS.at(-1);
   let testProgress = startStop(readWorldProgress(true), finalStop.id, true);
   const question = QUESTIONS_BY_STOP.get(finalStop.id)[0];
-  testProgress = answerQuestion(testProgress, finalStop.id, question, (question.correctIndex + 1) % 5);
+  testProgress = answerQuestion(testProgress, finalStop.id, question, (question.correctIndex + 1) % question.choices.length);
   writeWorldProgress(testProgress, true);
   assert.deepEqual(readWorldProgress(true), testProgress);
   assert.equal(readWorldPlaytestMode(), true);
@@ -266,7 +290,7 @@ test("playtest reloads independently and never writes normal progress or Journey
   testProgress = solveStop(testProgress, finalStop.id);
   writeWorldProgress(testProgress, true);
   assert.deepEqual(readWorldProgress(), normalProgress);
-  assert.equal(storage.getItem("spatial-gym-math-world-progress"), normalSave);
+  assert.equal(storage.getItem(WORLD_MODE === "prototype" ? "spatial-gym-math-world-progress" : "spatial-gym-math-world-spiral-progress"), normalSave);
   assert.equal(storage.getItem(PROGRESSION_STORAGE_KEY), savedJourney);
 
   saveProgressionState(profileState("Ada"), storage);
@@ -287,7 +311,7 @@ test("corrupt saved attempts return to the map instead of freezing a canonical q
   const questions = QUESTIONS_BY_STOP.get(stop.id);
   const question = questions[0];
   const initial = startStop(createInitialProgress(), stop.id);
-  const wrong = answerQuestion(initial, stop.id, question, (question.correctIndex + 1) % 5);
+  const wrong = answerQuestion(initial, stop.id, question, (question.correctIndex + 1) % question.choices.length);
   const correct = answerQuestion(initial, stop.id, question, question.correctIndex);
   const validStates = [initial, wrong, allowRetry(wrong, stop.id), correct,
     advanceQuestion(correct, stop.id, questions.length), solveStop(initial, stop.id)];
@@ -324,4 +348,83 @@ test("corrupt saved attempts return to the map instead of freezing a canonical q
     firstTryCorrect: { [question.id]: true, "unknown-question": true },
   } } });
   assert.deepEqual(readWorldProgress(), correct, "unknown and duplicate question references are removed without losing a valid attempt");
+});
+
+
+test("world navigation follows earned progress and never starts a question", () => {
+  let progress = createInitialProgress();
+  assert.equal(progress.selectedWorldId, WORLD_DEFINITIONS[0].id);
+  assert.equal(canOpenWorld(progress, "unknown", true), false);
+  assert.equal(selectWorld(progress, "unknown", true), progress);
+  for (const [index, world] of WORLD_DEFINITIONS.entries()) {
+    assert.equal(canOpenWorld(progress, world.id), index === 0);
+    assert.equal(canOpenWorld(progress, world.id, true), true);
+    const inspected = selectWorld(progress, world.id, true);
+    assert.equal(inspected.selectedWorldId, world.id);
+    assert.equal(inspected.activeStopId, null);
+    assert.deepEqual(inspected.completedStopIds, []);
+    if (index > 0) assert.equal(selectWorld(progress, world.id), progress);
+  }
+  for (const [index, world] of WORLD_DEFINITIONS.entries()) {
+    for (const stop of stopsForWorld(world.id)) {
+      assert.equal(nextRequiredStopId(progress), stop.id);
+      progress = solveStop(startStop(progress, stop.id), stop.id);
+      assert.equal(progress.activeStopId, null, "completion returns to the map");
+      assert.equal(progress.checkpointStopId, stop.id);
+    }
+    assert.equal(nextRequiredStopId(progress, world.id), null);
+    const next = WORLD_DEFINITIONS[index + 1];
+    if (next) {
+      assert.equal(canOpenWorld(progress, next.id), true);
+      progress = selectWorld(progress, next.id);
+      assert.equal(progress.selectedWorldId, next.id);
+      assert.equal(progress.activeStopId, null);
+      assert.equal(progress.checkpointStopId, null);
+    }
+  }
+  assert.equal(nextRequiredStopId(progress), null);
+});
+
+test("selected QA world survives reload without touching the prototype or Journey saves", (context) => {
+  const storage = memoryStorage();
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { localStorage: storage } });
+  context.after(() => {
+    if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
+    else delete globalThis.window;
+  });
+  storage.setItem(PROGRESSION_STORAGE_KEY, "untouched-journey");
+  if (WORLD_MODE === "spiral-preview") storage.setItem("spatial-gym-math-world-progress", "untouched-prototype");
+  const selected = selectWorld(createInitialProgress(), WORLD_DEFINITIONS.at(-1).id, true);
+  writeWorldProgress(selected, true);
+  assert.deepEqual(readWorldProgress(true), selected);
+  assert.equal(readWorldProgress().selectedWorldId, WORLD_DEFINITIONS[0].id);
+  assert.equal(storage.getItem(PROGRESSION_STORAGE_KEY), "untouched-journey");
+  if (WORLD_MODE === "spiral-preview") assert.equal(storage.getItem("spatial-gym-math-world-progress"), "untouched-prototype");
+});
+
+
+test("playtest notes preserve other curriculum versions and migrate matching legacy notes", (context) => {
+  const storage = memoryStorage();
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { localStorage: storage } });
+  context.after(() => {
+    if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
+    else delete globalThis.window;
+  });
+  const version = createInitialProgress().contentVersion;
+  const old = JSON.stringify({ schemaVersion: 1, contentVersion: "another-curriculum", records: { old: { note: "Keep this review" } } });
+  storage.setItem("spatial-gym-math-world-qa", old);
+  assert.deepEqual(readQaArchive().records, {});
+  const record = { questionId: WORLD_QUESTIONS[0].id, stopId: WORLD_QUESTIONS[0].stopId, categories: [], note: "Current review", status: "looks-good", firstSelectedIndex: null, updatedAt: "2026-09-22T00:00:00Z" };
+  writeQaRecord(record);
+  assert.equal(storage.getItem("spatial-gym-math-world-qa"), old);
+  assert.deepEqual(readQaArchive().records[record.questionId], record);
+  storage.removeItem(`spatial-gym-math-world-qa:${WORLD_MODE}:${version}`);
+  const legacy = JSON.stringify({ schemaVersion: 1, contentVersion: version, records: { saved: { note: "Matching legacy review" } } });
+  storage.setItem("spatial-gym-math-world-qa", legacy);
+  assert.equal(readQaArchive().records.saved.note, "Matching legacy review");
+  writeQaRecord(record);
+  assert.equal(readQaArchive().records.saved.note, "Matching legacy review");
+  assert.equal(storage.getItem("spatial-gym-math-world-qa"), legacy);
 });
