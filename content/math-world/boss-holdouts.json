@@ -1,0 +1,769 @@
+{
+  "schemaVersion": 1,
+  "policyVersion": "annual-boss-holdouts.v1",
+  "scope": "USA Math Kangaroo annual tests, Grades 1–2, reserved outside the 20 teaching worlds.",
+  "matchingPolicy": {
+    "exactReferences": "Reserve every sourceId and reservedReferences ID, including documented aliases, surface variants, edition variants, and their connected source occurrences. Variant reservation prevents prior exposure; it does not assert that the artwork is identical.",
+    "metadataFallback": {
+      "sourceFamilyPrefix": "USA",
+      "excludedSourceKinds": [
+        "practice",
+        "mock"
+      ],
+      "excludedSourceMarkers": [
+        "team",
+        "mock",
+        "practice",
+        "workbook"
+      ]
+    },
+    "metadataFallbackNote": "For renamed source records, reserve USA contest provenance in the held-out year and grade band. Compilation publication years, other grades, and unrelated practice, mock, or team tests do not identify these annual tests.",
+    "evidenceNote": "Evidence paths are relative identifiers into the local authoring audit. They contain no question content, private URL, credential, or local account path."
+  },
+  "challenges": [
+    {
+      "id": "boss-2025",
+      "year": 2025,
+      "gradeBand": "1-2",
+      "afterWorldNumber": 10,
+      "questionCount": 24,
+      "status": "placeholder",
+      "sourceFamily": "USA",
+      "sourceKind": "contest",
+      "questions": [
+        {
+          "number": 1,
+          "sourceId": "usa-electronic-2025-grades-1-2-q01",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q01",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q01",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:712"
+            },
+            {
+              "id": "electronic-alternative:lebanon:2025:grades-1-2:q01",
+              "relation": "semantic_equivalent_surface_variant",
+              "linkedFromId": "cyprus-2025-grades-1-2-part-single-q01",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:50"
+            }
+          ]
+        },
+        {
+          "number": 2,
+          "sourceId": "usa-electronic-2025-grades-1-2-q02",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q02",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q02",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:713"
+            },
+            {
+              "id": "electronic-alternative:lebanon:2025:grades-1-2:q02",
+              "relation": "semantic_equivalent_surface_variant",
+              "linkedFromId": "cyprus-2025-grades-1-2-part-single-q02",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:51"
+            }
+          ]
+        },
+        {
+          "number": 3,
+          "sourceId": "usa-electronic-2025-grades-1-2-q03",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q03",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q03",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:714"
+            },
+            {
+              "id": "electronic-alternative:lebanon:2025:grades-1-2:q03",
+              "relation": "exact_content_duplicate",
+              "linkedFromId": "cyprus-2025-grades-1-2-part-single-q03",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:52"
+            }
+          ]
+        },
+        {
+          "number": 4,
+          "sourceId": "usa-electronic-2025-grades-1-2-q04",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q04",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q04",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:715"
+            },
+            {
+              "id": "electronic-alternative:lebanon:2025:grades-1-2:q04",
+              "relation": "semantic_equivalent_surface_variant",
+              "linkedFromId": "cyprus-2025-grades-1-2-part-single-q04",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:53"
+            }
+          ]
+        },
+        {
+          "number": 5,
+          "sourceId": "usa-electronic-2025-grades-1-2-q05",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q05",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q05",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:716"
+            },
+            {
+              "id": "electronic-alternative:lebanon:2025:grades-1-2:q05",
+              "relation": "exact_content_duplicate",
+              "linkedFromId": "cyprus-2025-grades-1-2-part-single-q05",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:54"
+            }
+          ]
+        },
+        {
+          "number": 6,
+          "sourceId": "usa-electronic-2025-grades-1-2-q06",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q06",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q06",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:717"
+            },
+            {
+              "id": "electronic-alternative:lebanon:2025:grades-1-2:q06",
+              "relation": "semantic_equivalent_surface_variant",
+              "linkedFromId": "cyprus-2025-grades-1-2-part-single-q06",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:55"
+            }
+          ]
+        },
+        {
+          "number": 7,
+          "sourceId": "usa-electronic-2025-grades-1-2-q07",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q07",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q07",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:718"
+            },
+            {
+              "id": "usa-annual-sample-2025-grades-1-2-p3",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "cyprus-2025-grades-1-2-part-single-q07",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:617"
+            }
+          ]
+        },
+        {
+          "number": 8,
+          "sourceId": "usa-electronic-2025-grades-1-2-q08",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q08",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q08",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:719"
+            }
+          ]
+        },
+        {
+          "number": 9,
+          "sourceId": "usa-electronic-2025-grades-1-2-q09",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q09",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q09",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:720"
+            },
+            {
+              "id": "electronic-alternative:lebanon:2025:grades-1-2:q07",
+              "relation": "semantic_equivalent_surface_variant",
+              "linkedFromId": "cyprus-2025-grades-1-2-part-single-q09",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:56"
+            }
+          ]
+        },
+        {
+          "number": 10,
+          "sourceId": "usa-electronic-2025-grades-1-2-q10",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q10",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q10",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:721"
+            },
+            {
+              "id": "electronic-alternative:lebanon:2025:grades-1-2:q08",
+              "relation": "semantic_equivalent_surface_variant",
+              "linkedFromId": "cyprus-2025-grades-1-2-part-single-q10",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:57"
+            }
+          ]
+        },
+        {
+          "number": 11,
+          "sourceId": "usa-electronic-2025-grades-1-2-q11",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q11",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q11",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:722"
+            },
+            {
+              "id": "electronic-alternative:lebanon:2025:grades-1-2:q09",
+              "relation": "semantic_equivalent_surface_variant",
+              "linkedFromId": "cyprus-2025-grades-1-2-part-single-q11",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:58"
+            }
+          ]
+        },
+        {
+          "number": 12,
+          "sourceId": "usa-electronic-2025-grades-1-2-q12",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q12",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q12",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:723"
+            },
+            {
+              "id": "electronic-alternative:lebanon:2025:grades-1-2:q10",
+              "relation": "semantic_equivalent_surface_variant",
+              "linkedFromId": "cyprus-2025-grades-1-2-part-single-q12",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:59"
+            }
+          ]
+        },
+        {
+          "number": 13,
+          "sourceId": "usa-electronic-2025-grades-1-2-q13",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q13",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q13",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:724"
+            },
+            {
+              "id": "usa-annual-sample-2025-grades-1-2-p4",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "cyprus-2025-grades-1-2-part-single-q13",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:618"
+            }
+          ]
+        },
+        {
+          "number": 14,
+          "sourceId": "usa-electronic-2025-grades-1-2-q14",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q14",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q14",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:725"
+            }
+          ]
+        },
+        {
+          "number": 15,
+          "sourceId": "usa-electronic-2025-grades-1-2-q15",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q15",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q15",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:726"
+            },
+            {
+              "id": "electronic-alternative:lebanon:2025:grades-1-2:q11",
+              "relation": "semantic_equivalent_surface_variant",
+              "linkedFromId": "cyprus-2025-grades-1-2-part-single-q15",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:60"
+            }
+          ]
+        },
+        {
+          "number": 16,
+          "sourceId": "usa-electronic-2025-grades-1-2-q16",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q16",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q16",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:727"
+            },
+            {
+              "id": "electronic-alternative:lebanon:2025:grades-1-2:q12",
+              "relation": "semantic_equivalent_surface_variant",
+              "linkedFromId": "cyprus-2025-grades-1-2-part-single-q16",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:61"
+            }
+          ]
+        },
+        {
+          "number": 17,
+          "sourceId": "usa-electronic-2025-grades-1-2-q17",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q17",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q17",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:728"
+            },
+            {
+              "id": "electronic-alternative:lebanon:2025:grades-1-2:q13",
+              "relation": "exact_content_duplicate",
+              "linkedFromId": "cyprus-2025-grades-1-2-part-single-q17",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:62"
+            }
+          ]
+        },
+        {
+          "number": 18,
+          "sourceId": "usa-electronic-2025-grades-1-2-q18",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q18",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q18",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:729"
+            }
+          ]
+        },
+        {
+          "number": 19,
+          "sourceId": "usa-electronic-2025-grades-1-2-q19",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q19",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q19",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:730"
+            },
+            {
+              "id": "electronic-alternative:lebanon:2025:grades-1-2:q14",
+              "relation": "semantic_equivalent_surface_variant",
+              "linkedFromId": "cyprus-2025-grades-1-2-part-single-q19",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:63"
+            },
+            {
+              "id": "usa-annual-sample-2025-grades-1-2-p5",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "cyprus-2025-grades-1-2-part-single-q19",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:619"
+            }
+          ]
+        },
+        {
+          "number": 20,
+          "sourceId": "usa-electronic-2025-grades-1-2-q20",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q20",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q20",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:731"
+            }
+          ]
+        },
+        {
+          "number": 21,
+          "sourceId": "usa-electronic-2025-grades-1-2-q21",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q21",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q21",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:732"
+            },
+            {
+              "id": "electronic-alternative:lebanon:2025:grades-1-2:q15",
+              "relation": "semantic_equivalent_surface_variant",
+              "linkedFromId": "cyprus-2025-grades-1-2-part-single-q21",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:64"
+            }
+          ]
+        },
+        {
+          "number": 22,
+          "sourceId": "usa-electronic-2025-grades-1-2-q22",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q22",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q22",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:733"
+            },
+            {
+              "id": "electronic-alternative:lebanon:2025:grades-1-2:q16",
+              "relation": "semantic_equivalent_surface_variant",
+              "linkedFromId": "cyprus-2025-grades-1-2-part-single-q22",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:65"
+            }
+          ]
+        },
+        {
+          "number": 23,
+          "sourceId": "usa-electronic-2025-grades-1-2-q23",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q23",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q23",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:734"
+            },
+            {
+              "id": "electronic-alternative:lebanon:2025:grades-1-2:q17",
+              "relation": "semantic_equivalent_surface_variant",
+              "linkedFromId": "cyprus-2025-grades-1-2-part-single-q23",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:66"
+            }
+          ]
+        },
+        {
+          "number": 24,
+          "sourceId": "usa-electronic-2025-grades-1-2-q24",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2025-grades-1-2-part-single-q24",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "usa-electronic-2025-grades-1-2-q24",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:735"
+            },
+            {
+              "id": "electronic-alternative:lebanon:2025:grades-1-2:q18",
+              "relation": "semantic_equivalent_surface_variant",
+              "linkedFromId": "cyprus-2025-grades-1-2-part-single-q24",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:67"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "boss-2026",
+      "year": 2026,
+      "gradeBand": "1-2",
+      "afterWorldNumber": 20,
+      "questionCount": 24,
+      "status": "placeholder",
+      "sourceFamily": "USA",
+      "sourceKind": "contest",
+      "questions": [
+        {
+          "number": 1,
+          "sourceId": "usa-video-2026-grades-1-2-q01",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q01",
+              "relation": "alias",
+              "linkedFromId": "usa-video-2026-grades-1-2-q01",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:794"
+            }
+          ]
+        },
+        {
+          "number": 2,
+          "sourceId": "usa-video-2026-grades-1-2-q02",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q02",
+              "relation": "surface_variant",
+              "linkedFromId": "usa-video-2026-grades-1-2-q02",
+              "evidence": "oasis-sources/corpus-integration/surface-variants.jsonl:2"
+            }
+          ]
+        },
+        {
+          "number": 3,
+          "sourceId": "usa-video-2026-grades-1-2-q03",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q03",
+              "relation": "alias",
+              "linkedFromId": "usa-video-2026-grades-1-2-q03",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:795"
+            }
+          ]
+        },
+        {
+          "number": 4,
+          "sourceId": "usa-video-2026-grades-1-2-q04",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q04",
+              "relation": "surface_variant",
+              "linkedFromId": "usa-video-2026-grades-1-2-q04",
+              "evidence": "oasis-sources/corpus-integration/surface-variants.jsonl:3"
+            }
+          ]
+        },
+        {
+          "number": 5,
+          "sourceId": "usa-video-2026-grades-1-2-q05",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q05",
+              "relation": "alias",
+              "linkedFromId": "usa-video-2026-grades-1-2-q05",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:796"
+            }
+          ]
+        },
+        {
+          "number": 6,
+          "sourceId": "usa-video-2026-grades-1-2-q06",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q06",
+              "relation": "surface_variant",
+              "linkedFromId": "usa-video-2026-grades-1-2-q06",
+              "evidence": "oasis-sources/corpus-integration/surface-variants.jsonl:4"
+            }
+          ]
+        },
+        {
+          "number": 7,
+          "sourceId": "usa-video-2026-grades-1-2-q07",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q07",
+              "relation": "surface_variant",
+              "linkedFromId": "usa-video-2026-grades-1-2-q07",
+              "evidence": "oasis-sources/corpus-integration/surface-variants.jsonl:5"
+            },
+            {
+              "id": "usa-annual-sample-2026-grades-1-2-p3",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "cyprus-2026-grades-1-2-part-single-q07",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:635"
+            }
+          ]
+        },
+        {
+          "number": 8,
+          "sourceId": "usa-video-2026-grades-1-2-q08",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q08",
+              "relation": "alias",
+              "linkedFromId": "usa-video-2026-grades-1-2-q08",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:797"
+            }
+          ]
+        },
+        {
+          "number": 9,
+          "sourceId": "usa-video-2026-grades-1-2-q09",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q09",
+              "relation": "alias",
+              "linkedFromId": "usa-video-2026-grades-1-2-q09",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:798"
+            }
+          ]
+        },
+        {
+          "number": 10,
+          "sourceId": "usa-video-2026-grades-1-2-q10",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q10",
+              "relation": "surface_variant",
+              "linkedFromId": "usa-video-2026-grades-1-2-q10",
+              "evidence": "oasis-sources/corpus-integration/surface-variants.jsonl:6"
+            }
+          ]
+        },
+        {
+          "number": 11,
+          "sourceId": "usa-video-2026-grades-1-2-q11",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q11",
+              "relation": "alias",
+              "linkedFromId": "usa-video-2026-grades-1-2-q11",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:799"
+            },
+            {
+              "id": "usa-annual-sample-2026-grades-1-2-p4",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "cyprus-2026-grades-1-2-part-single-q11",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:636"
+            }
+          ]
+        },
+        {
+          "number": 12,
+          "sourceId": "usa-video-2026-grades-1-2-q12",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q12",
+              "relation": "edition_variant",
+              "linkedFromId": "usa-video-2026-grades-1-2-q12",
+              "evidence": "oasis-sources/corpus-integration/surface-variants.jsonl:702"
+            }
+          ]
+        },
+        {
+          "number": 13,
+          "sourceId": "usa-video-2026-grades-1-2-q13",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q13",
+              "relation": "surface_variant",
+              "linkedFromId": "usa-video-2026-grades-1-2-q13",
+              "evidence": "oasis-sources/corpus-integration/surface-variants.jsonl:7"
+            }
+          ]
+        },
+        {
+          "number": 14,
+          "sourceId": "usa-video-2026-grades-1-2-q14",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q14",
+              "relation": "surface_variant",
+              "linkedFromId": "usa-video-2026-grades-1-2-q14",
+              "evidence": "oasis-sources/corpus-integration/surface-variants.jsonl:8"
+            }
+          ]
+        },
+        {
+          "number": 15,
+          "sourceId": "usa-video-2026-grades-1-2-q15",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q15",
+              "relation": "surface_variant",
+              "linkedFromId": "usa-video-2026-grades-1-2-q15",
+              "evidence": "oasis-sources/corpus-integration/surface-variants.jsonl:9"
+            }
+          ]
+        },
+        {
+          "number": 16,
+          "sourceId": "usa-video-2026-grades-1-2-q16",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q16",
+              "relation": "alias",
+              "linkedFromId": "usa-video-2026-grades-1-2-q16",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:800"
+            }
+          ]
+        },
+        {
+          "number": 17,
+          "sourceId": "usa-video-2026-grades-1-2-q17",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q17",
+              "relation": "surface_variant",
+              "linkedFromId": "usa-video-2026-grades-1-2-q17",
+              "evidence": "oasis-sources/corpus-integration/surface-variants.jsonl:10"
+            }
+          ]
+        },
+        {
+          "number": 18,
+          "sourceId": "usa-video-2026-grades-1-2-q18",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q18",
+              "relation": "edition_variant",
+              "linkedFromId": "usa-video-2026-grades-1-2-q18",
+              "evidence": "oasis-sources/corpus-integration/surface-variants.jsonl:703"
+            }
+          ]
+        },
+        {
+          "number": 19,
+          "sourceId": "usa-video-2026-grades-1-2-q19",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q19",
+              "relation": "edition_variant",
+              "linkedFromId": "usa-video-2026-grades-1-2-q19",
+              "evidence": "oasis-sources/corpus-integration/surface-variants.jsonl:704"
+            }
+          ]
+        },
+        {
+          "number": 20,
+          "sourceId": "usa-video-2026-grades-1-2-q20",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q20",
+              "relation": "surface_variant",
+              "linkedFromId": "usa-video-2026-grades-1-2-q20",
+              "evidence": "oasis-sources/corpus-integration/surface-variants.jsonl:11"
+            }
+          ]
+        },
+        {
+          "number": 21,
+          "sourceId": "usa-video-2026-grades-1-2-q21",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q21",
+              "relation": "edition_variant",
+              "linkedFromId": "usa-video-2026-grades-1-2-q21",
+              "evidence": "oasis-sources/corpus-integration/surface-variants.jsonl:705"
+            }
+          ]
+        },
+        {
+          "number": 22,
+          "sourceId": "usa-video-2026-grades-1-2-q22",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q22",
+              "relation": "surface_variant",
+              "linkedFromId": "usa-video-2026-grades-1-2-q22",
+              "evidence": "oasis-sources/corpus-integration/surface-variants.jsonl:12"
+            }
+          ]
+        },
+        {
+          "number": 23,
+          "sourceId": "usa-video-2026-grades-1-2-q23",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q23",
+              "relation": "edition_variant",
+              "linkedFromId": "usa-video-2026-grades-1-2-q23",
+              "evidence": "oasis-sources/corpus-integration/surface-variants.jsonl:706"
+            }
+          ]
+        },
+        {
+          "number": 24,
+          "sourceId": "usa-video-2026-grades-1-2-q24",
+          "reservedReferences": [
+            {
+              "id": "cyprus-2026-grades-1-2-part-single-q24",
+              "relation": "surface_variant",
+              "linkedFromId": "usa-video-2026-grades-1-2-q24",
+              "evidence": "oasis-sources/corpus-integration/surface-variants.jsonl:13"
+            },
+            {
+              "id": "usa-annual-sample-2026-grades-1-2-p5",
+              "relation": "alias_existing_canonical",
+              "linkedFromId": "cyprus-2026-grades-1-2-part-single-q24",
+              "evidence": "oasis-sources/corpus-integration/aliases.jsonl:637"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

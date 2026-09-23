@@ -46,6 +46,8 @@ import {
   type WorldQuestion,
 } from "./world-data.ts";
 import { WorldMap } from "./WorldMap";
+import { BossWorld } from "./BossWorld";
+import { bossById, canOpenBoss, type BossChallenge } from "./boss-challenges.ts";
 import styles from "./math-world.module.css";
 
 const basePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
@@ -78,6 +80,7 @@ export default function MathWorldClient() {
   const [progress, setProgress] = useState<WorldProgress>(createInitialProgress);
   const [hydrated, setHydrated] = useState(false);
   const [qaUnlocked, setQaUnlocked] = useState(false);
+  const [selectedBoss, setSelectedBoss] = useState<BossChallenge | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [inspectedStopId, setInspectedStopId] = useState<string | null>(null);
   const [lastVisitedStopId, setLastVisitedStopId] = useState<string | null>(null);
@@ -94,8 +97,15 @@ export default function MathWorldClient() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const playtestMode = readWorldPlaytestMode() || new URLSearchParams(window.location.search).get("qa") === "1";
+      const savedProgress = readWorldProgress(playtestMode);
+      const requestedBoss = bossById(new URLSearchParams(window.location.search).get("boss"));
+      const initialBoss = requestedBoss && canOpenBoss(savedProgress, requestedBoss, playtestMode) ? requestedBoss : null;
       setQaUnlocked(playtestMode);
-      setProgress(readWorldProgress(playtestMode));
+      setProgress(savedProgress);
+      setSelectedBoss(initialBoss);
+      const initialUrl = new URL(window.location.href);
+      if (!initialBoss) initialUrl.searchParams.delete("boss");
+      window.history.replaceState({ ...window.history.state, mathWorldId: savedProgress.selectedWorldId }, "", initialUrl);
       setSoundEnabled(readSoundPreference());
       setHydrated(true);
       window.scrollTo({ top: 0, behavior: "auto" });
@@ -111,13 +121,20 @@ export default function MathWorldClient() {
     if (!hydrated) return;
     const syncProfile = () => {
       const next = readWorldPlaytestMode() || new URLSearchParams(window.location.search).get("qa") === "1";
+      const nextProgress = next !== qaUnlocked ? readWorldProgress(next) : progress;
       if (next !== qaUnlocked) {
         setQaUnlocked(next);
-        setProgress(readWorldProgress(next));
+        setProgress(nextProgress);
         setInspectedStopId(null);
         setLastVisitedStopId(null);
         setQaOpen(false);
         setZoomed(false);
+      }
+      if (selectedBoss && !canOpenBoss(nextProgress, selectedBoss, next)) {
+        setSelectedBoss(null);
+        const url = new URL(window.location.href);
+        url.searchParams.delete("boss");
+        window.history.replaceState({ ...window.history.state, mathWorldId: nextProgress.selectedWorldId }, "", url);
       }
     };
     const onStorage = (event: StorageEvent) => {
@@ -129,9 +146,42 @@ export default function MathWorldClient() {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("focus", syncProfile);
     };
-  }, [hydrated, qaUnlocked]);
+  }, [hydrated, qaUnlocked, progress, selectedBoss]);
 
-  const activeStop = stopById(progress.activeStopId);
+  useEffect(() => {
+    if (!hydrated) return;
+    const restoreDestination = (event: PopStateEvent) => {
+      const params = new URLSearchParams(window.location.search);
+      const nextQa = readWorldPlaytestMode() || params.get("qa") === "1";
+      const nextProgress = nextQa !== qaUnlocked ? readWorldProgress(nextQa) : progress;
+      if (nextQa !== qaUnlocked) {
+        setQaUnlocked(nextQa);
+        setProgress(nextProgress);
+      }
+      const requestedBossId = params.get("boss");
+      const requestedBoss = bossById(requestedBossId);
+      const allowedBoss = requestedBoss && canOpenBoss(nextProgress, requestedBoss, nextQa) ? requestedBoss : null;
+      setSelectedBoss(allowedBoss);
+      setInspectedStopId(null);
+      setLastVisitedStopId(null);
+      setQaOpen(false);
+      setZoomed(false);
+      if (!allowedBoss) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("boss");
+        const worldId = event.state?.mathWorldId;
+        if (!requestedBossId && typeof worldId === "string" && canOpenWorld(nextProgress, worldId, nextQa)) {
+          setProgress(current => current.selectedWorldId === worldId ? current : selectWorld(current, worldId, nextQa));
+        }
+        window.history.replaceState(window.history.state, "", url);
+      }
+      window.scrollTo({ top: 0, behavior: "auto" });
+    };
+    window.addEventListener("popstate", restoreDestination);
+    return () => window.removeEventListener("popstate", restoreDestination);
+  }, [hydrated, progress, qaUnlocked]);
+
+  const activeStop = selectedBoss ? null : stopById(progress.activeStopId);
   const selectedWorld = (activeStop ? worldForStop(activeStop.id) : undefined)
     ?? WORLD_DEFINITIONS.find(({ id }) => id === progress.selectedWorldId)
     ?? WORLD_DEFINITIONS[0];
@@ -247,11 +297,28 @@ export default function MathWorldClient() {
 
   function chooseWorld(worldId: string) {
     if (!canOpenWorld(progress, worldId, qaUnlocked)) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("boss");
+    window.history.pushState({ ...window.history.state, mathWorldId: worldId }, "", url);
+    setSelectedBoss(null);
     setInspectedStopId(null);
     setLastVisitedStopId(null);
     setQaOpen(false);
     setZoomed(false);
     setProgress((current) => selectWorld(current, worldId, qaUnlocked));
+    resetViewport();
+  }
+
+  function chooseBoss(challenge: BossChallenge) {
+    if (!canOpenBoss(progress, challenge, qaUnlocked)) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("boss", challenge.id);
+    window.history.pushState({ ...window.history.state, mathWorldId: progress.selectedWorldId }, "", url);
+    setSelectedBoss(challenge);
+    setInspectedStopId(null);
+    setLastVisitedStopId(null);
+    setQaOpen(false);
+    setZoomed(false);
     resetViewport();
   }
 
@@ -346,7 +413,11 @@ export default function MathWorldClient() {
         </div>
       </header>
 
-      {activeStop && question && attempt ? (
+      {selectedBoss ? (
+        <BossWorld key={`${qaUnlocked ? "playtest" : "adventure"}:${selectedBoss.id}`}
+          challenge={selectedBoss} progress={progress} qaUnlocked={qaUnlocked}
+          onChooseWorld={chooseWorld} onChooseBoss={chooseBoss} />
+      ) : activeStop && question && attempt ? (
         <main className={styles.courseShell}>
           <section className={styles.courseTopline} aria-label="Stop progress">
             <div>
@@ -470,6 +541,7 @@ export default function MathWorldClient() {
           key={`${qaUnlocked ? "playtest" : "adventure"}:${selectedWorld.id}`}
           world={selectedWorld}
           onChooseWorld={chooseWorld}
+          onChooseBoss={chooseBoss}
           avatarStopId={lastVisitedStopId}
           progress={progress}
           qaUnlocked={qaUnlocked}

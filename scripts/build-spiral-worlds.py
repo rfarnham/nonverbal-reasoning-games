@@ -32,6 +32,27 @@ STRANDS = [
 ]
 ANCHORS = [(10,73,27,89),(23,56,70,80),(35,76,29,70),(45,51,68,60),(59,65,27,50),(68,44,69,40),(80,54,28,30),(78,24,68,20),(90,21,44,10)]
 STAGES = [('Discover', 'Notice the central idea.'), ('Explore', 'Try the idea in another setting.'), ('Connect', 'Combine the clues and choose a useful method.'), ('Summit', 'Use what you learned more independently.')]
+BOSS_HOLDOUTS = json.loads((ROOT/'content/math-world/boss-holdouts.json').read_text())
+
+def assert_not_boss_holdout(item_id: str, source: dict) -> None:
+    """Reject annual challenge exposure, including documented alternate source IDs."""
+    identities = {item_id, *(source.get(key) for key in ('id', 'itemId', 'item_id', 'sourceId', 'canonicalId', 'occurrenceId'))}
+    rule = BOSS_HOLDOUTS['matchingPolicy']['metadataFallback']
+    family = str(source.get('sourceFamily', source.get('source_family', '')))
+    kind = source.get('sourceKind', source.get('source_kind', 'contest'))
+    part = source.get('paperPart', source.get('paper_part', ''))
+    markers = set(re.split(r'[^a-z]+', f'{family} {part}'.lower()))
+    usa_contest = (family.lower().startswith(rule['sourceFamilyPrefix'].lower())
+                   and kind not in rule['excludedSourceKinds']
+                   and not markers.intersection(rule['excludedSourceMarkers']))
+    for challenge in BOSS_HOLDOUTS['challenges']:
+        exact = any(reference['sourceId'] in identities
+                    or any(alias['id'] in identities for alias in reference['reservedReferences'])
+                    for reference in challenge['questions'])
+        annual_source = (usa_contest and str(source.get('year')) == str(challenge['year'])
+                         and source.get('gradeBand', source.get('grade_band')) == challenge['gradeBand'])
+        if exact or annual_source:
+            raise ValueError(f"Math Worlds boss holdout: {item_id} is reserved for the {challenge['year']} Grades {challenge['gradeBand']} challenge after world {challenge['afterWorldNumber']}. Remove it from the 20 teaching worlds; keep the complete test separate (content/math-world/boss-holdouts.json).")
 
 def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -65,6 +86,7 @@ def build(catalogue: Path, reviews: list[Path], output: Path, plan: Path) -> dic
                 raise ValueError(f'Duplicate question selection: {item_id}')
             seen_ids.add(item_id)
             row = rows[item_id]
+            assert_not_boss_holdout(item_id, {**row, 'sourceKind': record.get('sourceKind', 'contest')})
             if record['contentVersion'] != row['content_version']:
                 raise ValueError(f'Stale content review: {item_id}')
             concept, spiral = record['conceptId'], record['pass']

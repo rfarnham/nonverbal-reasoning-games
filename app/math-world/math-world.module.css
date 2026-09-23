@@ -827,6 +827,25 @@
 @media (prefers-reduced-motion: reduce) { .storyButton { transition: none; } }
 
 .worldNavigation { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-top: 24px; }
+.bossTestNotice { margin-top: 24px; }
+.bossPlaceholder { width: min(760px, 100%); margin: 42px auto 64px; padding: 42px; border: 1px solid #cfcabd; border-radius: 28px; background: #fffdf8; text-align: center; }
+.bossEmblem { display: grid; place-items: center; width: 88px; height: 88px; margin: 0 auto 26px; border: 1px dashed #a5a294; border-radius: 24px; color: #657087; background: #f4f1e8; }
+.bossEmblem svg { width: 62px; height: 62px; }
+.bossPlaceholder h1 { margin: 12px 0 18px; font-size: clamp(2.2rem, 4vw, 3.4rem); font-weight: 900; letter-spacing: -.055em; line-height: 1.05; }
+.bossPlaceholder h1:focus { outline: none; }
+.bossTestDetails { margin: 0; color: #657087; font-size: .9rem; font-weight: 650; line-height: 1.6; }
+.bossDescription { max-width: 490px; margin: 22px auto; color: #657087; line-height: 1.65; }
+.bossPlaceholder > .workbookButton { padding: 13px 22px; font-size: .9rem; }
+.bossComingSoon { margin: 32px 0 26px; padding: 22px; border-radius: 16px; color: #657087; background: #f4f1e8; line-height: 1.6; }
+.bossComingSoon strong { color: #17213d; }
+.bossComingSoon p { max-width: 480px; margin: 8px auto 0; font-size: .9rem; }
+.bossPrintError { margin: 18px 0 0; color: #a5322c; line-height: 1.5; }
+@media (max-width: 620px) {
+  .bossPlaceholder { margin-top: 24px; padding: 28px 20px; border-radius: 22px; }
+  .bossPlaceholder .kicker { line-height: 1.6; }
+  .bossPlaceholder > .primaryButton, .bossPlaceholder > .workbookButton { width: 100%; }
+  .bossComingSoon { padding: 20px 16px; }
+}
 .worldPicker { display: flex; align-items: flex-end; gap: 10px; min-width: 0; }
 .worldSelectLabel { display: grid; gap: 6px; min-width: 0; }
 .worldSelectLabel > span { color: var(--world-muted); font-size: .66rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }

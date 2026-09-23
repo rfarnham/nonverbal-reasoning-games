@@ -18,6 +18,7 @@ async function fixture(context) {
   const generated = path.join(root, 'app/math-world/data/runtime.generated.json');
   for (const directory of [path.dirname(script), path.dirname(approved), assets]) await mkdir(directory, { recursive: true });
   await copyFile(new URL('../scripts/generate-math-world-runtime.mjs', import.meta.url), script);
+  await copyFile(new URL('../content/math-world/boss-holdouts.json', import.meta.url), path.join(root, 'content/math-world/boss-holdouts.json'));
   const payload = { schemaVersion: 2, mode: 'spiral-preview', contentVersion: 'approved-version-unchanged', ontologyVersion: 'test-taxonomy', worlds: [], stops: [], breaks: [], questions: [] };
   for (let worldIndex = 0; worldIndex < 20; worldIndex++) {
     const worldId = `world-${worldIndex}`;

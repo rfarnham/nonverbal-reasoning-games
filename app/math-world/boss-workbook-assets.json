@@ -1,0 +1,602 @@
+{
+  "version": 1,
+  "tests": [
+    {
+      "year": 2025,
+      "gradeBand": "1-2",
+      "questionCount": 24,
+      "layout": "paper",
+      "sourceLabel": "Math Kangaroo USA 2025 original Grades 1 and 2 paper",
+      "sourceFile": "2025-questions-grades-1-2.pdf",
+      "sourceSha256": "79ace418e4f53b32cc963945897e8554c8eda8118082aa3694ba46d5966d0dd6",
+      "pages": [
+        {
+          "src": "/math-world/boss-tests/2025-grades-1-2-page-01.png",
+          "width": 1700,
+          "height": 2120,
+          "sha256": "0e620e2c199818c45bf21d5900a81e68fe5b5120376ab4fce05d3de13aa6ec23",
+          "questionNumbers": [
+            1,
+            2
+          ],
+          "sourcePage": 1,
+          "renderDpi": 200,
+          "sourceCropPixels": [
+            0,
+            80,
+            1700,
+            2200
+          ]
+        },
+        {
+          "src": "/math-world/boss-tests/2025-grades-1-2-page-02.png",
+          "width": 1700,
+          "height": 2080,
+          "sha256": "35d92bd5539bf43a473243e71748c4562112fe01c4ff23c4c17ddb11a27909a8",
+          "questionNumbers": [
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "sourcePage": 2,
+          "renderDpi": 200,
+          "sourceCropPixels": [
+            0,
+            120,
+            1700,
+            2200
+          ]
+        },
+        {
+          "src": "/math-world/boss-tests/2025-grades-1-2-page-03.png",
+          "width": 1700,
+          "height": 2080,
+          "sha256": "6548e9489a3796d257b76b9a0a4a45e6c0eea6e794af8dbd39ab077c798bb26d",
+          "questionNumbers": [
+            8,
+            9,
+            10,
+            11
+          ],
+          "sourcePage": 3,
+          "renderDpi": 200,
+          "sourceCropPixels": [
+            0,
+            120,
+            1700,
+            2200
+          ]
+        },
+        {
+          "src": "/math-world/boss-tests/2025-grades-1-2-page-04.png",
+          "width": 1700,
+          "height": 2080,
+          "sha256": "2c40416b8d2e02777412e5404d62e819654be99a4b41a4e304ba65f4c239583c",
+          "questionNumbers": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "sourcePage": 4,
+          "renderDpi": 200,
+          "sourceCropPixels": [
+            0,
+            120,
+            1700,
+            2200
+          ]
+        },
+        {
+          "src": "/math-world/boss-tests/2025-grades-1-2-page-05.png",
+          "width": 1700,
+          "height": 2080,
+          "sha256": "bd0a1eda548cd2f6b1b947f856e8bee635b566a42aef6cb54da3cef3b35a7e7a",
+          "questionNumbers": [
+            16,
+            17,
+            18,
+            19,
+            20
+          ],
+          "sourcePage": 5,
+          "renderDpi": 200,
+          "sourceCropPixels": [
+            0,
+            120,
+            1700,
+            2200
+          ]
+        },
+        {
+          "src": "/math-world/boss-tests/2025-grades-1-2-page-06.png",
+          "width": 1700,
+          "height": 2080,
+          "sha256": "56f1e91e856f2eb9ade5adfde32ece6b6ff8cb350ccb78e986c54767e67baf2f",
+          "questionNumbers": [
+            21,
+            22,
+            23,
+            24
+          ],
+          "sourcePage": 6,
+          "renderDpi": 200,
+          "sourceCropPixels": [
+            0,
+            120,
+            1700,
+            2200
+          ]
+        }
+      ]
+    },
+    {
+      "year": 2026,
+      "gradeBand": "1-2",
+      "questionCount": 24,
+      "layout": "questions",
+      "sourceLabel": "Math Kangaroo USA 2026 original Grades 1 and 2 question slides",
+      "sourceFile": "official-question-video-frames",
+      "pages": [
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q01.png",
+          "width": 1127,
+          "height": 259,
+          "sha256": "4b810dce06a7a2937ca6914997aa6e9431e84e4e74c7c593f0230a7fcd893bf3",
+          "questionNumbers": [
+            1
+          ],
+          "sourceVideoFile": "001-2026-1-2-1.mp4",
+          "sourceVideoSha256": "85b1e190cfab2d9e6ae089328199f56119a07788ff5940d666fee7a1994d53aa",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            75,
+            0,
+            1202,
+            259
+          ],
+          "sourceFrameSha256": "4b810dce06a7a2937ca6914997aa6e9431e84e4e74c7c593f0230a7fcd893bf3"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q02.png",
+          "width": 1012,
+          "height": 324,
+          "sha256": "e526d817c37deac4da54ee7cbbfdc5c9277f8a4ec91d98c54b0d6a665455f30d",
+          "questionNumbers": [
+            2
+          ],
+          "sourceVideoFile": "002-2026-1-2-2.mp4",
+          "sourceVideoSha256": "ac3059593417e68641169d96512a6220e5eeeb372b67a549c32baa16d907227a",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            129,
+            0,
+            1141,
+            324
+          ],
+          "sourceFrameSha256": "e526d817c37deac4da54ee7cbbfdc5c9277f8a4ec91d98c54b0d6a665455f30d"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q03.png",
+          "width": 863,
+          "height": 356,
+          "sha256": "4d82146f7d16b9e8beed05d72ec17aea2dc4d6c6e685443f4b2f423cb2e9f33b",
+          "questionNumbers": [
+            3
+          ],
+          "sourceVideoFile": "003-2026-1-2-3.mp4",
+          "sourceVideoSha256": "ccd346d851cb970cb995cd17dcda1794846515bfebc59b104732540501e2b39b",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            147,
+            0,
+            1010,
+            356
+          ],
+          "sourceFrameSha256": "4d82146f7d16b9e8beed05d72ec17aea2dc4d6c6e685443f4b2f423cb2e9f33b"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q04.png",
+          "width": 1097,
+          "height": 229,
+          "sha256": "53ffa8293da25fb2d63e0187f6e820e474ebb65a60f0b19ac2bc6f2dd11ff804",
+          "questionNumbers": [
+            4
+          ],
+          "sourceVideoFile": "004-2026-1-2-4.mp4",
+          "sourceVideoSha256": "653baa9026712ebb294dc31819af9e80d0922025fdcc317e06bc60c31ca36143",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            84,
+            6,
+            1181,
+            235
+          ],
+          "sourceFrameSha256": "53ffa8293da25fb2d63e0187f6e820e474ebb65a60f0b19ac2bc6f2dd11ff804"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q05.png",
+          "width": 1144,
+          "height": 453,
+          "sha256": "e6180841ecd21d49f94dc321872ec2cca82e2f647387463d2079c9a82d5f5a21",
+          "questionNumbers": [
+            5
+          ],
+          "sourceVideoFile": "005-2026-1-2-5.mp4",
+          "sourceVideoSha256": "0c4bdce1dab701a553286a703c6a5a887b4e6e2fb916bff8042a8dc02204e895",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            63,
+            0,
+            1207,
+            453
+          ],
+          "sourceFrameSha256": "e6180841ecd21d49f94dc321872ec2cca82e2f647387463d2079c9a82d5f5a21"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q06.png",
+          "width": 1027,
+          "height": 242,
+          "sha256": "0bc83eec61a8f8af5482f6761738bffa5f6e5b7fce8be9ebde7b7755a8b0acf0",
+          "questionNumbers": [
+            6
+          ],
+          "sourceVideoFile": "006-2026-1-2-6.mp4",
+          "sourceVideoSha256": "424d2a8afb4e573cacbe32bfd73889360a3607aec4115fa54c33fbcb98ff144e",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            127,
+            0,
+            1154,
+            242
+          ],
+          "sourceFrameSha256": "0bc83eec61a8f8af5482f6761738bffa5f6e5b7fce8be9ebde7b7755a8b0acf0"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q07.png",
+          "width": 1104,
+          "height": 316,
+          "sha256": "329010131895ad251f93cf7047e3f323b92bb1d1d297be9da7c9389b6f3d455c",
+          "questionNumbers": [
+            7
+          ],
+          "sourceVideoFile": "007-2026-1-2-7.mp4",
+          "sourceVideoSha256": "de1da782231a3676a1aa3d36d9fca70049bb9853853ee6cafb27db368fa15254",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            89,
+            0,
+            1193,
+            316
+          ],
+          "sourceFrameSha256": "329010131895ad251f93cf7047e3f323b92bb1d1d297be9da7c9389b6f3d455c"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q08.png",
+          "width": 1143,
+          "height": 200,
+          "sha256": "c0f1c3689f58052031dff882c887e651143b19051dddc9678fc8a6bf094b9d9d",
+          "questionNumbers": [
+            8
+          ],
+          "sourceVideoFile": "008-2026-1-2-8.mp4",
+          "sourceVideoSha256": "37fa3cf6b82191a3aa9439c88d64531483a4e5e70b93f6e83298ce923c918232",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            72,
+            0,
+            1215,
+            200
+          ],
+          "sourceFrameSha256": "c0f1c3689f58052031dff882c887e651143b19051dddc9678fc8a6bf094b9d9d"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q09.png",
+          "width": 1143,
+          "height": 201,
+          "sha256": "4d6b1dfdd9b9bd854901e2aab6f45ea9e5ae48bea45a74e875d18a346753d0f1",
+          "questionNumbers": [
+            9
+          ],
+          "sourceVideoFile": "009-2026-1-2-9.mp4",
+          "sourceVideoSha256": "5be5f0ff15fe73e1399febe39bb4b3c44b7a9d3db47d404475f8160a750f4e4f",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            65,
+            0,
+            1208,
+            201
+          ],
+          "sourceFrameSha256": "4d6b1dfdd9b9bd854901e2aab6f45ea9e5ae48bea45a74e875d18a346753d0f1"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q10.png",
+          "width": 940,
+          "height": 414,
+          "sha256": "4a8247c79cf46f773f2597ae9e02a1fae3559092b19dbe176a019a036fc82147",
+          "questionNumbers": [
+            10
+          ],
+          "sourceVideoFile": "010-2026-1-2-10.mp4",
+          "sourceVideoSha256": "0eea15e426f55bafeec7ec3dbcaec1403e7c0222cfeac4fc615da8c268b90684",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            166,
+            0,
+            1106,
+            414
+          ],
+          "sourceFrameSha256": "4a8247c79cf46f773f2597ae9e02a1fae3559092b19dbe176a019a036fc82147"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q11.png",
+          "width": 1029,
+          "height": 387,
+          "sha256": "e828b6a73b85575063d2fc4aaf09fbc31bf5b416ea446ae05a1fb16153d48484",
+          "questionNumbers": [
+            11
+          ],
+          "sourceVideoFile": "011-2026-1-2-11.mp4",
+          "sourceVideoSha256": "1afde7e1f5946cc89169e67aa2cb2d44251fd20c7024da8c5d9e4929acb1ecc3",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            122,
+            0,
+            1151,
+            387
+          ],
+          "sourceFrameSha256": "e828b6a73b85575063d2fc4aaf09fbc31bf5b416ea446ae05a1fb16153d48484"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q12.png",
+          "width": 1081,
+          "height": 249,
+          "sha256": "b1d79824876e0c2d42cf5371660b72cea04b0a1c420897efed96f15fa22289d2",
+          "questionNumbers": [
+            12
+          ],
+          "sourceVideoFile": "012-2026-1-2-12.mp4",
+          "sourceVideoSha256": "752be72d73ebf21773ebc45ff7ddfa29aa6a634b2410173ea75dd3523acfb2bc",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            87,
+            0,
+            1168,
+            249
+          ],
+          "sourceFrameSha256": "b1d79824876e0c2d42cf5371660b72cea04b0a1c420897efed96f15fa22289d2"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q13.png",
+          "width": 988,
+          "height": 412,
+          "sha256": "c04891fd79a24c6547fe5f29919d7f7e437a5fbdd5765a53f72d05ccc6078ba2",
+          "questionNumbers": [
+            13
+          ],
+          "sourceVideoFile": "013-2026-1-2-13.mp4",
+          "sourceVideoSha256": "fe5e1562f396f963eab9e6e26a366c6eabef670fa5a7c5acedc230d57e0a7e01",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            110,
+            0,
+            1098,
+            412
+          ],
+          "sourceFrameSha256": "c04891fd79a24c6547fe5f29919d7f7e437a5fbdd5765a53f72d05ccc6078ba2"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q14.png",
+          "width": 1076,
+          "height": 180,
+          "sha256": "993066fab7b807fd0fdc801f1acc224fbf31eb21ea63a3664c79f284a0cc4527",
+          "questionNumbers": [
+            14
+          ],
+          "sourceVideoFile": "014-2026-1-2-14.mp4",
+          "sourceVideoSha256": "bae9b31e6f3d6e1f5defb155dee8e01a53d0659483c77eda65da420cd70c783c",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            88,
+            0,
+            1164,
+            180
+          ],
+          "sourceFrameSha256": "993066fab7b807fd0fdc801f1acc224fbf31eb21ea63a3664c79f284a0cc4527"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q15.png",
+          "width": 1008,
+          "height": 236,
+          "sha256": "15af8ab42ade0f3bd7df7745bd74a5df4b4fe073828db8a45c6c2be21887bfd2",
+          "questionNumbers": [
+            15
+          ],
+          "sourceVideoFile": "015-2026-1-2-15.mp4",
+          "sourceVideoSha256": "ec0175e076f44e230c6fa4f850b3bda49a2476de16222172100a20cc4923834d",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            131,
+            0,
+            1139,
+            236
+          ],
+          "sourceFrameSha256": "15af8ab42ade0f3bd7df7745bd74a5df4b4fe073828db8a45c6c2be21887bfd2"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q16.png",
+          "width": 990,
+          "height": 431,
+          "sha256": "278030870b03d60efdc996381fa0dc6286ea6e3999ef1288f8dd1e6fd3539744",
+          "questionNumbers": [
+            16
+          ],
+          "sourceVideoFile": "016-2026-1-2-16.mp4",
+          "sourceVideoSha256": "3cedc0338dfeec37fe2eb21fc74031aac22b3471d88cb8a7a7ef845ebebbbbca",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            104,
+            0,
+            1094,
+            431
+          ],
+          "sourceFrameSha256": "278030870b03d60efdc996381fa0dc6286ea6e3999ef1288f8dd1e6fd3539744"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q17.png",
+          "width": 906,
+          "height": 373,
+          "sha256": "0f5800e7bc4200b2f82857df1e1a457f52b86974b49a2e580ec4804c3644bc88",
+          "questionNumbers": [
+            17
+          ],
+          "sourceVideoFile": "017-2026-1-2-17.mp4",
+          "sourceVideoSha256": "7bf96cccd8e1cb19197e2045669fc0f536e8d7e5b47e375d58731020212d7c48",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            187,
+            0,
+            1093,
+            373
+          ],
+          "sourceFrameSha256": "0f5800e7bc4200b2f82857df1e1a457f52b86974b49a2e580ec4804c3644bc88"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q18.png",
+          "width": 1038,
+          "height": 301,
+          "sha256": "de40dcdd8bc99230911c45e034e3be2b366c85b334b96114784175326504a657",
+          "questionNumbers": [
+            18
+          ],
+          "sourceVideoFile": "018-2026-1-2-18.mp4",
+          "sourceVideoSha256": "b7e78f2bd89613f9b1c34ac7a6b437acdb007e66385b8b7c1ea4260750f58237",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            125,
+            0,
+            1163,
+            301
+          ],
+          "sourceFrameSha256": "de40dcdd8bc99230911c45e034e3be2b366c85b334b96114784175326504a657"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q19.png",
+          "width": 1045,
+          "height": 243,
+          "sha256": "6a653e22b48cb6c78e0b2ef5c265cd950f056aab36e2843f26caee15ddbbfe2e",
+          "questionNumbers": [
+            19
+          ],
+          "sourceVideoFile": "019-2026-1-2-19.mp4",
+          "sourceVideoSha256": "3823d47e503a49dc3526f6bb077ca5d9000a63d67e693a8698e077158385849b",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            113,
+            0,
+            1158,
+            243
+          ],
+          "sourceFrameSha256": "6a653e22b48cb6c78e0b2ef5c265cd950f056aab36e2843f26caee15ddbbfe2e"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q20.png",
+          "width": 963,
+          "height": 359,
+          "sha256": "49f106dbd647029ba36ed31d9051ced7540e2958de96a0ac8c86aa131d54612a",
+          "questionNumbers": [
+            20
+          ],
+          "sourceVideoFile": "020-2026-1-2-20.mp4",
+          "sourceVideoSha256": "a5c85599a2458a3306ae57200af6aa305c7e3d67699822571684aa0264041c08",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            100,
+            0,
+            1063,
+            359
+          ],
+          "sourceFrameSha256": "49f106dbd647029ba36ed31d9051ced7540e2958de96a0ac8c86aa131d54612a"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q21.png",
+          "width": 1205,
+          "height": 720,
+          "sha256": "f3926075507935d46c02e7ae503f162e5e4f9995abe0381f9057849a276a3586",
+          "questionNumbers": [
+            21
+          ],
+          "sourceVideoFile": "021-2026-1-2-21.mp4",
+          "sourceVideoSha256": "b05968015c5213e0b9e4c7d36ef5da7036d8f98506e08aaf8001909d6aaefd77",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            75,
+            0,
+            1280,
+            720
+          ],
+          "sourceFrameSha256": "458fe6801510327dca689b06ef8f27a3aca4a671672d8118f273a12215d7fcfd"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q22.png",
+          "width": 942,
+          "height": 265,
+          "sha256": "02bfc2731cbdbd53ee4ea65b5732ca817d07cee5fce13628cb0cb210f15aee78",
+          "questionNumbers": [
+            22
+          ],
+          "sourceVideoFile": "022-2026-1-2-22.mp4",
+          "sourceVideoSha256": "3598f5262b0e5577fc93d514bb6c9ee49b3b0b92d020e3d2f017ce34d24391cc",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            107,
+            0,
+            1049,
+            265
+          ],
+          "sourceFrameSha256": "02bfc2731cbdbd53ee4ea65b5732ca817d07cee5fce13628cb0cb210f15aee78"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q23.png",
+          "width": 1055,
+          "height": 244,
+          "sha256": "def3e83072cc71b374df022d3749351c1d72af4a2f34d3e95956e6cf58643289",
+          "questionNumbers": [
+            23
+          ],
+          "sourceVideoFile": "023-2026-1-2-23.mp4",
+          "sourceVideoSha256": "f3c6c3acca0deaa5cb1d4176a20828fd7411b9e48318a325322a3d1814bae759",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            109,
+            0,
+            1164,
+            244
+          ],
+          "sourceFrameSha256": "def3e83072cc71b374df022d3749351c1d72af4a2f34d3e95956e6cf58643289"
+        },
+        {
+          "src": "/math-world/boss-tests/2026-grades-1-2-q24.png",
+          "width": 1043,
+          "height": 174,
+          "sha256": "fef1f658011639cf0a8dd223d3a9e4f1b77ff63aa4cebf577776b16268f1171a",
+          "questionNumbers": [
+            24
+          ],
+          "sourceVideoFile": "024-2026-1-2-24.mp4",
+          "sourceVideoSha256": "4e0b60fcb222c445d0f473ec0e563b90515dcf608e9ff34e0b6f8016d1ed5a3f",
+          "captureTimeSeconds": 0.5,
+          "sourceCropPixels": [
+            116,
+            0,
+            1159,
+            174
+          ],
+          "sourceFrameSha256": "fef1f658011639cf0a8dd223d3a9e4f1b77ff63aa4cebf577776b16268f1171a"
+        }
+      ]
+    }
+  ]
+}

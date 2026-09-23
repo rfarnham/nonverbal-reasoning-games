@@ -8,6 +8,28 @@ The adventure visits ten strands, then returns to each for a deeper second pass:
 
 Each world has **four stops of six questions: 24 questions per world, 480 across the adventure**. All 480 are selected from existing source questions and have agent review records. The [reference manifest](../content/math-world/spiral-20.plan.json) records the exact versioned selection; the current snapshot is `spiral-20.v1.f665226c7060bba8`.
 
+Two additional **boss challenge placeholders** mark the end of each spiral:
+
+| Milestone | Reserved challenge | Full-test workbook |
+| --- | --- | --- |
+| After World 10 | USA Math Kangaroo 2025, Grades 1–2 | All 24 questions in original test order |
+| After World 20 | USA Math Kangaroo 2026, Grades 1–2 | All 24 questions in original test order |
+
+These milestones are separate from the 20 teaching worlds and do not change their
+480 questions or saved progress. The boss artwork and challenge interaction remain
+placeholders for later design. Each boss already has a working **Print whole test**
+button that prints all 24 questions in original test order, using original source
+crops and space for pencil work. Printing does not complete or score the challenge.
+
+The [boss holdout manifest](../content/math-world/boss-holdouts.json) records all
+48 annual source occurrences and their documented canonical aliases and related
+surface or edition variants. Those identities are excluded from every teaching
+world, including future local selections and preview exports. Source provenance
+also catches renamed USA annual contest records from the reserved years and grade
+band. A 2025 or 2026 publication date alone does not exclude unrelated workbooks,
+mocks, team contests, or other grade bands. The current 480-question selection
+contains none of the reserved source identities and retains its content version.
+
 Each world map has a **Print workbook** button. Its workbook follows the exact
 stop and question order, with one question per page, space for pencil work, and
 an answer line. Questions and choices favor verified original paper/image crops;

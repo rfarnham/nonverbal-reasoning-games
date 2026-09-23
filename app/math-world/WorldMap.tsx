@@ -27,11 +27,14 @@ import CoastScene from "./CoastScene";
 import { useMapTravel } from "./useMapTravel";
 import { printWorldWorkbook } from "./workbook";
 import { getWorldMapLayout } from "./map-layouts";
+import { bossAfterWorld, canOpenBoss, type BossChallenge } from "./boss-challenges.ts";
+import { WorldNavigation } from "./WorldNavigation";
 
 type MapProps = Readonly<{
   progress: WorldProgress;
   world: WorldDefinition;
   onChooseWorld: (worldId: string) => void;
+  onChooseBoss: (challenge: BossChallenge) => void;
   qaUnlocked: boolean;
   avatarStopId: string | null;
   onOpenStop: (stopId: string) => void;
@@ -168,6 +171,7 @@ export function WorldMap({
   avatarStopId,
   world,
   onChooseWorld,
+  onChooseBoss,
 }: MapProps) {
   const mapLayout = WORLD_MODE === "spiral-preview" ? getWorldMapLayout(world.number) : null;
   const requiredStops = stopsForWorld(world.id);
@@ -185,8 +189,8 @@ export function WorldMap({
     ?? [...requiredStops].reverse().find(({ id }) => progress.completedStopIds.includes(id))
     ?? requiredStops[0];
   const worldIndex = WORLD_DEFINITIONS.findIndex(({ id }) => id === world.id);
-  const previousWorld = WORLD_DEFINITIONS[worldIndex - 1];
   const nextWorld = WORLD_DEFINITIONS[worldIndex + 1];
+  const nextBoss = WORLD_MODE === "spiral-preview" ? bossAfterWorld(world.number) : undefined;
   const titleParts = world.title.split(" ");
   const lastTitlePart = titleParts.pop();
   let completedRoadSlot = -1;
@@ -245,30 +249,8 @@ export function WorldMap({
 
   return (
     <main className={styles.worldShell} data-world-id={world.id} data-map-layout={mapLayout ? "islands" : "legacy"} data-launch-phase={travel?.phase ?? "idle"}>
-      <nav className={styles.worldNavigation} aria-label="World navigation">
-        <div className={styles.worldPicker}>
-          <button type="button" className={styles.worldArrow} aria-label="Previous world"
-            disabled={busy || !previousWorld || !canOpenWorld(progress, previousWorld.id, qaUnlocked)}
-            onClick={() => previousWorld && onChooseWorld(previousWorld.id)}>←</button>
-          <label className={styles.worldSelectLabel}>
-            <span>Choose a world</span>
-            <select aria-label="Choose a world" value={world.id} disabled={busy}
-              onChange={(event) => onChooseWorld(event.target.value)}>
-              {WORLD_DEFINITIONS.map((candidate) => {
-                const finished = candidate.stopIds.every((id) => progress.completedStopIds.includes(id));
-                const available = canOpenWorld(progress, candidate.id, qaUnlocked);
-                return <option key={candidate.id} value={candidate.id} disabled={!available}>
-                  {String(candidate.number).padStart(2, "0")} · {candidate.title} · {candidate.concept} {candidate.spiral}{finished ? " · ✓" : !available ? " · Locked" : ""}
-                </option>;
-              })}
-            </select>
-          </label>
-          <button type="button" className={styles.worldArrow} aria-label="Next world"
-            disabled={busy || !nextWorld || !canOpenWorld(progress, nextWorld.id, qaUnlocked)}
-            onClick={() => nextWorld && onChooseWorld(nextWorld.id)}>→</button>
-        </div>
-        <span className={styles.worldSequence}>World {world.number} of {WORLD_DEFINITIONS.length}</span>
-      </nav>
+      <WorldNavigation selectedId={world.id} progress={progress} qaUnlocked={qaUnlocked} busy={busy}
+        onChooseWorld={onChooseWorld} onChooseBoss={onChooseBoss} />
       <section className={styles.mapIntro} aria-labelledby="world-title">
         <div>
           <p className={styles.kicker}><span className={styles.worldNumber}>{String(world.number).padStart(2, "0")}</span> {world.concept} {world.spiral}</p>
@@ -388,7 +370,11 @@ export function WorldMap({
           <div><span>{complete ? "Island complete" : "Your next trail"}</span><strong>{nextStop.label}</strong></div>
           <small>{QUESTIONS_BY_STOP.get(nextStop.id)?.length ?? 0} questions · Untimed</small>
         </div>
-        {complete && nextWorld ? (
+        {complete && nextBoss ? (
+          <button type="button" className={styles.primaryButton} disabled={busy || !canOpenBoss(progress, nextBoss, qaUnlocked)} onClick={() => onChooseBoss(nextBoss)}>
+            Open {nextBoss.year} Boss Challenge <span aria-hidden="true">→</span>
+          </button>
+        ) : complete && nextWorld ? (
           <button type="button" className={styles.primaryButton} disabled={busy || !canOpenWorld(progress, nextWorld.id, qaUnlocked)} onClick={() => onChooseWorld(nextWorld.id)}>
             Choose next world <span aria-hidden="true">→</span>
           </button>
