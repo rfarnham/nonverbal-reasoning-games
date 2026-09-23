@@ -1,6 +1,6 @@
 # Math Kangaroo Worlds: spiral curriculum proposal
 
-**For sequence review — 22 September 2026. Not an approved runtime manifest.**
+**Proposal 0.2 for sequence review — 22 September 2026. Not an approved runtime manifest.**
 
 The proposed road is **Counting 1 → Symmetry 1 → Addition & Subtraction 1 →
 Patterns 1 → the other concept worlds → Counting 2 → Symmetry 2 → …**.
@@ -19,25 +19,37 @@ for example, its Clock Tower currently contains animal-weight and exchange
 questions. This proposal includes a separate, counting-only first-world bank
 below; it does not silently replace the playable questions or saved progress.
 
+**What changed after reviewing the courses:** Set A and B are complementary
+same-grade courses, so later passes can revisit harder questions from the same
+grade band. The proposal separates each world’s primary concept from strategy
+and subskill facets; selected questions will receive those annotations during bank review. Balance/exchange, age invariants, ordering/intervals,
+organized counting, codes, and minimum/maximum reasoning are explicit. The
+16-concept sequence below remains a proposal for your review.
+
 ## The four passes
 
 | Pass | Purpose | Initial corpus search pool | Change in reasoning |
 | --- | --- | --- | --- |
 | 1 · Notice | Establish the concept | Grades 1–2 | Concrete pictures, one main relation, generous distinctions |
-| 2 · Connect | Apply it in another representation | Grades 3–4 | Two related steps, missing information, plausible near-matches |
-| 3 · Plan | Choose and organize a strategy | Grades 5–6 | Interacting constraints, cases, decomposition, transfer |
-| 4 · Generalize | Explain why a strategy works | Grades 7–12 | Structural arguments, invariants, algebraic or geometric generalization |
+| 2 · Connect | Apply it in another representation | Grades 1–4 | Two related steps, missing information, plausible near-matches |
+| 3 · Plan | Choose and organize a strategy | Grades 3–6 | Interacting constraints, cases, decomposition, transfer |
+| 4 · Generalize | Explain why a strategy works | Grades 5–12 | Structural arguments, invariants, algebraic or geometric generalization |
 
 These bands are **search pools**, not age gates, ability labels, or a claim that
 every Grade 3–4 question is harder than every Grade 1–2 question. A visual
 Grade 3–4 question can be an excellent earlier fit; a Grade 1–2 five-point
 question can require substantially more reasoning than a later easy item.
 Published point tiers and question numbers are secondary sorting signals only.
+The search pools overlap deliberately: the same Grade 1–2 course can introduce
+direct counting, then return to demanding counting through constraints or an
+organized list. A candidate may appear in more than one search pool, but final
+main-road assignments must never reuse the same problem.
 
-Pass 4 spans a wide range. Its entrance uses accessible Grades 7–8 problems;
-Grades 9–12 supply later optional stretch routes only when their prerequisites
-have already appeared. Do not force an advanced item into the road just to use
-the oldest grade band.
+Pass 4 can use suitable Grade 5–6 problems that require independent reasoning;
+it does not require Grade 7+ content. Higher-grade problems supply optional
+stretch routes only when their prerequisites have already appeared. Even a
+simple age problem can teach an invariant; formal algebra and proof are later
+extensions, not requirements for demonstrating the underlying idea.
 
 The existing `concrete → direct → structured → integrated → novel` authoring
 stages describe questions *within* these passes. They remain separate from
@@ -56,7 +68,7 @@ The table defines the whole proposed core sequence, not just the first chapter.
 | 2 | **Symmetry** | Mirror halves and one reflection | Folds, axes, turns versus mirrors | Compose transformations; preserved features | Use symmetry to reduce cases and prove relations |
 | 3 | **Addition & Subtraction** | Join, remove, compare | Inverses and two-step comparisons | Efficient decomposition; signed quantities | Expressions and additive invariants |
 | 4 | **Patterns** | Repeating units; simple growth | Missing positions and cycles | Recursive versus position rules | Generalize and justify a rule |
-| 5 | **Shape Building** | Boundaries and fitting pieces | Decompose and tile | Angles, congruence, similarity | Geometric arguments and useful constructions |
+| 5 | **Shape Building** | Boundaries and fitting pieces | Decompose and tile | Angles, congruence, tiling constraints | Similarity, geometric arguments, and constructions |
 | 6 | **Logic** | Combine two clues | Order, place, work backward | Interacting constraints and cases | Contradiction, invariants, exhaustive reasoning |
 | 7 | **Groups & Sharing** | Equal groups and fair sharing | Multiplication, division, remainders | Ratios and unit rates | Changing rates and proportional constraints |
 | 8 | **Number & Digits** | Place value and digit composition | Parity and simple divisibility | Factors, multiples, remainders | Modular structure, factorization, powers |
@@ -88,6 +100,8 @@ These six are conditional, especially Chance & Data. The present classifier
 finds too few explicit candidates to commit them to the required road. Their
 absence from an early release should not lock players out of the next spiral.
 
+Similarity belongs in Shape Building 4, after Groups & Sharing 3 and Length & Measure 3 have established ratios and scale.
+
 The longer-term curriculum covers the six existing realms without demanding
 equal numbers of worlds per realm. Closely connected advanced concepts remain
 in their appropriate strands: ratios in Groups & Sharing, divisibility in
@@ -115,11 +129,112 @@ operations. Keep incidental reading and arithmetic load small where they are
 not the concept. Alternate easy consolidation with modest increases; the
 last item need not be the most obscure contest puzzle.
 
+**A scope decision for review:** 16 worlds × 12 questions means 192 required
+questions per core pass, so a concept’s numbered revisit is far apart. I propose
+one brief, fresh retrieval question from an earlier concept between worlds,
+shown as a separate campfire stop. That keeps each world focused while making
+the spiral active between passes. These interludes are a proposal, not included
+in the 70 world slots or their bank counts. If the loop still feels too long,
+we can shorten the first pass before locking its sequence.
+
 At the next numbered world, begin with a fresh retrieval problem from the
 previous concept level, then extend it. Mistake redemption and optional
 return visits supply additional practice between passes. Existing first-try
 history must remain unchanged by retries. New main-road items must not repeat
 an earlier problem or a translated/source-duplicate version of it.
+
+## What the teaching materials change
+
+This revision uses the archived **Math Kangaroo Exploring Level 1–2 Set A and
+Set B courses**, together with **Think Academy's six 2024 MK 300 workbooks**
+(Grades 1–2 and 3–4, each at 3-, 4-, and 5-point tiers). The course materials
+give us a more useful teaching vocabulary than the automatic corpus tags alone.
+
+**Set A and Set B are complementary courses at the same grade level. They are
+not difficulty levels 1 and 2.** Both teach several concepts and reusable
+strategies, then finish with a mixed synthesis lesson. We should borrow that
+structure without claiming that every lesson title is an atomic concept or
+that taking Set B requires a jump to a higher grade band.
+
+The exact lesson order is below. A and B in the same row are their respective
+lesson numbers, not matched difficulty pairs. Alternate handout/deck titles
+are retained where relevant.
+
+| Lesson | Set A | Set B |
+| ---: | --- | --- |
+| 1 | Fun With Patterns | Math in Motion: Paths and Mazes |
+| 2 | Picture It, Solve It! | Compare, Get in Line! |
+| 3 | Let's Work Backwards | Spatial Secrets |
+| 4 | Tick-Tock Time Travelers | Measure Up! |
+| 5 | Puzzle Mania | Story Problems |
+| 6 | Flat Figures and Shapes | How Old Are You? |
+| 7 | Think, Guess, Check! | Solids in Action |
+| 8 | Money, Money, Money | Balance the Scales / Balancing Act |
+| 9 | Symmetry Quest | Logical Reasoning / Got Logic? |
+| 10 | Game On! / MK 2012 | The 4-Step Method and MK 2022 |
+
+The Think Academy source hierarchy is **grade band → point tier → week/domain
+→ day/topic**. Both 3-point books begin with **Shape → Enumeration → Numbers
+and Word Problem → Logic**. Each 4- and 5-point book uses four topical practice
+days followed by a fifth mixed-review day within each of four weeks. Of the
+600 source question occurrences in these six books, 80 have a review role.
+Those review pages are retrieval and synthesis, not another mathematical
+concept. Broad headings occasionally contain a different concept, so even the
+source headings require question-level interpretation.
+
+## Two connected axes: concept and strategy
+
+Keep the 16 proposed concept worlds below, but give every selected question
+independent **subskill, strategy, representation, and reasoning-demand facets**.
+The world answers “what mathematical idea are we practicing?”; its lesson
+answers “what useful move helps us solve it?” A question can have several valid
+strategies while retaining one primary world assignment.
+
+The course-grounded strategy vocabulary is: **find a pattern; draw a diagram;
+visualize; work backward; try, check, and revise; make an organized list; build
+a table; write an equation**. Comparing/ordering, decomposing, tracing paths,
+organizing cases, using an invariant, and minimizing/maximizing make useful
+more-specific annotations. These are source-grounded teaching categories,
+not newly verified classifications of every question in the corpus.
+
+| Source bridge | Subskills we should make explicit | Proposed home |
+| --- | --- | --- |
+| A2 diagrams → B2 comparisons | Ordinal position, people ahead/behind, points versus gaps, inclusive intervals | Counting; Number & Digits; Routes & Grids |
+| A3 backward reasoning → B1 paths and B6 ages | Trace from an end state; reverse operation order; undo numerical change | A strategy used across worlds |
+| A5/A6 missing pieces → B3 spatial views | Complete a whole, track overlap and layering, compare outlines | Shape Building; Counting; Area & Boundary |
+| A6 flat/solid distinction → B7 solids | Visible versus hidden blocks, top views, nets, opposite faces | Solids & Views |
+| A7 trial and equal sums → B8 balances | Preserve equality, remove equal groups, substitute equivalents, chain exchanges | Missing Values; Groups & Sharing |
+| A4 time → B6 age problems | Everyone ages together; differences stay fixed; sums grow per person | Time, with arithmetic and invariant strategy tags |
+| B5 lists/tables → Think Enumeration | Exhaust possibilities without omissions or duplication | Counting; later Possibilities |
+| B9 clues → Think Logic | Conditional constraints, comparison chains, smallest/largest feasible result | Logic, plus an optimization strategy |
+| A9 identical/mirror figures → Think transformations | Separate exact matching, reflection, folds, successive flips, and other turns | Symmetry, with precise subskill labels |
+| Think numbers/word problems | Codes, page numbering, surplus/shortage, operations without explicit numbers | Number & Digits; Missing Values |
+
+**Dice are not automatically probability:** the inspected Think topics include
+opposite faces and nets. Gears teach linked rotational motion. Neither is
+evidence that the thin Chance & Data pool is ready. Gears need an explicit
+transformation-world decision; do not relabel them as mirror symmetry.
+
+The four-step routine from both course finales becomes a quiet teaching
+framework: **understand → choose a strategy → carry it out → check**. Show it
+through a worked example and useful feedback, not four mandatory reading or
+clicking steps before every puzzle. Mixed review belongs at a separate
+campfire or chapter culmination, preserving each world's primary concept.
+
+The source-grounded additions improve the draft without locking new worlds:
+balance and exchange, age invariants, ordering and intervals, systematic
+enumeration, codes, and minimum/maximum reasoning now have explicit subskill
+IDs. The 70 proposed world slots and the original corpus classifications remain
+provisional. Fractions and Chance & Data remain corpus-backed extension
+candidates; these course titles alone do not establish their placement.
+
+Source locators for these summaries: Set A lesson 3, slides p. 3; lesson 9,
+pp. 3 and 7–17; lesson 10, pp. 4–8. Set B lesson 2, slides 7–8; lesson 3,
+slide 7; lesson 5, slides 4–10; lesson 6, slides 7–8; lesson 8, slide 7;
+lesson 9, slide 7; lesson 10, slides 5–8. Think Academy Grades 1–2 4-point
+workbook, pp. 3, 17, 30, 36, 42, 46, and 48; Grades 1–2 5-point workbook,
+pp. 35 and 37; Grades 3–4 5-point workbook, pp. 19, 22, 33–38, and 49.
+Private email identifiers, recipients, links, and full slide text are omitted.
 
 ## What is actually in the corpus
 
@@ -159,32 +274,33 @@ itself as `deterministic-lexical-catalogue.v2`, with `authoritative: false`.
 ## Candidate coverage, before editorial assignment
 
 Each number below counts complete-choice records in that pass's search bands
-having at least one configured retrieval tag. Candidate sets overlap; **do not
-add these columns to estimate unique available questions**. A question asking
+having at least one configured retrieval tag. Candidate sets overlap **across
+concepts and across passes**; do not add rows or columns to estimate unique
+available questions. A question asking
 “how many” can receive a Counting tag while actually testing algebra or spatial
 reasoning. A keyword hit is a discovery lead, not a world assignment.
 
 | Concept | Pass 1 | Pass 2 | Pass 3 | Pass 4 |
 | --- | ---: | ---: | ---: | ---: |
-| Counting | 500 | 519 | 451 | 356 |
-| Symmetry, explicit tag only | 9 | 10 | 12 | 10 |
-| Symmetry plus transformation/turn search | 24 | 48 | 67 | 106 |
-| Addition & Subtraction | 249 | 295 | 302 | 296 |
-| Patterns | 35 | 32 | 19 | 22 |
-| Shape Building | 288 | 295 | 339 | 339 |
-| Logic | 93 | 126 | 195 | 149 |
-| Groups & Sharing | 14 | 27 | 75 | 145 |
-| Number & Digits | 73 | 94 | 96 | 100 |
-| Routes & Grids | 38 | 92 | 80 | 73 |
-| Fractions | 39 | 46 | 58 | 46 |
-| Solids & Views | 50 | 53 | 72 | 63 |
-| Length & Measure | 52 | 90 | 117 | 136 |
-| Money & Value | 37 | 51 | 25 | 21 |
-| Time | 89 | 72 | 74 | 52 |
-| Area & Boundary | 5 | 21 | 78 | 141 |
-| Missing Values | 17 | 16 | 13 | 47 |
-| Possibilities, conditional | — | 17 | 18 | 17 |
-| Chance & Data, conditional | — | 2 | 8 | 8 |
+| Counting | 500 | 1019 | 970 | 807 |
+| Symmetry, explicit tag only | 9 | 19 | 22 | 22 |
+| Symmetry plus transformation/turn search | 24 | 72 | 115 | 173 |
+| Addition & Subtraction | 249 | 544 | 597 | 598 |
+| Patterns | 35 | 67 | 51 | 41 |
+| Shape Building | 288 | 583 | 634 | 678 |
+| Logic | 93 | 219 | 321 | 344 |
+| Groups & Sharing | 14 | 41 | 102 | 220 |
+| Number & Digits | 73 | 167 | 190 | 196 |
+| Routes & Grids | 38 | 130 | 172 | 153 |
+| Fractions | 39 | 85 | 104 | 104 |
+| Solids & Views | 50 | 103 | 125 | 135 |
+| Length & Measure | 52 | 142 | 207 | 253 |
+| Money & Value | 37 | 88 | 76 | 46 |
+| Time | 89 | 161 | 146 | 126 |
+| Area & Boundary | 5 | 26 | 99 | 219 |
+| Missing Values | 17 | 33 | 29 | 60 |
+| Possibilities, conditional | — | 23 | 35 | 35 |
+| Chance & Data, conditional | — | 2 | 10 | 16 |
 
 The important gaps and consequences are:
 
@@ -193,12 +309,13 @@ The important gaps and consequences are:
   rotations do not become symmetry questions by renaming them. Use a shorter
   first map or defer a slot if the real pool is too small.
 - **Early equal groups and missing values:** the current player supports five
-  choices. Groups & Sharing 1 has only 11 five-choice candidates, and Missing
-  Values 3 has only seven. Either structure the existing four-choice items
-  properly or select from neighboring bands based on reasoning demands.
-- **Patterns, money, possibilities:** several pools have fewer than 24
-  candidates before deduplication and true-concept checks. Prefer a compact
-  world to a padded one.
+  choices. Groups & Sharing 1 has only 11 five-choice candidates; Missing
+  Values 1 has 17 and Missing Values 3 has 23. Either structure the existing
+  four-choice items properly or select from neighboring bands based on
+  reasoning demands. Larger overlapping pools are not new unique inventory.
+- **Possibilities and symmetry:** several pools have fewer than 24 candidates
+  before deduplication and true-concept checks. Possibilities 1 has 23; its
+  later pools overlap. Prefer a compact world to a padded one.
 - **Chance/data and early area:** sparse detection is a classification gap,
   not evidence that the subject is unimportant or absent. Search the diagrams
   and source families directly, then retain or defer those proposed slots.
@@ -277,7 +394,9 @@ python3 scripts/draft-math-world-spiral.py
 
 It reads the explicitly pinned catalogue using SQLite `mode=ro` and writes
 [`content/math-world/spiral-curriculum.proposed.json`](../content/math-world/spiral-curriculum.proposed.json).
-That file contains all 70 ordered slots, four-pass objectives, retrieval tags,
-four/five-choice counts, sample item references, and the exact first-world
-proposal with content hashes. It contains no prompts, answers, source URLs,
-or private asset paths and is not imported by the application.
+That file contains all 70 ordered slots, four-pass objectives and overlapping
+search pools, retrieval tags, four/five-choice counts, sample item references,
+20 ordered source lessons, strategy and subskill facets with source locators,
+editorial status, and the exact first-world proposal with content hashes.
+It contains no prompts, answers, source URLs, private email identifiers, or
+private asset paths and is not imported by the application.

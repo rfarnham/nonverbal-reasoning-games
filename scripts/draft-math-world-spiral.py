@@ -17,10 +17,85 @@ ROOT = Path(__file__).resolve().parents[1]
 RUN_ID = "catalogue-8b9cfc0f0f01b9ef7138902e"
 PASSES = [
     (1, "Notice", ["1-2"]),
-    (2, "Connect", ["3-4"]),
-    (3, "Plan", ["5-6"]),
-    (4, "Generalize", ["7-8", "9-10", "11-12"]),
+    (2, "Connect", ["1-2", "3-4"]),
+    (3, "Plan", ["3-4", "5-6"]),
+    (4, "Generalize", ["5-6", "7-8", "9-10", "11-12"]),
 ]
+
+# Public-safe summaries of the archived course materials. These are evidence
+# for the curriculum vocabulary, not verified labels on individual corpus items.
+SOURCE_LESSONS = [
+    ("A", 1, "Fun With Patterns", ["patterns"], ["find-pattern"], "slides pp. 2-11", "Repeating pictures, colors, events, and addition/subtraction rules."),
+    ("A", 2, "Picture It, Solve It!", ["counting", "addition-subtraction", "groups-sharing", "routes"], ["draw-diagram", "visualize"], "slides pp. 4-12", "Use simple pictures to track quantities, positions, intervals, and changing states."),
+    ("A", 3, "Let's Work Backwards", ["addition-subtraction", "routes", "time", "missing-values"], ["work-backward"], "slides pp. 3-12", "Start from a known end state; reverse the order and direction of operations."),
+    ("A", 4, "Tick-Tock Time Travelers", ["time"], ["draw-diagram", "work-backward"], "slides pp. 3-12", "Read clocks/calendars, convert familiar time units, and reason about elapsed time."),
+    ("A", 5, "Puzzle Mania", ["counting", "shapes", "area"], ["visualize", "draw-diagram", "compare-order"], "slides pp. 3-4, 15", "Infer missing pieces, compare outlines, and reconstruct a pictured whole."),
+    ("A", 6, "Flat Figures and Shapes", ["shapes", "counting", "area"], ["decompose", "compare-order"], "slides pp. 3-17", "Distinguish flat/solid objects; compare and cut shapes; count missing units and compare coverage."),
+    ("A", 7, "Think, Guess, Check!", ["digits", "logic", "missing-values"], ["guess-check", "organize-cases"], "slides pp. 2-13", "Use parity, digit clues, and equal-sum constraints to try and revise candidates."),
+    ("A", 8, "Money, Money, Money", ["money", "groups-sharing", "missing-values"], ["draw-diagram", "write-equation", "compare-order"], "slides pp. 3-13", "List prices, combine costs, find change, repeat equal prices, and compare purchases."),
+    ("A", 9, "Symmetry Quest", ["symmetry", "shapes"], ["visualize", "transform"], "slides pp. 3, 7-17", "Distinguish identical figures from mirror images; use axes, folds, stamps, and successive flips."),
+    ("A", 10, "Game On! / MK 2012", [], ["choose-and-check"], "slides pp. 4-11", "Mixed synthesis: understand, choose a strategy, carry it out, check the result."),
+    ("B", 1, "Math in Motion: Paths and Mazes", ["routes", "possibilities"], ["trace-path", "guess-check", "organized-list"], "class notes pp. 6-10", "Trace legal routes, backtrack from dead ends, minimize crossings, and count possible routes."),
+    ("B", 2, "Compare, Get in Line!", ["counting", "digits", "logic", "measurement"], ["compare-order", "draw-diagram"], "class notes slides 7-8", "Use comparison clues, order values or objects, and reason about positions in a line."),
+    ("B", 3, "Spatial Secrets", ["shapes", "solids", "counting"], ["visualize", "draw-diagram", "transform"], "class notes slide 7 and worked examples", "Track views, stacking order, overlaps, woven strips, and shape completion."),
+    ("B", 4, "Measure Up!", ["measurement", "routes", "area"], ["compare-order", "draw-diagram"], "class notes slide 5 and worked examples", "Count equal units and compare lengths, heights, and route distances."),
+    ("B", 5, "Story Problems", ["counting", "possibilities", "groups-sharing", "logic"], ["organized-list", "build-table", "organize-cases"], "class notes slides 4-10; instructor lesson summary", "Use organized lists and tables for routes, repeated processes, pairings, and allocations."),
+    ("B", 6, "How Old Are You?", ["time", "addition-subtraction", "missing-values"], ["draw-diagram", "use-invariant", "work-backward"], "class notes slides 7-13", "Ages change together; differences stay fixed; a sum grows once per person each year."),
+    ("B", 7, "Solids in Action", ["solids"], ["visualize", "decompose"], "class notes slides 7-9 and worked examples", "Identify solids, faces, edges, and vertices; infer hidden cubes and match views/nets."),
+    ("B", 8, "Balance the Scales / Balancing Act", ["missing-values", "groups-sharing", "money"], ["write-equation", "use-invariant", "work-backward"], "class notes slide 7 and worked examples", "Preserve equality on both sides, substitute equivalent groups, and chain exchanges."),
+    ("B", 9, "Logical Reasoning / Got Logic?", ["logic", "measurement", "routes"], ["draw-diagram", "guess-check", "compare-order"], "class notes slide 7 and worked examples", "Combine explicit and implied clues; revise an arrangement while satisfying every condition."),
+    ("B", 10, "The 4-Step Method and MK 2022", [], ["choose-and-check"], "class notes slides 5-8", "Mixed synthesis with pattern, diagram, list, table, visualization, trial, and equation strategies."),
+]
+
+STRATEGIES = [
+    ("find-pattern", "Find a pattern", ["set-a-01", "set-b-10"]),
+    ("draw-diagram", "Draw a diagram", ["set-a-02", "set-b-02", "set-b-09"]),
+    ("visualize", "Visualize the state change", ["set-a-02", "set-a-09", "set-b-03"]),
+    ("work-backward", "Work backward", ["set-a-03", "set-b-06", "set-b-10"]),
+    ("guess-check", "Try, check, and revise", ["set-a-07", "set-b-01", "set-b-10"]),
+    ("organized-list", "Make an organized list", ["set-b-05", "set-b-10", "think-enumeration"]),
+    ("build-table", "Build a table", ["set-b-05", "set-b-10"]),
+    ("write-equation", "Write an equation", ["set-b-08", "set-b-10"]),
+    ("compare-order", "Compare and order", ["set-b-02", "set-b-04", "think-logic"]),
+    ("organize-cases", "Organize and exhaust cases", ["set-a-07", "set-b-05", "think-enumeration"]),
+    ("decompose", "Decompose and rebuild", ["set-a-05", "set-a-06", "set-b-07"]),
+    ("transform", "Track a reflection, turn, or fold", ["set-a-09", "set-b-03", "think-shape"]),
+    ("trace-path", "Trace and backtrack", ["set-a-03", "set-b-01"]),
+    ("use-invariant", "Use what stays unchanged", ["set-b-06", "set-b-08"]),
+    ("optimize", "Find a minimum or maximum", ["think-enumeration", "think-logic"]),
+    ("choose-and-check", "Choose a strategy and check another way", ["set-a-10", "set-b-10"]),
+]
+
+SOURCE_SUBSKILLS = [
+    ("count-once", "Count objects, relevant subsets, and missing units", ["counting"], ["set-a-05", "set-a-06"]),
+    ("ordering-intervals", "Ordering, line positions, and intervals", ["counting", "digits", "routes"], ["set-a-02", "set-b-02", "think-enumeration"]),
+    ("systematic-enumeration", "Count possibilities with a list, table, or cases", ["counting", "possibilities"], ["set-b-05", "think-enumeration"]),
+    ("mirrors-identical", "Identical figures, mirror axes, folds, and successive flips", ["symmetry"], ["set-a-09", "think-shape"]),
+    ("reverse-process", "Reverse a numerical or spatial process", ["addition-subtraction", "routes", "missing-values"], ["set-a-03"]),
+    ("repeating-growing", "Repeating and growing picture/number rules", ["patterns"], ["set-a-01"]),
+    ("missing-pieces", "Compose, complete, cut, and compare flat figures", ["shapes", "area"], ["set-a-05", "set-a-06", "set-b-03"]),
+    ("constraint-clues", "Conditional, comparison, and arrangement clues", ["logic"], ["set-b-09", "think-logic"]),
+    ("min-max", "Smallest/largest feasible result under constraints", ["logic", "counting", "money", "possibilities"], ["think-enumeration", "think-logic"]),
+    ("equal-groups", "Equal sharing, repeated equal quantities, and exchange rates", ["groups-sharing"], ["set-a-02", "set-a-08", "set-b-08"]),
+    ("number-structure", "Digit clues, parity, page numbering, and divisibility", ["digits"], ["set-a-07", "think-number"]),
+    ("routes-rules", "Maze reachability, shortest paths, and constrained route counts", ["routes"], ["set-b-01"]),
+    ("spatial-views", "Top views, occlusion, layers, hidden cubes, and nets", ["solids"], ["set-b-03", "set-b-07", "think-shape"]),
+    ("dice-faces", "Dice faces, opposite faces, and nets", ["solids"], ["think-shape"]),
+    ("gear-motion", "Linked gear motion", [], ["think-shape"]),
+    ("measure-units", "Repeated units, length/height comparisons, and distance", ["measurement"], ["set-b-04"]),
+    ("purchase-relations", "Coin values, change, bundles, and purchase differences", ["money"], ["set-a-08"]),
+    ("clock-calendar", "Clocks, calendars, elapsed time, and backward schedules", ["time"], ["set-a-04", "set-a-03"]),
+    ("age-invariants", "Ages changing together, fixed differences, and changing sums", ["time", "addition-subtraction", "missing-values"], ["set-b-06"]),
+    ("balance-exchange", "Equality-preserving moves, equivalent groups, and exchanges", ["missing-values", "groups-sharing", "money"], ["set-b-08"]),
+    ("codes-surplus", "Codes, quantities without numbers, and surplus/shortage", ["missing-values", "addition-subtraction"], ["think-number", "think-logic"]),
+]
+
+STRATEGY_SCAFFOLDING = {
+    1: "Demonstrate a useful move, then repeat it with a small variation.",
+    2: "Transfer a familiar move to a new representation; combine two linked steps.",
+    3: "Choose between plausible moves; organize several cases or interacting constraints.",
+    4: "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
+}
 
 # Skills are retrieval seeds. A shared seed never establishes a primary placement.
 CONCEPTS = [
@@ -51,8 +126,8 @@ CONCEPTS = [
     ("shapes", "Shape Building", ["cnt_two_dimensional_shapes", "cnt_spatial_composition", "cnt_tessellation_covering", "cnt_polygon_angle_structure", "cnt_circle_geometry", "cnt_congruence_similarity"], [
         "Recognize boundaries and fit or combine simple pieces.",
         "Decompose and tile shapes while preserving their boundaries.",
-        "Use angles, congruence, and similarity to constrain a construction.",
-        "Prove a geometric relation using a useful decomposition or auxiliary shape.",
+        "Use angles, congruence, and tiling constraints to organize a construction.",
+        "Use similarity, decomposition, and auxiliary shapes after ratios and scale have been taught.",
     ]),
     ("logic", "Logic", ["rsn_constraint_propagation", "rsn_case_analysis", "cnt_multi_clue_ordering", "cnt_truth_consistency", "cnt_assignment_constraints", "cnt_state_reversal", "cnt_possible_impossible", "cnt_invariant_structure"], [
         "Combine two concrete clues to eliminate an impossible arrangement.",
@@ -200,6 +275,10 @@ def build(catalogue: Path) -> dict:
                 "pass": pass_number, "passLabel": pass_label,
                 "kind": "core-proposal" if order <= 16 else "conditional-specialist-proposal",
                 "objective": objectives[pass_number - 1],
+                "strategyScaffolding": STRATEGY_SCAFFOLDING[pass_number],
+                "sourceLinkedSubskillIds": [s[0] for s in SOURCE_SUBSKILLS if concept_id in s[2]],
+                "strategyIds": sorted({strategy for lesson in SOURCE_LESSONS if concept_id in lesson[3] for strategy in lesson[4]} | ({"find-pattern"} if concept_id == "patterns" else set())),
+                "editorialStatus": "proposed-not-assigned-or-approved",
                 "searchGradeBands": bands,
                 "candidateCount": len(candidates),
                 "fiveChoiceCandidateCount": sum(r["five"] for r in candidates),
@@ -216,12 +295,36 @@ def build(catalogue: Path) -> dict:
             raise ValueError(f"Counting candidate lacks the existing five-choice structure: {item_id}")
         pilot.append({"order": index, "stop": stop, "itemId": item_id, "contentVersion": row["content_version"], "rationale": rationale, "publishedPointTier": row["published_point_tier"], "sourceAnswerStatus": row["answer_status"], "assetInspected": True, "editorialStatus": "agent-proposed-after-visual-inspection", "runtimeApproved": False, "sourceFamily": row["source_family"]})
     return {
-        "schemaVersion": 1, "proposalVersion": "spiral.2026-09-22.1",
+        "schemaVersion": 1, "proposalVersion": "spiral.2026-09-22.2",
         "status": "proposal-awaiting-user-sequence-approval",
         "runtimeConsumption": "none", "catalogueRunId": RUN_ID,
         "corpusSnapshotSha256": run["corpus_snapshot_sha256"],
         "classificationVersion": run["proposal_version"],
-        "cautions": ["Candidate sets overlap and are not additive.", "Counts are records, not deduplicated unique problems.", "Stored answer metadata does not establish curriculum or display approval.", "Grade and published point tier are search hints, not calibrated learner difficulty.", "No private question text, answer, or asset is exported."],
+        "cautions": ["Candidate sets overlap both across concepts and across passes and are not additive.", "Counts are records, not deduplicated unique problems.", "Stored answer metadata does not establish curriculum or display approval.", "Grade and published point tier are search hints, not calibrated learner difficulty.", "Set A and Set B are complementary Level 1-2 courses, not difficulty levels 1 and 2.", "Source-linked subskills describe curriculum evidence, not verified tags on each candidate question.", "No private question text, answer, email identifiers, or asset is exported."],
+        "passes": [{"number": n, "label": label, "searchGradeBands": bands, "strategyScaffolding": STRATEGY_SCAFFOLDING[n]} for n, label, bands in PASSES],
+        "ontologyFacets": {
+            "primaryConcept": "One primary home for each selected question; worlds follow this axis.",
+            "subskills": "Specific mathematical relations or actions evidenced in the source courses.",
+            "strategies": "Several legitimate solving moves may apply to the same question.",
+            "representation": "Pictures, diagrams, grids, physical arrangements, text, equations, lists, or tables.",
+            "reasoningDemand": ["linked-relations", "cases", "hidden-state", "representation-changes", "prerequisite-operations", "strategy-choice", "scaffold-independence"],
+            "sourceRole": ["topic-practice", "warm-up", "mixed-review", "course-capstone"],
+            "editorialStatus": "Source vocabulary grounded; individual item assignments remain proposed.",
+        },
+        "sourceCurricula": [
+            {"id": "set-a", "label": "Math Kangaroo Exploring Level 1-2, Set A", "orderedLessonIds": [f"set-a-{n:02}" for n in range(1, 11)], "relationship": "Complementary same-grade course; not a difficulty tier."},
+            {"id": "set-b", "label": "Math Kangaroo Exploring Level 1-2, Set B", "orderedLessonIds": [f"set-b-{n:02}" for n in range(1, 11)], "relationship": "Complementary same-grade course; not a difficulty tier."},
+            {"id": "think-mk300", "label": "Think Academy MK 300, six 2024 workbooks", "scope": "Grades 1-2 and 3-4, each at 3/4/5-point tiers; 600 source occurrences, including 80 review-role occurrences.", "hierarchy": ["grade-band", "point-tier", "week-domain", "day-topic"], "threePointOrder": ["Shape", "Enumeration", "Numbers and Word Problem", "Logic"], "fourFivePointCadence": "Four topical practice days followed by a fifth mixed-review day within each of four weeks.", "caveat": "Broad source headings can contain another concept; inspect each question. A dice problem is not automatically probability."},
+        ],
+        "sourceLessons": [{"id": f"set-{set_id.lower()}-{number:02}", "set": set_id, "lesson": number, "title": title, "conceptIds": concept_ids, "strategyIds": strategies, "evidenceLocator": locator, "summary": summary, "sourceRole": "course-capstone" if number == 10 else "topic-practice", "evidenceStatus": "source-grounded-summary"} for set_id, number, title, concept_ids, strategies, locator, summary in SOURCE_LESSONS],
+        "additionalSourceReferences": [
+            {"id": "think-shape", "label": "Think Academy Shape / Spatial Imagination / Geometry topics", "evidenceLocator": "Grades 1-2, 4-point pp. 3-16; 5-point pp. 35, 37; Grades 3-4, 5-point p. 49", "evidenceStatus": "source-grounded-summary"},
+            {"id": "think-enumeration", "label": "Think Academy Enumeration and systematic-counting topics", "evidenceLocator": "Both 3-point workbook Enumeration weeks; topic and review structure across the six books", "evidenceStatus": "source-grounded-summary"},
+            {"id": "think-number", "label": "Think Academy Numbers, Digital Logic, and Word Problems topics", "evidenceLocator": "Grades 1-2, 4-point pp. 17-41; Grades 3-4, 5-point pp. 19, 22, 33-38", "evidenceStatus": "source-grounded-summary"},
+            {"id": "think-logic", "label": "Think Academy Logic and Logical Reasoning topics", "evidenceLocator": "Grades 1-2, 4-point pp. 42-48; four topical days then review", "evidenceStatus": "source-grounded-summary"},
+        ],
+        "reasoningStrategies": [{"id": sid, "label": label, "sourceReferenceIds": refs, "editorialStatus": "source-grounded-vocabulary-not-item-classification"} for sid, label, refs in STRATEGIES],
+        "sourceLinkedSubskills": [{"id": sid, "label": label, "conceptIds": concepts, "sourceReferenceIds": refs, "editorialStatus": "source-grounded-vocabulary-not-item-classification", "placementCaveat": "A transformation extension needs an explicit world assignment; do not silently label gear motion as mirror symmetry." if sid == "gear-motion" else None} for sid, label, concepts, refs in SOURCE_SUBSKILLS],
         "corpus": {"items": len(rows), "completeChoiceRecords": len(complete), "fiveChoiceRecords": sum(r["five"] for r in rows), "duplicateFlaggedCompleteRecords": sum(r["duplicate_flag"] for r in complete), "currentRunCatalogueReviewRows": review_count, "currentRunWorldPlacementReviewedItems": placement_count, "bands": summaries, "completeChoiceAnswerStatuses": dict(sorted(Counter(r["answer_status"] for r in complete).items()))},
         "concepts": [{"id": c[0], "label": c[1], "retrievalSkillIds": c[2], "objectivesByPass": c[3]} for c in CONCEPTS],
         "worldSlots": slots, "countingOneProposedQuestions": pilot,

@@ -1,17 +1,972 @@
 {
   "schemaVersion": 1,
-  "proposalVersion": "spiral.2026-09-22.1",
+  "proposalVersion": "spiral.2026-09-22.2",
   "status": "proposal-awaiting-user-sequence-approval",
   "runtimeConsumption": "none",
   "catalogueRunId": "catalogue-8b9cfc0f0f01b9ef7138902e",
   "corpusSnapshotSha256": "66c129b6af3b3d358dca433c13eceb0a70422018f2f7aed255ccb031b68d580d",
   "classificationVersion": "deterministic-lexical-catalogue.v2",
   "cautions": [
-    "Candidate sets overlap and are not additive.",
+    "Candidate sets overlap both across concepts and across passes and are not additive.",
     "Counts are records, not deduplicated unique problems.",
     "Stored answer metadata does not establish curriculum or display approval.",
     "Grade and published point tier are search hints, not calibrated learner difficulty.",
-    "No private question text, answer, or asset is exported."
+    "Set A and Set B are complementary Level 1-2 courses, not difficulty levels 1 and 2.",
+    "Source-linked subskills describe curriculum evidence, not verified tags on each candidate question.",
+    "No private question text, answer, email identifiers, or asset is exported."
+  ],
+  "passes": [
+    {
+      "number": 1,
+      "label": "Notice",
+      "searchGradeBands": [
+        "1-2"
+      ],
+      "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation."
+    },
+    {
+      "number": 2,
+      "label": "Connect",
+      "searchGradeBands": [
+        "1-2",
+        "3-4"
+      ],
+      "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps."
+    },
+    {
+      "number": 3,
+      "label": "Plan",
+      "searchGradeBands": [
+        "3-4",
+        "5-6"
+      ],
+      "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints."
+    },
+    {
+      "number": 4,
+      "label": "Generalize",
+      "searchGradeBands": [
+        "5-6",
+        "7-8",
+        "9-10",
+        "11-12"
+      ],
+      "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional."
+    }
+  ],
+  "ontologyFacets": {
+    "primaryConcept": "One primary home for each selected question; worlds follow this axis.",
+    "subskills": "Specific mathematical relations or actions evidenced in the source courses.",
+    "strategies": "Several legitimate solving moves may apply to the same question.",
+    "representation": "Pictures, diagrams, grids, physical arrangements, text, equations, lists, or tables.",
+    "reasoningDemand": [
+      "linked-relations",
+      "cases",
+      "hidden-state",
+      "representation-changes",
+      "prerequisite-operations",
+      "strategy-choice",
+      "scaffold-independence"
+    ],
+    "sourceRole": [
+      "topic-practice",
+      "warm-up",
+      "mixed-review",
+      "course-capstone"
+    ],
+    "editorialStatus": "Source vocabulary grounded; individual item assignments remain proposed."
+  },
+  "sourceCurricula": [
+    {
+      "id": "set-a",
+      "label": "Math Kangaroo Exploring Level 1-2, Set A",
+      "orderedLessonIds": [
+        "set-a-01",
+        "set-a-02",
+        "set-a-03",
+        "set-a-04",
+        "set-a-05",
+        "set-a-06",
+        "set-a-07",
+        "set-a-08",
+        "set-a-09",
+        "set-a-10"
+      ],
+      "relationship": "Complementary same-grade course; not a difficulty tier."
+    },
+    {
+      "id": "set-b",
+      "label": "Math Kangaroo Exploring Level 1-2, Set B",
+      "orderedLessonIds": [
+        "set-b-01",
+        "set-b-02",
+        "set-b-03",
+        "set-b-04",
+        "set-b-05",
+        "set-b-06",
+        "set-b-07",
+        "set-b-08",
+        "set-b-09",
+        "set-b-10"
+      ],
+      "relationship": "Complementary same-grade course; not a difficulty tier."
+    },
+    {
+      "id": "think-mk300",
+      "label": "Think Academy MK 300, six 2024 workbooks",
+      "scope": "Grades 1-2 and 3-4, each at 3/4/5-point tiers; 600 source occurrences, including 80 review-role occurrences.",
+      "hierarchy": [
+        "grade-band",
+        "point-tier",
+        "week-domain",
+        "day-topic"
+      ],
+      "threePointOrder": [
+        "Shape",
+        "Enumeration",
+        "Numbers and Word Problem",
+        "Logic"
+      ],
+      "fourFivePointCadence": "Four topical practice days followed by a fifth mixed-review day within each of four weeks.",
+      "caveat": "Broad source headings can contain another concept; inspect each question. A dice problem is not automatically probability."
+    }
+  ],
+  "sourceLessons": [
+    {
+      "id": "set-a-01",
+      "set": "A",
+      "lesson": 1,
+      "title": "Fun With Patterns",
+      "conceptIds": [
+        "patterns"
+      ],
+      "strategyIds": [
+        "find-pattern"
+      ],
+      "evidenceLocator": "slides pp. 2-11",
+      "summary": "Repeating pictures, colors, events, and addition/subtraction rules.",
+      "sourceRole": "topic-practice",
+      "evidenceStatus": "source-grounded-summary"
+    },
+    {
+      "id": "set-a-02",
+      "set": "A",
+      "lesson": 2,
+      "title": "Picture It, Solve It!",
+      "conceptIds": [
+        "counting",
+        "addition-subtraction",
+        "groups-sharing",
+        "routes"
+      ],
+      "strategyIds": [
+        "draw-diagram",
+        "visualize"
+      ],
+      "evidenceLocator": "slides pp. 4-12",
+      "summary": "Use simple pictures to track quantities, positions, intervals, and changing states.",
+      "sourceRole": "topic-practice",
+      "evidenceStatus": "source-grounded-summary"
+    },
+    {
+      "id": "set-a-03",
+      "set": "A",
+      "lesson": 3,
+      "title": "Let's Work Backwards",
+      "conceptIds": [
+        "addition-subtraction",
+        "routes",
+        "time",
+        "missing-values"
+      ],
+      "strategyIds": [
+        "work-backward"
+      ],
+      "evidenceLocator": "slides pp. 3-12",
+      "summary": "Start from a known end state; reverse the order and direction of operations.",
+      "sourceRole": "topic-practice",
+      "evidenceStatus": "source-grounded-summary"
+    },
+    {
+      "id": "set-a-04",
+      "set": "A",
+      "lesson": 4,
+      "title": "Tick-Tock Time Travelers",
+      "conceptIds": [
+        "time"
+      ],
+      "strategyIds": [
+        "draw-diagram",
+        "work-backward"
+      ],
+      "evidenceLocator": "slides pp. 3-12",
+      "summary": "Read clocks/calendars, convert familiar time units, and reason about elapsed time.",
+      "sourceRole": "topic-practice",
+      "evidenceStatus": "source-grounded-summary"
+    },
+    {
+      "id": "set-a-05",
+      "set": "A",
+      "lesson": 5,
+      "title": "Puzzle Mania",
+      "conceptIds": [
+        "counting",
+        "shapes",
+        "area"
+      ],
+      "strategyIds": [
+        "visualize",
+        "draw-diagram",
+        "compare-order"
+      ],
+      "evidenceLocator": "slides pp. 3-4, 15",
+      "summary": "Infer missing pieces, compare outlines, and reconstruct a pictured whole.",
+      "sourceRole": "topic-practice",
+      "evidenceStatus": "source-grounded-summary"
+    },
+    {
+      "id": "set-a-06",
+      "set": "A",
+      "lesson": 6,
+      "title": "Flat Figures and Shapes",
+      "conceptIds": [
+        "shapes",
+        "counting",
+        "area"
+      ],
+      "strategyIds": [
+        "decompose",
+        "compare-order"
+      ],
+      "evidenceLocator": "slides pp. 3-17",
+      "summary": "Distinguish flat/solid objects; compare and cut shapes; count missing units and compare coverage.",
+      "sourceRole": "topic-practice",
+      "evidenceStatus": "source-grounded-summary"
+    },
+    {
+      "id": "set-a-07",
+      "set": "A",
+      "lesson": 7,
+      "title": "Think, Guess, Check!",
+      "conceptIds": [
+        "digits",
+        "logic",
+        "missing-values"
+      ],
+      "strategyIds": [
+        "guess-check",
+        "organize-cases"
+      ],
+      "evidenceLocator": "slides pp. 2-13",
+      "summary": "Use parity, digit clues, and equal-sum constraints to try and revise candidates.",
+      "sourceRole": "topic-practice",
+      "evidenceStatus": "source-grounded-summary"
+    },
+    {
+      "id": "set-a-08",
+      "set": "A",
+      "lesson": 8,
+      "title": "Money, Money, Money",
+      "conceptIds": [
+        "money",
+        "groups-sharing",
+        "missing-values"
+      ],
+      "strategyIds": [
+        "draw-diagram",
+        "write-equation",
+        "compare-order"
+      ],
+      "evidenceLocator": "slides pp. 3-13",
+      "summary": "List prices, combine costs, find change, repeat equal prices, and compare purchases.",
+      "sourceRole": "topic-practice",
+      "evidenceStatus": "source-grounded-summary"
+    },
+    {
+      "id": "set-a-09",
+      "set": "A",
+      "lesson": 9,
+      "title": "Symmetry Quest",
+      "conceptIds": [
+        "symmetry",
+        "shapes"
+      ],
+      "strategyIds": [
+        "visualize",
+        "transform"
+      ],
+      "evidenceLocator": "slides pp. 3, 7-17",
+      "summary": "Distinguish identical figures from mirror images; use axes, folds, stamps, and successive flips.",
+      "sourceRole": "topic-practice",
+      "evidenceStatus": "source-grounded-summary"
+    },
+    {
+      "id": "set-a-10",
+      "set": "A",
+      "lesson": 10,
+      "title": "Game On! / MK 2012",
+      "conceptIds": [],
+      "strategyIds": [
+        "choose-and-check"
+      ],
+      "evidenceLocator": "slides pp. 4-11",
+      "summary": "Mixed synthesis: understand, choose a strategy, carry it out, check the result.",
+      "sourceRole": "course-capstone",
+      "evidenceStatus": "source-grounded-summary"
+    },
+    {
+      "id": "set-b-01",
+      "set": "B",
+      "lesson": 1,
+      "title": "Math in Motion: Paths and Mazes",
+      "conceptIds": [
+        "routes",
+        "possibilities"
+      ],
+      "strategyIds": [
+        "trace-path",
+        "guess-check",
+        "organized-list"
+      ],
+      "evidenceLocator": "class notes pp. 6-10",
+      "summary": "Trace legal routes, backtrack from dead ends, minimize crossings, and count possible routes.",
+      "sourceRole": "topic-practice",
+      "evidenceStatus": "source-grounded-summary"
+    },
+    {
+      "id": "set-b-02",
+      "set": "B",
+      "lesson": 2,
+      "title": "Compare, Get in Line!",
+      "conceptIds": [
+        "counting",
+        "digits",
+        "logic",
+        "measurement"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "draw-diagram"
+      ],
+      "evidenceLocator": "class notes slides 7-8",
+      "summary": "Use comparison clues, order values or objects, and reason about positions in a line.",
+      "sourceRole": "topic-practice",
+      "evidenceStatus": "source-grounded-summary"
+    },
+    {
+      "id": "set-b-03",
+      "set": "B",
+      "lesson": 3,
+      "title": "Spatial Secrets",
+      "conceptIds": [
+        "shapes",
+        "solids",
+        "counting"
+      ],
+      "strategyIds": [
+        "visualize",
+        "draw-diagram",
+        "transform"
+      ],
+      "evidenceLocator": "class notes slide 7 and worked examples",
+      "summary": "Track views, stacking order, overlaps, woven strips, and shape completion.",
+      "sourceRole": "topic-practice",
+      "evidenceStatus": "source-grounded-summary"
+    },
+    {
+      "id": "set-b-04",
+      "set": "B",
+      "lesson": 4,
+      "title": "Measure Up!",
+      "conceptIds": [
+        "measurement",
+        "routes",
+        "area"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "draw-diagram"
+      ],
+      "evidenceLocator": "class notes slide 5 and worked examples",
+      "summary": "Count equal units and compare lengths, heights, and route distances.",
+      "sourceRole": "topic-practice",
+      "evidenceStatus": "source-grounded-summary"
+    },
+    {
+      "id": "set-b-05",
+      "set": "B",
+      "lesson": 5,
+      "title": "Story Problems",
+      "conceptIds": [
+        "counting",
+        "possibilities",
+        "groups-sharing",
+        "logic"
+      ],
+      "strategyIds": [
+        "organized-list",
+        "build-table",
+        "organize-cases"
+      ],
+      "evidenceLocator": "class notes slides 4-10; instructor lesson summary",
+      "summary": "Use organized lists and tables for routes, repeated processes, pairings, and allocations.",
+      "sourceRole": "topic-practice",
+      "evidenceStatus": "source-grounded-summary"
+    },
+    {
+      "id": "set-b-06",
+      "set": "B",
+      "lesson": 6,
+      "title": "How Old Are You?",
+      "conceptIds": [
+        "time",
+        "addition-subtraction",
+        "missing-values"
+      ],
+      "strategyIds": [
+        "draw-diagram",
+        "use-invariant",
+        "work-backward"
+      ],
+      "evidenceLocator": "class notes slides 7-13",
+      "summary": "Ages change together; differences stay fixed; a sum grows once per person each year.",
+      "sourceRole": "topic-practice",
+      "evidenceStatus": "source-grounded-summary"
+    },
+    {
+      "id": "set-b-07",
+      "set": "B",
+      "lesson": 7,
+      "title": "Solids in Action",
+      "conceptIds": [
+        "solids"
+      ],
+      "strategyIds": [
+        "visualize",
+        "decompose"
+      ],
+      "evidenceLocator": "class notes slides 7-9 and worked examples",
+      "summary": "Identify solids, faces, edges, and vertices; infer hidden cubes and match views/nets.",
+      "sourceRole": "topic-practice",
+      "evidenceStatus": "source-grounded-summary"
+    },
+    {
+      "id": "set-b-08",
+      "set": "B",
+      "lesson": 8,
+      "title": "Balance the Scales / Balancing Act",
+      "conceptIds": [
+        "missing-values",
+        "groups-sharing",
+        "money"
+      ],
+      "strategyIds": [
+        "write-equation",
+        "use-invariant",
+        "work-backward"
+      ],
+      "evidenceLocator": "class notes slide 7 and worked examples",
+      "summary": "Preserve equality on both sides, substitute equivalent groups, and chain exchanges.",
+      "sourceRole": "topic-practice",
+      "evidenceStatus": "source-grounded-summary"
+    },
+    {
+      "id": "set-b-09",
+      "set": "B",
+      "lesson": 9,
+      "title": "Logical Reasoning / Got Logic?",
+      "conceptIds": [
+        "logic",
+        "measurement",
+        "routes"
+      ],
+      "strategyIds": [
+        "draw-diagram",
+        "guess-check",
+        "compare-order"
+      ],
+      "evidenceLocator": "class notes slide 7 and worked examples",
+      "summary": "Combine explicit and implied clues; revise an arrangement while satisfying every condition.",
+      "sourceRole": "topic-practice",
+      "evidenceStatus": "source-grounded-summary"
+    },
+    {
+      "id": "set-b-10",
+      "set": "B",
+      "lesson": 10,
+      "title": "The 4-Step Method and MK 2022",
+      "conceptIds": [],
+      "strategyIds": [
+        "choose-and-check"
+      ],
+      "evidenceLocator": "class notes slides 5-8",
+      "summary": "Mixed synthesis with pattern, diagram, list, table, visualization, trial, and equation strategies.",
+      "sourceRole": "course-capstone",
+      "evidenceStatus": "source-grounded-summary"
+    }
+  ],
+  "additionalSourceReferences": [
+    {
+      "id": "think-shape",
+      "label": "Think Academy Shape / Spatial Imagination / Geometry topics",
+      "evidenceLocator": "Grades 1-2, 4-point pp. 3-16; 5-point pp. 35, 37; Grades 3-4, 5-point p. 49",
+      "evidenceStatus": "source-grounded-summary"
+    },
+    {
+      "id": "think-enumeration",
+      "label": "Think Academy Enumeration and systematic-counting topics",
+      "evidenceLocator": "Both 3-point workbook Enumeration weeks; topic and review structure across the six books",
+      "evidenceStatus": "source-grounded-summary"
+    },
+    {
+      "id": "think-number",
+      "label": "Think Academy Numbers, Digital Logic, and Word Problems topics",
+      "evidenceLocator": "Grades 1-2, 4-point pp. 17-41; Grades 3-4, 5-point pp. 19, 22, 33-38",
+      "evidenceStatus": "source-grounded-summary"
+    },
+    {
+      "id": "think-logic",
+      "label": "Think Academy Logic and Logical Reasoning topics",
+      "evidenceLocator": "Grades 1-2, 4-point pp. 42-48; four topical days then review",
+      "evidenceStatus": "source-grounded-summary"
+    }
+  ],
+  "reasoningStrategies": [
+    {
+      "id": "find-pattern",
+      "label": "Find a pattern",
+      "sourceReferenceIds": [
+        "set-a-01",
+        "set-b-10"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification"
+    },
+    {
+      "id": "draw-diagram",
+      "label": "Draw a diagram",
+      "sourceReferenceIds": [
+        "set-a-02",
+        "set-b-02",
+        "set-b-09"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification"
+    },
+    {
+      "id": "visualize",
+      "label": "Visualize the state change",
+      "sourceReferenceIds": [
+        "set-a-02",
+        "set-a-09",
+        "set-b-03"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification"
+    },
+    {
+      "id": "work-backward",
+      "label": "Work backward",
+      "sourceReferenceIds": [
+        "set-a-03",
+        "set-b-06",
+        "set-b-10"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification"
+    },
+    {
+      "id": "guess-check",
+      "label": "Try, check, and revise",
+      "sourceReferenceIds": [
+        "set-a-07",
+        "set-b-01",
+        "set-b-10"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification"
+    },
+    {
+      "id": "organized-list",
+      "label": "Make an organized list",
+      "sourceReferenceIds": [
+        "set-b-05",
+        "set-b-10",
+        "think-enumeration"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification"
+    },
+    {
+      "id": "build-table",
+      "label": "Build a table",
+      "sourceReferenceIds": [
+        "set-b-05",
+        "set-b-10"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification"
+    },
+    {
+      "id": "write-equation",
+      "label": "Write an equation",
+      "sourceReferenceIds": [
+        "set-b-08",
+        "set-b-10"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification"
+    },
+    {
+      "id": "compare-order",
+      "label": "Compare and order",
+      "sourceReferenceIds": [
+        "set-b-02",
+        "set-b-04",
+        "think-logic"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification"
+    },
+    {
+      "id": "organize-cases",
+      "label": "Organize and exhaust cases",
+      "sourceReferenceIds": [
+        "set-a-07",
+        "set-b-05",
+        "think-enumeration"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification"
+    },
+    {
+      "id": "decompose",
+      "label": "Decompose and rebuild",
+      "sourceReferenceIds": [
+        "set-a-05",
+        "set-a-06",
+        "set-b-07"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification"
+    },
+    {
+      "id": "transform",
+      "label": "Track a reflection, turn, or fold",
+      "sourceReferenceIds": [
+        "set-a-09",
+        "set-b-03",
+        "think-shape"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification"
+    },
+    {
+      "id": "trace-path",
+      "label": "Trace and backtrack",
+      "sourceReferenceIds": [
+        "set-a-03",
+        "set-b-01"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification"
+    },
+    {
+      "id": "use-invariant",
+      "label": "Use what stays unchanged",
+      "sourceReferenceIds": [
+        "set-b-06",
+        "set-b-08"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification"
+    },
+    {
+      "id": "optimize",
+      "label": "Find a minimum or maximum",
+      "sourceReferenceIds": [
+        "think-enumeration",
+        "think-logic"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification"
+    },
+    {
+      "id": "choose-and-check",
+      "label": "Choose a strategy and check another way",
+      "sourceReferenceIds": [
+        "set-a-10",
+        "set-b-10"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification"
+    }
+  ],
+  "sourceLinkedSubskills": [
+    {
+      "id": "count-once",
+      "label": "Count objects, relevant subsets, and missing units",
+      "conceptIds": [
+        "counting"
+      ],
+      "sourceReferenceIds": [
+        "set-a-05",
+        "set-a-06"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification",
+      "placementCaveat": null
+    },
+    {
+      "id": "ordering-intervals",
+      "label": "Ordering, line positions, and intervals",
+      "conceptIds": [
+        "counting",
+        "digits",
+        "routes"
+      ],
+      "sourceReferenceIds": [
+        "set-a-02",
+        "set-b-02",
+        "think-enumeration"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification",
+      "placementCaveat": null
+    },
+    {
+      "id": "systematic-enumeration",
+      "label": "Count possibilities with a list, table, or cases",
+      "conceptIds": [
+        "counting",
+        "possibilities"
+      ],
+      "sourceReferenceIds": [
+        "set-b-05",
+        "think-enumeration"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification",
+      "placementCaveat": null
+    },
+    {
+      "id": "mirrors-identical",
+      "label": "Identical figures, mirror axes, folds, and successive flips",
+      "conceptIds": [
+        "symmetry"
+      ],
+      "sourceReferenceIds": [
+        "set-a-09",
+        "think-shape"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification",
+      "placementCaveat": null
+    },
+    {
+      "id": "reverse-process",
+      "label": "Reverse a numerical or spatial process",
+      "conceptIds": [
+        "addition-subtraction",
+        "routes",
+        "missing-values"
+      ],
+      "sourceReferenceIds": [
+        "set-a-03"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification",
+      "placementCaveat": null
+    },
+    {
+      "id": "repeating-growing",
+      "label": "Repeating and growing picture/number rules",
+      "conceptIds": [
+        "patterns"
+      ],
+      "sourceReferenceIds": [
+        "set-a-01"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification",
+      "placementCaveat": null
+    },
+    {
+      "id": "missing-pieces",
+      "label": "Compose, complete, cut, and compare flat figures",
+      "conceptIds": [
+        "shapes",
+        "area"
+      ],
+      "sourceReferenceIds": [
+        "set-a-05",
+        "set-a-06",
+        "set-b-03"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification",
+      "placementCaveat": null
+    },
+    {
+      "id": "constraint-clues",
+      "label": "Conditional, comparison, and arrangement clues",
+      "conceptIds": [
+        "logic"
+      ],
+      "sourceReferenceIds": [
+        "set-b-09",
+        "think-logic"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification",
+      "placementCaveat": null
+    },
+    {
+      "id": "min-max",
+      "label": "Smallest/largest feasible result under constraints",
+      "conceptIds": [
+        "logic",
+        "counting",
+        "money",
+        "possibilities"
+      ],
+      "sourceReferenceIds": [
+        "think-enumeration",
+        "think-logic"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification",
+      "placementCaveat": null
+    },
+    {
+      "id": "equal-groups",
+      "label": "Equal sharing, repeated equal quantities, and exchange rates",
+      "conceptIds": [
+        "groups-sharing"
+      ],
+      "sourceReferenceIds": [
+        "set-a-02",
+        "set-a-08",
+        "set-b-08"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification",
+      "placementCaveat": null
+    },
+    {
+      "id": "number-structure",
+      "label": "Digit clues, parity, page numbering, and divisibility",
+      "conceptIds": [
+        "digits"
+      ],
+      "sourceReferenceIds": [
+        "set-a-07",
+        "think-number"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification",
+      "placementCaveat": null
+    },
+    {
+      "id": "routes-rules",
+      "label": "Maze reachability, shortest paths, and constrained route counts",
+      "conceptIds": [
+        "routes"
+      ],
+      "sourceReferenceIds": [
+        "set-b-01"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification",
+      "placementCaveat": null
+    },
+    {
+      "id": "spatial-views",
+      "label": "Top views, occlusion, layers, hidden cubes, and nets",
+      "conceptIds": [
+        "solids"
+      ],
+      "sourceReferenceIds": [
+        "set-b-03",
+        "set-b-07",
+        "think-shape"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification",
+      "placementCaveat": null
+    },
+    {
+      "id": "dice-faces",
+      "label": "Dice faces, opposite faces, and nets",
+      "conceptIds": [
+        "solids"
+      ],
+      "sourceReferenceIds": [
+        "think-shape"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification",
+      "placementCaveat": null
+    },
+    {
+      "id": "gear-motion",
+      "label": "Linked gear motion",
+      "conceptIds": [],
+      "sourceReferenceIds": [
+        "think-shape"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification",
+      "placementCaveat": "A transformation extension needs an explicit world assignment; do not silently label gear motion as mirror symmetry."
+    },
+    {
+      "id": "measure-units",
+      "label": "Repeated units, length/height comparisons, and distance",
+      "conceptIds": [
+        "measurement"
+      ],
+      "sourceReferenceIds": [
+        "set-b-04"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification",
+      "placementCaveat": null
+    },
+    {
+      "id": "purchase-relations",
+      "label": "Coin values, change, bundles, and purchase differences",
+      "conceptIds": [
+        "money"
+      ],
+      "sourceReferenceIds": [
+        "set-a-08"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification",
+      "placementCaveat": null
+    },
+    {
+      "id": "clock-calendar",
+      "label": "Clocks, calendars, elapsed time, and backward schedules",
+      "conceptIds": [
+        "time"
+      ],
+      "sourceReferenceIds": [
+        "set-a-04",
+        "set-a-03"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification",
+      "placementCaveat": null
+    },
+    {
+      "id": "age-invariants",
+      "label": "Ages changing together, fixed differences, and changing sums",
+      "conceptIds": [
+        "time",
+        "addition-subtraction",
+        "missing-values"
+      ],
+      "sourceReferenceIds": [
+        "set-b-06"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification",
+      "placementCaveat": null
+    },
+    {
+      "id": "balance-exchange",
+      "label": "Equality-preserving moves, equivalent groups, and exchanges",
+      "conceptIds": [
+        "missing-values",
+        "groups-sharing",
+        "money"
+      ],
+      "sourceReferenceIds": [
+        "set-b-08"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification",
+      "placementCaveat": null
+    },
+    {
+      "id": "codes-surplus",
+      "label": "Codes, quantities without numbers, and surplus/shortage",
+      "conceptIds": [
+        "missing-values",
+        "addition-subtraction"
+      ],
+      "sourceReferenceIds": [
+        "think-number",
+        "think-logic"
+      ],
+      "editorialStatus": "source-grounded-vocabulary-not-item-classification",
+      "placementCaveat": null
+    }
   ],
   "corpus": {
     "items": 5207,
@@ -154,8 +1109,8 @@
       "objectivesByPass": [
         "Recognize boundaries and fit or combine simple pieces.",
         "Decompose and tile shapes while preserving their boundaries.",
-        "Use angles, congruence, and similarity to constrain a construction.",
-        "Prove a geometric relation using a useful decomposition or auxiliary shape."
+        "Use angles, congruence, and tiling constraints to organize a construction.",
+        "Use similarity, decomposition, and auxiliary shapes after ratios and scale have been taught."
       ]
     },
     {
@@ -387,6 +1342,24 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Count visible objects once; choose the relevant objects; count missing units.",
+      "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
+      "sourceLinkedSubskillIds": [
+        "count-once",
+        "ordering-intervals",
+        "systematic-enumeration",
+        "min-max"
+      ],
+      "strategyIds": [
+        "build-table",
+        "compare-order",
+        "decompose",
+        "draw-diagram",
+        "organize-cases",
+        "organized-list",
+        "transform",
+        "visualize"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
         "1-2"
       ],
@@ -420,6 +1393,15 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Match mirror halves and complete one reflection across a visible line.",
+      "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
+      "sourceLinkedSubskillIds": [
+        "mirrors-identical"
+      ],
+      "strategyIds": [
+        "transform",
+        "visualize"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
         "1-2"
       ],
@@ -453,6 +1435,19 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Join, remove, and compare small visible quantities.",
+      "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
+      "sourceLinkedSubskillIds": [
+        "reverse-process",
+        "age-invariants",
+        "codes-surplus"
+      ],
+      "strategyIds": [
+        "draw-diagram",
+        "use-invariant",
+        "visualize",
+        "work-backward"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
         "1-2"
       ],
@@ -486,6 +1481,14 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Identify a repeating unit or one-step growing pattern.",
+      "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
+      "sourceLinkedSubskillIds": [
+        "repeating-growing"
+      ],
+      "strategyIds": [
+        "find-pattern"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
         "1-2"
       ],
@@ -519,6 +1522,18 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Recognize boundaries and fit or combine simple pieces.",
+      "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
+      "sourceLinkedSubskillIds": [
+        "missing-pieces"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "decompose",
+        "draw-diagram",
+        "transform",
+        "visualize"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
         "1-2"
       ],
@@ -552,6 +1567,20 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Combine two concrete clues to eliminate an impossible arrangement.",
+      "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
+      "sourceLinkedSubskillIds": [
+        "constraint-clues",
+        "min-max"
+      ],
+      "strategyIds": [
+        "build-table",
+        "compare-order",
+        "draw-diagram",
+        "guess-check",
+        "organize-cases",
+        "organized-list"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
         "1-2"
       ],
@@ -585,6 +1614,23 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Make equal groups and share concrete objects fairly.",
+      "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
+      "sourceLinkedSubskillIds": [
+        "equal-groups",
+        "balance-exchange"
+      ],
+      "strategyIds": [
+        "build-table",
+        "compare-order",
+        "draw-diagram",
+        "organize-cases",
+        "organized-list",
+        "use-invariant",
+        "visualize",
+        "work-backward",
+        "write-equation"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
         "1-2"
       ],
@@ -618,6 +1664,18 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Read place value and compose or compare numbers from digits.",
+      "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
+      "sourceLinkedSubskillIds": [
+        "ordering-intervals",
+        "number-structure"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "draw-diagram",
+        "guess-check",
+        "organize-cases"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
         "1-2"
       ],
@@ -651,6 +1709,22 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Follow a path, read positions, and distinguish steps from visited points.",
+      "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
+      "sourceLinkedSubskillIds": [
+        "ordering-intervals",
+        "reverse-process",
+        "routes-rules"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "draw-diagram",
+        "guess-check",
+        "organized-list",
+        "trace-path",
+        "visualize",
+        "work-backward"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
         "1-2"
       ],
@@ -684,6 +1758,10 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Recognize equal parts and halves in concrete pictures.",
+      "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
+      "sourceLinkedSubskillIds": [],
+      "strategyIds": [],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
         "1-2"
       ],
@@ -717,6 +1795,18 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Match a simple solid to a view and count visible blocks.",
+      "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
+      "sourceLinkedSubskillIds": [
+        "spatial-views",
+        "dice-faces"
+      ],
+      "strategyIds": [
+        "decompose",
+        "draw-diagram",
+        "transform",
+        "visualize"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
         "1-2"
       ],
@@ -750,6 +1840,16 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Compare lengths and measure with repeated equal units.",
+      "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
+      "sourceLinkedSubskillIds": [
+        "measure-units"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "draw-diagram",
+        "guess-check"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
         "1-2"
       ],
@@ -783,6 +1883,20 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Combine coin values and make a small purchase.",
+      "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
+      "sourceLinkedSubskillIds": [
+        "min-max",
+        "purchase-relations",
+        "balance-exchange"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "draw-diagram",
+        "use-invariant",
+        "work-backward",
+        "write-equation"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
         "1-2"
       ],
@@ -816,6 +1930,17 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Read a clock or calendar and order short time intervals.",
+      "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
+      "sourceLinkedSubskillIds": [
+        "clock-calendar",
+        "age-invariants"
+      ],
+      "strategyIds": [
+        "draw-diagram",
+        "use-invariant",
+        "work-backward"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
         "1-2"
       ],
@@ -849,6 +1974,17 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Compare covered space using whole squares and trace a boundary.",
+      "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
+      "sourceLinkedSubskillIds": [
+        "missing-pieces"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "decompose",
+        "draw-diagram",
+        "visualize"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
         "1-2"
       ],
@@ -882,6 +2018,23 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Find one missing amount in a pictured balance or equality.",
+      "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
+      "sourceLinkedSubskillIds": [
+        "reverse-process",
+        "age-invariants",
+        "balance-exchange",
+        "codes-surplus"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "draw-diagram",
+        "guess-check",
+        "organize-cases",
+        "use-invariant",
+        "work-backward",
+        "write-equation"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
         "1-2"
       ],
@@ -915,12 +2068,31 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Organize groups, overlapping regions, and inclusive endpoints without double counting.",
+      "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
+      "sourceLinkedSubskillIds": [
+        "count-once",
+        "ordering-intervals",
+        "systematic-enumeration",
+        "min-max"
+      ],
+      "strategyIds": [
+        "build-table",
+        "compare-order",
+        "decompose",
+        "draw-diagram",
+        "organize-cases",
+        "organized-list",
+        "transform",
+        "visualize"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "1-2",
         "3-4"
       ],
-      "candidateCount": 519,
-      "fiveChoiceCandidateCount": 519,
-      "duplicateFlaggedCandidateCount": 11,
+      "candidateCount": 1019,
+      "fiveChoiceCandidateCount": 970,
+      "duplicateFlaggedCandidateCount": 15,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
@@ -930,12 +2102,12 @@
           "contentVersion": "sha256:c6a4481b264ac45b9257ecedbb44bea5ce4a994795996bb5b892fc6588d78200"
         },
         {
-          "itemId": "oasis-online-2012-grades-3-4-q01",
-          "contentVersion": "sha256:bcf2bfe57621b1a7017cf2f8352c9ad933e899eaa56a2f7e513e1b065f3790e2"
+          "itemId": "oasis-online-2012-grades-1-2-q01",
+          "contentVersion": "sha256:15e7e442b57bc9dafce9386da112dc4a113f0315560222bbb31d76629335f6bc"
         },
         {
-          "itemId": "oasis-online-2013-grades-3-4-q01",
-          "contentVersion": "sha256:25271888f6020cbad78b42ca73e6776acf329a8754e550e1baa858380b4ec3c0"
+          "itemId": "oasis-online-2012-grades-3-4-q01",
+          "contentVersion": "sha256:bcf2bfe57621b1a7017cf2f8352c9ad933e899eaa56a2f7e513e1b065f3790e2"
         }
       ]
     },
@@ -948,14 +2120,24 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Track folds and reflections across different axes; distinguish turns from mirrors.",
+      "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
+      "sourceLinkedSubskillIds": [
+        "mirrors-identical"
+      ],
+      "strategyIds": [
+        "transform",
+        "visualize"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "1-2",
         "3-4"
       ],
-      "candidateCount": 10,
-      "fiveChoiceCandidateCount": 10,
+      "candidateCount": 19,
+      "fiveChoiceCandidateCount": 19,
       "duplicateFlaggedCandidateCount": 1,
-      "broaderTransformationCandidateCount": 48,
-      "coverage": "retrieval-gap",
+      "broaderTransformationCandidateCount": 72,
+      "coverage": "thin-candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
         {
@@ -967,8 +2149,8 @@
           "contentVersion": "sha256:30fd0a0a2731b01de71a581ebc9115982e76886a4c4a6f2d989d50b22ab11c0e"
         },
         {
-          "itemId": "oasis-online-2017-grades-3-4-q07",
-          "contentVersion": "sha256:ce0634b703fd0a882056c1add22a15be83c6eed4215e0af4434bc457e4054e29"
+          "itemId": "oasis-online-2021-grades-1-2-q05",
+          "contentVersion": "sha256:8e0b5747ef9ebcc37a4c4a7dfc0bf6f8dfb37a673262e39003b2ce0b927869c9"
         }
       ]
     },
@@ -981,11 +2163,25 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Use inverse operations and two-step comparison stories.",
+      "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
+      "sourceLinkedSubskillIds": [
+        "reverse-process",
+        "age-invariants",
+        "codes-surplus"
+      ],
+      "strategyIds": [
+        "draw-diagram",
+        "use-invariant",
+        "visualize",
+        "work-backward"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "1-2",
         "3-4"
       ],
-      "candidateCount": 295,
-      "fiveChoiceCandidateCount": 295,
+      "candidateCount": 544,
+      "fiveChoiceCandidateCount": 511,
       "duplicateFlaggedCandidateCount": 3,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
@@ -1014,12 +2210,21 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Find missing positions and use the period of a cycle.",
+      "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
+      "sourceLinkedSubskillIds": [
+        "repeating-growing"
+      ],
+      "strategyIds": [
+        "find-pattern"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "1-2",
         "3-4"
       ],
-      "candidateCount": 32,
-      "fiveChoiceCandidateCount": 32,
-      "duplicateFlaggedCandidateCount": 2,
+      "candidateCount": 67,
+      "fiveChoiceCandidateCount": 64,
+      "duplicateFlaggedCandidateCount": 7,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
@@ -1047,12 +2252,25 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Decompose and tile shapes while preserving their boundaries.",
+      "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
+      "sourceLinkedSubskillIds": [
+        "missing-pieces"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "decompose",
+        "draw-diagram",
+        "transform",
+        "visualize"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "1-2",
         "3-4"
       ],
-      "candidateCount": 295,
-      "fiveChoiceCandidateCount": 295,
-      "duplicateFlaggedCandidateCount": 8,
+      "candidateCount": 583,
+      "fiveChoiceCandidateCount": 550,
+      "duplicateFlaggedCandidateCount": 13,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
@@ -1062,12 +2280,12 @@
           "contentVersion": "sha256:9a7aa8f28a24ba4975c8a8d2ffe63840feb661fdef583d348d32d750969b9c27"
         },
         {
-          "itemId": "oasis-online-2017-grades-3-4-q01",
-          "contentVersion": "sha256:d0478d1821f5357f2b904664f2ff64294b05bc1006dd52ff247735b88f18dee6"
+          "itemId": "oasis-online-2015-grades-1-2-q01",
+          "contentVersion": "sha256:c0102e1ef2ef315a007a74911ce20e8e48d8be0463e8a1b839c3e834d8c8c30b"
         },
         {
-          "itemId": "oasis-online-2023-grades-3-4-q01",
-          "contentVersion": "sha256:52503c6dff68792f093d93c929bf19b57abdf6e3f13336f6f7c9d00057c80373"
+          "itemId": "oasis-online-2017-grades-1-2-q01",
+          "contentVersion": "sha256:a6459d39dbb57f3d7b489217b4caab38e3f4864095c2d2148a1c1320e55dcca2"
         }
       ]
     },
@@ -1080,11 +2298,26 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Order or place several objects; work backward through a short process.",
+      "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
+      "sourceLinkedSubskillIds": [
+        "constraint-clues",
+        "min-max"
+      ],
+      "strategyIds": [
+        "build-table",
+        "compare-order",
+        "draw-diagram",
+        "guess-check",
+        "organize-cases",
+        "organized-list"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "1-2",
         "3-4"
       ],
-      "candidateCount": 126,
-      "fiveChoiceCandidateCount": 126,
+      "candidateCount": 219,
+      "fiveChoiceCandidateCount": 210,
       "duplicateFlaggedCandidateCount": 0,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
@@ -1095,12 +2328,12 @@
           "contentVersion": "sha256:9a7aa8f28a24ba4975c8a8d2ffe63840feb661fdef583d348d32d750969b9c27"
         },
         {
-          "itemId": "oasis-online-2011-grades-3-4-q03",
-          "contentVersion": "sha256:021154ec46f08b7d356e9b346db35f946fddfc62e2c31c0f999f7620d6167367"
+          "itemId": "oasis-online-2014-grades-1-2-q02",
+          "contentVersion": "sha256:c479b99e0799d2ad733c6afecc47f9cc75d14f0451318963a3b8df1be4771679"
         },
         {
-          "itemId": "oasis-online-2017-grades-3-4-q03",
-          "contentVersion": "sha256:abc93bdbcee28e3fbbb30dea4e5af1eb53c4e43b61793c40aa3e452803e3a5bc"
+          "itemId": "oasis-online-2018-grades-1-2-q02",
+          "contentVersion": "sha256:67cb9d89a2e78aed9268e6ab914a01f8e9aa6ba06e5d742ecbddbe4f1d0c937b"
         }
       ]
     },
@@ -1113,16 +2346,38 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Link multiplication and division, including a meaningful remainder.",
+      "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
+      "sourceLinkedSubskillIds": [
+        "equal-groups",
+        "balance-exchange"
+      ],
+      "strategyIds": [
+        "build-table",
+        "compare-order",
+        "draw-diagram",
+        "organize-cases",
+        "organized-list",
+        "use-invariant",
+        "visualize",
+        "work-backward",
+        "write-equation"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "1-2",
         "3-4"
       ],
-      "candidateCount": 27,
-      "fiveChoiceCandidateCount": 27,
+      "candidateCount": 41,
+      "fiveChoiceCandidateCount": 38,
       "duplicateFlaggedCandidateCount": 2,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
+        {
+          "itemId": "usa-2006-grades-1-2-q02",
+          "contentVersion": "sha256:1884e93547b378e050d7ab8872552b4033cc9042fd6c9380bd8385b9327ba688"
+        },
         {
           "itemId": "mk-lithuania-2000-34-mazylis-q03",
           "contentVersion": "sha256:7ace47035933d31c0d2a03b40e4456e776ec3c80758646125036540ad7fea982"
@@ -1130,10 +2385,6 @@
         {
           "itemId": "oasis-online-2015-grades-3-4-q06",
           "contentVersion": "sha256:769ddbf639fc35822f4011d8854f68c4cd07c3e87ba2d4b26e7ab843ec6d59e9"
-        },
-        {
-          "itemId": "oasis-online-2014-grades-3-4-q07",
-          "contentVersion": "sha256:e53c40779e28788350b17254a5ca1127806fe5a68763eff872ce99d9ae9f67e6"
         }
       ]
     },
@@ -1146,27 +2397,40 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Use parity, place-value constraints, and simple divisibility.",
+      "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
+      "sourceLinkedSubskillIds": [
+        "ordering-intervals",
+        "number-structure"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "draw-diagram",
+        "guess-check",
+        "organize-cases"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "1-2",
         "3-4"
       ],
-      "candidateCount": 94,
-      "fiveChoiceCandidateCount": 94,
+      "candidateCount": 167,
+      "fiveChoiceCandidateCount": 157,
       "duplicateFlaggedCandidateCount": 4,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
         {
+          "itemId": "oasis-online-2011-grades-1-2-q01",
+          "contentVersion": "sha256:0c34705bcea66c8f86aa42f5e9127e0175a1797d783491cd24512dc901bc8ac3"
+        },
+        {
+          "itemId": "oasis-online-2013-grades-1-2-q01",
+          "contentVersion": "sha256:9717c4f420ce64dbec20a3be293c10537f3de6a71a5c42f136e6abbfebe14697"
+        },
+        {
           "itemId": "oasis-online-2015-grades-3-4-q01",
           "contentVersion": "sha256:36b4f99ace52ac355c00797b68da674edd692d3117b07cfb56a301f2f18a88b5"
-        },
-        {
-          "itemId": "oasis-online-2013-grades-3-4-q02",
-          "contentVersion": "sha256:4a85c98f5da21741b74bbda93dbc9f4fa5c4ae06803ff347869e90961ddc4b17"
-        },
-        {
-          "itemId": "oasis-online-2015-grades-3-4-q03",
-          "contentVersion": "sha256:c42c359cb368983f15c914dc6d6eeba168f7409a38ea28c9e97f9cebee1e5041"
         }
       ]
     },
@@ -1179,27 +2443,44 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Compare routes on grids and obey one-way or no-repeat rules.",
+      "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
+      "sourceLinkedSubskillIds": [
+        "ordering-intervals",
+        "reverse-process",
+        "routes-rules"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "draw-diagram",
+        "guess-check",
+        "organized-list",
+        "trace-path",
+        "visualize",
+        "work-backward"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "1-2",
         "3-4"
       ],
-      "candidateCount": 92,
-      "fiveChoiceCandidateCount": 92,
+      "candidateCount": 130,
+      "fiveChoiceCandidateCount": 128,
       "duplicateFlaggedCandidateCount": 3,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
         {
+          "itemId": "oasis-online-2011-grades-1-2-q01",
+          "contentVersion": "sha256:0c34705bcea66c8f86aa42f5e9127e0175a1797d783491cd24512dc901bc8ac3"
+        },
+        {
+          "itemId": "usa-2011-grades-1-2-q01",
+          "contentVersion": "sha256:25c4120d101e5c2750dcd38a5b237dfde888e63aab5afe522a3908ed665f86ba"
+        },
+        {
           "itemId": "oasis-online-2020-grades-3-4-q03",
           "contentVersion": "sha256:f0459819990c8b9e147269d26f4f75c521448d64b5edd27aa46265c776365478"
-        },
-        {
-          "itemId": "oasis-online-2022-grades-3-4-q03",
-          "contentVersion": "sha256:ee8bb6ae69711cefe6606aa5cf6e16ac828c9b5db386c1dfd9a6d8d0513636a2"
-        },
-        {
-          "itemId": "think-academy-mock-2026-march-lv34-q04",
-          "contentVersion": "sha256:7eb06c7ba9dde494f5642b3e41d2de2c7d15018be5ca5596e634714706785ace"
         }
       ]
     },
@@ -1212,12 +2493,17 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Compare and compose fractions; reconstruct a whole from a part.",
+      "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
+      "sourceLinkedSubskillIds": [],
+      "strategyIds": [],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "1-2",
         "3-4"
       ],
-      "candidateCount": 46,
-      "fiveChoiceCandidateCount": 46,
-      "duplicateFlaggedCandidateCount": 1,
+      "candidateCount": 85,
+      "fiveChoiceCandidateCount": 78,
+      "duplicateFlaggedCandidateCount": 2,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
@@ -1231,8 +2517,8 @@
           "contentVersion": "sha256:acc69a11888f0673ab620e070d24236878950d8d1f132d362d103b8bb9c508f9"
         },
         {
-          "itemId": "oasis-online-2011-grades-3-4-q04",
-          "contentVersion": "sha256:63116e40a86313c734f35a024b9657dfb6e7f8399ceee907dfe7ba21473e7d5e"
+          "itemId": "oasis-online-2022-grades-1-2-q02",
+          "contentVersion": "sha256:759acff7d2aa33255be480e2ccd3039d4453a02234a8580557dec2da95076e83"
         }
       ]
     },
@@ -1245,12 +2531,25 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Infer hidden blocks and match nets or multiple views.",
+      "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
+      "sourceLinkedSubskillIds": [
+        "spatial-views",
+        "dice-faces"
+      ],
+      "strategyIds": [
+        "decompose",
+        "draw-diagram",
+        "transform",
+        "visualize"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "1-2",
         "3-4"
       ],
-      "candidateCount": 53,
-      "fiveChoiceCandidateCount": 53,
-      "duplicateFlaggedCandidateCount": 7,
+      "candidateCount": 103,
+      "fiveChoiceCandidateCount": 100,
+      "duplicateFlaggedCandidateCount": 10,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
@@ -1260,12 +2559,12 @@
           "contentVersion": "sha256:d96a60b25b3591085e5ec1a92a65da6b82733ce5c81b0ff81b3d03674455f3dd"
         },
         {
-          "itemId": "mk-austria-2001-34-ecolier-q03",
-          "contentVersion": "sha256:42273161db85fe41a8ccb025be1ec86423537de2341a3654ec82c87c826df108"
+          "itemId": "usa-2009-grades-1-2-q01",
+          "contentVersion": "sha256:37818bdeda1a14f74228cf188b6ecd841f66216719ee1b3b2a55a2f9919da5dd"
         },
         {
-          "itemId": "mk-lithuania-2004-34-minor-q03",
-          "contentVersion": "sha256:460250bb8d54154bea55e923d6ef97f0d169bf835183dbdd80d2404ecd8d8870"
+          "itemId": "oasis-online-2023-grades-1-2-q02",
+          "contentVersion": "sha256:9a071423e9432ab74fe4786009d91b1a71b2d0247e5e3074e02bfefc92307319"
         }
       ]
     },
@@ -1278,11 +2577,22 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Combine measurements, choose units, and interpret a simple scale.",
+      "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
+      "sourceLinkedSubskillIds": [
+        "measure-units"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "draw-diagram",
+        "guess-check"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "1-2",
         "3-4"
       ],
-      "candidateCount": 90,
-      "fiveChoiceCandidateCount": 90,
+      "candidateCount": 142,
+      "fiveChoiceCandidateCount": 135,
       "duplicateFlaggedCandidateCount": 3,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
@@ -1311,11 +2621,26 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Make change and compare equivalent purchases.",
+      "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
+      "sourceLinkedSubskillIds": [
+        "min-max",
+        "purchase-relations",
+        "balance-exchange"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "draw-diagram",
+        "use-invariant",
+        "work-backward",
+        "write-equation"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "1-2",
         "3-4"
       ],
-      "candidateCount": 51,
-      "fiveChoiceCandidateCount": 51,
+      "candidateCount": 88,
+      "fiveChoiceCandidateCount": 82,
       "duplicateFlaggedCandidateCount": 0,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
@@ -1330,8 +2655,8 @@
           "contentVersion": "sha256:ee8bb6ae69711cefe6606aa5cf6e16ac828c9b5db386c1dfd9a6d8d0513636a2"
         },
         {
-          "itemId": "think-academy-mock-2026-march-lv34-q04",
-          "contentVersion": "sha256:7eb06c7ba9dde494f5642b3e41d2de2c7d15018be5ca5596e634714706785ace"
+          "itemId": "oasis-online-2022-grades-1-2-q04",
+          "contentVersion": "sha256:34bb7ff4d249a7c9e0e56fc527ec6ba9e4dccb9af148013d7f6d0ac8ad88da86"
         }
       ]
     },
@@ -1344,11 +2669,23 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Find elapsed time across hour and day boundaries.",
+      "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
+      "sourceLinkedSubskillIds": [
+        "clock-calendar",
+        "age-invariants"
+      ],
+      "strategyIds": [
+        "draw-diagram",
+        "use-invariant",
+        "work-backward"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "1-2",
         "3-4"
       ],
-      "candidateCount": 72,
-      "fiveChoiceCandidateCount": 72,
+      "candidateCount": 161,
+      "fiveChoiceCandidateCount": 146,
       "duplicateFlaggedCandidateCount": 1,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
@@ -1377,14 +2714,26 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Distinguish area from perimeter and decompose a rectilinear region.",
+      "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
+      "sourceLinkedSubskillIds": [
+        "missing-pieces"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "decompose",
+        "draw-diagram",
+        "visualize"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "1-2",
         "3-4"
       ],
-      "candidateCount": 21,
-      "fiveChoiceCandidateCount": 21,
+      "candidateCount": 26,
+      "fiveChoiceCandidateCount": 26,
       "duplicateFlaggedCandidateCount": 1,
       "broaderTransformationCandidateCount": null,
-      "coverage": "thin-candidate-pool",
+      "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
         {
@@ -1410,14 +2759,32 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Link two equalities and solve a simple symbol code.",
+      "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
+      "sourceLinkedSubskillIds": [
+        "reverse-process",
+        "age-invariants",
+        "balance-exchange",
+        "codes-surplus"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "draw-diagram",
+        "guess-check",
+        "organize-cases",
+        "use-invariant",
+        "work-backward",
+        "write-equation"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "1-2",
         "3-4"
       ],
-      "candidateCount": 16,
-      "fiveChoiceCandidateCount": 16,
+      "candidateCount": 33,
+      "fiveChoiceCandidateCount": 33,
       "duplicateFlaggedCandidateCount": 0,
       "broaderTransformationCandidateCount": null,
-      "coverage": "thin-candidate-pool",
+      "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
         {
@@ -1429,8 +2796,8 @@
           "contentVersion": "sha256:c42c359cb368983f15c914dc6d6eeba168f7409a38ea28c9e97f9cebee1e5041"
         },
         {
-          "itemId": "oasis-online-2022-grades-3-4-q12",
-          "contentVersion": "sha256:2a828b7d2fc2d65171751d0996c7ef86b95c749aa0cdaa6fb5f907e3c76829a9"
+          "itemId": "oasis-online-2017-grades-1-2-q08",
+          "contentVersion": "sha256:0cd7165da8acc48ce8edd0e954a42c06816613611da6ce060a4ac163c3eda562"
         }
       ]
     },
@@ -1443,16 +2810,34 @@
       "passLabel": "Connect",
       "kind": "conditional-specialist-proposal",
       "objective": "List combinations systematically without missing or repeating an outcome.",
+      "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
+      "sourceLinkedSubskillIds": [
+        "systematic-enumeration",
+        "min-max"
+      ],
+      "strategyIds": [
+        "build-table",
+        "guess-check",
+        "organize-cases",
+        "organized-list",
+        "trace-path"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "1-2",
         "3-4"
       ],
-      "candidateCount": 17,
-      "fiveChoiceCandidateCount": 17,
+      "candidateCount": 23,
+      "fiveChoiceCandidateCount": 23,
       "duplicateFlaggedCandidateCount": 0,
       "broaderTransformationCandidateCount": null,
       "coverage": "thin-candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
+        {
+          "itemId": "oasis-online-2019-grades-1-2-q12",
+          "contentVersion": "sha256:a348f07094196e893b56694b9e72565686c4f486855e2040f3f44977a0c47bea"
+        },
         {
           "itemId": "oasis-online-2015-grades-3-4-q14",
           "contentVersion": "sha256:3b7ee856b4e676f234d261cd6082c63249c028b51693d2603a8721f8ba6f3c6e"
@@ -1460,10 +2845,6 @@
         {
           "itemId": "oasis-online-2020-grades-3-4-q16",
           "contentVersion": "sha256:37c25b86307b7cd8a701308dda62dcbd9e69465edeb8f9df468f10762b5f5285"
-        },
-        {
-          "itemId": "think300-l3-4-4-points-q077",
-          "contentVersion": "sha256:f4a1efb2e3b961df59707294207562f777b71a29dbb79e18547668f9e7e48da1"
         }
       ]
     },
@@ -1476,7 +2857,12 @@
       "passLabel": "Connect",
       "kind": "conditional-specialist-proposal",
       "objective": "Read a data display and identify all equally likely outcomes.",
+      "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
+      "sourceLinkedSubskillIds": [],
+      "strategyIds": [],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "1-2",
         "3-4"
       ],
       "candidateCount": 2,
@@ -1505,12 +2891,31 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Count by cases and complements; derive rather than enumerate a larger total.",
+      "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
+      "sourceLinkedSubskillIds": [
+        "count-once",
+        "ordering-intervals",
+        "systematic-enumeration",
+        "min-max"
+      ],
+      "strategyIds": [
+        "build-table",
+        "compare-order",
+        "decompose",
+        "draw-diagram",
+        "organize-cases",
+        "organized-list",
+        "transform",
+        "visualize"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "3-4",
         "5-6"
       ],
-      "candidateCount": 451,
-      "fiveChoiceCandidateCount": 413,
-      "duplicateFlaggedCandidateCount": 5,
+      "candidateCount": 970,
+      "fiveChoiceCandidateCount": 932,
+      "duplicateFlaggedCandidateCount": 16,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
@@ -1524,8 +2929,8 @@
           "contentVersion": "sha256:f23527d6a1f44c6100c7431731afce947f0c8e3c5ab179fb98d2be5fde597cf9"
         },
         {
-          "itemId": "mk-lithuania-2004-56-benjamin-q01",
-          "contentVersion": "sha256:4dd45fab8af63db17f0599006bb1ee4c414eb977b1fcc33762ef07ebcd00b999"
+          "itemId": "mk-lithuania-2004-34-minor-q01",
+          "contentVersion": "sha256:c6a4481b264ac45b9257ecedbb44bea5ce4a994795996bb5b892fc6588d78200"
         }
       ]
     },
@@ -1538,13 +2943,23 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Combine transformations and reason about invariant features.",
+      "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
+      "sourceLinkedSubskillIds": [
+        "mirrors-identical"
+      ],
+      "strategyIds": [
+        "transform",
+        "visualize"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "3-4",
         "5-6"
       ],
-      "candidateCount": 12,
-      "fiveChoiceCandidateCount": 11,
-      "duplicateFlaggedCandidateCount": 1,
-      "broaderTransformationCandidateCount": 67,
+      "candidateCount": 22,
+      "fiveChoiceCandidateCount": 21,
+      "duplicateFlaggedCandidateCount": 2,
+      "broaderTransformationCandidateCount": 115,
       "coverage": "thin-candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
@@ -1553,12 +2968,12 @@
           "contentVersion": "sha256:a1af08bb4b5cdc006aee19dee4ecce6324b0f39c1e6f9b0f34b36f195e23f7a5"
         },
         {
-          "itemId": "oasis-online-2022-grades-5-6-q03",
-          "contentVersion": "sha256:cd36587224dfccf5b3c6d4bfed0fc6f2f331545da0797c1ee72546e233771f7c"
+          "itemId": "oasis-online-2022-grades-3-4-q02",
+          "contentVersion": "sha256:856c5f782f4c48e47d00939a025c6f6884c9ffd5b31bd98231ca67ec703f4d54"
         },
         {
-          "itemId": "oasis-online-2020-grades-5-6-q05",
-          "contentVersion": "sha256:e6ec50f12d2d3252a361f0b8dd188f46362f34067a47de018928e21780cd5edd"
+          "itemId": "oasis-online-2022-grades-5-6-q03",
+          "contentVersion": "sha256:cd36587224dfccf5b3c6d4bfed0fc6f2f331545da0797c1ee72546e233771f7c"
         }
       ]
     },
@@ -1571,27 +2986,41 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Choose an efficient decomposition and reason with signed quantities.",
+      "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
+      "sourceLinkedSubskillIds": [
+        "reverse-process",
+        "age-invariants",
+        "codes-surplus"
+      ],
+      "strategyIds": [
+        "draw-diagram",
+        "use-invariant",
+        "visualize",
+        "work-backward"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "3-4",
         "5-6"
       ],
-      "candidateCount": 302,
-      "fiveChoiceCandidateCount": 271,
-      "duplicateFlaggedCandidateCount": 3,
+      "candidateCount": 597,
+      "fiveChoiceCandidateCount": 566,
+      "duplicateFlaggedCandidateCount": 6,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
         {
-          "itemId": "mk-lithuania-2004-56-benjamin-q01",
-          "contentVersion": "sha256:4dd45fab8af63db17f0599006bb1ee4c414eb977b1fcc33762ef07ebcd00b999"
+          "itemId": "mk-austria-2001-34-ecolier-q01",
+          "contentVersion": "sha256:41e52263a5487c64ea6c489751d097650ce10434e30e1b9a0f39bc6165178e32"
         },
         {
-          "itemId": "pakistan-2005-grades-5-6-q01",
-          "contentVersion": "sha256:f40bb2d94146537452b394a294d4755621e8c7e29ed808a9e6a3e952ec368c11"
+          "itemId": "mk-canada-2003-34-single-q01",
+          "contentVersion": "sha256:2b86387907947825fdda870433ad9be5188198777b45f7bb452fb647bef5653f"
         },
         {
-          "itemId": "pakistan-2006-grades-5-6-q01",
-          "contentVersion": "sha256:1b9c0f6c95943cdf9249ae54523ed58ac8a6e9ecfdda6e02611d9bc351bc5dbb"
+          "itemId": "mk-lithuania-2004-34-minor-q01",
+          "contentVersion": "sha256:c6a4481b264ac45b9257ecedbb44bea5ce4a994795996bb5b892fc6588d78200"
         }
       ]
     },
@@ -1604,14 +3033,23 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Compare recursive and position-based rules.",
+      "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
+      "sourceLinkedSubskillIds": [
+        "repeating-growing"
+      ],
+      "strategyIds": [
+        "find-pattern"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "3-4",
         "5-6"
       ],
-      "candidateCount": 19,
-      "fiveChoiceCandidateCount": 14,
-      "duplicateFlaggedCandidateCount": 2,
+      "candidateCount": 51,
+      "fiveChoiceCandidateCount": 46,
+      "duplicateFlaggedCandidateCount": 4,
       "broaderTransformationCandidateCount": null,
-      "coverage": "thin-candidate-pool",
+      "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
         {
@@ -1636,13 +3074,26 @@
       "pass": 3,
       "passLabel": "Plan",
       "kind": "core-proposal",
-      "objective": "Use angles, congruence, and similarity to constrain a construction.",
+      "objective": "Use angles, congruence, and tiling constraints to organize a construction.",
+      "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
+      "sourceLinkedSubskillIds": [
+        "missing-pieces"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "decompose",
+        "draw-diagram",
+        "transform",
+        "visualize"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "3-4",
         "5-6"
       ],
-      "candidateCount": 339,
-      "fiveChoiceCandidateCount": 309,
-      "duplicateFlaggedCandidateCount": 2,
+      "candidateCount": 634,
+      "fiveChoiceCandidateCount": 604,
+      "duplicateFlaggedCandidateCount": 10,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
@@ -1652,12 +3103,12 @@
           "contentVersion": "sha256:d885c593a93cba0a51229831465951d54f5fc883035f5b97d404cb72636fce9b"
         },
         {
-          "itemId": "oasis-online-2019-grades-5-6-q01",
-          "contentVersion": "sha256:fa31b3f26cdffdc15ec03141a64d3c8be6146a706e37c498a276ec1059e3bf7d"
+          "itemId": "oasis-online-2014-grades-3-4-q01",
+          "contentVersion": "sha256:9a7aa8f28a24ba4975c8a8d2ffe63840feb661fdef583d348d32d750969b9c27"
         },
         {
-          "itemId": "oasis-online-2021-grades-5-6-q01",
-          "contentVersion": "sha256:bc8224e0e099fe87949fc4b4398f89680ef4d31393a7ff7c601654a26364dd55"
+          "itemId": "oasis-online-2017-grades-3-4-q01",
+          "contentVersion": "sha256:d0478d1821f5357f2b904664f2ff64294b05bc1006dd52ff247735b88f18dee6"
         }
       ]
     },
@@ -1670,16 +3121,35 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Track interacting constraints and exhaust a small set of cases.",
+      "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
+      "sourceLinkedSubskillIds": [
+        "constraint-clues",
+        "min-max"
+      ],
+      "strategyIds": [
+        "build-table",
+        "compare-order",
+        "draw-diagram",
+        "guess-check",
+        "organize-cases",
+        "organized-list"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "3-4",
         "5-6"
       ],
-      "candidateCount": 195,
-      "fiveChoiceCandidateCount": 184,
+      "candidateCount": 321,
+      "fiveChoiceCandidateCount": 310,
       "duplicateFlaggedCandidateCount": 0,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
+        {
+          "itemId": "oasis-online-2014-grades-3-4-q01",
+          "contentVersion": "sha256:9a7aa8f28a24ba4975c8a8d2ffe63840feb661fdef583d348d32d750969b9c27"
+        },
         {
           "itemId": "usa-video-2026-grades-5-6-q01",
           "contentVersion": "sha256:fb4c789414ba22931a2352aa2c4020ccf15056495308261bbec11654a61bf958"
@@ -1687,10 +3157,6 @@
         {
           "itemId": "mk-lithuania-2004-56-benjamin-q02",
           "contentVersion": "sha256:61cc80211667842f5792e7b20476ce5aa166a93bc73d0a097edbbc55878b1be6"
-        },
-        {
-          "itemId": "oasis-online-2013-grades-5-6-q02",
-          "contentVersion": "sha256:49aec66e062c22cd2b5ef0655d38f3440d884138f0ea5809896385edda4499f4"
         }
       ]
     },
@@ -1703,12 +3169,30 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Compare ratios and unit rates in multi-step situations.",
+      "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
+      "sourceLinkedSubskillIds": [
+        "equal-groups",
+        "balance-exchange"
+      ],
+      "strategyIds": [
+        "build-table",
+        "compare-order",
+        "draw-diagram",
+        "organize-cases",
+        "organized-list",
+        "use-invariant",
+        "visualize",
+        "work-backward",
+        "write-equation"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "3-4",
         "5-6"
       ],
-      "candidateCount": 75,
-      "fiveChoiceCandidateCount": 65,
-      "duplicateFlaggedCandidateCount": 4,
+      "candidateCount": 102,
+      "fiveChoiceCandidateCount": 92,
+      "duplicateFlaggedCandidateCount": 6,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
@@ -1736,16 +3220,33 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Use factors, multiples, remainders, and digit constraints together.",
+      "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
+      "sourceLinkedSubskillIds": [
+        "ordering-intervals",
+        "number-structure"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "draw-diagram",
+        "guess-check",
+        "organize-cases"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "3-4",
         "5-6"
       ],
-      "candidateCount": 96,
-      "fiveChoiceCandidateCount": 84,
-      "duplicateFlaggedCandidateCount": 1,
+      "candidateCount": 190,
+      "fiveChoiceCandidateCount": 178,
+      "duplicateFlaggedCandidateCount": 5,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
+        {
+          "itemId": "oasis-online-2015-grades-3-4-q01",
+          "contentVersion": "sha256:36b4f99ace52ac355c00797b68da674edd692d3117b07cfb56a301f2f18a88b5"
+        },
         {
           "itemId": "oasis-online-2022-grades-5-6-q01",
           "contentVersion": "sha256:bdc5a1e5b041d3350f8cbb4efcb17e38710f462d5e33d23317f67dc6ebdf0977"
@@ -1753,10 +3254,6 @@
         {
           "itemId": "pakistan-2009-grades-5-6-q01",
           "contentVersion": "sha256:6e8f38e860d176be8c607c4357bf30ecff8d0c03928dbbcc50a012c49f13de0c"
-        },
-        {
-          "itemId": "pakistan-2010-grades-5-6-q01",
-          "contentVersion": "sha256:fab41180aa6fb7f79a2f6caba661603e56f3ae2a8fbc794315d2ccb52f9ca9a1"
         }
       ]
     },
@@ -1769,12 +3266,29 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Count constrained routes and use connectivity.",
+      "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
+      "sourceLinkedSubskillIds": [
+        "ordering-intervals",
+        "reverse-process",
+        "routes-rules"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "draw-diagram",
+        "guess-check",
+        "organized-list",
+        "trace-path",
+        "visualize",
+        "work-backward"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "3-4",
         "5-6"
       ],
-      "candidateCount": 80,
-      "fiveChoiceCandidateCount": 72,
-      "duplicateFlaggedCandidateCount": 3,
+      "candidateCount": 172,
+      "fiveChoiceCandidateCount": 164,
+      "duplicateFlaggedCandidateCount": 6,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
@@ -1802,12 +3316,17 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Connect fraction operations, decimals, and percentages.",
+      "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
+      "sourceLinkedSubskillIds": [],
+      "strategyIds": [],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "3-4",
         "5-6"
       ],
-      "candidateCount": 58,
-      "fiveChoiceCandidateCount": 54,
-      "duplicateFlaggedCandidateCount": 0,
+      "candidateCount": 104,
+      "fiveChoiceCandidateCount": 100,
+      "duplicateFlaggedCandidateCount": 1,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
@@ -1817,12 +3336,12 @@
           "contentVersion": "sha256:565933d2b40a0642cd817941ef83bde3c47afcc51cb3ee6db7dccc7d054d88fe"
         },
         {
-          "itemId": "oasis-online-2016-grades-5-6-q02",
-          "contentVersion": "sha256:b1aa160f30e4637500a9f3a6f9eca453e7176899173ff503277b92711f04a7e2"
+          "itemId": "oasis-online-2010-grades-3-4-q02",
+          "contentVersion": "sha256:a8a3d25892f8fc177ec018d85dc3b5be2e55f4816f721dbb57d236e8db2aa179"
         },
         {
-          "itemId": "oasis-online-2019-grades-5-6-q04",
-          "contentVersion": "sha256:ff4af721564f06bcaaf25ab1eb6ca81cd33db60a5303dcf17a3623390868902b"
+          "itemId": "oasis-online-2016-grades-5-6-q02",
+          "contentVersion": "sha256:b1aa160f30e4637500a9f3a6f9eca453e7176899173ff503277b92711f04a7e2"
         }
       ]
     },
@@ -1835,16 +3354,33 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Reason about sections, painted faces, and surface versus volume.",
+      "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
+      "sourceLinkedSubskillIds": [
+        "spatial-views",
+        "dice-faces"
+      ],
+      "strategyIds": [
+        "decompose",
+        "draw-diagram",
+        "transform",
+        "visualize"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "3-4",
         "5-6"
       ],
-      "candidateCount": 72,
-      "fiveChoiceCandidateCount": 66,
-      "duplicateFlaggedCandidateCount": 0,
+      "candidateCount": 125,
+      "fiveChoiceCandidateCount": 119,
+      "duplicateFlaggedCandidateCount": 7,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
+        {
+          "itemId": "oasis-online-2021-grades-3-4-q01",
+          "contentVersion": "sha256:d96a60b25b3591085e5ec1a92a65da6b82733ce5c81b0ff81b3d03674455f3dd"
+        },
         {
           "itemId": "oasis-online-2021-grades-5-6-q01",
           "contentVersion": "sha256:bc8224e0e099fe87949fc4b4398f89680ef4d31393a7ff7c601654a26364dd55"
@@ -1852,10 +3388,6 @@
         {
           "itemId": "oasis-online-2013-grades-5-6-q02",
           "contentVersion": "sha256:49aec66e062c22cd2b5ef0655d38f3440d884138f0ea5809896385edda4499f4"
-        },
-        {
-          "itemId": "oasis-online-2011-grades-5-6-q03",
-          "contentVersion": "sha256:c87fa1d78620730f52574a599a9b9f75ebe12b85916ad406eeade2080ba2f5dc"
         }
       ]
     },
@@ -1868,16 +3400,31 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Convert units and relate scale, capacity, and distance.",
+      "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
+      "sourceLinkedSubskillIds": [
+        "measure-units"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "draw-diagram",
+        "guess-check"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "3-4",
         "5-6"
       ],
-      "candidateCount": 117,
-      "fiveChoiceCandidateCount": 102,
-      "duplicateFlaggedCandidateCount": 1,
+      "candidateCount": 207,
+      "fiveChoiceCandidateCount": 192,
+      "duplicateFlaggedCandidateCount": 4,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
+        {
+          "itemId": "mk-austria-2001-34-ecolier-q02",
+          "contentVersion": "sha256:32d57e1c8e1b03dd6693061b140e366ef87e4281c061800de9bdf88b0acdee13"
+        },
         {
           "itemId": "oasis-online-2011-grades-5-6-q02",
           "contentVersion": "sha256:49769ae446bb9af205e9cec1ff02254c7b53885ed4322ddff01a1e8c6dd2777e"
@@ -1885,10 +3432,6 @@
         {
           "itemId": "oasis-online-2014-grades-5-6-q02",
           "contentVersion": "sha256:d02f82f717a5963b60a14d1472ee0db7b051483ce9bc98a71d01c2813d9da7fd"
-        },
-        {
-          "itemId": "pakistan-2011-grades-5-6-q02",
-          "contentVersion": "sha256:36da24544f559583b9d8c1a6ebf56067322d8833fa43a512b0f6687eafcfef64"
         }
       ]
     },
@@ -1901,27 +3444,42 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Reason through exchanges, bundles, and proportional prices.",
+      "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
+      "sourceLinkedSubskillIds": [
+        "min-max",
+        "purchase-relations",
+        "balance-exchange"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "draw-diagram",
+        "use-invariant",
+        "work-backward",
+        "write-equation"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "3-4",
         "5-6"
       ],
-      "candidateCount": 25,
-      "fiveChoiceCandidateCount": 24,
+      "candidateCount": 76,
+      "fiveChoiceCandidateCount": 75,
       "duplicateFlaggedCandidateCount": 0,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
         {
+          "itemId": "oasis-online-2023-grades-3-4-q02",
+          "contentVersion": "sha256:640bb4679227934ae7d68eb10857d3a1247a298e4cb79879d19ecf4660845678"
+        },
+        {
           "itemId": "oasis-online-2012-grades-5-6-q03",
           "contentVersion": "sha256:7de3454bb5d639fc6dfe96efe981d3c02cd0a3067a5ad8cc78839d2ba77f8da7"
         },
         {
-          "itemId": "usa-annual-sample-2006-grades-5-6-p3",
-          "contentVersion": "sha256:7e6e4ee7a7d0d7ea251b4b97edfb0e487b24f7ce10a9bd8c5e71263e352ed452"
-        },
-        {
-          "itemId": "oasis-online-2023-grades-5-6-q05",
-          "contentVersion": "sha256:8e2aa26b752a9a590c16a817b3a85fdbec68b9c2fd293219a6fef1d71fc189ed"
+          "itemId": "oasis-online-2022-grades-3-4-q03",
+          "contentVersion": "sha256:ee8bb6ae69711cefe6606aa5cf6e16ac828c9b5db386c1dfd9a6d8d0513636a2"
         }
       ]
     },
@@ -1934,27 +3492,39 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Coordinate schedules, periodic events, and travel time.",
+      "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
+      "sourceLinkedSubskillIds": [
+        "clock-calendar",
+        "age-invariants"
+      ],
+      "strategyIds": [
+        "draw-diagram",
+        "use-invariant",
+        "work-backward"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "3-4",
         "5-6"
       ],
-      "candidateCount": 74,
-      "fiveChoiceCandidateCount": 68,
-      "duplicateFlaggedCandidateCount": 1,
+      "candidateCount": 146,
+      "fiveChoiceCandidateCount": 140,
+      "duplicateFlaggedCandidateCount": 2,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
         {
+          "itemId": "mk-lithuania-2000-34-mazylis-q01",
+          "contentVersion": "sha256:c33b0fa552c3fa5f006e55bc4301bf051a49020aeb5cda89dfef59a239f17191"
+        },
+        {
           "itemId": "oasis-online-2011-grades-5-6-q01",
           "contentVersion": "sha256:9a999a36d58ffcea71eee1ddab48871ae8a1c7e2484509e3d2fc1b4160bc53cb"
         },
         {
-          "itemId": "pakistan-2011-grades-5-6-q01",
-          "contentVersion": "sha256:ff212633a8af18106459ae59b963e6c6ef1f8c9d80662ae23372e430528f2c9f"
-        },
-        {
-          "itemId": "oasis-online-2011-grades-5-6-q02",
-          "contentVersion": "sha256:49769ae446bb9af205e9cec1ff02254c7b53885ed4322ddff01a1e8c6dd2777e"
+          "itemId": "oasis-online-2020-grades-3-4-q01",
+          "contentVersion": "sha256:57c08168bd243502915d9fec05a2f9420fe21562fb25e42e380e27d66c6d0a1a"
         }
       ]
     },
@@ -1967,12 +3537,24 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Find composite or shaded area using equalities and subtraction.",
+      "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
+      "sourceLinkedSubskillIds": [
+        "missing-pieces"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "decompose",
+        "draw-diagram",
+        "visualize"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "3-4",
         "5-6"
       ],
-      "candidateCount": 78,
-      "fiveChoiceCandidateCount": 70,
-      "duplicateFlaggedCandidateCount": 1,
+      "candidateCount": 99,
+      "fiveChoiceCandidateCount": 91,
+      "duplicateFlaggedCandidateCount": 2,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
@@ -1982,12 +3564,12 @@
           "contentVersion": "sha256:565933d2b40a0642cd817941ef83bde3c47afcc51cb3ee6db7dccc7d054d88fe"
         },
         {
-          "itemId": "oasis-online-2018-grades-5-6-q04",
-          "contentVersion": "sha256:35bffc6a1d6fe5db84c83ae6db2265e31c4cafe9fb4f09025bd192a274b18c9e"
+          "itemId": "oasis-online-2012-grades-3-4-q02",
+          "contentVersion": "sha256:4776b65b5e7cf137b989b78fa3b11c43720e3e7763897a9c4556086779498584"
         },
         {
-          "itemId": "oasis-online-2015-grades-5-6-q05",
-          "contentVersion": "sha256:8cebb8bd25f8d24f82a79a8c6ff9f7b8e893579b36affb036717fa0b8aacf30b"
+          "itemId": "oasis-online-2018-grades-5-6-q04",
+          "contentVersion": "sha256:35bffc6a1d6fe5db84c83ae6db2265e31c4cafe9fb4f09025bd192a274b18c9e"
         }
       ]
     },
@@ -2000,14 +3582,32 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Translate relations into equations and solve coupled unknowns.",
+      "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
+      "sourceLinkedSubskillIds": [
+        "reverse-process",
+        "age-invariants",
+        "balance-exchange",
+        "codes-surplus"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "draw-diagram",
+        "guess-check",
+        "organize-cases",
+        "use-invariant",
+        "work-backward",
+        "write-equation"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "3-4",
         "5-6"
       ],
-      "candidateCount": 13,
-      "fiveChoiceCandidateCount": 7,
+      "candidateCount": 29,
+      "fiveChoiceCandidateCount": 23,
       "duplicateFlaggedCandidateCount": 0,
       "broaderTransformationCandidateCount": null,
-      "coverage": "thin-candidate-pool",
+      "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
         {
@@ -2015,12 +3615,12 @@
           "contentVersion": "sha256:901dd53fa22c1b9e276c2307ee2d4bd137ce811d7e097f5af7ac80f3eb9cf7a9"
         },
         {
-          "itemId": "pakistan-2006-grades-5-6-q01",
-          "contentVersion": "sha256:1b9c0f6c95943cdf9249ae54523ed58ac8a6e9ecfdda6e02611d9bc351bc5dbb"
+          "itemId": "oasis-online-2017-grades-3-4-q01",
+          "contentVersion": "sha256:d0478d1821f5357f2b904664f2ff64294b05bc1006dd52ff247735b88f18dee6"
         },
         {
-          "itemId": "pakistan-2008-grades-5-6-q04",
-          "contentVersion": "sha256:46ba89062fcf42bcd5919345a7f3f41bdf28196ee3bd439fc360280c5f93587d"
+          "itemId": "pakistan-2006-grades-5-6-q01",
+          "contentVersion": "sha256:1b9c0f6c95943cdf9249ae54523ed58ac8a6e9ecfdda6e02611d9bc351bc5dbb"
         }
       ]
     },
@@ -2033,14 +3633,28 @@
       "passLabel": "Plan",
       "kind": "conditional-specialist-proposal",
       "objective": "Use product structure, organized cases, and complementary counts.",
+      "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
+      "sourceLinkedSubskillIds": [
+        "systematic-enumeration",
+        "min-max"
+      ],
+      "strategyIds": [
+        "build-table",
+        "guess-check",
+        "organize-cases",
+        "organized-list",
+        "trace-path"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "3-4",
         "5-6"
       ],
-      "candidateCount": 18,
-      "fiveChoiceCandidateCount": 16,
+      "candidateCount": 35,
+      "fiveChoiceCandidateCount": 33,
       "duplicateFlaggedCandidateCount": 2,
       "broaderTransformationCandidateCount": null,
-      "coverage": "thin-candidate-pool",
+      "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
         {
@@ -2048,12 +3662,12 @@
           "contentVersion": "sha256:38fc3b6f6a1f3dc534770d8a38cfc1074271ef45d42e837c1661427ffa1dfc91"
         },
         {
-          "itemId": "oasis-online-2011-grades-5-6-q18",
-          "contentVersion": "sha256:78a9374bcb49bd6b8188b3a8f83577d3821d0b88f966e00716971ee9e5332587"
+          "itemId": "oasis-online-2015-grades-3-4-q14",
+          "contentVersion": "sha256:3b7ee856b4e676f234d261cd6082c63249c028b51693d2603a8721f8ba6f3c6e"
         },
         {
-          "itemId": "oasis-online-2021-grades-5-6-q18",
-          "contentVersion": "sha256:d7fef221435eebd20026172be811b4028cd1774e757b1a4926ab6e87d04ba3a4"
+          "itemId": "oasis-online-2020-grades-3-4-q16",
+          "contentVersion": "sha256:37c25b86307b7cd8a701308dda62dcbd9e69465edeb8f9df468f10762b5f5285"
         }
       ]
     },
@@ -2066,11 +3680,16 @@
       "passLabel": "Plan",
       "kind": "conditional-specialist-proposal",
       "objective": "Compare probabilities and aggregate or interpret data.",
+      "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
+      "sourceLinkedSubskillIds": [],
+      "strategyIds": [],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "3-4",
         "5-6"
       ],
-      "candidateCount": 8,
-      "fiveChoiceCandidateCount": 8,
+      "candidateCount": 10,
+      "fiveChoiceCandidateCount": 10,
       "duplicateFlaggedCandidateCount": 0,
       "broaderTransformationCandidateCount": null,
       "coverage": "retrieval-gap",
@@ -2099,29 +3718,48 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Prove a counting strategy; use invariants and combinatorial structure.",
+      "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
+      "sourceLinkedSubskillIds": [
+        "count-once",
+        "ordering-intervals",
+        "systematic-enumeration",
+        "min-max"
+      ],
+      "strategyIds": [
+        "build-table",
+        "compare-order",
+        "decompose",
+        "draw-diagram",
+        "organize-cases",
+        "organized-list",
+        "transform",
+        "visualize"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "5-6",
         "7-8",
         "9-10",
         "11-12"
       ],
-      "candidateCount": 356,
-      "fiveChoiceCandidateCount": 356,
-      "duplicateFlaggedCandidateCount": 0,
+      "candidateCount": 807,
+      "fiveChoiceCandidateCount": 769,
+      "duplicateFlaggedCandidateCount": 5,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
         {
-          "itemId": "oasis-online-2010-grades-11-12-q01",
-          "contentVersion": "sha256:811bbb3df7f63279848353ef68799ef31f4c2e1d5ab67ad099cc39efd711553c"
+          "itemId": "mk-austria-2000-56-benjamin-q01",
+          "contentVersion": "sha256:a982773c3c9319f81615913b1c7867e2c9d5bb3048bcee55bbddc370f22a76d2"
         },
         {
-          "itemId": "oasis-online-2016-grades-7-8-q01",
-          "contentVersion": "sha256:fc56716de34ec49cdec922006817fe27003e5eb3103d3f51f816973d0dbecceb"
+          "itemId": "mk-austria-2001-56-benjamin-q01",
+          "contentVersion": "sha256:f23527d6a1f44c6100c7431731afce947f0c8e3c5ab179fb98d2be5fde597cf9"
         },
         {
-          "itemId": "oasis-online-2020-grades-7-8-q01",
-          "contentVersion": "sha256:d759165022d5cd1cf8cd8d2593da471a8ea3218d26ab934cce82f9c4fe5ea879"
+          "itemId": "mk-lithuania-2004-56-benjamin-q01",
+          "contentVersion": "sha256:4dd45fab8af63db17f0599006bb1ee4c414eb977b1fcc33762ef07ebcd00b999"
         }
       ]
     },
@@ -2134,18 +3772,32 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Use symmetry to reduce cases and justify geometric relationships.",
+      "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
+      "sourceLinkedSubskillIds": [
+        "mirrors-identical"
+      ],
+      "strategyIds": [
+        "transform",
+        "visualize"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "5-6",
         "7-8",
         "9-10",
         "11-12"
       ],
-      "candidateCount": 10,
-      "fiveChoiceCandidateCount": 10,
-      "duplicateFlaggedCandidateCount": 0,
-      "broaderTransformationCandidateCount": 106,
-      "coverage": "retrieval-gap",
+      "candidateCount": 22,
+      "fiveChoiceCandidateCount": 21,
+      "duplicateFlaggedCandidateCount": 1,
+      "broaderTransformationCandidateCount": 173,
+      "coverage": "thin-candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
+        {
+          "itemId": "oasis-online-2016-grades-5-6-q01",
+          "contentVersion": "sha256:a1af08bb4b5cdc006aee19dee4ecce6324b0f39c1e6f9b0f34b36f195e23f7a5"
+        },
         {
           "itemId": "oasis-online-2021-grades-7-8-q01",
           "contentVersion": "sha256:578fe0aa81e76979bbaf69ee5692d7f3fbf39acd6e1f1254fe2b0eb5c10929b1"
@@ -2153,10 +3805,6 @@
         {
           "itemId": "oasis-online-2010-grades-7-8-q02",
           "contentVersion": "sha256:a9cd3e9beda55c167e64cbdb1993c30fe00202c1b87db9283599b9bb77231dca"
-        },
-        {
-          "itemId": "oasis-online-2016-grades-7-8-q02",
-          "contentVersion": "sha256:fcecfba1c941cdaa06d9c119fd192d8a29c7d8fdf67cf5f73fe49c4de76d58ac"
         }
       ]
     },
@@ -2169,18 +3817,36 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Reason about expressions and additive invariants without brute-force calculation.",
+      "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
+      "sourceLinkedSubskillIds": [
+        "reverse-process",
+        "age-invariants",
+        "codes-surplus"
+      ],
+      "strategyIds": [
+        "draw-diagram",
+        "use-invariant",
+        "visualize",
+        "work-backward"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "5-6",
         "7-8",
         "9-10",
         "11-12"
       ],
-      "candidateCount": 296,
-      "fiveChoiceCandidateCount": 296,
-      "duplicateFlaggedCandidateCount": 0,
+      "candidateCount": 598,
+      "fiveChoiceCandidateCount": 567,
+      "duplicateFlaggedCandidateCount": 3,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
+        {
+          "itemId": "mk-lithuania-2004-56-benjamin-q01",
+          "contentVersion": "sha256:4dd45fab8af63db17f0599006bb1ee4c414eb977b1fcc33762ef07ebcd00b999"
+        },
         {
           "itemId": "oasis-online-2010-grades-7-8-q01",
           "contentVersion": "sha256:4cb005401fd30cfc10faeeccece786e9cdd6077d181e61497c46a891efad3e60"
@@ -2188,10 +3854,6 @@
         {
           "itemId": "oasis-online-2012-grades-7-8-q01",
           "contentVersion": "sha256:8e43522847f32f0781793d3ba1b004684a5421257f6cf74831f1055045251873"
-        },
-        {
-          "itemId": "oasis-online-2018-grades-7-8-q01",
-          "contentVersion": "sha256:2d6852a29ae1d7e641790fb7578d7202b7544ecee0e578cfd117c80c02635bbe"
         }
       ]
     },
@@ -2204,29 +3866,38 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Generalize a sequence and justify an indexed or recursive rule.",
+      "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
+      "sourceLinkedSubskillIds": [
+        "repeating-growing"
+      ],
+      "strategyIds": [
+        "find-pattern"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "5-6",
         "7-8",
         "9-10",
         "11-12"
       ],
-      "candidateCount": 22,
-      "fiveChoiceCandidateCount": 22,
-      "duplicateFlaggedCandidateCount": 0,
+      "candidateCount": 41,
+      "fiveChoiceCandidateCount": 36,
+      "duplicateFlaggedCandidateCount": 2,
       "broaderTransformationCandidateCount": null,
-      "coverage": "thin-candidate-pool",
+      "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
+        {
+          "itemId": "oasis-online-2020-grades-5-6-q01",
+          "contentVersion": "sha256:1c088676530e4343216151ce4c344038e0d9adb0cc001f0b239fd3e20978919f"
+        },
         {
           "itemId": "oasis-online-2023-grades-7-8-q01",
           "contentVersion": "sha256:7f087c949e3003a5f00d4eca4287acaa10efb6ed543fabe4a14a9353a4b41ed8"
         },
         {
-          "itemId": "usa-annual-sample-2007-grades-11-12-p3",
-          "contentVersion": "sha256:d24437530b56007f6639c52549500cc7530e5ef130a3ad93ac45c2a84a1a7a2d"
-        },
-        {
-          "itemId": "oasis-online-2010-grades-11-12-q10",
-          "contentVersion": "sha256:60214236bcc9bb58e997f5d5ba0ba1c1273033257f7ffa24512099744f463729"
+          "itemId": "pakistan-2006-grades-5-6-q01",
+          "contentVersion": "sha256:1b9c0f6c95943cdf9249ae54523ed58ac8a6e9ecfdda6e02611d9bc351bc5dbb"
         }
       ]
     },
@@ -2238,30 +3909,43 @@
       "pass": 4,
       "passLabel": "Generalize",
       "kind": "core-proposal",
-      "objective": "Prove a geometric relation using a useful decomposition or auxiliary shape.",
+      "objective": "Use similarity, decomposition, and auxiliary shapes after ratios and scale have been taught.",
+      "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
+      "sourceLinkedSubskillIds": [
+        "missing-pieces"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "decompose",
+        "draw-diagram",
+        "transform",
+        "visualize"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "5-6",
         "7-8",
         "9-10",
         "11-12"
       ],
-      "candidateCount": 339,
-      "fiveChoiceCandidateCount": 339,
-      "duplicateFlaggedCandidateCount": 0,
+      "candidateCount": 678,
+      "fiveChoiceCandidateCount": 648,
+      "duplicateFlaggedCandidateCount": 2,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
         {
+          "itemId": "oasis-online-2013-grades-5-6-q01",
+          "contentVersion": "sha256:d885c593a93cba0a51229831465951d54f5fc883035f5b97d404cb72636fce9b"
+        },
+        {
+          "itemId": "oasis-online-2019-grades-5-6-q01",
+          "contentVersion": "sha256:fa31b3f26cdffdc15ec03141a64d3c8be6146a706e37c498a276ec1059e3bf7d"
+        },
+        {
           "itemId": "oasis-online-2020-grades-9-10-q01",
           "contentVersion": "sha256:58d127420af61ad15a7b7701d4de85b297c7e521e5b94362a99723e02fe5cbc2"
-        },
-        {
-          "itemId": "oasis-online-2022-grades-7-8-q01",
-          "contentVersion": "sha256:ce92d129eaa6f6d72afa7dd821d12a81ccd87ad6e000b744a9e9c46db4bfa24c"
-        },
-        {
-          "itemId": "usa-video-2026-grades-11-12-q01",
-          "contentVersion": "sha256:11329f922238d7a75af2072ce65464edaae7921e812449789e308e64ddbdcfb9"
         }
       ]
     },
@@ -2274,13 +3958,28 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Use contradiction, invariants, and complete case analysis.",
+      "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
+      "sourceLinkedSubskillIds": [
+        "constraint-clues",
+        "min-max"
+      ],
+      "strategyIds": [
+        "build-table",
+        "compare-order",
+        "draw-diagram",
+        "guess-check",
+        "organize-cases",
+        "organized-list"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "5-6",
         "7-8",
         "9-10",
         "11-12"
       ],
-      "candidateCount": 149,
-      "fiveChoiceCandidateCount": 149,
+      "candidateCount": 344,
+      "fiveChoiceCandidateCount": 333,
       "duplicateFlaggedCandidateCount": 0,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
@@ -2295,8 +3994,8 @@
           "contentVersion": "sha256:5c0d5db4193f61201db7e1feab1b88547a3d2e5dc259ae124eb49f792e7a6ccc"
         },
         {
-          "itemId": "oasis-online-2020-grades-9-10-q02",
-          "contentVersion": "sha256:38b563c3c7b1b4494a04481434a0bac897383cba4bba6151740b128ea1bc5491"
+          "itemId": "usa-video-2026-grades-5-6-q01",
+          "contentVersion": "sha256:fb4c789414ba22931a2352aa2c4020ccf15056495308261bbec11654a61bf958"
         }
       ]
     },
@@ -2309,14 +4008,32 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Reason proportionally with changing rates and constraints.",
+      "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
+      "sourceLinkedSubskillIds": [
+        "equal-groups",
+        "balance-exchange"
+      ],
+      "strategyIds": [
+        "build-table",
+        "compare-order",
+        "draw-diagram",
+        "organize-cases",
+        "organized-list",
+        "use-invariant",
+        "visualize",
+        "work-backward",
+        "write-equation"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "5-6",
         "7-8",
         "9-10",
         "11-12"
       ],
-      "candidateCount": 145,
-      "fiveChoiceCandidateCount": 145,
-      "duplicateFlaggedCandidateCount": 0,
+      "candidateCount": 220,
+      "fiveChoiceCandidateCount": 210,
+      "duplicateFlaggedCandidateCount": 4,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
@@ -2326,12 +4043,12 @@
           "contentVersion": "sha256:098f8ea5945bf4f436220231922bf5081f35705ba8c7ab539b535f033e7651a8"
         },
         {
-          "itemId": "oasis-online-2013-grades-7-8-q02",
-          "contentVersion": "sha256:89fd8727930daad06f89be1ad6d9eff246ff053ba8ffb46a7973dabc7af283db"
+          "itemId": "pakistan-2005-grades-5-6-q01",
+          "contentVersion": "sha256:f40bb2d94146537452b394a294d4755621e8c7e29ed808a9e6a3e952ec368c11"
         },
         {
-          "itemId": "oasis-online-2021-grades-7-8-q02",
-          "contentVersion": "sha256:25bba3a384ef3c95ef441b6b8a760c3b6bd3b115eabbc65baae560785ebbac5f"
+          "itemId": "pakistan-2006-grades-5-6-q01",
+          "contentVersion": "sha256:1b9c0f6c95943cdf9249ae54523ed58ac8a6e9ecfdda6e02611d9bc351bc5dbb"
         }
       ]
     },
@@ -2344,14 +4061,27 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Apply modular, factorization, and exponent structure.",
+      "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
+      "sourceLinkedSubskillIds": [
+        "ordering-intervals",
+        "number-structure"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "draw-diagram",
+        "guess-check",
+        "organize-cases"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "5-6",
         "7-8",
         "9-10",
         "11-12"
       ],
-      "candidateCount": 100,
-      "fiveChoiceCandidateCount": 100,
-      "duplicateFlaggedCandidateCount": 0,
+      "candidateCount": 196,
+      "fiveChoiceCandidateCount": 184,
+      "duplicateFlaggedCandidateCount": 1,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
@@ -2365,8 +4095,8 @@
           "contentVersion": "sha256:d759165022d5cd1cf8cd8d2593da471a8ea3218d26ab934cce82f9c4fe5ea879"
         },
         {
-          "itemId": "usa-video-2026-grades-7-8-q02",
-          "contentVersion": "sha256:0e990dabaa4f7e75d5ba9470516e678132796f49bd4f4916a534c788758b51b1"
+          "itemId": "oasis-online-2022-grades-5-6-q01",
+          "contentVersion": "sha256:bdc5a1e5b041d3350f8cbb4efcb17e38710f462d5e33d23317f67dc6ebdf0977"
         }
       ]
     },
@@ -2379,29 +4109,46 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Combine coordinate and graph structure to prove a route property.",
+      "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
+      "sourceLinkedSubskillIds": [
+        "ordering-intervals",
+        "reverse-process",
+        "routes-rules"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "draw-diagram",
+        "guess-check",
+        "organized-list",
+        "trace-path",
+        "visualize",
+        "work-backward"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "5-6",
         "7-8",
         "9-10",
         "11-12"
       ],
-      "candidateCount": 73,
-      "fiveChoiceCandidateCount": 73,
-      "duplicateFlaggedCandidateCount": 0,
+      "candidateCount": 153,
+      "fiveChoiceCandidateCount": 145,
+      "duplicateFlaggedCandidateCount": 3,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
         {
-          "itemId": "oasis-online-2010-grades-9-10-q03",
-          "contentVersion": "sha256:67287a7518404494236daff4043cae96ce0d600af1a518f21260bea14d865fa4"
+          "itemId": "oasis-online-2017-grades-5-6-q01",
+          "contentVersion": "sha256:06ff86f90e539e1619481be2bc91b8ff50c2fecb8451b69e7bb9a2b6fce63997"
         },
         {
-          "itemId": "usa-annual-sample-2008-grades-7-8-p3",
-          "contentVersion": "sha256:901ef5164e4ed2f339279c361fe6d367f08f437e6ab8bed859810fde97d0ec4a"
+          "itemId": "mk-lithuania-2004-56-benjamin-q02",
+          "contentVersion": "sha256:61cc80211667842f5792e7b20476ce5aa166a93bc73d0a097edbbc55878b1be6"
         },
         {
-          "itemId": "usa-annual-sample-2014-grades-11-12-p3",
-          "contentVersion": "sha256:6d20dbaa5d04e34b7ea9c7d221bc1ec294fcfda219b08b70e2bdf697a7046063"
+          "itemId": "oasis-online-2022-grades-5-6-q02",
+          "contentVersion": "sha256:2b2c421accf5ff2e4aca70da85605e525e5cc206bb0c92d9306900cde1c98bce"
         }
       ]
     },
@@ -2414,29 +4161,34 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Reason with successive fractional changes and constrained proportions.",
+      "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
+      "sourceLinkedSubskillIds": [],
+      "strategyIds": [],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "5-6",
         "7-8",
         "9-10",
         "11-12"
       ],
-      "candidateCount": 46,
-      "fiveChoiceCandidateCount": 46,
+      "candidateCount": 104,
+      "fiveChoiceCandidateCount": 100,
       "duplicateFlaggedCandidateCount": 0,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
         {
+          "itemId": "oasis-online-2015-grades-5-6-q01",
+          "contentVersion": "sha256:565933d2b40a0642cd817941ef83bde3c47afcc51cb3ee6db7dccc7d054d88fe"
+        },
+        {
           "itemId": "oasis-online-2013-grades-7-8-q02",
           "contentVersion": "sha256:89fd8727930daad06f89be1ad6d9eff246ff053ba8ffb46a7973dabc7af283db"
         },
         {
-          "itemId": "oasis-online-2019-grades-7-8-q02",
-          "contentVersion": "sha256:0fb17584a6c29c2985db8433e029f1cbe256b1f5c9174b1d4c5af603b75cd0d7"
-        },
-        {
-          "itemId": "oasis-online-2017-grades-7-8-q04",
-          "contentVersion": "sha256:e120f86f777f4b81ec658ec67579dcd0080c0df150a9c2136e41de57468cc26a"
+          "itemId": "oasis-online-2016-grades-5-6-q02",
+          "contentVersion": "sha256:b1aa160f30e4637500a9f3a6f9eca453e7176899173ff503277b92711f04a7e2"
         }
       ]
     },
@@ -2449,29 +4201,42 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Use a spatial decomposition to justify a three-dimensional relationship.",
+      "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
+      "sourceLinkedSubskillIds": [
+        "spatial-views",
+        "dice-faces"
+      ],
+      "strategyIds": [
+        "decompose",
+        "draw-diagram",
+        "transform",
+        "visualize"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "5-6",
         "7-8",
         "9-10",
         "11-12"
       ],
-      "candidateCount": 63,
-      "fiveChoiceCandidateCount": 63,
+      "candidateCount": 135,
+      "fiveChoiceCandidateCount": 129,
       "duplicateFlaggedCandidateCount": 0,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
         {
+          "itemId": "oasis-online-2021-grades-5-6-q01",
+          "contentVersion": "sha256:bc8224e0e099fe87949fc4b4398f89680ef4d31393a7ff7c601654a26364dd55"
+        },
+        {
+          "itemId": "oasis-online-2013-grades-5-6-q02",
+          "contentVersion": "sha256:49aec66e062c22cd2b5ef0655d38f3440d884138f0ea5809896385edda4499f4"
+        },
+        {
           "itemId": "oasis-online-2010-grades-11-12-q03",
           "contentVersion": "sha256:6e8afd8b4cf46cfad33902c62de46fd68a7718e6cd45ca16c3358d993cf89647"
-        },
-        {
-          "itemId": "oasis-online-2010-grades-7-8-q03",
-          "contentVersion": "sha256:bde61c63541dca5ff2b94e20951412478ed5ba50a5db429670e58d4770bcd0e7"
-        },
-        {
-          "itemId": "oasis-online-2019-grades-7-8-q03",
-          "contentVersion": "sha256:e7a2c6e75ee436a8c7f7885648884520bce4061201d64068be6610b72ba68c71"
         }
       ]
     },
@@ -2484,14 +4249,25 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Model an indirect measurement and justify the chosen units and scale.",
+      "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
+      "sourceLinkedSubskillIds": [
+        "measure-units"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "draw-diagram",
+        "guess-check"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "5-6",
         "7-8",
         "9-10",
         "11-12"
       ],
-      "candidateCount": 136,
-      "fiveChoiceCandidateCount": 136,
-      "duplicateFlaggedCandidateCount": 0,
+      "candidateCount": 253,
+      "fiveChoiceCandidateCount": 238,
+      "duplicateFlaggedCandidateCount": 1,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
@@ -2505,8 +4281,8 @@
           "contentVersion": "sha256:11329f922238d7a75af2072ce65464edaae7921e812449789e308e64ddbdcfb9"
         },
         {
-          "itemId": "oasis-online-2013-grades-7-8-q03",
-          "contentVersion": "sha256:e99021184707ce3d26805f315736ebd214ad711bddf69d6e6b0a9ddd95973b37"
+          "itemId": "oasis-online-2011-grades-5-6-q02",
+          "contentVersion": "sha256:49769ae446bb9af205e9cec1ff02254c7b53885ed4322ddff01a1e8c6dd2777e"
         }
       ]
     },
@@ -2519,16 +4295,31 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Optimize a purchase or exchange with multiple constraints.",
+      "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
+      "sourceLinkedSubskillIds": [
+        "min-max",
+        "purchase-relations",
+        "balance-exchange"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "draw-diagram",
+        "use-invariant",
+        "work-backward",
+        "write-equation"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "5-6",
         "7-8",
         "9-10",
         "11-12"
       ],
-      "candidateCount": 21,
-      "fiveChoiceCandidateCount": 21,
+      "candidateCount": 46,
+      "fiveChoiceCandidateCount": 45,
       "duplicateFlaggedCandidateCount": 0,
       "broaderTransformationCandidateCount": null,
-      "coverage": "thin-candidate-pool",
+      "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
         {
@@ -2536,12 +4327,12 @@
           "contentVersion": "sha256:8e43522847f32f0781793d3ba1b004684a5421257f6cf74831f1055045251873"
         },
         {
-          "itemId": "usa-video-2026-grades-11-12-q06",
-          "contentVersion": "sha256:fc8879ffccda5cdf272bc112a9963b578ca5b962234b1f2ebf46bda23dfa63ff"
+          "itemId": "oasis-online-2012-grades-5-6-q03",
+          "contentVersion": "sha256:7de3454bb5d639fc6dfe96efe981d3c02cd0a3067a5ad8cc78839d2ba77f8da7"
         },
         {
-          "itemId": "oasis-online-2023-grades-7-8-q07",
-          "contentVersion": "sha256:4a6bfa0dc272a2f5233ce9b807a4dfc052b8b6fd2631fc070dd6360f001bffc1"
+          "itemId": "usa-annual-sample-2006-grades-5-6-p3",
+          "contentVersion": "sha256:7e6e4ee7a7d0d7ea251b4b97edfb0e487b24f7ce10a9bd8c5e71263e352ed452"
         }
       ]
     },
@@ -2554,18 +4345,34 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Reason about simultaneous cycles and rate-time constraints.",
+      "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
+      "sourceLinkedSubskillIds": [
+        "clock-calendar",
+        "age-invariants"
+      ],
+      "strategyIds": [
+        "draw-diagram",
+        "use-invariant",
+        "work-backward"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "5-6",
         "7-8",
         "9-10",
         "11-12"
       ],
-      "candidateCount": 52,
-      "fiveChoiceCandidateCount": 52,
-      "duplicateFlaggedCandidateCount": 0,
+      "candidateCount": 126,
+      "fiveChoiceCandidateCount": 120,
+      "duplicateFlaggedCandidateCount": 1,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
+        {
+          "itemId": "oasis-online-2011-grades-5-6-q01",
+          "contentVersion": "sha256:9a999a36d58ffcea71eee1ddab48871ae8a1c7e2484509e3d2fc1b4160bc53cb"
+        },
         {
           "itemId": "oasis-online-2014-grades-7-8-q01",
           "contentVersion": "sha256:7285901a3517a96ce0cd46a2733fe0d3746c8ddc8f2443610b92abb29bdcc740"
@@ -2573,10 +4380,6 @@
         {
           "itemId": "oasis-online-2017-grades-7-8-q01",
           "contentVersion": "sha256:73aa6edc2498217ec7fb18e59f35b8d2247fc8ed749579aa399c62f308e8665d"
-        },
-        {
-          "itemId": "usa-annual-sample-2021-grades-9-10-p3",
-          "contentVersion": "sha256:3b9cc87a6133f5d2c749292b81b0922c53d28bae0efa9efdb5c308b9f6e37b4f"
         }
       ]
     },
@@ -2589,18 +4392,34 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Prove area relations and optimize a boundary under constraints.",
+      "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
+      "sourceLinkedSubskillIds": [
+        "missing-pieces"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "decompose",
+        "draw-diagram",
+        "visualize"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "5-6",
         "7-8",
         "9-10",
         "11-12"
       ],
-      "candidateCount": 141,
-      "fiveChoiceCandidateCount": 141,
-      "duplicateFlaggedCandidateCount": 0,
+      "candidateCount": 219,
+      "fiveChoiceCandidateCount": 211,
+      "duplicateFlaggedCandidateCount": 1,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
+        {
+          "itemId": "oasis-online-2015-grades-5-6-q01",
+          "contentVersion": "sha256:565933d2b40a0642cd817941ef83bde3c47afcc51cb3ee6db7dccc7d054d88fe"
+        },
         {
           "itemId": "oasis-online-2020-grades-9-10-q01",
           "contentVersion": "sha256:58d127420af61ad15a7b7701d4de85b297c7e521e5b94362a99723e02fe5cbc2"
@@ -2608,10 +4427,6 @@
         {
           "itemId": "usa-video-2026-grades-7-8-q01",
           "contentVersion": "sha256:72dd89146a4b22e4bf4ceb91ad5d362b8ff78e10fef784ab980b0439fe86ef75"
-        },
-        {
-          "itemId": "oasis-online-2010-grades-11-12-q02",
-          "contentVersion": "sha256:3b1fbdcd20714d38c62c515e5e3292d4f3f5dc0c51cade4f8dc8e306b0363a8b"
         }
       ]
     },
@@ -2624,13 +4439,31 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Reason about functions, systems, and algebraic structure.",
+      "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
+      "sourceLinkedSubskillIds": [
+        "reverse-process",
+        "age-invariants",
+        "balance-exchange",
+        "codes-surplus"
+      ],
+      "strategyIds": [
+        "compare-order",
+        "draw-diagram",
+        "guess-check",
+        "organize-cases",
+        "use-invariant",
+        "work-backward",
+        "write-equation"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "5-6",
         "7-8",
         "9-10",
         "11-12"
       ],
-      "candidateCount": 47,
-      "fiveChoiceCandidateCount": 47,
+      "candidateCount": 60,
+      "fiveChoiceCandidateCount": 54,
       "duplicateFlaggedCandidateCount": 0,
       "broaderTransformationCandidateCount": null,
       "coverage": "candidate-pool",
@@ -2641,12 +4474,12 @@
           "contentVersion": "sha256:811bbb3df7f63279848353ef68799ef31f4c2e1d5ab67ad099cc39efd711553c"
         },
         {
-          "itemId": "usa-annual-sample-2008-grades-7-8-p3",
-          "contentVersion": "sha256:901ef5164e4ed2f339279c361fe6d367f08f437e6ab8bed859810fde97d0ec4a"
+          "itemId": "oasis-online-2010-grades-5-6-q01",
+          "contentVersion": "sha256:901dd53fa22c1b9e276c2307ee2d4bd137ce811d7e097f5af7ac80f3eb9cf7a9"
         },
         {
-          "itemId": "usa-annual-sample-2022-grades-9-10-p3",
-          "contentVersion": "sha256:047023ed7652587c010b860d856d3afb6b733089aefce964c0a2668c07c216d1"
+          "itemId": "pakistan-2006-grades-5-6-q01",
+          "contentVersion": "sha256:1b9c0f6c95943cdf9249ae54523ed58ac8a6e9ecfdda6e02611d9bc351bc5dbb"
         }
       ]
     },
@@ -2659,18 +4492,36 @@
       "passLabel": "Generalize",
       "kind": "conditional-specialist-proposal",
       "objective": "Use combinations, permutations, and inclusion-exclusion with justification.",
+      "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
+      "sourceLinkedSubskillIds": [
+        "systematic-enumeration",
+        "min-max"
+      ],
+      "strategyIds": [
+        "build-table",
+        "guess-check",
+        "organize-cases",
+        "organized-list",
+        "trace-path"
+      ],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "5-6",
         "7-8",
         "9-10",
         "11-12"
       ],
-      "candidateCount": 17,
-      "fiveChoiceCandidateCount": 17,
-      "duplicateFlaggedCandidateCount": 0,
+      "candidateCount": 35,
+      "fiveChoiceCandidateCount": 33,
+      "duplicateFlaggedCandidateCount": 2,
       "broaderTransformationCandidateCount": null,
-      "coverage": "thin-candidate-pool",
+      "coverage": "candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
+        {
+          "itemId": "pakistan-2006-grades-5-6-q06",
+          "contentVersion": "sha256:38fc3b6f6a1f3dc534770d8a38cfc1074271ef45d42e837c1661427ffa1dfc91"
+        },
         {
           "itemId": "oasis-online-2012-grades-7-8-q08",
           "contentVersion": "sha256:835d2dea3e87c4a33247f567b0a5daa9057addb0e19400dad11e314fa9944d8e"
@@ -2678,10 +4529,6 @@
         {
           "itemId": "oasis-online-2010-grades-11-12-q17",
           "contentVersion": "sha256:17082ee5dddd7762dcdc57f697296b9acca6db3f2b2b72785ba0201c315ce0e2"
-        },
-        {
-          "itemId": "oasis-online-2022-grades-7-8-q19",
-          "contentVersion": "sha256:9c6fb38c8cc5359335de4a65c1b2bf691384f243f4384519a43c2bd9b7915923"
         }
       ]
     },
@@ -2694,16 +4541,21 @@
       "passLabel": "Generalize",
       "kind": "conditional-specialist-proposal",
       "objective": "Reason about conditional information and structured sample spaces.",
+      "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
+      "sourceLinkedSubskillIds": [],
+      "strategyIds": [],
+      "editorialStatus": "proposed-not-assigned-or-approved",
       "searchGradeBands": [
+        "5-6",
         "7-8",
         "9-10",
         "11-12"
       ],
-      "candidateCount": 8,
-      "fiveChoiceCandidateCount": 8,
+      "candidateCount": 16,
+      "fiveChoiceCandidateCount": 16,
       "duplicateFlaggedCandidateCount": 0,
       "broaderTransformationCandidateCount": null,
-      "coverage": "retrieval-gap",
+      "coverage": "thin-candidate-pool",
       "classificationStatus": "unverified-lexical-candidates",
       "sampleCandidateReferences": [
         {
@@ -2715,8 +4567,8 @@
           "contentVersion": "sha256:1e07d43a517e1d5a532ee3eada3f96ba307e87e335ec1ee05f04cfe24b676379"
         },
         {
-          "itemId": "usa-annual-sample-2011-grades-11-12-p5",
-          "contentVersion": "sha256:306a7e4faa39c49419bca31b8f075ba3da22e067fde06c6788ba69c7176196fe"
+          "itemId": "oasis-online-2015-grades-5-6-q18",
+          "contentVersion": "sha256:90642f3bc3c520ce53e9148aeb81d719edf613a17f5f86618400f0023646089f"
         }
       ]
     }
