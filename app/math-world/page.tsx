@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import MathWorldClient from "./MathWorldClient";
+import PlaytestGate from "./PlaytestGate";
 
 export const metadata: Metadata = {
-  title: "Counting Coast · Math Kangaroo Worlds",
-  description: "A polished map adventure built around Math Kangaroo questions.",
+  title: "Math Kangaroo Worlds · Playtest",
+  description: "Explore a spiral of mathematical ideas across twenty colorful worlds.",
+  robots: { index: false, follow: false },
 };
 
 export default function MathWorldPage() {
-  return <MathWorldClient />;
+  return <PlaytestGate><MathWorldClient /></PlaytestGate>;
 }

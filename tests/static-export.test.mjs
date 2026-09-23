@@ -121,7 +121,9 @@ test("exports the catalog and implemented game routes as refresh-safe pages", as
   assert.match(mathKangarooLab, /All spatial types/);
   assert.match(subtractionLab, /Borrow Flash/);
   assert.match(home, /Explore Counting Coast/);
-  assert.match(mathWorld, /Counting Coast/);
+  assert.match(mathWorld, /id="playtest-heading"/);
+  assert.match(mathWorld, /name="robots" content="noindex, nofollow"/);
+  assert.doesNotMatch(mathWorld, /data-world-id="/);
   assert.match(mathWorld, /Math Kangaroo Worlds/);
   assert.doesNotMatch(home, /codex-preview|Your site is taking shape/i);
 });

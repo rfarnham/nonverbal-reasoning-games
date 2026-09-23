@@ -11,7 +11,11 @@ There is no account, download, backend, or analytics.
 
 **[Play the games](https://rfarnham.github.io/nonverbal-reasoning-games/)**
 
-The prominent **Journey** path connects a stable, snapshotted set of up to
+**[Math Kangaroo Worlds](https://rfarnham.github.io/nonverbal-reasoning-games/math-world/)**
+is a password-gated playtest of 20 spiral worlds, with four six-question stops
+per world. See the [curriculum outline](docs/math-world-20-world-curriculum.md).
+
+The secondary **Journey** path connects a stable, snapshotted set of up to
 eight canonical games across seven boards: Starter, Junior I–II, Expert I–II,
 and Wizard I–II. It includes local player profiles, animal avatars, saved stop
 progress, Turbo Time, redemption, level challenges, collectible XP, and two

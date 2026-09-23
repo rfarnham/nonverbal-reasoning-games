@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Assemble reviewed, source-bound selections into an opt-in LOCAL 20-world preview.
 
-Question material remains under ignored work/ and is copied into ignored local
-runtime assets only by MATH_WORLD_PREVIEW=1. The public plan contains references,
+New question selections remain under ignored work/ until separately approved.
+Published builds use the committed approved runtime. This authoring plan contains references,
 not source text, answers, images, private paths, or reviewer solution notes.
 """
 from __future__ import annotations
@@ -188,7 +188,7 @@ def build(catalogue: Path, reviews: list[Path], output: Path, plan: Path) -> dic
     content_hash=hashlib.sha256(json.dumps({'worlds':worlds,'questions':questions},sort_keys=True).encode()).hexdigest()[:16]
     version=f'spiral-20.v1.{content_hash}'
     runtime={'schemaVersion':2,'mode':'spiral-preview','contentVersion':version,'ontologyVersion':'elementary_competition_math.1.0.0','worlds':worlds,'stops':stops,'breaks':breaks,'questions':questions}
-    plan_data={'schemaVersion':1,'contentVersion':version,'status':'agent-curated-local-playtest','catalogueRunId':RUN_ID,'taxonomyVersion':'elementary_competition_math.1.0.0','selectionPolicy':{'maximumWorldQuestions':24,'stopsPerWorld':4,'questionsPerStop':6,'recentTestsPreferred':True,'gradePointTiers':{'1-2':[3,4,5],'3-4':[3,4]},'sourcePolicy':'Private source material is excluded from public Git and standard builds.','order':'Reviewed reasoning demand first; source grade and points are secondary signals.'},'worlds':world_plans,'statistics':{'worlds':len(worlds),'questions':len(questions),'bySourceKind':dict(Counter(q['source']['sourceKind'] for q in questions)),'byGrade':dict(Counter(q['source']['gradeBand'] for q in questions)),'byYear':dict(sorted(Counter(q['source']['year'] for q in questions).items(),reverse=True)),'byGradeAndPoints':dict(Counter(f"{q['source']['gradeBand']}:{q['source']['pointTier']}" for q in questions))},'warnings':warnings}
+    plan_data={'schemaVersion':1,'contentVersion':version,'status':'agent-curated-local-playtest','catalogueRunId':RUN_ID,'taxonomyVersion':'elementary_competition_math.1.0.0','selectionPolicy':{'maximumWorldQuestions':24,'stopsPerWorld':4,'questionsPerStop':6,'recentTestsPreferred':True,'gradePointTiers':{'1-2':[3,4,5],'3-4':[3,4]},'sourcePolicy':'New selections remain local until explicitly approved; published builds use the committed approved selection.','order':'Reviewed reasoning demand first; source grade and points are secondary signals.'},'worlds':world_plans,'statistics':{'worlds':len(worlds),'questions':len(questions),'bySourceKind':dict(Counter(q['source']['sourceKind'] for q in questions)),'byGrade':dict(Counter(q['source']['gradeBand'] for q in questions)),'byYear':dict(sorted(Counter(q['source']['year'] for q in questions).items(),reverse=True)),'byGradeAndPoints':dict(Counter(f"{q['source']['gradeBand']}:{q['source']['pointTier']}" for q in questions))},'warnings':warnings}
     output.parent.mkdir(parents=True,exist_ok=True)
     assets_dir=output.parent/'assets';assets_dir.mkdir(exist_ok=True)
     for old_asset in assets_dir.iterdir():

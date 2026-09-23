@@ -1,6 +1,6 @@
 # Math Kangaroo Worlds: 20-world spiral
 
-**Approved implementation scope · local playtest · 22 September 2026.**
+**Approved implementation scope · password-gated public playtest · 22 September 2026.**
 
 The adventure visits ten strands, then returns to each for a deeper second pass:
 
@@ -51,10 +51,12 @@ Each selected source card is reviewed with its diagram and choices. The authorin
 
 The combined 480-record audit found no repeated question IDs, identical source-image hashes, or repeated USA exam/grade/question references. All selected grade bands, point tiers, taxonomy IDs, strategy tags, and source versions pass validation. Shared-stem candidate clusters, including gears, woven reversals, and disc views, retain documented differences in their actual diagrams; they are practice variations of a method rather than new concept families.
 
-The result is **agent-reviewed material for local playtesting**, not a calibrated assessment or a publicly released question collection. Private source cards and restricted source text remain in the local preview. Public documentation contains the curriculum outline and aggregate provenance, not the private source material.
+The result is **agent-reviewed playtest material**, not a calibrated assessment. On 22 September 2026, the product owner explicitly approved sharing this selected 480-question version publicly behind a simple password gate. The approved runtime and its question-scoped images are committed for reproducible builds; the broader research corpus and authoring workbench remain local. See [ADR 0004](architecture/adr-0004-math-world-public-playtest.md).
 
-## Running the local preview
+## Running the playtest
 
-Use `npm run dev:worlds` for development, or `npm run build:worlds` for the preview build. These commands require the ignored local source export and assets; a clean public checkout does not include that private material. Standard builds exclude it. The exact, case-sensitive local profile name `testUser123` enables the labeled test mode for visiting every world and stop.
+Use `npm run dev` for development or `npm run build:pages` for the published build. A clean checkout includes the approved 480-question bank and its images. Enter `hedgehog` at the Math Worlds gate; a one-year cookie remembers access in that browser. The gate also appears on direct links and test-mode URLs. After entry, the exact, case-sensitive local profile name `testUser123` enables the labeled test mode for visiting every world and stop.
+
+`npm run dev:worlds` and `npm run build:worlds` remain aliases for previewing the approved bank. An explicit `MATH_WORLD_PREVIEW_MANIFEST` can supply local question edits only when its image references and hashes match the approved assets; it never replaces committed images.
 
 The earlier [four-pass proposal](math-world-spiral-curriculum-proposal.md) remains a historical design record. This 20-world plan supersedes that proposed world count and sequence for the current implementation.

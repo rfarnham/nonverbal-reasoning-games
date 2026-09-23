@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "contentVersion": "spiral-20.v1.f665226c7060bba8",
-  "status": "agent-curated-local-playtest",
+  "status": "agent-curated-public-playtest",
   "catalogueRunId": "catalogue-8b9cfc0f0f01b9ef7138902e",
   "taxonomyVersion": "elementary_competition_math.1.0.0",
   "selectionPolicy": {
@@ -20,7 +20,7 @@
         4
       ]
     },
-    "sourcePolicy": "Private source material is excluded from public Git and standard builds.",
+    "sourcePolicy": "This selected version is approved for public playtesting; new selections require separate publication approval. The broader corpus remains local.",
     "order": "Reviewed reasoning demand first; source grade and points are secondary signals."
   },
   "worlds": [
@@ -7879,5 +7879,11 @@
       "sameStatementAs": "oasis-online-2023-grades-1-2-q15",
       "resolution": "Distinct diagram/value variant explicitly reviewed."
     }
-  ]
+  ],
+  "publication": {
+    "approvedOn": "2026-09-22",
+    "approvedContentVersion": "spiral-20.v1.f665226c7060bba8",
+    "scope": "Selected480 questions and question-scoped images",
+    "access": "Client-side password gate with persistent browser cookie"
+  }
 }

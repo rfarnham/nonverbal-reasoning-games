@@ -51,6 +51,5 @@ __pycache__/
 .idea/
 .vscode/
 
-# Opt-in private curriculum preview; source material stays out of public Git.
+# Generated runtime; approved source material lives in content/ and public/.
 /app/math-world/data/runtime.generated.json
-/public/math-world/spiral-questions/
