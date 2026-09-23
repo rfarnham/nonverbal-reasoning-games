@@ -44,6 +44,7 @@ questions.
 | Lab | Practice | Status |
 | --- | --- | --- |
 | [Borrow Flash](https://rfarnham.github.io/nonverbal-reasoning-games/lab/subtraction-flash/) | Visual and listening subtraction practice with tap, handwriting, and speech answers | Playable |
+| [Subtraction Steps](https://rfarnham.github.io/nonverbal-reasoning-games/lab/subtraction-trainer/) | Draw-only vertical subtraction, a writable workspace, five adaptive fluency tiers, and mistake review | Playable |
 | [Math Kangaroo Shuffle](https://rfarnham.github.io/nonverbal-reasoning-games/lab/math-kangaroo/) | Random spatial questions filtered by grade, point value, and question type | Playable |
 
 ## Project shape

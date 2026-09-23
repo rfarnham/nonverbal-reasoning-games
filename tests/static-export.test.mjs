@@ -20,6 +20,7 @@ test("exports the catalog and implemented game routes as refresh-safe pages", as
       access(new URL(`games/${slug}/index.html`, outputRoot)),
     ),
     access(new URL("lab/subtraction-flash/index.html", outputRoot)),
+    access(new URL("lab/subtraction-trainer/index.html", outputRoot)),
     access(new URL("lab/math-kangaroo/index.html", outputRoot)),
     access(new URL("math-world/index.html", outputRoot)),
     access(new URL("404.html", outputRoot)),
@@ -68,6 +69,11 @@ test("exports the catalog and implemented game routes as refresh-safe pages", as
   assert.match(home, /Bracelet Search/);
   assert.match(home, /Math Kangaroo Shuffle/);
   assert.match(home, /Borrow Flash/);
+  assert.match(home, /Subtraction Steps/);
+  assert.match(home, /href="\/nonverbal-reasoning-games\/lab\/subtraction-trainer\/"/);
+  const subtractionTrainer = await readOutput("lab/subtraction-trainer/index.html");
+  assert.match(subtractionTrainer, /Subtraction Steps/);
+  assert.match(subtractionTrainer, /<title>Subtraction Steps · Spatial Gym<\/title>/);
   assert.match(rotationGame, /Transformation Match/);
   assert.match(rotationGame, />Campaign</);
   assert.doesNotMatch(rotationGame, />36 puzzles</);
