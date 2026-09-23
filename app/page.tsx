@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MathWorldHomeLink } from "@/components/MathWorldHomeLink";
 import { JourneyHomeCta } from "@/components/progression/JourneyHomeCta";
 import { games, type GameCatalogEntry } from "@/lib/games";
 
@@ -89,9 +90,7 @@ export default function Home() {
             No account. No download.
           </p>
           <div className="hero-actions">
-            <Link className="button button-primary math-world-home-cta" href="/math-world/">
-              Explore Counting Coast <span aria-hidden="true">→</span>
-            </Link>
+            <MathWorldHomeLink />
             <JourneyHomeCta secondary />
             <a className="button button-secondary" href="#games">
               Pick a single game
