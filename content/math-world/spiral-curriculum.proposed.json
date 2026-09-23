@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "proposalVersion": "spiral.2026-09-22.2",
+  "proposalVersion": "spiral.2026-09-22.3",
   "status": "proposal-awaiting-user-sequence-approval",
   "runtimeConsumption": "none",
   "catalogueRunId": "catalogue-8b9cfc0f0f01b9ef7138902e",
@@ -13,7 +13,9 @@
     "Grade and published point tier are search hints, not calibrated learner difficulty.",
     "Set A and Set B are complementary Level 1-2 courses, not difficulty levels 1 and 2.",
     "Source-linked subskills describe curriculum evidence, not verified tags on each candidate question.",
-    "No private question text, answer, email identifiers, or asset is exported."
+    "The 12-family crosswalk is a secondary design input; existing candidate counts still use the pinned lexical classifier.",
+    "The supplied taxonomy targets grades 1-5; upper-grade extension and every item assignment require review.",
+    "No private question text, answer, email identifiers, conversation identifiers, or asset is exported."
   ],
   "passes": [
     {
@@ -55,7 +57,8 @@
     }
   ],
   "ontologyFacets": {
-    "primaryConcept": "One primary home for each selected question; worlds follow this axis.",
+    "primaryConcept": "One primary learning target and world home for each selected question. World grouping and taxonomy family are distinct; classify structure rather than story setting.",
+    "taxonomy": "One primary subtype plus at most three essential secondary concepts; do not tag incidental arithmetic. Use the supplied 86 registered subtype IDs; any extension requires an explicit proposal and review.",
     "subskills": "Specific mathematical relations or actions evidenced in the source courses.",
     "strategies": "Several legitimate solving moves may apply to the same question.",
     "representation": "Pictures, diagrams, grids, physical arrangements, text, equations, lists, or tables.",
@@ -76,6 +79,1148 @@
     ],
     "editorialStatus": "Source vocabulary grounded; individual item assignments remain proposed."
   },
+  "secondaryTaxonomyInput": {
+    "title": "Competition Math Taxonomy Outline",
+    "type": "user-supplied ChatGPT synthesis and complete companion attachments",
+    "authority": "secondary-design-input-not-verified-official-ontology",
+    "reviewedScope": "12 families, 86 registered topics with definitions and boundaries, 22 strategy tags, controlled facets, classification rules, tie-breakers, output schema, and 12 illustrative examples.",
+    "taxonomyId": "elementary_competition_math",
+    "version": "1.0.0",
+    "sourceCreated": "2026-09-23",
+    "taxonomyPath": "content/math-world/competition-math-taxonomy.v1.0.0.proposed.json",
+    "taxonomySha256": "efab964621740ae1cc7a367f252edc3c5756630be5befd9d5472961947750586",
+    "guidePath": "docs/competition-math-classification-guide.v1.0.0.proposed.md",
+    "guideSha256": "ffcaf472880cb9dd5cca36aafb5f55daa6b7447b37d8a201949da1cfbb1e6f6e",
+    "preservation": "Both supplied attachments are preserved byte-for-byte, including original metadata; not imported by the runtime.",
+    "registeredTopicIds": [
+      "NUM.quantities",
+      "NUM.order_number_line",
+      "NUM.place_value",
+      "NUM.add_subtract",
+      "NUM.multiply_divide",
+      "NUM.computation_structure",
+      "NUM.estimation",
+      "NUM.intervals",
+      "INT.parity",
+      "INT.divisibility",
+      "INT.factors_primes",
+      "INT.gcd_lcm",
+      "INT.remainders",
+      "INT.digit_properties",
+      "INT.special_numbers",
+      "FRC.part_whole",
+      "FRC.equivalence_order",
+      "FRC.operations",
+      "FRC.fraction_of_quantity",
+      "FRC.ratio_proportion",
+      "FRC.percentages",
+      "REL.additive",
+      "REL.multiplicative",
+      "REL.sum_difference",
+      "REL.two_totals",
+      "REL.chained_operations",
+      "REL.transfers",
+      "REL.equations",
+      "REL.balance",
+      "REL.cryptarithms",
+      "REL.rates",
+      "PAT.repeat",
+      "PAT.growth_numeric",
+      "PAT.growth_geometric",
+      "PAT.interleaved",
+      "PAT.cycles",
+      "MEA.units",
+      "MEA.length_scales",
+      "MEA.mass_capacity_temperature",
+      "MEA.money",
+      "MEA.clock_elapsed",
+      "MEA.calendar",
+      "GEO.properties",
+      "GEO.angles",
+      "GEO.perimeter",
+      "GEO.area_basic",
+      "GEO.area_composite",
+      "GEO.symmetry_transformations",
+      "GEO.dissection_tiling",
+      "GEO.coordinates",
+      "SPA.containment_position",
+      "SPA.visual_matching",
+      "SPA.solid_properties",
+      "SPA.cube_stacks_views",
+      "SPA.cube_nets",
+      "SPA.cube_orientation",
+      "SPA.folding_cutting",
+      "SPA.overlap_layers",
+      "CNT.ordered_arrangements",
+      "CNT.unordered_selections",
+      "CNT.equivalence_counting",
+      "CNT.distributions",
+      "CNT.target_sums",
+      "CNT.path_counts",
+      "CNT.figure_counts",
+      "CNT.digit_occurrences",
+      "CNT.overlap_counts",
+      "CNT.pair_counts",
+      "LOG.attribute_matching",
+      "LOG.order_constraints",
+      "LOG.truth_lies",
+      "LOG.set_membership",
+      "LOG.grid_constraints",
+      "LOG.pigeonhole",
+      "LOG.weighing_information",
+      "MOV.navigation",
+      "MOV.traversal",
+      "MOV.state_moves",
+      "MOV.winning_games",
+      "MOV.networks",
+      "DAT.data_reading",
+      "DAT.mean_total",
+      "DAT.order_statistics",
+      "DAT.qualitative_chance",
+      "DAT.probability_single",
+      "DAT.probability_multi"
+    ],
+    "registeredStrategyIds": [
+      "direct_calculation",
+      "work_backward",
+      "draw_model",
+      "organized_enumeration",
+      "case_split",
+      "guess_check",
+      "constraint_propagation",
+      "substitution_elimination",
+      "find_pattern",
+      "unitary_scaling",
+      "decompose_recompose",
+      "symmetry",
+      "complement",
+      "sum_product_rule",
+      "inclusion_exclusion",
+      "invariant",
+      "parity_coloring",
+      "extremal_bounds",
+      "worst_case_pigeonhole",
+      "simulate_state",
+      "backward_game_analysis",
+      "option_elimination"
+    ],
+    "classificationSchemaReference": "content/math-world/competition-math-taxonomy.v1.0.0.proposed.json#/output_json_schema",
+    "targetGrades": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "upperGradeScopeStatus": "Requires extension review; grades 5-6 retain their source band and higher-grade pools are not validated by this elementary taxonomy.",
+    "worldCrosswalkStatus": "locally-proposed-not-item-classifications",
+    "newTaxonomyClassificationsProduced": 0
+  },
+  "proposedTaxonomyFamilies": [
+    {
+      "id": "NUM",
+      "label": "Number sense and arithmetic",
+      "candidateWorldConceptIds": [
+        "counting",
+        "addition-subtraction",
+        "groups-sharing",
+        "digits"
+      ],
+      "scopeSummary": "Given objects, number order, place value, operations, estimation, and intervals.",
+      "mappingStatus": "local-proposal-requires-primary-learning-target-review"
+    },
+    {
+      "id": "INT",
+      "label": "Integer properties and number theory",
+      "candidateWorldConceptIds": [
+        "digits"
+      ],
+      "scopeSummary": "Parity, divisibility, factors, primes, GCD/LCM, remainders, and digit constraints.",
+      "mappingStatus": "local-proposal-requires-primary-learning-target-review"
+    },
+    {
+      "id": "FRC",
+      "label": "Fractions, decimals, ratios, and percentages",
+      "candidateWorldConceptIds": [
+        "fractions",
+        "groups-sharing"
+      ],
+      "scopeSummary": "Part-whole relations, fraction operations, proportional sharing, and percentages.",
+      "mappingStatus": "local-proposal-requires-primary-learning-target-review"
+    },
+    {
+      "id": "REL",
+      "label": "Quantitative relationships and early algebra",
+      "candidateWorldConceptIds": [
+        "missing-values",
+        "addition-subtraction",
+        "groups-sharing",
+        "digits",
+        "money",
+        "time"
+      ],
+      "scopeSummary": "Comparisons, transfers, age relations, balances, codes, and rates; story context alone does not determine placement.",
+      "mappingStatus": "local-proposal-requires-primary-learning-target-review"
+    },
+    {
+      "id": "PAT",
+      "label": "Patterns, sequences, and cycles",
+      "candidateWorldConceptIds": [
+        "patterns",
+        "time"
+      ],
+      "scopeSummary": "Repeating, growing, interleaved, and synchronized cycles.",
+      "mappingStatus": "local-proposal-requires-primary-learning-target-review"
+    },
+    {
+      "id": "MEA",
+      "label": "Measurement, money, and time",
+      "candidateWorldConceptIds": [
+        "measurement",
+        "money",
+        "time"
+      ],
+      "scopeSummary": "Units, scales, prices/change, clocks, elapsed time, and calendars.",
+      "mappingStatus": "local-proposal-requires-primary-learning-target-review"
+    },
+    {
+      "id": "GEO",
+      "label": "Plane geometry",
+      "candidateWorldConceptIds": [
+        "symmetry",
+        "shapes",
+        "area",
+        "routes"
+      ],
+      "scopeSummary": "Shapes, angles, area, perimeter, reflection, tiling, and coordinates.",
+      "mappingStatus": "local-proposal-requires-primary-learning-target-review"
+    },
+    {
+      "id": "SPA",
+      "label": "Spatial visualization and visual structure",
+      "candidateWorldConceptIds": [
+        "shapes",
+        "solids",
+        "symmetry"
+      ],
+      "scopeSummary": "Positions, missing pieces, views, hidden cubes, nets, dice faces, folding, and layers.",
+      "mappingStatus": "local-proposal-requires-primary-learning-target-review"
+    },
+    {
+      "id": "CNT",
+      "label": "Combinatorial counting and discrete selection",
+      "candidateWorldConceptIds": [
+        "counting",
+        "possibilities",
+        "routes",
+        "digits"
+      ],
+      "scopeSummary": "Arrangements, selections, distributions, route counts, embedded figures, digit occurrences, sets, and pairings.",
+      "mappingStatus": "local-proposal-requires-primary-learning-target-review"
+    },
+    {
+      "id": "LOG",
+      "label": "Logic and constraint satisfaction",
+      "candidateWorldConceptIds": [
+        "logic"
+      ],
+      "scopeSummary": "Matching, ordering from clues, truth conditions, grids, pigeonhole, and informative weighings.",
+      "mappingStatus": "local-proposal-requires-primary-learning-target-review"
+    },
+    {
+      "id": "MOV",
+      "label": "Paths, transformations, games, and networks",
+      "candidateWorldConceptIds": [
+        "routes"
+      ],
+      "scopeSummary": "Mazes, shortest paths, one-stroke routes, legal moves, winning strategies, and connectivity.",
+      "mappingStatus": "local-proposal-requires-primary-learning-target-review"
+    },
+    {
+      "id": "DAT",
+      "label": "Data, statistics, and probability",
+      "candidateWorldConceptIds": [
+        "chance-data"
+      ],
+      "scopeSummary": "Tables/charts, averages, spread, likelihood, and probability.",
+      "mappingStatus": "local-proposal-requires-primary-learning-target-review"
+    }
+  ],
+  "proposedTopicWorldCrosswalk": [
+    {
+      "topicId": "NUM.quantities",
+      "candidateWorldConceptIds": [
+        "counting"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "NUM.order_number_line",
+      "candidateWorldConceptIds": [
+        "digits"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "NUM.place_value",
+      "candidateWorldConceptIds": [
+        "digits"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "NUM.add_subtract",
+      "candidateWorldConceptIds": [
+        "addition-subtraction"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "NUM.multiply_divide",
+      "candidateWorldConceptIds": [
+        "groups-sharing"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "NUM.computation_structure",
+      "candidateWorldConceptIds": [
+        "addition-subtraction"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "NUM.estimation",
+      "candidateWorldConceptIds": [
+        "digits"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "NUM.intervals",
+      "candidateWorldConceptIds": [
+        "counting"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "INT.parity",
+      "candidateWorldConceptIds": [
+        "digits"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "INT.divisibility",
+      "candidateWorldConceptIds": [
+        "digits"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "INT.factors_primes",
+      "candidateWorldConceptIds": [
+        "digits"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "INT.gcd_lcm",
+      "candidateWorldConceptIds": [
+        "digits"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "INT.remainders",
+      "candidateWorldConceptIds": [
+        "digits"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "INT.digit_properties",
+      "candidateWorldConceptIds": [
+        "digits"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "INT.special_numbers",
+      "candidateWorldConceptIds": [
+        "digits"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "FRC.part_whole",
+      "candidateWorldConceptIds": [
+        "fractions"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "FRC.equivalence_order",
+      "candidateWorldConceptIds": [
+        "fractions"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "FRC.operations",
+      "candidateWorldConceptIds": [
+        "fractions"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "FRC.fraction_of_quantity",
+      "candidateWorldConceptIds": [
+        "fractions"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "FRC.ratio_proportion",
+      "candidateWorldConceptIds": [
+        "groups-sharing"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "FRC.percentages",
+      "candidateWorldConceptIds": [
+        "fractions"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "REL.additive",
+      "candidateWorldConceptIds": [
+        "addition-subtraction"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "REL.multiplicative",
+      "candidateWorldConceptIds": [
+        "groups-sharing"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "REL.sum_difference",
+      "candidateWorldConceptIds": [
+        "missing-values"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "REL.two_totals",
+      "candidateWorldConceptIds": [
+        "missing-values"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "REL.chained_operations",
+      "candidateWorldConceptIds": [
+        "addition-subtraction",
+        "missing-values"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "REL.transfers",
+      "candidateWorldConceptIds": [
+        "addition-subtraction",
+        "missing-values"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "REL.equations",
+      "candidateWorldConceptIds": [
+        "missing-values"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "REL.balance",
+      "candidateWorldConceptIds": [
+        "missing-values",
+        "groups-sharing",
+        "money"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "REL.cryptarithms",
+      "candidateWorldConceptIds": [
+        "missing-values",
+        "digits"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "REL.rates",
+      "candidateWorldConceptIds": [
+        "groups-sharing",
+        "time"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "PAT.repeat",
+      "candidateWorldConceptIds": [
+        "patterns"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "PAT.growth_numeric",
+      "candidateWorldConceptIds": [
+        "patterns"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "PAT.growth_geometric",
+      "candidateWorldConceptIds": [
+        "patterns"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "PAT.interleaved",
+      "candidateWorldConceptIds": [
+        "patterns"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "PAT.cycles",
+      "candidateWorldConceptIds": [
+        "patterns",
+        "time"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "MEA.units",
+      "candidateWorldConceptIds": [
+        "measurement"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "MEA.length_scales",
+      "candidateWorldConceptIds": [
+        "measurement"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "MEA.mass_capacity_temperature",
+      "candidateWorldConceptIds": [
+        "measurement"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "MEA.money",
+      "candidateWorldConceptIds": [
+        "money"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "MEA.clock_elapsed",
+      "candidateWorldConceptIds": [
+        "time"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "MEA.calendar",
+      "candidateWorldConceptIds": [
+        "time"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "GEO.properties",
+      "candidateWorldConceptIds": [
+        "shapes"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "GEO.angles",
+      "candidateWorldConceptIds": [
+        "shapes"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "GEO.perimeter",
+      "candidateWorldConceptIds": [
+        "area"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "GEO.area_basic",
+      "candidateWorldConceptIds": [
+        "area"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "GEO.area_composite",
+      "candidateWorldConceptIds": [
+        "area"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "GEO.symmetry_transformations",
+      "candidateWorldConceptIds": [
+        "symmetry"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "GEO.dissection_tiling",
+      "candidateWorldConceptIds": [
+        "shapes"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "GEO.coordinates",
+      "candidateWorldConceptIds": [
+        "routes"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "SPA.containment_position",
+      "candidateWorldConceptIds": [
+        "shapes",
+        "solids"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "SPA.visual_matching",
+      "candidateWorldConceptIds": [
+        "shapes"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "SPA.solid_properties",
+      "candidateWorldConceptIds": [
+        "solids"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "SPA.cube_stacks_views",
+      "candidateWorldConceptIds": [
+        "solids"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "SPA.cube_nets",
+      "candidateWorldConceptIds": [
+        "solids"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "SPA.cube_orientation",
+      "candidateWorldConceptIds": [
+        "solids"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "SPA.folding_cutting",
+      "candidateWorldConceptIds": [
+        "symmetry",
+        "shapes"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "SPA.overlap_layers",
+      "candidateWorldConceptIds": [
+        "shapes",
+        "solids"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "CNT.ordered_arrangements",
+      "candidateWorldConceptIds": [
+        "counting",
+        "possibilities"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "CNT.unordered_selections",
+      "candidateWorldConceptIds": [
+        "counting",
+        "possibilities"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "CNT.equivalence_counting",
+      "candidateWorldConceptIds": [
+        "counting",
+        "possibilities"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "CNT.distributions",
+      "candidateWorldConceptIds": [
+        "counting",
+        "possibilities"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "CNT.target_sums",
+      "candidateWorldConceptIds": [
+        "counting",
+        "possibilities"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "CNT.path_counts",
+      "candidateWorldConceptIds": [
+        "routes",
+        "possibilities"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "CNT.figure_counts",
+      "candidateWorldConceptIds": [
+        "counting"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "CNT.digit_occurrences",
+      "candidateWorldConceptIds": [
+        "digits",
+        "counting"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "CNT.overlap_counts",
+      "candidateWorldConceptIds": [
+        "counting"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "CNT.pair_counts",
+      "candidateWorldConceptIds": [
+        "counting",
+        "possibilities"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "LOG.attribute_matching",
+      "candidateWorldConceptIds": [
+        "logic"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "LOG.order_constraints",
+      "candidateWorldConceptIds": [
+        "logic"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "LOG.truth_lies",
+      "candidateWorldConceptIds": [
+        "logic"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "LOG.set_membership",
+      "candidateWorldConceptIds": [
+        "logic"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "LOG.grid_constraints",
+      "candidateWorldConceptIds": [
+        "logic"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "LOG.pigeonhole",
+      "candidateWorldConceptIds": [
+        "logic"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "LOG.weighing_information",
+      "candidateWorldConceptIds": [
+        "logic"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "MOV.navigation",
+      "candidateWorldConceptIds": [
+        "routes"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "MOV.traversal",
+      "candidateWorldConceptIds": [
+        "routes"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "MOV.state_moves",
+      "candidateWorldConceptIds": [],
+      "status": "unplaced-requires-world-decision"
+    },
+    {
+      "topicId": "MOV.winning_games",
+      "candidateWorldConceptIds": [],
+      "status": "unplaced-requires-world-decision"
+    },
+    {
+      "topicId": "MOV.networks",
+      "candidateWorldConceptIds": [
+        "routes"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "DAT.data_reading",
+      "candidateWorldConceptIds": [
+        "chance-data"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "DAT.mean_total",
+      "candidateWorldConceptIds": [
+        "chance-data"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "DAT.order_statistics",
+      "candidateWorldConceptIds": [
+        "chance-data"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "DAT.qualitative_chance",
+      "candidateWorldConceptIds": [
+        "chance-data"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "DAT.probability_single",
+      "candidateWorldConceptIds": [
+        "chance-data"
+      ],
+      "status": "local-proposal-requires-item-review"
+    },
+    {
+      "topicId": "DAT.probability_multi",
+      "candidateWorldConceptIds": [
+        "chance-data"
+      ],
+      "status": "local-proposal-requires-item-review"
+    }
+  ],
+  "courseStrategyCrosswalk": [
+    {
+      "courseStrategyId": "find-pattern",
+      "candidateRegisteredStrategyIds": [
+        "find_pattern"
+      ],
+      "boundary": "Direct vocabulary match.",
+      "status": "local-proposal-not-automatic-conversion"
+    },
+    {
+      "courseStrategyId": "draw-diagram",
+      "candidateRegisteredStrategyIds": [
+        "draw_model"
+      ],
+      "boundary": "A model introduced to solve the problem, not every supplied diagram.",
+      "status": "local-proposal-not-automatic-conversion"
+    },
+    {
+      "courseStrategyId": "visualize",
+      "candidateRegisteredStrategyIds": [
+        "simulate_state"
+      ],
+      "boundary": "Candidate when explicitly tracking states; visual format alone is not a strategy.",
+      "status": "local-proposal-not-automatic-conversion"
+    },
+    {
+      "courseStrategyId": "work-backward",
+      "candidateRegisteredStrategyIds": [
+        "work_backward"
+      ],
+      "boundary": "Direct vocabulary match.",
+      "status": "local-proposal-not-automatic-conversion"
+    },
+    {
+      "courseStrategyId": "guess-check",
+      "candidateRegisteredStrategyIds": [
+        "guess_check"
+      ],
+      "boundary": "Structured candidate checking.",
+      "status": "local-proposal-not-automatic-conversion"
+    },
+    {
+      "courseStrategyId": "organized-list",
+      "candidateRegisteredStrategyIds": [
+        "organized_enumeration"
+      ],
+      "boundary": "List must support complete, nonduplicated enumeration.",
+      "status": "local-proposal-not-automatic-conversion"
+    },
+    {
+      "courseStrategyId": "build-table",
+      "candidateRegisteredStrategyIds": [
+        "organized_enumeration"
+      ],
+      "boundary": "Only when the table enumerates cases; otherwise table is a representation.",
+      "status": "local-proposal-not-automatic-conversion"
+    },
+    {
+      "courseStrategyId": "write-equation",
+      "candidateRegisteredStrategyIds": [],
+      "boundary": "Equation is a representation; select substitution_elimination only when the actual method warrants it.",
+      "status": "local-proposal-not-automatic-conversion"
+    },
+    {
+      "courseStrategyId": "compare-order",
+      "candidateRegisteredStrategyIds": [],
+      "boundary": "Compare/order are goals; choose a strategy from the actual solution.",
+      "status": "local-proposal-not-automatic-conversion"
+    },
+    {
+      "courseStrategyId": "organize-cases",
+      "candidateRegisteredStrategyIds": [
+        "case_split",
+        "organized_enumeration"
+      ],
+      "boundary": "Choose the essential method(s), not both by default.",
+      "status": "local-proposal-not-automatic-conversion"
+    },
+    {
+      "courseStrategyId": "decompose",
+      "candidateRegisteredStrategyIds": [
+        "decompose_recompose"
+      ],
+      "boundary": "Direct vocabulary match.",
+      "status": "local-proposal-not-automatic-conversion"
+    },
+    {
+      "courseStrategyId": "transform",
+      "candidateRegisteredStrategyIds": [
+        "simulate_state",
+        "symmetry"
+      ],
+      "boundary": "Tracking a turn and exploiting symmetry differ; inspect the method.",
+      "status": "local-proposal-not-automatic-conversion"
+    },
+    {
+      "courseStrategyId": "trace-path",
+      "candidateRegisteredStrategyIds": [
+        "simulate_state",
+        "work_backward"
+      ],
+      "boundary": "Candidates depend on whether tracing proceeds forward or backward.",
+      "status": "local-proposal-not-automatic-conversion"
+    },
+    {
+      "courseStrategyId": "use-invariant",
+      "candidateRegisteredStrategyIds": [
+        "invariant"
+      ],
+      "boundary": "Direct vocabulary match.",
+      "status": "local-proposal-not-automatic-conversion"
+    },
+    {
+      "courseStrategyId": "optimize",
+      "candidateRegisteredStrategyIds": [
+        "extremal_bounds"
+      ],
+      "boundary": "Optimization is a goal; use this strategy only for a bound plus an attaining construction.",
+      "status": "local-proposal-not-automatic-conversion"
+    },
+    {
+      "courseStrategyId": "choose-and-check",
+      "candidateRegisteredStrategyIds": [],
+      "boundary": "A teaching routine, not an automatic mathematical strategy tag.",
+      "status": "local-proposal-not-automatic-conversion"
+    }
+  ],
+  "classificationBoundaries": [
+    {
+      "id": "given-vs-possible",
+      "rule": "Counting given objects is NUM; counting configurations, embedded composite figures, or possible arrangements is CNT. If tracing containment or hidden structure is the bottleneck, consider SPA.",
+      "status": "proposed-editorial-rule"
+    },
+    {
+      "id": "order-vs-arrangements",
+      "rule": "Deducing a line-up is LOG.order_constraints; counting allowed line-ups is CNT.ordered_arrangements. Both IDs are registered in the supplied v1.0.0 taxonomy.",
+      "status": "proposed-editorial-rule"
+    },
+    {
+      "id": "navigation-vs-route-count",
+      "rule": "Find or optimize a legal route: MOV. Count valid routes: CNT. Use coordinate geometry essentially: GEO.",
+      "status": "proposed-editorial-rule"
+    },
+    {
+      "id": "dice-structure",
+      "rule": "Infer dice faces or a net: SPA. Count dice configurations: CNT. Reason about likelihood under a random experiment: DAT.",
+      "status": "proposed-editorial-rule"
+    },
+    {
+      "id": "balance-vs-information",
+      "rule": "Solve equivalent quantities on a balance: REL. Choose informative weighings to identify an unknown object: LOG.",
+      "status": "proposed-editorial-rule"
+    },
+    {
+      "id": "clock-vs-age",
+      "rule": "Read clocks, elapsed time, or calendars: MEA. Infer age sums, differences, or invariant relations: REL; the age story alone does not make Time the primary world.",
+      "status": "proposed-editorial-rule"
+    },
+    {
+      "id": "money-context",
+      "rule": "Money is primary MEA when denomination, units, value, or change is essential; a purchase setting alone does not displace REL, CNT, or another core structure.",
+      "status": "proposed-editorial-rule"
+    },
+    {
+      "id": "symmetry-role",
+      "rule": "Reflection or geometric symmetry can be primary GEO; using symmetry to simplify a count is a strategy with primary CNT.",
+      "status": "proposed-editorial-rule"
+    },
+    {
+      "id": "incidental-arithmetic",
+      "rule": "Do not add arithmetic as a secondary concept merely because a solution includes a routine calculation.",
+      "status": "proposed-editorial-rule"
+    }
+  ],
+  "classificationProvenancePolicy": {
+    "status": "proposed-not-implemented",
+    "sourcePreservation": "Keep each original corpus record unchanged. Classification output is an annotation, not a replacement source record.",
+    "separateEnvelope": [
+      "problem_id",
+      "content-version-or-input-fingerprint",
+      "classification-run-id",
+      "model-and-prompt-version",
+      "parent-question-and-subpart",
+      "shared-stimulus-reference",
+      "source-country-and-system",
+      "asset-references"
+    ],
+    "schemaBoundary": "The supplied classification schema forbids extra properties; store provenance outside that schema, keyed by problem_id and the source content version."
+  },
+  "classificationPilot": {
+    "status": "proposed-not-executed",
+    "targetRecords": 400,
+    "acceptableRange": [
+      300,
+      500
+    ],
+    "stratifyBy": [
+      "source-family",
+      "grade-band",
+      "point-tier",
+      "candidate-family",
+      "diagram-dependence",
+      "metadata-quality"
+    ],
+    "reviewChecks": [
+      "Inspect prompt, diagrams, pictured options, and answer source.",
+      "Resolve the primary structure and at most three essential secondary concepts.",
+      "Keep source grade, prerequisites, reasoning demand, and incidental reading/computation/visual demand separate.",
+      "Allow missing or uncertain classification rather than inferring unseen information.",
+      "Review disagreement and overlap before scaling; deduplicate source editions before world assignment."
+    ],
+    "semanticValidationStillRequired": [
+      "No primary topic duplicated among secondary topics.",
+      "Every tag is essential and supported; no unstated conventions.",
+      "Ambiguous candidate topics agree with the stated family or explicitly span families.",
+      "Material quality flags and proposed new topics require review.",
+      "No calibrated difficulty claim without real response evidence."
+    ],
+    "fixtureGaps": [
+      "INT",
+      "FRC",
+      "MEA",
+      "GEO",
+      "family_only",
+      "ambiguous",
+      "unreadable",
+      "out_of_scope"
+    ],
+    "rolloutGate": "Sequence and aesthetics acceptance precede world production; a classification pilot and subtype-definition review precede corpus-wide relabeling."
+  },
+  "taxonomyCoverageGaps": [
+    {
+      "familyId": "CNT",
+      "issue": "Counting and Possibilities overlap; arrangements, selections, distributions, pairings, and embedded figures need explicit subtype boundaries before bank assignment.",
+      "action": "Keep specialist worlds conditional; choose one primary home per problem."
+    },
+    {
+      "familyId": "MOV",
+      "issue": "Routes covers navigation but does not establish coverage of swaps, toggles, pouring, or winning-strategy games.",
+      "action": "Reserve unplaced subskills; no new required world without inspected coverage and approval."
+    },
+    {
+      "familyId": "DAT",
+      "issue": "The thin Chance & Data pool does not establish statistics or probability coverage separately.",
+      "action": "Inspect charts and statistical reasoning separately from random experiments; defer or split only after coverage review."
+    },
+    {
+      "familyId": "LOG",
+      "issue": "Pigeonhole and informative weighing are not established by the current broad Logic candidate count.",
+      "action": "Review specific structures instead of inferring coverage from the family name."
+    },
+    {
+      "familyId": "SPA",
+      "issue": "Gear motion and folding details need a precise learning target; existing world names do not prove placement.",
+      "action": "Hold unplaced cases for taxonomy and world-boundary review."
+    }
+  ],
   "sourceCurricula": [
     {
       "id": "set-a",
@@ -419,7 +1564,6 @@
       "lesson": 6,
       "title": "How Old Are You?",
       "conceptIds": [
-        "time",
         "addition-subtraction",
         "missing-values"
       ],
@@ -429,7 +1573,7 @@
         "work-backward"
       ],
       "evidenceLocator": "class notes slides 7-13",
-      "summary": "Ages change together; differences stay fixed; a sum grows once per person each year.",
+      "summary": "Ages change together; differences stay fixed; a sum grows once per person each year. Classify the quantity relation, not the age setting.",
       "sourceRole": "topic-practice",
       "evidenceStatus": "source-grounded-summary"
     },
@@ -929,7 +2073,6 @@
       "id": "age-invariants",
       "label": "Ages changing together, fixed differences, and changing sums",
       "conceptIds": [
-        "time",
         "addition-subtraction",
         "missing-values"
       ],
@@ -1051,7 +2194,12 @@
         "Organize groups, overlapping regions, and inclusive endpoints without double counting.",
         "Count by cases and complements; derive rather than enumerate a larger total.",
         "Prove a counting strategy; use invariants and combinatorial structure."
-      ]
+      ],
+      "candidateTaxonomyFamilyIds": [
+        "NUM",
+        "CNT"
+      ],
+      "taxonomyMappingStatus": "local-world-crosswalk-not-item-assignment"
     },
     {
       "id": "symmetry",
@@ -1064,7 +2212,12 @@
         "Track folds and reflections across different axes; distinguish turns from mirrors.",
         "Combine transformations and reason about invariant features.",
         "Use symmetry to reduce cases and justify geometric relationships."
-      ]
+      ],
+      "candidateTaxonomyFamilyIds": [
+        "GEO",
+        "SPA"
+      ],
+      "taxonomyMappingStatus": "local-world-crosswalk-not-item-assignment"
     },
     {
       "id": "addition-subtraction",
@@ -1078,7 +2231,12 @@
         "Use inverse operations and two-step comparison stories.",
         "Choose an efficient decomposition and reason with signed quantities.",
         "Reason about expressions and additive invariants without brute-force calculation."
-      ]
+      ],
+      "candidateTaxonomyFamilyIds": [
+        "NUM",
+        "REL"
+      ],
+      "taxonomyMappingStatus": "local-world-crosswalk-not-item-assignment"
     },
     {
       "id": "patterns",
@@ -1093,7 +2251,11 @@
         "Find missing positions and use the period of a cycle.",
         "Compare recursive and position-based rules.",
         "Generalize a sequence and justify an indexed or recursive rule."
-      ]
+      ],
+      "candidateTaxonomyFamilyIds": [
+        "PAT"
+      ],
+      "taxonomyMappingStatus": "local-world-crosswalk-not-item-assignment"
     },
     {
       "id": "shapes",
@@ -1111,7 +2273,12 @@
         "Decompose and tile shapes while preserving their boundaries.",
         "Use angles, congruence, and tiling constraints to organize a construction.",
         "Use similarity, decomposition, and auxiliary shapes after ratios and scale have been taught."
-      ]
+      ],
+      "candidateTaxonomyFamilyIds": [
+        "GEO",
+        "SPA"
+      ],
+      "taxonomyMappingStatus": "local-world-crosswalk-not-item-assignment"
     },
     {
       "id": "logic",
@@ -1131,7 +2298,11 @@
         "Order or place several objects; work backward through a short process.",
         "Track interacting constraints and exhaust a small set of cases.",
         "Use contradiction, invariants, and complete case analysis."
-      ]
+      ],
+      "candidateTaxonomyFamilyIds": [
+        "LOG"
+      ],
+      "taxonomyMappingStatus": "local-world-crosswalk-not-item-assignment"
     },
     {
       "id": "groups-sharing",
@@ -1146,7 +2317,13 @@
         "Link multiplication and division, including a meaningful remainder.",
         "Compare ratios and unit rates in multi-step situations.",
         "Reason proportionally with changing rates and constraints."
-      ]
+      ],
+      "candidateTaxonomyFamilyIds": [
+        "NUM",
+        "FRC",
+        "REL"
+      ],
+      "taxonomyMappingStatus": "local-world-crosswalk-not-item-assignment"
     },
     {
       "id": "digits",
@@ -1166,7 +2343,14 @@
         "Use parity, place-value constraints, and simple divisibility.",
         "Use factors, multiples, remainders, and digit constraints together.",
         "Apply modular, factorization, and exponent structure."
-      ]
+      ],
+      "candidateTaxonomyFamilyIds": [
+        "NUM",
+        "INT",
+        "REL",
+        "CNT"
+      ],
+      "taxonomyMappingStatus": "local-world-crosswalk-not-item-assignment"
     },
     {
       "id": "routes",
@@ -1184,7 +2368,13 @@
         "Compare routes on grids and obey one-way or no-repeat rules.",
         "Count constrained routes and use connectivity.",
         "Combine coordinate and graph structure to prove a route property."
-      ]
+      ],
+      "candidateTaxonomyFamilyIds": [
+        "GEO",
+        "CNT",
+        "MOV"
+      ],
+      "taxonomyMappingStatus": "local-world-crosswalk-not-item-assignment"
     },
     {
       "id": "fractions",
@@ -1200,7 +2390,11 @@
         "Compare and compose fractions; reconstruct a whole from a part.",
         "Connect fraction operations, decimals, and percentages.",
         "Reason with successive fractional changes and constrained proportions."
-      ]
+      ],
+      "candidateTaxonomyFamilyIds": [
+        "FRC"
+      ],
+      "taxonomyMappingStatus": "local-world-crosswalk-not-item-assignment"
     },
     {
       "id": "solids",
@@ -1215,7 +2409,11 @@
         "Infer hidden blocks and match nets or multiple views.",
         "Reason about sections, painted faces, and surface versus volume.",
         "Use a spatial decomposition to justify a three-dimensional relationship."
-      ]
+      ],
+      "candidateTaxonomyFamilyIds": [
+        "SPA"
+      ],
+      "taxonomyMappingStatus": "local-world-crosswalk-not-item-assignment"
     },
     {
       "id": "measurement",
@@ -1233,7 +2431,11 @@
         "Combine measurements, choose units, and interpret a simple scale.",
         "Convert units and relate scale, capacity, and distance.",
         "Model an indirect measurement and justify the chosen units and scale."
-      ]
+      ],
+      "candidateTaxonomyFamilyIds": [
+        "MEA"
+      ],
+      "taxonomyMappingStatus": "local-world-crosswalk-not-item-assignment"
     },
     {
       "id": "money",
@@ -1247,7 +2449,12 @@
         "Make change and compare equivalent purchases.",
         "Reason through exchanges, bundles, and proportional prices.",
         "Optimize a purchase or exchange with multiple constraints."
-      ]
+      ],
+      "candidateTaxonomyFamilyIds": [
+        "REL",
+        "MEA"
+      ],
+      "taxonomyMappingStatus": "local-world-crosswalk-not-item-assignment"
     },
     {
       "id": "time",
@@ -1262,7 +2469,13 @@
         "Find elapsed time across hour and day boundaries.",
         "Coordinate schedules, periodic events, and travel time.",
         "Reason about simultaneous cycles and rate-time constraints."
-      ]
+      ],
+      "candidateTaxonomyFamilyIds": [
+        "REL",
+        "PAT",
+        "MEA"
+      ],
+      "taxonomyMappingStatus": "local-world-crosswalk-not-item-assignment"
     },
     {
       "id": "area",
@@ -1277,7 +2490,11 @@
         "Distinguish area from perimeter and decompose a rectilinear region.",
         "Find composite or shaded area using equalities and subtraction.",
         "Prove area relations and optimize a boundary under constraints."
-      ]
+      ],
+      "candidateTaxonomyFamilyIds": [
+        "GEO"
+      ],
+      "taxonomyMappingStatus": "local-world-crosswalk-not-item-assignment"
     },
     {
       "id": "missing-values",
@@ -1294,7 +2511,11 @@
         "Link two equalities and solve a simple symbol code.",
         "Translate relations into equations and solve coupled unknowns.",
         "Reason about functions, systems, and algebraic structure."
-      ]
+      ],
+      "candidateTaxonomyFamilyIds": [
+        "REL"
+      ],
+      "taxonomyMappingStatus": "local-world-crosswalk-not-item-assignment"
     },
     {
       "id": "possibilities",
@@ -1313,7 +2534,11 @@
         "List combinations systematically without missing or repeating an outcome.",
         "Use product structure, organized cases, and complementary counts.",
         "Use combinations, permutations, and inclusion-exclusion with justification."
-      ]
+      ],
+      "candidateTaxonomyFamilyIds": [
+        "CNT"
+      ],
+      "taxonomyMappingStatus": "local-world-crosswalk-not-item-assignment"
     },
     {
       "id": "chance-data",
@@ -1329,7 +2554,11 @@
         "Read a data display and identify all equally likely outcomes.",
         "Compare probabilities and aggregate or interpret data.",
         "Reason about conditional information and structured sample spaces."
-      ]
+      ],
+      "candidateTaxonomyFamilyIds": [
+        "DAT"
+      ],
+      "taxonomyMappingStatus": "local-world-crosswalk-not-item-assignment"
     }
   ],
   "worldSlots": [
@@ -1342,6 +2571,12 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Count visible objects once; choose the relevant objects; count missing units.",
+      "candidateTaxonomyFamilyIds": [
+        "NUM",
+        "CNT"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
       "sourceLinkedSubskillIds": [
         "count-once",
@@ -1393,6 +2628,12 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Match mirror halves and complete one reflection across a visible line.",
+      "candidateTaxonomyFamilyIds": [
+        "GEO",
+        "SPA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
       "sourceLinkedSubskillIds": [
         "mirrors-identical"
@@ -1435,6 +2676,12 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Join, remove, and compare small visible quantities.",
+      "candidateTaxonomyFamilyIds": [
+        "NUM",
+        "REL"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
       "sourceLinkedSubskillIds": [
         "reverse-process",
@@ -1481,6 +2728,11 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Identify a repeating unit or one-step growing pattern.",
+      "candidateTaxonomyFamilyIds": [
+        "PAT"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
       "sourceLinkedSubskillIds": [
         "repeating-growing"
@@ -1522,6 +2774,12 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Recognize boundaries and fit or combine simple pieces.",
+      "candidateTaxonomyFamilyIds": [
+        "GEO",
+        "SPA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
       "sourceLinkedSubskillIds": [
         "missing-pieces"
@@ -1567,6 +2825,11 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Combine two concrete clues to eliminate an impossible arrangement.",
+      "candidateTaxonomyFamilyIds": [
+        "LOG"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
       "sourceLinkedSubskillIds": [
         "constraint-clues",
@@ -1614,6 +2877,13 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Make equal groups and share concrete objects fairly.",
+      "candidateTaxonomyFamilyIds": [
+        "NUM",
+        "FRC",
+        "REL"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
       "sourceLinkedSubskillIds": [
         "equal-groups",
@@ -1664,6 +2934,14 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Read place value and compose or compare numbers from digits.",
+      "candidateTaxonomyFamilyIds": [
+        "NUM",
+        "INT",
+        "REL",
+        "CNT"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
       "sourceLinkedSubskillIds": [
         "ordering-intervals",
@@ -1709,6 +2987,13 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Follow a path, read positions, and distinguish steps from visited points.",
+      "candidateTaxonomyFamilyIds": [
+        "GEO",
+        "CNT",
+        "MOV"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
       "sourceLinkedSubskillIds": [
         "ordering-intervals",
@@ -1758,6 +3043,11 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Recognize equal parts and halves in concrete pictures.",
+      "candidateTaxonomyFamilyIds": [
+        "FRC"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
       "sourceLinkedSubskillIds": [],
       "strategyIds": [],
@@ -1795,6 +3085,11 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Match a simple solid to a view and count visible blocks.",
+      "candidateTaxonomyFamilyIds": [
+        "SPA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
       "sourceLinkedSubskillIds": [
         "spatial-views",
@@ -1840,6 +3135,11 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Compare lengths and measure with repeated equal units.",
+      "candidateTaxonomyFamilyIds": [
+        "MEA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
       "sourceLinkedSubskillIds": [
         "measure-units"
@@ -1883,6 +3183,12 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Combine coin values and make a small purchase.",
+      "candidateTaxonomyFamilyIds": [
+        "REL",
+        "MEA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
       "sourceLinkedSubskillIds": [
         "min-max",
@@ -1930,14 +3236,19 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Read a clock or calendar and order short time intervals.",
+      "candidateTaxonomyFamilyIds": [
+        "REL",
+        "PAT",
+        "MEA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
       "sourceLinkedSubskillIds": [
-        "clock-calendar",
-        "age-invariants"
+        "clock-calendar"
       ],
       "strategyIds": [
         "draw-diagram",
-        "use-invariant",
         "work-backward"
       ],
       "editorialStatus": "proposed-not-assigned-or-approved",
@@ -1974,6 +3285,11 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Compare covered space using whole squares and trace a boundary.",
+      "candidateTaxonomyFamilyIds": [
+        "GEO"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
       "sourceLinkedSubskillIds": [
         "missing-pieces"
@@ -2018,6 +3334,11 @@
       "passLabel": "Notice",
       "kind": "core-proposal",
       "objective": "Find one missing amount in a pictured balance or equality.",
+      "candidateTaxonomyFamilyIds": [
+        "REL"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Demonstrate a useful move, then repeat it with a small variation.",
       "sourceLinkedSubskillIds": [
         "reverse-process",
@@ -2068,6 +3389,12 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Organize groups, overlapping regions, and inclusive endpoints without double counting.",
+      "candidateTaxonomyFamilyIds": [
+        "NUM",
+        "CNT"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
       "sourceLinkedSubskillIds": [
         "count-once",
@@ -2120,6 +3447,12 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Track folds and reflections across different axes; distinguish turns from mirrors.",
+      "candidateTaxonomyFamilyIds": [
+        "GEO",
+        "SPA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
       "sourceLinkedSubskillIds": [
         "mirrors-identical"
@@ -2163,6 +3496,12 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Use inverse operations and two-step comparison stories.",
+      "candidateTaxonomyFamilyIds": [
+        "NUM",
+        "REL"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
       "sourceLinkedSubskillIds": [
         "reverse-process",
@@ -2210,6 +3549,11 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Find missing positions and use the period of a cycle.",
+      "candidateTaxonomyFamilyIds": [
+        "PAT"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
       "sourceLinkedSubskillIds": [
         "repeating-growing"
@@ -2252,6 +3596,12 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Decompose and tile shapes while preserving their boundaries.",
+      "candidateTaxonomyFamilyIds": [
+        "GEO",
+        "SPA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
       "sourceLinkedSubskillIds": [
         "missing-pieces"
@@ -2298,6 +3648,11 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Order or place several objects; work backward through a short process.",
+      "candidateTaxonomyFamilyIds": [
+        "LOG"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
       "sourceLinkedSubskillIds": [
         "constraint-clues",
@@ -2346,6 +3701,13 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Link multiplication and division, including a meaningful remainder.",
+      "candidateTaxonomyFamilyIds": [
+        "NUM",
+        "FRC",
+        "REL"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
       "sourceLinkedSubskillIds": [
         "equal-groups",
@@ -2397,6 +3759,14 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Use parity, place-value constraints, and simple divisibility.",
+      "candidateTaxonomyFamilyIds": [
+        "NUM",
+        "INT",
+        "REL",
+        "CNT"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
       "sourceLinkedSubskillIds": [
         "ordering-intervals",
@@ -2443,6 +3813,13 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Compare routes on grids and obey one-way or no-repeat rules.",
+      "candidateTaxonomyFamilyIds": [
+        "GEO",
+        "CNT",
+        "MOV"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
       "sourceLinkedSubskillIds": [
         "ordering-intervals",
@@ -2493,6 +3870,11 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Compare and compose fractions; reconstruct a whole from a part.",
+      "candidateTaxonomyFamilyIds": [
+        "FRC"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
       "sourceLinkedSubskillIds": [],
       "strategyIds": [],
@@ -2531,6 +3913,11 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Infer hidden blocks and match nets or multiple views.",
+      "candidateTaxonomyFamilyIds": [
+        "SPA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
       "sourceLinkedSubskillIds": [
         "spatial-views",
@@ -2577,6 +3964,11 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Combine measurements, choose units, and interpret a simple scale.",
+      "candidateTaxonomyFamilyIds": [
+        "MEA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
       "sourceLinkedSubskillIds": [
         "measure-units"
@@ -2621,6 +4013,12 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Make change and compare equivalent purchases.",
+      "candidateTaxonomyFamilyIds": [
+        "REL",
+        "MEA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
       "sourceLinkedSubskillIds": [
         "min-max",
@@ -2669,14 +4067,19 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Find elapsed time across hour and day boundaries.",
+      "candidateTaxonomyFamilyIds": [
+        "REL",
+        "PAT",
+        "MEA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
       "sourceLinkedSubskillIds": [
-        "clock-calendar",
-        "age-invariants"
+        "clock-calendar"
       ],
       "strategyIds": [
         "draw-diagram",
-        "use-invariant",
         "work-backward"
       ],
       "editorialStatus": "proposed-not-assigned-or-approved",
@@ -2714,6 +4117,11 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Distinguish area from perimeter and decompose a rectilinear region.",
+      "candidateTaxonomyFamilyIds": [
+        "GEO"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
       "sourceLinkedSubskillIds": [
         "missing-pieces"
@@ -2759,6 +4167,11 @@
       "passLabel": "Connect",
       "kind": "core-proposal",
       "objective": "Link two equalities and solve a simple symbol code.",
+      "candidateTaxonomyFamilyIds": [
+        "REL"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
       "sourceLinkedSubskillIds": [
         "reverse-process",
@@ -2810,6 +4223,11 @@
       "passLabel": "Connect",
       "kind": "conditional-specialist-proposal",
       "objective": "List combinations systematically without missing or repeating an outcome.",
+      "candidateTaxonomyFamilyIds": [
+        "CNT"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
       "sourceLinkedSubskillIds": [
         "systematic-enumeration",
@@ -2857,6 +4275,11 @@
       "passLabel": "Connect",
       "kind": "conditional-specialist-proposal",
       "objective": "Read a data display and identify all equally likely outcomes.",
+      "candidateTaxonomyFamilyIds": [
+        "DAT"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "within-reference-target-grades-subject-to-item-review",
       "strategyScaffolding": "Transfer a familiar move to a new representation; combine two linked steps.",
       "sourceLinkedSubskillIds": [],
       "strategyIds": [],
@@ -2891,6 +4314,12 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Count by cases and complements; derive rather than enumerate a larger total.",
+      "candidateTaxonomyFamilyIds": [
+        "NUM",
+        "CNT"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "preserve-grades-5-6-and-check-prerequisites",
       "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
       "sourceLinkedSubskillIds": [
         "count-once",
@@ -2943,6 +4372,12 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Combine transformations and reason about invariant features.",
+      "candidateTaxonomyFamilyIds": [
+        "GEO",
+        "SPA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "preserve-grades-5-6-and-check-prerequisites",
       "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
       "sourceLinkedSubskillIds": [
         "mirrors-identical"
@@ -2986,6 +4421,12 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Choose an efficient decomposition and reason with signed quantities.",
+      "candidateTaxonomyFamilyIds": [
+        "NUM",
+        "REL"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "preserve-grades-5-6-and-check-prerequisites",
       "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
       "sourceLinkedSubskillIds": [
         "reverse-process",
@@ -3033,6 +4474,11 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Compare recursive and position-based rules.",
+      "candidateTaxonomyFamilyIds": [
+        "PAT"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "preserve-grades-5-6-and-check-prerequisites",
       "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
       "sourceLinkedSubskillIds": [
         "repeating-growing"
@@ -3075,6 +4521,12 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Use angles, congruence, and tiling constraints to organize a construction.",
+      "candidateTaxonomyFamilyIds": [
+        "GEO",
+        "SPA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "preserve-grades-5-6-and-check-prerequisites",
       "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
       "sourceLinkedSubskillIds": [
         "missing-pieces"
@@ -3121,6 +4573,11 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Track interacting constraints and exhaust a small set of cases.",
+      "candidateTaxonomyFamilyIds": [
+        "LOG"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "preserve-grades-5-6-and-check-prerequisites",
       "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
       "sourceLinkedSubskillIds": [
         "constraint-clues",
@@ -3169,6 +4626,13 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Compare ratios and unit rates in multi-step situations.",
+      "candidateTaxonomyFamilyIds": [
+        "NUM",
+        "FRC",
+        "REL"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "preserve-grades-5-6-and-check-prerequisites",
       "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
       "sourceLinkedSubskillIds": [
         "equal-groups",
@@ -3220,6 +4684,14 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Use factors, multiples, remainders, and digit constraints together.",
+      "candidateTaxonomyFamilyIds": [
+        "NUM",
+        "INT",
+        "REL",
+        "CNT"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "preserve-grades-5-6-and-check-prerequisites",
       "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
       "sourceLinkedSubskillIds": [
         "ordering-intervals",
@@ -3266,6 +4738,13 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Count constrained routes and use connectivity.",
+      "candidateTaxonomyFamilyIds": [
+        "GEO",
+        "CNT",
+        "MOV"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "preserve-grades-5-6-and-check-prerequisites",
       "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
       "sourceLinkedSubskillIds": [
         "ordering-intervals",
@@ -3316,6 +4795,11 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Connect fraction operations, decimals, and percentages.",
+      "candidateTaxonomyFamilyIds": [
+        "FRC"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "preserve-grades-5-6-and-check-prerequisites",
       "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
       "sourceLinkedSubskillIds": [],
       "strategyIds": [],
@@ -3354,6 +4838,11 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Reason about sections, painted faces, and surface versus volume.",
+      "candidateTaxonomyFamilyIds": [
+        "SPA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "preserve-grades-5-6-and-check-prerequisites",
       "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
       "sourceLinkedSubskillIds": [
         "spatial-views",
@@ -3400,6 +4889,11 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Convert units and relate scale, capacity, and distance.",
+      "candidateTaxonomyFamilyIds": [
+        "MEA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "preserve-grades-5-6-and-check-prerequisites",
       "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
       "sourceLinkedSubskillIds": [
         "measure-units"
@@ -3444,6 +4938,12 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Reason through exchanges, bundles, and proportional prices.",
+      "candidateTaxonomyFamilyIds": [
+        "REL",
+        "MEA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "preserve-grades-5-6-and-check-prerequisites",
       "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
       "sourceLinkedSubskillIds": [
         "min-max",
@@ -3492,14 +4992,19 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Coordinate schedules, periodic events, and travel time.",
+      "candidateTaxonomyFamilyIds": [
+        "REL",
+        "PAT",
+        "MEA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "preserve-grades-5-6-and-check-prerequisites",
       "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
       "sourceLinkedSubskillIds": [
-        "clock-calendar",
-        "age-invariants"
+        "clock-calendar"
       ],
       "strategyIds": [
         "draw-diagram",
-        "use-invariant",
         "work-backward"
       ],
       "editorialStatus": "proposed-not-assigned-or-approved",
@@ -3537,6 +5042,11 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Find composite or shaded area using equalities and subtraction.",
+      "candidateTaxonomyFamilyIds": [
+        "GEO"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "preserve-grades-5-6-and-check-prerequisites",
       "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
       "sourceLinkedSubskillIds": [
         "missing-pieces"
@@ -3582,6 +5092,11 @@
       "passLabel": "Plan",
       "kind": "core-proposal",
       "objective": "Translate relations into equations and solve coupled unknowns.",
+      "candidateTaxonomyFamilyIds": [
+        "REL"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "preserve-grades-5-6-and-check-prerequisites",
       "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
       "sourceLinkedSubskillIds": [
         "reverse-process",
@@ -3633,6 +5148,11 @@
       "passLabel": "Plan",
       "kind": "conditional-specialist-proposal",
       "objective": "Use product structure, organized cases, and complementary counts.",
+      "candidateTaxonomyFamilyIds": [
+        "CNT"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "preserve-grades-5-6-and-check-prerequisites",
       "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
       "sourceLinkedSubskillIds": [
         "systematic-enumeration",
@@ -3680,6 +5200,11 @@
       "passLabel": "Plan",
       "kind": "conditional-specialist-proposal",
       "objective": "Compare probabilities and aggregate or interpret data.",
+      "candidateTaxonomyFamilyIds": [
+        "DAT"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "preserve-grades-5-6-and-check-prerequisites",
       "strategyScaffolding": "Choose between plausible moves; organize several cases or interacting constraints.",
       "sourceLinkedSubskillIds": [],
       "strategyIds": [],
@@ -3718,6 +5243,12 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Prove a counting strategy; use invariants and combinatorial structure.",
+      "candidateTaxonomyFamilyIds": [
+        "NUM",
+        "CNT"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "upper-grade-extension-review",
       "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
       "sourceLinkedSubskillIds": [
         "count-once",
@@ -3772,6 +5303,12 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Use symmetry to reduce cases and justify geometric relationships.",
+      "candidateTaxonomyFamilyIds": [
+        "GEO",
+        "SPA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "upper-grade-extension-review",
       "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
       "sourceLinkedSubskillIds": [
         "mirrors-identical"
@@ -3817,6 +5354,12 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Reason about expressions and additive invariants without brute-force calculation.",
+      "candidateTaxonomyFamilyIds": [
+        "NUM",
+        "REL"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "upper-grade-extension-review",
       "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
       "sourceLinkedSubskillIds": [
         "reverse-process",
@@ -3866,6 +5409,11 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Generalize a sequence and justify an indexed or recursive rule.",
+      "candidateTaxonomyFamilyIds": [
+        "PAT"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "upper-grade-extension-review",
       "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
       "sourceLinkedSubskillIds": [
         "repeating-growing"
@@ -3910,6 +5458,12 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Use similarity, decomposition, and auxiliary shapes after ratios and scale have been taught.",
+      "candidateTaxonomyFamilyIds": [
+        "GEO",
+        "SPA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "upper-grade-extension-review",
       "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
       "sourceLinkedSubskillIds": [
         "missing-pieces"
@@ -3958,6 +5512,11 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Use contradiction, invariants, and complete case analysis.",
+      "candidateTaxonomyFamilyIds": [
+        "LOG"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "upper-grade-extension-review",
       "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
       "sourceLinkedSubskillIds": [
         "constraint-clues",
@@ -4008,6 +5567,13 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Reason proportionally with changing rates and constraints.",
+      "candidateTaxonomyFamilyIds": [
+        "NUM",
+        "FRC",
+        "REL"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "upper-grade-extension-review",
       "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
       "sourceLinkedSubskillIds": [
         "equal-groups",
@@ -4061,6 +5627,14 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Apply modular, factorization, and exponent structure.",
+      "candidateTaxonomyFamilyIds": [
+        "NUM",
+        "INT",
+        "REL",
+        "CNT"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "upper-grade-extension-review",
       "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
       "sourceLinkedSubskillIds": [
         "ordering-intervals",
@@ -4109,6 +5683,13 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Combine coordinate and graph structure to prove a route property.",
+      "candidateTaxonomyFamilyIds": [
+        "GEO",
+        "CNT",
+        "MOV"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "upper-grade-extension-review",
       "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
       "sourceLinkedSubskillIds": [
         "ordering-intervals",
@@ -4161,6 +5742,11 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Reason with successive fractional changes and constrained proportions.",
+      "candidateTaxonomyFamilyIds": [
+        "FRC"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "upper-grade-extension-review",
       "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
       "sourceLinkedSubskillIds": [],
       "strategyIds": [],
@@ -4201,6 +5787,11 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Use a spatial decomposition to justify a three-dimensional relationship.",
+      "candidateTaxonomyFamilyIds": [
+        "SPA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "upper-grade-extension-review",
       "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
       "sourceLinkedSubskillIds": [
         "spatial-views",
@@ -4249,6 +5840,11 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Model an indirect measurement and justify the chosen units and scale.",
+      "candidateTaxonomyFamilyIds": [
+        "MEA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "upper-grade-extension-review",
       "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
       "sourceLinkedSubskillIds": [
         "measure-units"
@@ -4295,6 +5891,12 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Optimize a purchase or exchange with multiple constraints.",
+      "candidateTaxonomyFamilyIds": [
+        "REL",
+        "MEA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "upper-grade-extension-review",
       "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
       "sourceLinkedSubskillIds": [
         "min-max",
@@ -4345,14 +5947,19 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Reason about simultaneous cycles and rate-time constraints.",
+      "candidateTaxonomyFamilyIds": [
+        "REL",
+        "PAT",
+        "MEA"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "upper-grade-extension-review",
       "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
       "sourceLinkedSubskillIds": [
-        "clock-calendar",
-        "age-invariants"
+        "clock-calendar"
       ],
       "strategyIds": [
         "draw-diagram",
-        "use-invariant",
         "work-backward"
       ],
       "editorialStatus": "proposed-not-assigned-or-approved",
@@ -4392,6 +5999,11 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Prove area relations and optimize a boundary under constraints.",
+      "candidateTaxonomyFamilyIds": [
+        "GEO"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "upper-grade-extension-review",
       "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
       "sourceLinkedSubskillIds": [
         "missing-pieces"
@@ -4439,6 +6051,11 @@
       "passLabel": "Generalize",
       "kind": "core-proposal",
       "objective": "Reason about functions, systems, and algebraic structure.",
+      "candidateTaxonomyFamilyIds": [
+        "REL"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "upper-grade-extension-review",
       "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
       "sourceLinkedSubskillIds": [
         "reverse-process",
@@ -4492,6 +6109,11 @@
       "passLabel": "Generalize",
       "kind": "conditional-specialist-proposal",
       "objective": "Use combinations, permutations, and inclusion-exclusion with justification.",
+      "candidateTaxonomyFamilyIds": [
+        "CNT"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "upper-grade-extension-review",
       "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
       "sourceLinkedSubskillIds": [
         "systematic-enumeration",
@@ -4541,6 +6163,11 @@
       "passLabel": "Generalize",
       "kind": "conditional-specialist-proposal",
       "objective": "Reason about conditional information and structured sample spaces.",
+      "candidateTaxonomyFamilyIds": [
+        "DAT"
+      ],
+      "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+      "taxonomyScopeReview": "upper-grade-extension-review",
       "strategyScaffolding": "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
       "sourceLinkedSubskillIds": [],
       "strategyIds": [],

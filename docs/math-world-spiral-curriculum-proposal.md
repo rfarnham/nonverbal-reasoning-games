@@ -1,6 +1,6 @@
 # Math Kangaroo Worlds: spiral curriculum proposal
 
-**Proposal 0.2 for sequence review — 22 September 2026. Not an approved runtime manifest.**
+**Proposal 0.3 for sequence review — 22 September 2026. Not an approved runtime manifest.**
 
 The proposed road is **Counting 1 → Symmetry 1 → Addition & Subtraction 1 →
 Patterns 1 → the other concept worlds → Counting 2 → Symmetry 2 → …**.
@@ -16,8 +16,9 @@ is to make the entire sequence reviewable before producing those worlds.
 The playable Counting Coast remains an **art and navigation prototype using its
 existing mixed bank**. Its stop names are not trustworthy skill assignments:
 for example, its Clock Tower currently contains animal-weight and exchange
-questions. This proposal includes a separate, counting-only first-world bank
-below; it does not silently replace the playable questions or saved progress.
+questions. This proposal includes a separate candidate bank for Counting 1,
+with subtype review still required; it does not silently replace the playable
+questions or saved progress.
 
 **What changed after reviewing the courses:** Set A and B are complementary
 same-grade courses, so later passes can revisit harder questions from the same
@@ -25,6 +26,14 @@ grade band. The proposal separates each world’s primary concept from strategy
 and subskill facets; selected questions will receive those annotations during bank review. Balance/exchange, age invariants, ordering/intervals,
 organized counting, codes, and minimum/maximum reasoning are explicit. The
 16-concept sequence below remains a proposal for your review.
+
+**What the supplied taxonomy adds:** retain the proposed spiral and use its
+**12 families, 86 specific problem types, and 22 strategy tags** to select and
+annotate questions. Basic counting differs from counting possibilities; a
+money, age, or dice story does not decide its mathematical home. One primary
+subtype, up to three essential secondary concepts, and separate method/goal
+facets make the world boundaries more precise. This is a proposed annotation
+system, not a newly classified corpus. The sequence and counts remain unchanged.
 
 ## The four passes
 
@@ -105,9 +114,16 @@ Similarity belongs in Shape Building 4, after Groups & Sharing 3 and Length & Me
 The longer-term curriculum covers the six existing realms without demanding
 equal numbers of worlds per realm. Closely connected advanced concepts remain
 in their appropriate strands: ratios in Groups & Sharing, divisibility in
-Number & Digits, work backward in Logic, and algebra in Missing Values. If
+Number & Digits, and algebra in Missing Values. Work backward is a reusable
+strategy across strands. If
 playtesting shows a strand becomes too broad, split that advanced world after
 the concepts have been introduced, while retaining stable semantic IDs.
+
+These are child-facing world groups, not a claim that each group equals one
+taxonomy family. Routes, money, and time need question-level boundary review:
+route counting differs from navigation; exchange relations differ from reading
+money; age relations differ from reading a clock. Each authored world still
+needs one clear primary learning target.
 
 ## Inside one concept world
 
@@ -184,7 +200,7 @@ source headings require question-level interpretation.
 
 ## Two connected axes: concept and strategy
 
-Keep the 16 proposed concept worlds below, but give every selected question
+Keep the 16 proposed concept worlds above, but give every selected question
 independent **subskill, strategy, representation, and reasoning-demand facets**.
 The world answers “what mathematical idea are we practicing?”; its lesson
 answers “what useful move helps us solve it?” A question can have several valid
@@ -204,7 +220,7 @@ not newly verified classifications of every question in the corpus.
 | A5/A6 missing pieces → B3 spatial views | Complete a whole, track overlap and layering, compare outlines | Shape Building; Counting; Area & Boundary |
 | A6 flat/solid distinction → B7 solids | Visible versus hidden blocks, top views, nets, opposite faces | Solids & Views |
 | A7 trial and equal sums → B8 balances | Preserve equality, remove equal groups, substitute equivalents, chain exchanges | Missing Values; Groups & Sharing |
-| A4 time → B6 age problems | Everyone ages together; differences stay fixed; sums grow per person | Time, with arithmetic and invariant strategy tags |
+| A4 time → B6 age problems | Everyone ages together; differences stay fixed; sums grow per person | Missing Values or Addition & Subtraction by the main relation; invariant strategy |
 | B5 lists/tables → Think Enumeration | Exhaust possibilities without omissions or duplication | Counting; later Possibilities |
 | B9 clues → Think Logic | Conditional constraints, comparison chains, smallest/largest feasible result | Logic, plus an optimization strategy |
 | A9 identical/mirror figures → Think transformations | Separate exact matching, reflection, folds, successive flips, and other turns | Symmetry, with precise subskill labels |
@@ -235,6 +251,118 @@ lesson 9, slide 7; lesson 10, slides 5–8. Think Academy Grades 1–2 4-point
 workbook, pp. 3, 17, 30, 36, 42, 46, and 48; Grades 1–2 5-point workbook,
 pp. 35 and 37; Grades 3–4 5-point workbook, pp. 19, 22, 33–38, and 49.
 Private email identifiers, recipients, links, and full slide text are omitted.
+
+## How the supplied taxonomy improves classification
+
+The user-supplied **“Competition Math Taxonomy Outline”** and its complete
+companion files provide a useful secondary design input. The attachments contain
+**12 families, 86 registered problem types, 22 strategy tags, controlled facets,
+boundary rules, a classification schema, and 12 illustrative examples**. Both
+files are preserved unchanged with their original version and metadata:
+
+- [Taxonomy JSON v1.0.0](../content/math-world/competition-math-taxonomy.v1.0.0.proposed.json)
+- [Classification guide v1.0.0](competition-math-classification-guide.v1.0.0.proposed.md)
+
+This is a proposed cross-competition synthesis, not an official Math Kangaroo
+ontology or a taxonomy calibrated on our corpus. We inspected its definitions
+and rules; its external source claims have not been independently re-audited.
+Its **target is grades 1–5**. Keep a Grade 5–6 source labeled 5–6 and inspect
+prerequisites rather than assuming every problem fits grade 5. The higher-grade
+search pools in this spiral require explicit extension review; the supplied
+schema's grade-relative difficulty scale does not validate Grade 6–12 material.
+
+### Family-to-world crosswalk
+
+The connections below are local proposals. One family can support several
+worlds; a world group can use different subtypes at different passes. Neither
+mapping assigns a question automatically. The machine proposal includes all
+86 registered topic IDs with candidate world homes or an unplaced status.
+
+| Family | Main structure | Candidate world homes |
+| --- | --- | --- |
+| **NUM** · Number sense/arithmetic | Given objects, order, place value, operations, intervals | Counting; Addition & Subtraction; Groups & Sharing; Number & Digits |
+| **INT** · Integer properties | Parity, divisibility, factors, GCD/LCM, remainders, digit constraints | Number & Digits |
+| **FRC** · Fractions/decimals/ratios | Part-whole relations, proportional sharing, percentages | Fractions; Groups & Sharing |
+| **REL** · Quantitative relations/early algebra | Comparisons, transfers, ages, balances, codes, rates | Missing Values; selected arithmetic, grouping, digit, money, or time worlds when the relation is the target |
+| **PAT** · Patterns | Repeating/growing/interleaved patterns and synchronized cycles | Patterns; selected cycle problems in later Time |
+| **MEA** · Measurement/money/time | Units, scales, value/change, clocks, elapsed time, calendars | Length & Measure; Money & Value; Time |
+| **GEO** · Plane geometry | Shapes, angles, area, perimeter, transformations, tiling, coordinates | Symmetry; Shape Building; Area & Boundary; coordinate problems in Routes & Grids |
+| **SPA** · Spatial visualization | Missing pieces, views, hidden blocks, nets, dice faces, folds, layers | Shape Building; Solids & Views; fold-tracking in Symmetry, subject to its learning target |
+| **CNT** · Combinatorial counting | Arrangements, selections, distributions, routes, embedded figures, digit occurrences, sets, pairings | Later Counting; conditional Possibilities; counting tasks in Routes & Grids or Number & Digits |
+| **LOG** · Logic/constraints | Matching, ordering from clues, truth conditions, grids, pigeonhole, informative weighings | Logic |
+| **MOV** · Paths/legal moves/strategy games | Navigation, shortest paths, traversal, legal moves, connectivity, winning strategies | Routes & Grids for navigation; other subskills remain unplaced |
+| **DAT** · Data/statistics/probability | Charts, averages, spread, likelihood, random experiments | Conditional Chance & Data, subject to separate data/probability coverage review |
+
+Use the supplied subtype boundaries when inspecting questions:
+
+- **Given objects → `NUM.quantities`; embedded figures → `CNT.figure_counts`.**
+  If tracing tangled boundaries or containment is the main obstacle, consider
+  `SPA.containment_position`. “How many?” does not establish Counting.
+- **Deduce an ordering → `LOG.order_constraints`; count allowed orderings →
+  `CNT.ordered_arrangements`; simple endpoints/gaps → `NUM.intervals`.**
+- **Find or minimize a route → `MOV.navigation`; count routes → `CNT.path_counts`;
+  use each required edge → `MOV.traversal`.** Direct distance arithmetic can
+  instead be `MEA.length_scales`.
+- **Dice orientation → `SPA.cube_orientation`; nets → `SPA.cube_nets`;
+  outcome strings → `CNT.ordered_arrangements`; random likelihood → DAT.**
+- **Unknown equivalent weights → `REL.balance`; combinations of known weights
+  → `CNT.target_sums`; diagnostic weighings → `LOG.weighing_information`.**
+- **Clock/elapsed time → `MEA.clock_elapsed`; an age total-and-difference
+  problem → `REL.sum_difference`.** Payment/change is `MEA.money`; a shopping
+  setting does not displace a more specific relation or selection problem.
+- **Geometric symmetry → `GEO.symmetry_transformations`; equivalent
+  configurations counted modulo symmetry → `CNT.equivalence_counting`.**
+  `symmetry` can independently be a strategy. Routine arithmetic is not a
+  secondary topic merely because it appears in a solution.
+
+### Annotation and validation plan
+
+Use the attached schema and registered IDs instead of inventing another topic
+list. Record one supported primary subtype, **0–3 essential secondary topics**,
+and **0–3 central strategies** for a canonical elementary solution. Keep goals,
+representations, motifs, constraints, source metadata, prerequisite estimates,
+and reading/computation/visual loads separate. Source grade and published point
+tier do not set difficulty; any difficulty estimate needs an explicit reference
+grade and must not claim learner calibration without response evidence.
+
+The 16 course-grounded teaching labels remain useful, but are not unconditional
+aliases for the 22 taxonomy strategies. For example, **compare/order and
+optimize are goals**; a table or equation can be a representation. Use
+`extremal_bounds` only when proving a bound and an attaining construction.
+The proposal includes a conditional strategy crosswalk rather than silently
+renaming these teaching practices.
+
+Inspect diagrams and pictured choices alongside the prompt and answer source.
+Use `family_only`, `ambiguous`, `unreadable`, or `out_of_scope` when appropriate;
+retain missing-information and quality flags. A schema-valid record is not an
+editorially verified question. The imported 12 examples pass their JSON Schema
+and basic ID/uniqueness checks; they are examples, not a corpus evaluation.
+Before production classification, add semantic checks for primary/secondary
+duplication, irrelevant tags, unsupported conventions, inconsistent candidate
+families, material flags or proposed new topics without review, and unsupported
+claims of calibrated difficulty. The supplied examples cover eight families
+and only `classified` status: add INT/FRC/MEA/GEO and unresolved-status fixtures
+before using the classifier at scale.
+
+Preserve the original corpus record. The supplied schema forbids extra
+properties, so keep classification-run provenance in a separate envelope keyed
+by problem ID and content version. Preserve parent/subpart and shared-stimulus
+references, assets, input fingerprint, source country/system, and model/prompt
+version there. A classification record must not replace its source record.
+
+Propose a **400-question pilot within the guide's 300–500 range**, varied by
+source family, grade, point tier, candidate family, diagram dependence, and
+metadata quality. Review disagreements and boundary cases before scaling.
+**No taxonomy pilot or full reclassification has run.** The 12 Counting 1 image
+reviews are selection evidence, not completed new-taxonomy annotations.
+
+This crosswalk also exposes unresolved scope: legal-move and winning-strategy
+games have no dedicated home; the broad Logic pool does not establish
+pigeonhole or informative-weighing coverage; the thin Chance & Data pool does
+not establish statistics and probability coverage separately. Counting and
+Possibilities need a clear boundary. Keep these subskills unplaced or worlds
+conditional until inspected questions support them. No extra required worlds
+or new question counts are inferred from the taxonomy's family names.
 
 ## What is actually in the corpus
 
@@ -278,7 +406,8 @@ having at least one configured retrieval tag. Candidate sets overlap **across
 concepts and across passes**; do not add rows or columns to estimate unique
 available questions. A question asking
 “how many” can receive a Counting tag while actually testing algebra or spatial
-reasoning. A keyword hit is a discovery lead, not a world assignment.
+reasoning. A keyword hit is a discovery lead, not a world assignment. These counts still
+use the pinned lexical classifier, not the new 86-topic taxonomy.
 
 | Concept | Pass 1 | Pass 2 | Pass 3 | Pass 4 |
 | --- | ---: | ---: | ---: | ---: |
@@ -332,6 +461,12 @@ an available local asset, and stored `official-verified` answer metadata. None
 has an existing duplicate-group flag. This is an agent-authored recommendation,
 not a recorded teacher approval or an independent answer-key audit.
 
+The new subtype boundaries require another placement check: ropes, nested
+boundaries, containment, and hidden units may primarily test spatial structure
+rather than counting. Keep them only when counting is the intended main move;
+replace or move any candidate whose main obstacle is spatial tracing. No new
+primary subtype has been assigned to these 12 items yet.
+
 | Stop / order | Question reference | Target move |
 | --- | --- | --- |
 | 1 / 1 | `oasis-online-2012-grades-1-2-q01` | Count animals, including the joey, while excluding non-animals |
@@ -370,8 +505,9 @@ After sequence and aesthetics acceptance:
 1. Assign concept owners in parallel and inspect actual questions, using the
    counts and references as retrieval leads. Keep the first Counting bank
    separate until its source and presentation details are resolved.
-2. Give every chosen problem exactly one primary home, bind its content
-   version, detect cross-source duplicates, and order by solution demands.
+2. Pilot the supplied taxonomy and semantic checks before classifying at scale.
+   Give every chosen problem exactly one primary subtype and world home, bind
+   its content version, detect duplicates, and order by solution demands.
 3. Freeze small world manifests with explicit prerequisite and coverage notes.
    Resolve thin or empty slots honestly; no unrelated fallback questions.
 4. Produce concept-specific maps in parallel from the accepted visual system,
@@ -397,6 +533,9 @@ It reads the explicitly pinned catalogue using SQLite `mode=ro` and writes
 That file contains all 70 ordered slots, four-pass objectives and overlapping
 search pools, retrieval tags, four/five-choice counts, sample item references,
 20 ordered source lessons, strategy and subskill facets with source locators,
-editorial status, and the exact first-world proposal with content hashes.
-It contains no prompts, answers, source URLs, private email identifiers, or
-private asset paths and is not imported by the application.
+all 86 proposed topic-to-world mappings, conditional strategy mappings, reference
+file hashes, editorial status, and the first-world proposal with content hashes.
+The curriculum report contains no prompts, answers, source URLs, private email
+identifiers, or private asset paths and is not imported by the application. The
+separate supplied taxonomy/guide retain their public source links and original
+illustrative examples; they contain no copied private corpus questions.

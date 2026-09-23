@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+import hashlib
 import json
 from pathlib import Path
 import sqlite3
@@ -40,7 +41,7 @@ SOURCE_LESSONS = [
     ("B", 3, "Spatial Secrets", ["shapes", "solids", "counting"], ["visualize", "draw-diagram", "transform"], "class notes slide 7 and worked examples", "Track views, stacking order, overlaps, woven strips, and shape completion."),
     ("B", 4, "Measure Up!", ["measurement", "routes", "area"], ["compare-order", "draw-diagram"], "class notes slide 5 and worked examples", "Count equal units and compare lengths, heights, and route distances."),
     ("B", 5, "Story Problems", ["counting", "possibilities", "groups-sharing", "logic"], ["organized-list", "build-table", "organize-cases"], "class notes slides 4-10; instructor lesson summary", "Use organized lists and tables for routes, repeated processes, pairings, and allocations."),
-    ("B", 6, "How Old Are You?", ["time", "addition-subtraction", "missing-values"], ["draw-diagram", "use-invariant", "work-backward"], "class notes slides 7-13", "Ages change together; differences stay fixed; a sum grows once per person each year."),
+    ("B", 6, "How Old Are You?", ["addition-subtraction", "missing-values"], ["draw-diagram", "use-invariant", "work-backward"], "class notes slides 7-13", "Ages change together; differences stay fixed; a sum grows once per person each year. Classify the quantity relation, not the age setting."),
     ("B", 7, "Solids in Action", ["solids"], ["visualize", "decompose"], "class notes slides 7-9 and worked examples", "Identify solids, faces, edges, and vertices; infer hidden cubes and match views/nets."),
     ("B", 8, "Balance the Scales / Balancing Act", ["missing-values", "groups-sharing", "money"], ["write-equation", "use-invariant", "work-backward"], "class notes slide 7 and worked examples", "Preserve equality on both sides, substitute equivalent groups, and chain exchanges."),
     ("B", 9, "Logical Reasoning / Got Logic?", ["logic", "measurement", "routes"], ["draw-diagram", "guess-check", "compare-order"], "class notes slide 7 and worked examples", "Combine explicit and implied clues; revise an arrangement while satisfying every condition."),
@@ -85,7 +86,7 @@ SOURCE_SUBSKILLS = [
     ("measure-units", "Repeated units, length/height comparisons, and distance", ["measurement"], ["set-b-04"]),
     ("purchase-relations", "Coin values, change, bundles, and purchase differences", ["money"], ["set-a-08"]),
     ("clock-calendar", "Clocks, calendars, elapsed time, and backward schedules", ["time"], ["set-a-04", "set-a-03"]),
-    ("age-invariants", "Ages changing together, fixed differences, and changing sums", ["time", "addition-subtraction", "missing-values"], ["set-b-06"]),
+    ("age-invariants", "Ages changing together, fixed differences, and changing sums", ["addition-subtraction", "missing-values"], ["set-b-06"]),
     ("balance-exchange", "Equality-preserving moves, equivalent groups, and exchanges", ["missing-values", "groups-sharing", "money"], ["set-b-08"]),
     ("codes-surplus", "Codes, quantities without numbers, and surplus/shortage", ["missing-values", "addition-subtraction"], ["think-number", "think-logic"]),
 ]
@@ -96,6 +97,104 @@ STRATEGY_SCAFFOLDING = {
     3: "Choose between plausible moves; organize several cases or interacting constraints.",
     4: "Justify completeness or invariance and check a solution independently; advanced notation is optional.",
 }
+
+# Family-to-world mappings are local proposals. The user-supplied taxonomy is
+# preserved byte-for-byte in its versioned reference file, including all 86
+# subtype definitions, 22 strategies, boundaries, schema, and source metadata.
+TAXONOMY_FAMILIES = [
+    ("NUM", "Number sense and arithmetic", ["counting", "addition-subtraction", "groups-sharing", "digits"], "Given objects, number order, place value, operations, estimation, and intervals."),
+    ("INT", "Integer properties", ["digits"], "Parity, divisibility, factors, primes, GCD/LCM, remainders, and digit constraints."),
+    ("FRC", "Fractions, decimals, and ratios", ["fractions", "groups-sharing"], "Part-whole relations, fraction operations, proportional sharing, and percentages."),
+    ("REL", "Quantitative relations and early algebra", ["missing-values", "addition-subtraction", "groups-sharing", "digits", "money", "time"], "Comparisons, transfers, age relations, balances, codes, and rates; story context alone does not determine placement."),
+    ("PAT", "Patterns", ["patterns", "time"], "Repeating, growing, interleaved, and synchronized cycles."),
+    ("MEA", "Measurement, money, and time", ["measurement", "money", "time"], "Units, scales, prices/change, clocks, elapsed time, and calendars."),
+    ("GEO", "Plane geometry", ["symmetry", "shapes", "area", "routes"], "Shapes, angles, area, perimeter, reflection, tiling, and coordinates."),
+    ("SPA", "Spatial visualization", ["shapes", "solids", "symmetry"], "Positions, missing pieces, views, hidden cubes, nets, dice faces, folding, and layers."),
+    ("CNT", "Combinatorial counting", ["counting", "possibilities", "routes", "digits"], "Arrangements, selections, distributions, route counts, embedded figures, digit occurrences, sets, and pairings."),
+    ("LOG", "Logic and constraints", ["logic"], "Matching, ordering from clues, truth conditions, grids, pigeonhole, and informative weighings."),
+    ("MOV", "Paths, legal moves, and strategy games", ["routes"], "Mazes, shortest paths, one-stroke routes, legal moves, winning strategies, and connectivity."),
+    ("DAT", "Data, statistics, and probability", ["chance-data"], "Tables/charts, averages, spread, likelihood, and probability."),
+]
+
+TAXONOMY_BOUNDARIES = [
+    ("given-vs-possible", "Counting given objects is NUM; counting configurations, embedded composite figures, or possible arrangements is CNT. If tracing containment or hidden structure is the bottleneck, consider SPA."),
+    ("order-vs-arrangements", "Deducing a line-up is LOG.order_constraints; counting allowed line-ups is CNT.ordered_arrangements. Both IDs are registered in the supplied v1.0.0 taxonomy."),
+    ("navigation-vs-route-count", "Find or optimize a legal route: MOV. Count valid routes: CNT. Use coordinate geometry essentially: GEO."),
+    ("dice-structure", "Infer dice faces or a net: SPA. Count dice configurations: CNT. Reason about likelihood under a random experiment: DAT."),
+    ("balance-vs-information", "Solve equivalent quantities on a balance: REL. Choose informative weighings to identify an unknown object: LOG."),
+    ("clock-vs-age", "Read clocks, elapsed time, or calendars: MEA. Infer age sums, differences, or invariant relations: REL; the age story alone does not make Time the primary world."),
+    ("money-context", "Money is primary MEA when denomination, units, value, or change is essential; a purchase setting alone does not displace REL, CNT, or another core structure."),
+    ("symmetry-role", "Reflection or geometric symmetry can be primary GEO; using symmetry to simplify a count is a strategy with primary CNT."),
+    ("incidental-arithmetic", "Do not add arithmetic as a secondary concept merely because a solution includes a routine calculation."),
+]
+
+
+TAXONOMY_PATH = ROOT / "content/math-world/competition-math-taxonomy.v1.0.0.proposed.json"
+GUIDE_PATH = ROOT / "docs/competition-math-classification-guide.v1.0.0.proposed.md"
+
+# These are candidate homes, not a replacement for subtype or item review.
+TOPIC_HOME_OVERRIDES = {
+    "NUM.quantities": ["counting"], "NUM.order_number_line": ["digits"],
+    "NUM.place_value": ["digits"], "NUM.add_subtract": ["addition-subtraction"],
+    "NUM.multiply_divide": ["groups-sharing"], "NUM.computation_structure": ["addition-subtraction"],
+    "NUM.estimation": ["digits"], "NUM.intervals": ["counting"],
+    "FRC.ratio_proportion": ["groups-sharing"],
+    "REL.additive": ["addition-subtraction"], "REL.multiplicative": ["groups-sharing"],
+    "REL.chained_operations": ["addition-subtraction", "missing-values"],
+    "REL.transfers": ["addition-subtraction", "missing-values"],
+    "REL.balance": ["missing-values", "groups-sharing", "money"],
+    "REL.cryptarithms": ["missing-values", "digits"], "REL.rates": ["groups-sharing", "time"],
+    "PAT.cycles": ["patterns", "time"],
+    "MEA.units": ["measurement"], "MEA.length_scales": ["measurement"],
+    "MEA.mass_capacity_temperature": ["measurement"], "MEA.money": ["money"],
+    "MEA.clock_elapsed": ["time"], "MEA.calendar": ["time"],
+    "GEO.properties": ["shapes"], "GEO.angles": ["shapes"],
+    "GEO.perimeter": ["area"], "GEO.area_basic": ["area"], "GEO.area_composite": ["area"],
+    "GEO.symmetry_transformations": ["symmetry"], "GEO.dissection_tiling": ["shapes"],
+    "GEO.coordinates": ["routes"],
+    "SPA.containment_position": ["shapes", "solids"], "SPA.visual_matching": ["shapes"],
+    "SPA.folding_cutting": ["symmetry", "shapes"], "SPA.overlap_layers": ["shapes", "solids"],
+    "CNT.path_counts": ["routes", "possibilities"], "CNT.figure_counts": ["counting"],
+    "CNT.digit_occurrences": ["digits", "counting"], "CNT.overlap_counts": ["counting"],
+    "MOV.navigation": ["routes"], "MOV.traversal": ["routes"], "MOV.networks": ["routes"],
+    "MOV.state_moves": [], "MOV.winning_games": [],
+}
+TOPIC_DEFAULT_HOMES = {"INT": ["digits"], "FRC": ["fractions"], "REL": ["missing-values"], "PAT": ["patterns"], "SPA": ["solids"], "CNT": ["counting", "possibilities"], "LOG": ["logic"], "DAT": ["chance-data"]}
+
+COURSE_STRATEGY_CROSSWALK = [
+    ("find-pattern", ["find_pattern"], "Direct vocabulary match."),
+    ("draw-diagram", ["draw_model"], "A model introduced to solve the problem, not every supplied diagram."),
+    ("visualize", ["simulate_state"], "Candidate when explicitly tracking states; visual format alone is not a strategy."),
+    ("work-backward", ["work_backward"], "Direct vocabulary match."),
+    ("guess-check", ["guess_check"], "Structured candidate checking."),
+    ("organized-list", ["organized_enumeration"], "List must support complete, nonduplicated enumeration."),
+    ("build-table", ["organized_enumeration"], "Only when the table enumerates cases; otherwise table is a representation."),
+    ("write-equation", [], "Equation is a representation; select substitution_elimination only when the actual method warrants it."),
+    ("compare-order", [], "Compare/order are goals; choose a strategy from the actual solution."),
+    ("organize-cases", ["case_split", "organized_enumeration"], "Choose the essential method(s), not both by default."),
+    ("decompose", ["decompose_recompose"], "Direct vocabulary match."),
+    ("transform", ["simulate_state", "symmetry"], "Tracking a turn and exploiting symmetry differ; inspect the method."),
+    ("trace-path", ["simulate_state", "work_backward"], "Candidates depend on whether tracing proceeds forward or backward."),
+    ("use-invariant", ["invariant"], "Direct vocabulary match."),
+    ("optimize", ["extremal_bounds"], "Optimization is a goal; use this strategy only for a bound plus an attaining construction."),
+    ("choose-and-check", [], "A teaching routine, not an automatic mathematical strategy tag."),
+]
+
+
+def taxonomy_reference():
+    payload = TAXONOMY_PATH.read_bytes()
+    taxonomy = json.loads(payload)
+    topics = [topic for family in taxonomy["domains"] for topic in family["topics"]]
+    topic_ids = {topic["id"] for topic in topics}
+    strategy_ids = set(taxonomy["tag_vocabularies"]["strategies"])
+    if len(taxonomy["domains"]) != 12 or len(topics) != 86 or len(topic_ids) != 86 or len(strategy_ids) != 22:
+        raise ValueError("Unexpected supplied taxonomy scope")
+    if not set(TOPIC_HOME_OVERRIDES).issubset(topic_ids):
+        raise ValueError("Unregistered subtype in local world crosswalk")
+    if any(not set(ids).issubset(strategy_ids) for _, ids, _ in COURSE_STRATEGY_CROSSWALK):
+        raise ValueError("Unregistered strategy in course crosswalk")
+    return taxonomy, payload, topics
+
 
 # Skills are retrieval seeds. A shared seed never establishes a primary placement.
 CONCEPTS = [
@@ -226,6 +325,7 @@ COUNTING_ONE = [
 
 
 def build(catalogue: Path) -> dict:
+    taxonomy, taxonomy_bytes, taxonomy_topics = taxonomy_reference()
     connection = sqlite3.connect(f"file:{catalogue.resolve()}?mode=ro", uri=True)
     connection.row_factory = sqlite3.Row
     run = connection.execute("SELECT * FROM catalogue_runs WHERE run_id=?", (RUN_ID,)).fetchone()
@@ -275,6 +375,9 @@ def build(catalogue: Path) -> dict:
                 "pass": pass_number, "passLabel": pass_label,
                 "kind": "core-proposal" if order <= 16 else "conditional-specialist-proposal",
                 "objective": objectives[pass_number - 1],
+                "candidateTaxonomyFamilyIds": [f[0] for f in TAXONOMY_FAMILIES if concept_id in f[2]],
+                "taxonomyPlacementStatus": "world-crosswalk-only-no-item-taxonomy-assignment",
+                "taxonomyScopeReview": "upper-grade-extension-review" if pass_number == 4 else "preserve-grades-5-6-and-check-prerequisites" if pass_number == 3 else "within-reference-target-grades-subject-to-item-review",
                 "strategyScaffolding": STRATEGY_SCAFFOLDING[pass_number],
                 "sourceLinkedSubskillIds": [s[0] for s in SOURCE_SUBSKILLS if concept_id in s[2]],
                 "strategyIds": sorted({strategy for lesson in SOURCE_LESSONS if concept_id in lesson[3] for strategy in lesson[4]} | ({"find-pattern"} if concept_id == "patterns" else set())),
@@ -295,15 +398,16 @@ def build(catalogue: Path) -> dict:
             raise ValueError(f"Counting candidate lacks the existing five-choice structure: {item_id}")
         pilot.append({"order": index, "stop": stop, "itemId": item_id, "contentVersion": row["content_version"], "rationale": rationale, "publishedPointTier": row["published_point_tier"], "sourceAnswerStatus": row["answer_status"], "assetInspected": True, "editorialStatus": "agent-proposed-after-visual-inspection", "runtimeApproved": False, "sourceFamily": row["source_family"]})
     return {
-        "schemaVersion": 1, "proposalVersion": "spiral.2026-09-22.2",
+        "schemaVersion": 1, "proposalVersion": "spiral.2026-09-22.3",
         "status": "proposal-awaiting-user-sequence-approval",
         "runtimeConsumption": "none", "catalogueRunId": RUN_ID,
         "corpusSnapshotSha256": run["corpus_snapshot_sha256"],
         "classificationVersion": run["proposal_version"],
-        "cautions": ["Candidate sets overlap both across concepts and across passes and are not additive.", "Counts are records, not deduplicated unique problems.", "Stored answer metadata does not establish curriculum or display approval.", "Grade and published point tier are search hints, not calibrated learner difficulty.", "Set A and Set B are complementary Level 1-2 courses, not difficulty levels 1 and 2.", "Source-linked subskills describe curriculum evidence, not verified tags on each candidate question.", "No private question text, answer, email identifiers, or asset is exported."],
+        "cautions": ["Candidate sets overlap both across concepts and across passes and are not additive.", "Counts are records, not deduplicated unique problems.", "Stored answer metadata does not establish curriculum or display approval.", "Grade and published point tier are search hints, not calibrated learner difficulty.", "Set A and Set B are complementary Level 1-2 courses, not difficulty levels 1 and 2.", "Source-linked subskills describe curriculum evidence, not verified tags on each candidate question.", "The 12-family crosswalk is a secondary design input; existing candidate counts still use the pinned lexical classifier.", "The supplied taxonomy targets grades 1-5; upper-grade extension and every item assignment require review.", "No private question text, answer, email identifiers, conversation identifiers, or asset is exported."],
         "passes": [{"number": n, "label": label, "searchGradeBands": bands, "strategyScaffolding": STRATEGY_SCAFFOLDING[n]} for n, label, bands in PASSES],
         "ontologyFacets": {
-            "primaryConcept": "One primary home for each selected question; worlds follow this axis.",
+            "primaryConcept": "One primary learning target and world home for each selected question. World grouping and taxonomy family are distinct; classify structure rather than story setting.",
+            "taxonomy": "One primary subtype plus at most three essential secondary concepts; do not tag incidental arithmetic. Use the supplied 86 registered subtype IDs; any extension requires an explicit proposal and review.",
             "subskills": "Specific mathematical relations or actions evidenced in the source courses.",
             "strategies": "Several legitimate solving moves may apply to the same question.",
             "representation": "Pictures, diagrams, grids, physical arrangements, text, equations, lists, or tables.",
@@ -311,6 +415,47 @@ def build(catalogue: Path) -> dict:
             "sourceRole": ["topic-practice", "warm-up", "mixed-review", "course-capstone"],
             "editorialStatus": "Source vocabulary grounded; individual item assignments remain proposed.",
         },
+        "secondaryTaxonomyInput": {
+            "title": "Competition Math Taxonomy Outline", "type": "user-supplied ChatGPT synthesis and complete companion attachments",
+            "authority": "secondary-design-input-not-verified-official-ontology",
+            "reviewedScope": "12 families, 86 registered topics with definitions and boundaries, 22 strategy tags, controlled facets, classification rules, tie-breakers, output schema, and 12 illustrative examples.",
+            "taxonomyId": taxonomy["taxonomy_id"], "version": taxonomy["version"], "sourceCreated": taxonomy["created"],
+            "taxonomyPath": str(TAXONOMY_PATH.relative_to(ROOT)), "taxonomySha256": hashlib.sha256(taxonomy_bytes).hexdigest(),
+            "guidePath": str(GUIDE_PATH.relative_to(ROOT)), "guideSha256": hashlib.sha256(GUIDE_PATH.read_bytes()).hexdigest(),
+            "preservation": "Both supplied attachments are preserved byte-for-byte, including original metadata; not imported by the runtime.",
+            "registeredTopicIds": [topic["id"] for topic in taxonomy_topics],
+            "registeredStrategyIds": list(taxonomy["tag_vocabularies"]["strategies"]),
+            "classificationSchemaReference": str(TAXONOMY_PATH.relative_to(ROOT)) + "#/output_json_schema",
+            "targetGrades": taxonomy["scope"]["target_grades"],
+            "upperGradeScopeStatus": "Requires extension review; grades 5-6 retain their source band and higher-grade pools are not validated by this elementary taxonomy.",
+            "worldCrosswalkStatus": "locally-proposed-not-item-classifications",
+            "newTaxonomyClassificationsProduced": 0,
+        },
+        "proposedTaxonomyFamilies": [{"id": fid, "label": next(d["label"] for d in taxonomy["domains"] if d["id"] == fid), "candidateWorldConceptIds": concepts, "scopeSummary": scope, "mappingStatus": "local-proposal-requires-primary-learning-target-review"} for fid, _, concepts, scope in TAXONOMY_FAMILIES],
+        "proposedTopicWorldCrosswalk": [{"topicId": topic["id"], "candidateWorldConceptIds": homes, "status": "local-proposal-requires-item-review" if homes else "unplaced-requires-world-decision"} for topic in taxonomy_topics for homes in [TOPIC_HOME_OVERRIDES.get(topic["id"], TOPIC_DEFAULT_HOMES.get(topic["id"].split(".")[0], []))]],
+        "courseStrategyCrosswalk": [{"courseStrategyId": sid, "candidateRegisteredStrategyIds": ids, "boundary": note, "status": "local-proposal-not-automatic-conversion"} for sid, ids, note in COURSE_STRATEGY_CROSSWALK],
+        "classificationBoundaries": [{"id": bid, "rule": rule, "status": "proposed-editorial-rule"} for bid, rule in TAXONOMY_BOUNDARIES],
+        "classificationProvenancePolicy": {
+            "status": "proposed-not-implemented",
+            "sourcePreservation": "Keep each original corpus record unchanged. Classification output is an annotation, not a replacement source record.",
+            "separateEnvelope": ["problem_id", "content-version-or-input-fingerprint", "classification-run-id", "model-and-prompt-version", "parent-question-and-subpart", "shared-stimulus-reference", "source-country-and-system", "asset-references"],
+            "schemaBoundary": "The supplied classification schema forbids extra properties; store provenance outside that schema, keyed by problem_id and the source content version.",
+        },
+        "classificationPilot": {
+            "status": "proposed-not-executed", "targetRecords": 400, "acceptableRange": [300, 500],
+            "stratifyBy": ["source-family", "grade-band", "point-tier", "candidate-family", "diagram-dependence", "metadata-quality"],
+            "reviewChecks": ["Inspect prompt, diagrams, pictured options, and answer source.", "Resolve the primary structure and at most three essential secondary concepts.", "Keep source grade, prerequisites, reasoning demand, and incidental reading/computation/visual demand separate.", "Allow missing or uncertain classification rather than inferring unseen information.", "Review disagreement and overlap before scaling; deduplicate source editions before world assignment."],
+            "semanticValidationStillRequired": ["No primary topic duplicated among secondary topics.", "Every tag is essential and supported; no unstated conventions.", "Ambiguous candidate topics agree with the stated family or explicitly span families.", "Material quality flags and proposed new topics require review.", "No calibrated difficulty claim without real response evidence."],
+            "fixtureGaps": ["INT", "FRC", "MEA", "GEO", "family_only", "ambiguous", "unreadable", "out_of_scope"],
+            "rolloutGate": "Sequence and aesthetics acceptance precede world production; a classification pilot and subtype-definition review precede corpus-wide relabeling.",
+        },
+        "taxonomyCoverageGaps": [
+            {"familyId": "CNT", "issue": "Counting and Possibilities overlap; arrangements, selections, distributions, pairings, and embedded figures need explicit subtype boundaries before bank assignment.", "action": "Keep specialist worlds conditional; choose one primary home per problem."},
+            {"familyId": "MOV", "issue": "Routes covers navigation but does not establish coverage of swaps, toggles, pouring, or winning-strategy games.", "action": "Reserve unplaced subskills; no new required world without inspected coverage and approval."},
+            {"familyId": "DAT", "issue": "The thin Chance & Data pool does not establish statistics or probability coverage separately.", "action": "Inspect charts and statistical reasoning separately from random experiments; defer or split only after coverage review."},
+            {"familyId": "LOG", "issue": "Pigeonhole and informative weighing are not established by the current broad Logic candidate count.", "action": "Review specific structures instead of inferring coverage from the family name."},
+            {"familyId": "SPA", "issue": "Gear motion and folding details need a precise learning target; existing world names do not prove placement.", "action": "Hold unplaced cases for taxonomy and world-boundary review."},
+        ],
         "sourceCurricula": [
             {"id": "set-a", "label": "Math Kangaroo Exploring Level 1-2, Set A", "orderedLessonIds": [f"set-a-{n:02}" for n in range(1, 11)], "relationship": "Complementary same-grade course; not a difficulty tier."},
             {"id": "set-b", "label": "Math Kangaroo Exploring Level 1-2, Set B", "orderedLessonIds": [f"set-b-{n:02}" for n in range(1, 11)], "relationship": "Complementary same-grade course; not a difficulty tier."},
@@ -326,7 +471,7 @@ def build(catalogue: Path) -> dict:
         "reasoningStrategies": [{"id": sid, "label": label, "sourceReferenceIds": refs, "editorialStatus": "source-grounded-vocabulary-not-item-classification"} for sid, label, refs in STRATEGIES],
         "sourceLinkedSubskills": [{"id": sid, "label": label, "conceptIds": concepts, "sourceReferenceIds": refs, "editorialStatus": "source-grounded-vocabulary-not-item-classification", "placementCaveat": "A transformation extension needs an explicit world assignment; do not silently label gear motion as mirror symmetry." if sid == "gear-motion" else None} for sid, label, concepts, refs in SOURCE_SUBSKILLS],
         "corpus": {"items": len(rows), "completeChoiceRecords": len(complete), "fiveChoiceRecords": sum(r["five"] for r in rows), "duplicateFlaggedCompleteRecords": sum(r["duplicate_flag"] for r in complete), "currentRunCatalogueReviewRows": review_count, "currentRunWorldPlacementReviewedItems": placement_count, "bands": summaries, "completeChoiceAnswerStatuses": dict(sorted(Counter(r["answer_status"] for r in complete).items()))},
-        "concepts": [{"id": c[0], "label": c[1], "retrievalSkillIds": c[2], "objectivesByPass": c[3]} for c in CONCEPTS],
+        "concepts": [{"id": c[0], "label": c[1], "retrievalSkillIds": c[2], "objectivesByPass": c[3], "candidateTaxonomyFamilyIds": [f[0] for f in TAXONOMY_FAMILIES if c[0] in f[2]], "taxonomyMappingStatus": "local-world-crosswalk-not-item-assignment"} for c in CONCEPTS],
         "worldSlots": slots, "countingOneProposedQuestions": pilot,
     }
 
@@ -339,4 +484,5 @@ if __name__ == "__main__":
     result = build(args.catalogue)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + "\n")
-    print(f"Wrote {len(result['worldSlots'])} proposed world slots from {result['corpus']['items']} records to {args.output.relative_to(ROOT)}")
+    display_output = args.output.relative_to(ROOT) if args.output.is_relative_to(ROOT) else args.output
+    print(f"Wrote {len(result['worldSlots'])} proposed world slots from {result['corpus']['items']} records to {display_output}")
