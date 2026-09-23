@@ -1,5 +1,7 @@
-import { useId, type CSSProperties } from "react";
-import { desktopBonusRoad, desktopRoad, mobileBonusRoad, mobileRoad } from "./map-travel";
+import { useId } from "react";
+import LegacyCoastScene from "./LegacyCoastScene";
+import { getWorldMapLayout, type MapIsland, type MapLandscape, type MapLayout } from "./map-layouts";
+import { WORLD_MODE } from "./world-data";
 
 type CoastSceneProps = {
   mobile?: boolean;
@@ -10,286 +12,388 @@ type CoastSceneProps = {
   showDetours?: boolean;
 };
 
-type Point = readonly [number, number];
+type Theme = {
+  sky: string; deep: string; grass: string; edge: string; cliff: string;
+  light: string; leaf: string; darkLeaf: string; accent: string; road: string;
+};
 
-type ScenePalette = readonly [string, string, string, string, string, string, string];
+// The palette supports each landscape's terrain and landmarks. Its silhouette,
+// route, island composition, and scenery also change between worlds.
+const THEMES: Record<MapLandscape, readonly [Theme, Theme]> = {
+  coast: [
+    { sky: "#8eecea", deep: "#25a9ce", grass: "#bfe96d", edge: "#ffe3a2", cliff: "#c08d51", light: "#effcbd", leaf: "#35bb73", darkLeaf: "#188864", accent: "#f07659", road: "#f8d783" },
+    { sky: "#a0eadb", deep: "#219cae", grass: "#b9dd68", edge: "#fff0b8", cliff: "#cb9653", light: "#e9f9c0", leaf: "#38ad7f", darkLeaf: "#217c68", accent: "#f7a95e", road: "#ffdd93" },
+  ],
+  mirror: [
+    { sky: "#c6ebf6", deep: "#719fd6", grass: "#d3eac1", edge: "#efecd0", cliff: "#81a6b5", light: "#edfbe9", leaf: "#bba7e8", darkLeaf: "#8d75bd", accent: "#c987d9", road: "#f6e7b1" },
+    { sky: "#e2d6f3", deep: "#978fc8", grass: "#d3e7d6", edge: "#faf0d7", cliff: "#8d9dbe", light: "#f3f9f6", leaf: "#e3acd6", darkLeaf: "#bb80b6", accent: "#8879cc", road: "#f9e7bd" },
+  ],
+  orchard: [
+    { sky: "#91e0cf", deep: "#39aba0", grass: "#d2e97b", edge: "#f3d18b", cliff: "#b99052", light: "#f0f8b6", leaf: "#60b84f", darkLeaf: "#31874c", accent: "#ee8354", road: "#fae0a0" },
+    { sky: "#a5e4d6", deep: "#58aca9", grass: "#f0da80", edge: "#f8e0a6", cliff: "#bb945b", light: "#fff2b8", leaf: "#c3ba53", darkLeaf: "#818a41", accent: "#e48349", road: "#fce8b6" },
+  ],
+  pattern: [
+    { sky: "#c2dafa", deep: "#799bcf", grass: "#ddcbed", edge: "#f5dec6", cliff: "#a889b0", light: "#f6eaf9", leaf: "#8ac7c0", darkLeaf: "#519e9e", accent: "#e190bb", road: "#fae4b6" },
+    { sky: "#c6d9f1", deep: "#638ebc", grass: "#bce2db", edge: "#f3d9a9", cliff: "#77aeb2", light: "#e8faf0", leaf: "#9c9fd6", darkLeaf: "#6a72ae", accent: "#eda4c0", road: "#f8dda6" },
+  ],
+  shapes: [
+    { sky: "#9de4eb", deep: "#45a4c3", grass: "#cceaa9", edge: "#e6deae", cliff: "#80b49f", light: "#f0f6c9", leaf: "#61c4ad", darkLeaf: "#329b91", accent: "#eead60", road: "#f6e3a5" },
+    { sky: "#acdfe5", deep: "#438faf", grass: "#bee2be", edge: "#f7d7a6", cliff: "#82aeb1", light: "#e2f2d4", leaf: "#97bfc8", darkLeaf: "#638f9f", accent: "#e7b562", road: "#f9e0ac" },
+  ],
+  lagoon: [
+    { sky: "#a1e8ed", deep: "#349fb8", grass: "#c8e4b3", edge: "#f7dbb6", cliff: "#b89388", light: "#eaf9d1", leaf: "#eaa294", darkLeaf: "#ca7b83", accent: "#ebbd71", road: "#fbe5b9" },
+    { sky: "#bbcfe9", deep: "#7186b6", grass: "#d8cce9", edge: "#f8d9bf", cliff: "#ac87ad", light: "#f4e6ed", leaf: "#c6a2d9", darkLeaf: "#997ab6", accent: "#edb394", road: "#f6dcc0" },
+  ],
+  desert: [
+    { sky: "#f4ddb0", deep: "#d5b277", grass: "#f5d68c", edge: "#fff0bd", cliff: "#c19059", light: "#fff1c5", leaf: "#79b777", darkLeaf: "#478763", accent: "#d9855c", road: "#fff1c3" },
+    { sky: "#e9c5b0", deep: "#bd936d", grass: "#ebc076", edge: "#ffe4a5", cliff: "#ac7a54", light: "#ffe5ae", leaf: "#7cac89", darkLeaf: "#527f73", accent: "#cc725c", road: "#ffebb8" },
+  ],
+  canopy: [
+    { sky: "#b0e4bc", deep: "#489b8e", grass: "#a7d27a", edge: "#e9d394", cliff: "#957e53", light: "#dbeeaa", leaf: "#58af79", darkLeaf: "#2b846b", accent: "#efb06c", road: "#eac48a" },
+    { sky: "#c0dcca", deep: "#5b9690", grass: "#cad08d", edge: "#ebd49b", cliff: "#9b825d", light: "#e9e8b5", leaf: "#a8b776", darkLeaf: "#6e9473", accent: "#e9a478", road: "#f4d59b" },
+  ],
+  cliffs: [
+    { sky: "#c8e6f5", deep: "#81aacd", grass: "#daebe1", edge: "#f0f1db", cliff: "#86aeb7", light: "#f7fcf2", leaf: "#9ac7bb", darkLeaf: "#629fa6", accent: "#d69aaa", road: "#f8e5b7" },
+    { sky: "#c4d6ec", deep: "#6983a9", grass: "#e9efed", edge: "#f9f4da", cliff: "#91a9bb", light: "#ffffff", leaf: "#a6c4d3", darkLeaf: "#7394b1", accent: "#cda2c4", road: "#f6e5bf" },
+  ],
+  balance: [
+    { sky: "#d9cef2", deep: "#9488c3", grass: "#dbe3ae", edge: "#f9e9bd", cliff: "#a799ab", light: "#f8f3d3", leaf: "#caacd7", darkLeaf: "#9c82b6", accent: "#e4b078", road: "#f9dfb1" },
+    { sky: "#e6d8ed", deep: "#a78bb5", grass: "#e2ddb2", edge: "#f8e8cb", cliff: "#b197ab", light: "#f9f2d8", leaf: "#bea4cc", darkLeaf: "#967ab0", accent: "#e3a993", road: "#f7dfb9" },
+  ],
+};
 
-// Twenty original scenic variations share the approved island geometry. Only
-// decorative landscape colors change; puzzle stimuli keep their own encoding.
-const SCENE_PALETTES: readonly ScenePalette[] = [
-  ["#71e0e5", "#22accc", "#c8e967", "#75c74d", "#29b566", "#137e5b", "#f27960"],
-  ["#a0dcfa", "#698bdc", "#d7eaaa", "#93ce8b", "#ad90e1", "#7755b3", "#a988dc"],
-  ["#8edfd3", "#2aaaaf", "#e1ed80", "#aacd47", "#f2a455", "#d46b40", "#e58547"],
-  ["#aec8f6", "#7d94d1", "#e9d1f3", "#baa6de", "#80cabe", "#48958f", "#db91cf"],
-  ["#89dfe1", "#3698bc", "#d7ebb1", "#90c995", "#4ebdab", "#268477", "#f0aa58"],
-  ["#9fdce9", "#579ab6", "#e5ebb8", "#accd78", "#eea584", "#c57067", "#d98873"],
-  ["#9ce5d4", "#38b4a7", "#d1e28a", "#7bba64", "#42a770", "#247356", "#e1bc65"],
-  ["#b8dff2", "#68a0d8", "#f6e3a5", "#dbc176", "#8dc985", "#57a177", "#de9462"],
-  ["#bbdaf7", "#769fda", "#eff7e7", "#cee7db", "#b5d9d2", "#6aaba8", "#dc9cad"],
-  ["#c8c7f1", "#8581c8", "#d8eaa6", "#96cb8a", "#e5afd3", "#b278b0", "#b496e0"],
-  ["#7ddfcb", "#219f9d", "#d9ed72", "#8dc849", "#38b786", "#188764", "#f4a766"],
-  ["#f1c9e5", "#ad91cf", "#e9e7b6", "#baca84", "#e994b9", "#bc668e", "#de91c3"],
-  ["#a7dce0", "#4b9aaa", "#f5d48c", "#d6ad5e", "#e89e58", "#b87542", "#d7845d"],
-  ["#b2d8f7", "#5f9ccc", "#dfd1ee", "#afa4d3", "#a6cdda", "#6392bc", "#cc93ce"],
-  ["#9fddda", "#51a8ac", "#c5e3a8", "#8fbe83", "#72bbaa", "#42857f", "#e4bd67"],
-  ["#d1d7f3", "#8f9cce", "#f2d6bb", "#d5aa86", "#b99dce", "#8a72ac", "#d58da5"],
-  ["#a6e4e7", "#46aebc", "#e3ef9c", "#a7ce64", "#e8ba63", "#ba8b3f", "#de9060"],
-  ["#beddec", "#72a6c1", "#dde3ae", "#adb875", "#d9a071", "#a57955", "#c98a62"],
-  ["#bccbe7", "#798eae", "#ebf2ed", "#c1dbd5", "#a7cacc", "#70a0ae", "#ce95b8"],
-  ["#d4c6ed", "#9486c8", "#e9e6b7", "#bfc986", "#cb9ed7", "#926bb1", "#d9a1ce"],
-];
+// Solid silhouettes: pools and terraces are surface details, so every map
+// anchor belongs to usable land rather than a decorative hole in an atoll.
+const SHAPES: Record<MapIsland["shape"], string> = {
+  bean: "M-98 4C-106-48-56-97-8-86C28-118 88-79 93-28C117 16 91 65 49 74C18 112-49 91-57 68C-89 74-103 40-98 4Z",
+  leaf: "M-100 4C-79-80-10-108 53-75C88-58 98-8 100 30C64 94-12 101-70 56C-89 43-99 28-100 4Z",
+  diamond: "M-98-10-48-71 27-92 97-28 76 54 4 93-72 61Z",
+  crescent: "M-95-17C-78-84-14-102 49-74C66-66 83-51 91-29C65-38 55-28 60-8C78 1 91 1 100-11C110 50 62 96-15 83C-69 97-112 39-95-17Z",
+  cloud: "M-98 0C-109-37-78-57-50-52C-44-105 12-112 34-74C72-90 108-58 90-18C120 14 93 62 58 60C24 108-18 90-33 67C-70 87-111 47-98 0Z",
+  mesa: "M-96-34-71-78-10-86 29-69 81-77 100-25 82 21 87 65 23 85-26 71-79 82-100 35Z",
+  ring: "M-100-7C-90-73-40-94 8-83C44-106 92-64 94-17C115 32 70 92 28 84C-25 107-85 63-90 34Z",
+  petal: "M-93-10C-99-61-53-97-12-71C13-111 72-94 77-49C110-31 109 32 76 42C61 101 9 100-16 73C-72 88-106 43-93-10Z",
+  terrace: "M-94-24-68-78-20-78-4-93 45-77 86-76 101-29 80-6 94 32 58 70 22 70 0 91-62 78-98 35Z",
+  atoll: "M-99 2C-102-53-64-83-18-73C17-106 72-84 87-41C104-20 110 19 88 44C63 85 5 85-29 67C-77 93-111 39-99 2Z",
+};
 
-function Landmark({ x, y, scale = 1, variant }: { x: number; y: number; scale?: number; variant: number }) {
-  if (variant === 0) return <Lighthouse x={x} y={y} scale={scale} />;
-  return <g transform={`translate(${x} ${y}) scale(${scale})`}>
-    <ellipse cy="5" rx="43" ry="12" fill="#248052" opacity=".2" />
+function Land({ island, theme, landscape, mobile }: { island: MapIsland; theme: Theme; landscape: MapLandscape; mobile: boolean }) {
+  const cliffDepth = landscape === "cliffs" ? (mobile ? 24 : 36) : landscape === "canopy" ? 21 : 14;
+  const d = SHAPES[island.shape];
+  const shape = (dy: number, fill: string, stroke?: string, strokeWidth = 0) => <path data-island-surface={dy === 0 ? "true" : undefined} d={d} transform={`translate(${island.x} ${island.y + dy}) rotate(${island.rotation ?? 0}) scale(${island.rx / 100} ${island.ry / 100})`} fill={fill} stroke={stroke} strokeWidth={strokeWidth} vectorEffect="non-scaling-stroke" />;
+  return <g data-island-id={island.id}>
+    {shape(cliffDepth + 6, theme.deep, theme.light, mobile ? 7 : 9)}
+    <g opacity=".4">{shape(cliffDepth + 13, theme.deep)}</g>
+    {shape(cliffDepth, theme.cliff)}
+    {landscape === "cliffs" && shape(cliffDepth * .57, theme.edge)}
+    {shape(5, theme.edge, theme.edge, mobile ? 5 : 7)}
+    {shape(0, theme.grass, theme.light, 2)}
+  </g>;
+}
+
+type DecorationProps = { theme: Theme; variant: 1 | 2; index: number };
+
+function Palm({ theme, bend = 1 }: { theme: Theme; bend?: number }) {
+  return <g transform={`scale(${bend} 1)`}>
+    <path d="M-4 5Q13-28 0-64L8-64Q27-27 5 7Z" fill="#b8874b" />
+    <path d="M1-61C-32-88-45-66-49-49Q-20-64 1-57C-20-56-25-33-23-21Q-4-44 6-54C13-38 31-33 44-37Q29-61 10-61C31-62 46-74 48-84Q18-85 6-67C7-90-11-98-22-95Q-13-68 1-61Z" fill={theme.darkLeaf} />
+    <path d="M3-64Q-16-77-37-64M7-63Q24-73 37-76M7-59Q21-48 32-44" fill="none" stroke={theme.leaf} strokeWidth="7" strokeLinecap="round" />
+    <circle cx="3" cy="-56" r="6" fill="#d0a063" /><circle cx="12" cy="-54" r="5" fill="#b78550" />
+  </g>;
+}
+
+function Lighthouse({ theme, variant, index }: DecorationProps) {
+  if (index === 0) return <>
+    <g transform="translate(-14 4)"><Palm theme={theme} bend={-1} /></g>
+    {variant === 2 && <g transform="translate(40 5) scale(.7)"><Palm theme={theme} /></g>}
+    <path d="M-46 8Q-9 21 45 10" fill="none" stroke={theme.light} strokeWidth="6" strokeLinecap="round" />
+    <path d="M30-6 34 2 43 3 36 9 38 18 30 13 21 18 23 9 16 3 25 2Z" fill={theme.accent} />
+  </>;
+  if (index === 1) return <>
+    <path d="M-50 6H50M-40-9V19M-19-9V19M19-9V19M40-9V19" fill="none" stroke="#b38851" strokeWidth="7" strokeLinecap="round" />
     {variant === 1 ? <>
-      <path d="M-30 4-21-87H21L30 4Z" fill="#fff9df" stroke="#45656b" strokeWidth="3" />
-      <path d="M-30-87 0-115 30-87Z" fill="var(--scene-accent)" stroke="#745879" strokeWidth="3" />
-      <circle cy="-74" r="8" fill="#ebbd62" stroke="#45656b" strokeWidth="3" />
-      {[0, 90, 180, 270].map((turn) => <path key={turn} transform={`rotate(${turn} 0 -74)`} d="M-4-78-10-128 7-128 4-78Z" fill="#fff7d9" stroke="#b8966e" strokeWidth="3" />)}
-      <path d="M-8 4V-18Q0-30 8-18V4Z" fill="#426578" />
-    </> : variant === 2 ? <>
-      <path d="M-35 4V-63H35V4Z" fill="#fff4dc" stroke="#536676" strokeWidth="3" />
-      <path d="M-40-63A40 40 0 0 1 40-63Z" fill="var(--scene-accent)" stroke="#536676" strokeWidth="3" />
-      <path d="M5-94 25-115 39-102 20-84Z" fill="#7796b7" stroke="#536676" strokeWidth="3" />
-      <circle cx="31" cy="-109" r="11" fill="#e3f3f1" stroke="#536676" strokeWidth="3" />
-      <path d="M-9 4V-18Q0-29 9-18V4Z" fill="#426578" />
-      <circle cx="-20" cy="-39" r="8" fill="#8ac4d2" /><circle cx="20" cy="-39" r="8" fill="#8ac4d2" />
-    </> : variant === 3 ? <>
-      <path d="M-10 7V-37H10V7Z" fill="#a76230" />
-      <path d="M-50-46Q-67-74-38-87Q-26-126 2-107Q30-127 42-93Q69-81 47-52Z" fill="var(--scene-leaf-dark)" />
-      <path d="M-46-61Q-55-84-28-92Q-20-119 4-102Q34-113 40-87Q60-75 43-61Z" fill="var(--scene-leaf)" />
-      <path d="M-30-18V-65H30V-18Z" fill="#f9de9f" stroke="#956d43" strokeWidth="3" />
-      <path d="M-36-65 0-93 36-65Z" fill="var(--scene-accent)" stroke="#956d43" strokeWidth="3" />
-      <path d="M-7-18V-41H7V-18Z" fill="#426578" /><path d="M-10-16V8M10-16V8M-10-6H10M-10 3H10" stroke="#a77c45" strokeWidth="3" />
+      <path d="M-34-1V-53H34V-1" fill="#fff2c7" stroke="#a2855b" strokeWidth="3" />
+      <path d="M-34-27H34M-20-2V-52M20-2V-52" stroke="#dbbc84" strokeWidth="3" />
+      <path d="M-44-53-31-78H31L44-53Z" fill={theme.accent} stroke="#b68658" strokeWidth="3" strokeLinejoin="round" />
+      <path d="M-18-77-23-54M2-77V-54M20-77 25-54" stroke="#fff6df" strokeWidth="9" />
+      <path d="M-11-1V-30Q0-43 11-30V-1Z" fill="#4d8c92" />
     </> : <>
-      <path d="M-43 4V-79H-21V-58H21V-79H43V4Z" fill="#fff2d2" stroke="#718091" strokeWidth="3" />
-      <path d="M-49-79-32-110-15-79ZM15-79 32-110 49-79Z" fill="var(--scene-accent)" stroke="#86719a" strokeWidth="3" />
-      <path d="M-12 4V-23Q0-39 12-23V4Z" fill="#426578" />
-      <path d="M-35-57H-28V-42H-35ZM28-57H35V-42H28Z" fill="#79b6c7" />
-      <path d="M0-60V-101M1-101 23-94 1-87Z" fill="#eabc59" stroke="#718091" strokeWidth="3" />
+      <path d="M-37 0V-37Q-37-89 0-91Q37-89 37-37V0H19V-35Q19-66 0-66Q-19-66-19-35V0Z" fill="#faf0c9" stroke="#b59c72" strokeWidth="3" />
+      <path d="M-40-37Q-40-92 0-96Q40-92 40-37" fill="none" stroke={theme.accent} strokeWidth="9" />
+      <path d="M-21-8H21L11 3H-11Z" fill={theme.leaf} />
+      <path d="M-16-70-10-58M16-70 10-58M0-89V-70" stroke="#cdbb90" strokeWidth="3" />
     </>}
-  </g>;
+  </>;
+  if (index === 2) return <>
+    <ellipse cy="7" rx="63" ry="17" fill="#75cecd" /><path d="M-49 6Q-28 14-8 8M14 12H40" fill="none" stroke="#dff8e8" strokeWidth="3" strokeLinecap="round" />
+    <path d="M-44-7H44L28 9H-27Z" fill="#fff5d7" stroke="#758d88" strokeWidth="3" /><path d="M-41-5H41L33 2H-34Z" fill={theme.accent} />
+    <path d="M-4-9V-99" fill="none" stroke="#527e81" strokeWidth="4" strokeLinecap="round" />
+    <path d="M-10-89-41-20H-10Z" fill="#fff8dc" /><path d="M3-88 35-20H3Z" fill={theme.accent} stroke="#be8b64" strokeWidth="2" />
+    <path d="M-3-99 21-92-3-85Z" fill="#f4cf68" />
+    {variant === 2 && <g transform="translate(46 7) scale(.55)"><path d="M-23-3H25L14 11H-14Z" fill="#fff1c7" /><path d="M-1-7V-64L23-9H3Z" fill={theme.leaf} stroke={theme.darkLeaf} strokeWidth="3" /></g>}
+  </>;
+  return <>
+    {variant === 2 && <g transform="translate(-39 5) scale(.65)"><Palm theme={theme} bend={-1} /></g>}
+    <path d="M-25 6-17-78H17L25 6Z" fill="#fff9dd" stroke="#4b7776" strokeWidth="3" />
+    <path d="M-21-39H21L23-20H-23ZM-18-75H18L20-58H-20Z" fill={theme.accent} />
+    <path d="M-7 6V-11Q0-25 7-11V6Z" fill="#366777" />
+    <rect x="-21" y="-100" width="42" height="25" rx="3" fill="#486b7a" />
+    <path d="M-14-95H14V-79H-14Z" fill="#ffe891" /><path d="M0-94V-80" stroke="#fff9e4" strokeWidth="3" />
+    <path d="M-28-99 0-120 28-99Z" fill={theme.accent} stroke="#ba785c" strokeWidth="3" strokeLinejoin="round" />
+    <path d="M0-122V-142M1-142 22-136 1-130Z" fill="#f8d66f" stroke="#537477" strokeWidth="2.5" />
+    {variant === 2 && <path d="M25-84 76-108V-62Z" fill="#fff3bc" opacity=".5" />}
+  </>;
 }
 
-
-function Tree({ x, y, scale = 1, warm = false }: { x: number; y: number; scale?: number; warm?: boolean }) {
-  return <g transform={`translate(${x} ${y}) scale(${scale})`}>
-    <ellipse cy="10" rx="22" ry="8" fill="#137957" opacity=".19" />
-    <path d="M-5 9 -4-27 5-27 6 9Z" fill="#a76230" />
-    <path d="M0-4 0-26" stroke="#e0a354" strokeWidth="3" strokeLinecap="round" />
-    <path d="M-25-24C-32-40-20-57-9-54C-14-75 18-81 24-56C43-54 43-25 27-20C28-5 8-4 1-12C-9-4-25-9-25-24Z" fill={warm ? "var(--scene-leaf-warm, #62aa2e)" : "var(--scene-leaf-dark, #137e5b)"} />
-    <path d="M-27-30C-32-43-18-58-8-54C-12-74 18-79 23-56C36-55 40-40 30-31C20-34 15-24 3-28C-7-23-17-33-27-30Z" fill={warm ? "var(--scene-leaf-light, #a4d640)" : "var(--scene-leaf, #29b566)"} />
-    <path d="M-10-55C-10-63-1-68 6-65" fill="none" stroke={warm ? "#d9ee7d" : "#78d979"} strokeWidth="5" strokeLinecap="round" />
-  </g>;
-}
-
-function Hill({ x, y, scale = 1, color = "#3bbd67" }: { x: number; y: number; scale?: number; color?: string }) {
-  return <g transform={`translate(${x} ${y}) scale(${scale})`}>
-    <ellipse cy="2" rx="39" ry="12" fill="#158458" opacity=".15" />
-    <path d="M-38 0V-43C-38-100 36-100 36-43V0C18 12-22 12-38 0Z" fill={`var(--scene-hill, ${color})`} />
-    <path d="M-27-29V-44C-27-62-21-73-10-76" fill="none" stroke="#bcf184" strokeWidth="9" strokeLinecap="round" opacity=".75" />
-    <ellipse cx="19" cy="-17" rx="5" ry="8" fill="#16955c" opacity=".32" />
-    <ellipse cx="6" cy="-5" rx="4" ry="5" fill="#16955c" opacity=".32" />
-  </g>;
-}
-
-function Flowers({ x, y, scale = 1, color = "#fff3ba" }: { x: number; y: number; scale?: number; color?: string }) {
-  return <g transform={`translate(${x} ${y}) scale(${scale})`}>
-    <path d="M0 6V-5M13 10V0M-12 9V1" stroke="#368f47" strokeWidth="2.5" strokeLinecap="round" />
-    {[[0, -6], [13, -1], [-12, 0]].map(([cx, cy], index) => <g key={index} transform={`translate(${cx} ${cy})`}>
-      <path d="M0-2C-7-9-11 1-4 3C-5 11 5 11 5 4C14 1 7-8 2-3Z" fill={color} />
-      <circle r="2.4" fill="#f6bb39" />
+function MirrorGarden({ theme, variant, index }: DecorationProps) {
+  return <>
+    <ellipse cy="-4" rx="70" ry="21" fill={theme.edge} /><ellipse cy="-7" rx="61" ry="16" fill="#8acada" />
+    <path d="M-45-8H-13M12-5H43M-11 1H16" stroke="#e6fbf8" strokeWidth="3" strokeLinecap="round" />
+    {[-1, 1].map(side => <g key={side} transform={`translate(${side * 38} -12)`}>
+      {variant === 1 ? <>
+        <path d="M-8 0V-50H8V0Z" fill="#a2acbf" />
+        <path d="M-19-53Q-22-87 0-103Q22-87 19-53Z" fill={theme.leaf} stroke={theme.darkLeaf} strokeWidth="3" />
+        <path d="M0-91V-62" stroke={theme.light} strokeWidth="4" strokeLinecap="round" />
+      </> : <>
+        <path d="M-19 0-21-48-7-82 15-59 22-12 8 2Z" fill={theme.darkLeaf} />
+        <path d="M-19-48-7-82 2-46-6-3Z" fill="#eee9fc" /><path d="M2-46 15-59 22-12 8 2Z" fill="#bbcee9" />
+        <path d="M-7-82 15-59 2-46Z" fill="#fffaff" />
+      </>}
     </g>)}
+    {index % 2 === 1 && <path d="M-26-18Q0-48 26-18" fill="none" stroke={theme.accent} strokeWidth="7" strokeLinecap="round" />}
+  </>;
+}
+
+function FruitTree({ theme, variant, index }: DecorationProps) {
+  return <>
+    <path d="M-7 5-5-55H5L8 5Z" fill="#9c7950" /><path d="M0-29-20-48M1-39 19-56" stroke="#9c7950" strokeWidth="7" />
+    <path d="M-36-42C-59-55-41-84-26-82C-30-105 3-119 17-96C43-109 58-73 39-61C51-36 11-24 0-38C-10-25-32-28-36-42Z" fill={theme.darkLeaf} />
+    <ellipse cx="-5" cy="-78" rx="31" ry="25" fill={theme.leaf} />
+    {[[-26, -65], [3, -88], [27, -65], [-2, -47]].map(([x, y], fruitIndex) => <g key={fruitIndex} transform={`translate(${x} ${y})`}>
+      <circle r={variant === 2 ? 9 : 8} fill={fruitIndex % 2 === index % 2 ? theme.accent : "#f4c557"} />
+      <path d="M0-7 3-12" stroke="#4f8851" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M-3-4-4-2" stroke="#ffedbc" strokeWidth="2.5" strokeLinecap="round" />
+    </g>)}
+  </>;
+}
+
+function Orchard({ theme, variant, index }: DecorationProps) {
+  if (variant === 2 && index === 3) return <>
+    <path d="M-46 4V-39L0-80 46-39V4Z" fill="#e3f2cd" stroke={theme.darkLeaf} strokeWidth="4" />
+    <path d="M-46-39H46M-25 4V-57M0 4V-77M25 4V-57" stroke="#85a886" strokeWidth="3" />
+    <path d="M-53-39 0-88 53-39" fill="none" stroke={theme.accent} strokeWidth="8" strokeLinejoin="round" />
+    <g transform="translate(-24 3) scale(.4)"><FruitTree theme={theme} variant={variant} index={index} /></g>
+    <g transform="translate(24 3) scale(.4)"><FruitTree theme={theme} variant={variant} index={index + 1} /></g>
+  </>;
+  return <>
+    <g transform="translate(-32 3) scale(.78)"><FruitTree theme={theme} variant={variant} index={index} /></g>
+    <g transform="translate(30 -5)"><FruitTree theme={theme} variant={variant} index={index + 1} /></g>
+    {variant === 2 && <path d="M-66 5Q-25 18 66 7M-59 17Q-10 27 51 19" fill="none" stroke={theme.edge} strokeWidth="6" strokeLinecap="round" />}
+  </>;
+}
+
+function PatternGarden({ theme, variant, index }: DecorationProps) {
+  return <>
+    {[-1, 0, 1].map((column) => <g key={column} transform={`translate(${column * 38} ${column === 0 ? -20 : 3}) scale(${column === 0 ? 1 : .7})`}>
+      <path d="M-7 4-10-43H10L7 4Z" fill="#fcf1d6" stroke="#8e899d" strokeWidth="3" />
+      {variant === 1 ? <>
+        <path d="M-36-38C-35-91 35-91 36-38Q0-25-36-38Z" fill={column === 0 ? theme.accent : theme.leaf} stroke={theme.darkLeaf} strokeWidth="3" />
+        <path d="M-17-65-10-34M7-72 18-35" stroke="#fff1df" strokeWidth="10" />
+        <path d="M-36-38Q0-25 36-38" fill="none" stroke={theme.darkLeaf} strokeWidth="3" />
+      </> : <>
+        <path d="M-34-43-23-73 0-88 24-73 35-43 0-31Z" fill={theme.leaf} stroke={theme.darkLeaf} strokeWidth="3" />
+        <path d="M-32-44 0-63 31-44M-23-71 0-50 24-71" fill="none" stroke={index % 2 ? theme.accent : theme.light} strokeWidth="9" strokeLinejoin="round" />
+      </>}
+    </g>)}
+  </>;
+}
+
+function Shapes({ theme, variant, index }: DecorationProps) {
+  return <>
+    <g transform="translate(-25 0)">
+      <path d="M-32-13 0-32 34-13 2 7Z" fill={theme.light} /><path d="M-32-13V-49L2-30V7Z" fill={theme.leaf} /><path d="M2 7V-30L34-49V-13Z" fill={theme.darkLeaf} /><path d="M-32-49 0-68 34-49 2-30Z" fill={theme.light} />
+      {variant === 2 && <g transform="translate(1 -40) scale(.74)"><path d="M-32-49 0-68 34-49 2-30Z" fill="#fff2c4" /><path d="M-32-49V-13L2 7V-30Z" fill={theme.accent} /><path d="M2-30 34-49V-13L2 7Z" fill="#c69264" /></g>}
+    </g>
+    <path d={index % 2 === 0 ? "M19 0 48-83 79 0Z" : "M23-6V-49A26 26 0 0 1 75-49V-6Z"} fill={theme.accent} stroke="#b38d62" strokeWidth="3" strokeLinejoin="round" />
+    <path d={index % 2 === 0 ? "M48-82 50-3H76Z" : "M61-68V-6H74V-46Q74-61 61-68Z"} fill="#ce935a" />
+  </>;
+}
+
+function LagoonArch({ theme, variant, index }: DecorationProps) {
+  return <>
+    <ellipse cy="3" rx="67" ry="19" fill="#6fc8cb" /><ellipse cy="3" rx="51" ry="11" fill="#b6ede4" />
+    <path d="M-49 4V-35C-49-109 49-109 49-35V4H25V-36C25-73-25-73-25-36V4Z" fill={theme.leaf} stroke={theme.darkLeaf} strokeWidth="4" />
+    <path d="M-35-42Q-33-76-8-79" fill="none" stroke={theme.light} strokeWidth="9" strokeLinecap="round" />
+    <path d="M-45-17H-29M29-20H45M-37-54-26-48M27-52 38-59M-9-87-8-63M16-82 12-61" stroke={theme.darkLeaf} strokeWidth="3" />
+    {variant === 2 && <g transform="translate(0 -88)"><path d="M-22 0-35-31-8-19 0-49 12-21 33-35 22 0Z" fill={theme.accent} stroke={theme.darkLeaf} strokeWidth="3" strokeLinejoin="round" /></g>}
+    <path d={`M${index % 2 ? -66 : 64} 9v-36m0 15q-17 0-15-16m15 7q15 0 15-13`} fill="none" stroke={theme.accent} strokeWidth="7" strokeLinecap="round" />
+  </>;
+}
+
+function DesertRuin({ theme, variant, index }: DecorationProps) {
+  return <>
+    <path d="M-75 6Q-35-49 10 5Q41-35 78 6Z" fill="#f8de9c" /><path d="M-75 6Q-35-49 10 5" fill="none" stroke={theme.light} strokeWidth="5" />
+    {index % 2 === 0 ? <>
+      <path d="M-23 5V-65H23V5H9V-29Q0-43-9-29V5Z" fill="#d7a369" stroke="#ad8055" strokeWidth="3" />
+      <path d="M-30-65-22-81H22L30-65Z" fill={theme.edge} stroke="#ad8055" strokeWidth="3" />
+      <path d="M-23-50H23M-23-34H-11M11-34H23M-23-17H-10M10-17H23" stroke="#b78455" strokeWidth="3" />
+      {variant === 2 && <path d="M-26-81 0-112 26-81Z" fill={theme.accent} stroke="#ad8055" strokeWidth="3" />}
+    </> : <>
+      <path d="M0 5V-76M-1-30Q-30-25-30-54M1-44Q26-40 26-67" fill="none" stroke={theme.darkLeaf} strokeWidth="17" strokeLinecap="round" />
+      <path d="M-4 4V-76M-29-31V-54M22-46V-67" fill="none" stroke={theme.leaf} strokeWidth="6" strokeLinecap="round" />
+      <path d="M-7-79-6-90 1-85 7-91 9-79Z" fill={theme.accent} />
+      {variant === 2 && <g transform="translate(39 5) scale(.6)"><path d="M-19 0V-68H19V0Z" fill="#deaf7a" /><path d="M-25-68H25V-82H-25Z" fill={theme.edge} /><path d="M-8-10V-56M6-10V-56" stroke="#b98a5e" strokeWidth="4" /></g>}
+    </>}
+  </>;
+}
+
+function CanopyHouse({ theme, variant, index }: DecorationProps) {
+  return <>
+    <path d="M-16 13-10-94H10L19 13Z" fill="#ad8253" /><path d="M-4 4-1-77" stroke="#d6af77" strokeWidth="7" strokeLinecap="round" />
+    <path d="M-64-71C-93-98-51-126-25-116C-20-151 29-154 41-118C75-124 93-89 62-67C48-42 11-55-2-63C-26-43-54-50-64-71Z" fill={theme.darkLeaf} />
+    <path d="M-68-88C-66-117-28-119-15-109C-8-140 29-139 39-113C62-114 77-95 63-81C34-73 28-90 7-83C-22-70-39-96-68-88Z" fill={theme.leaf} />
+    <path d="M-29-22V-63H30V-22Z" fill="#f4d99e" stroke="#987349" strokeWidth="3" /><path d="M-37-63 0-92 38-63Z" fill={theme.accent} stroke="#987349" strokeWidth="3" strokeLinejoin="round" />
+    <path d="M-7-22V-46H8V-22Z" fill="#527d76" /><path d="M-14-21V16M14-21V16M-14-10H14M-14 1H14M-14 12H14" stroke="#8e7149" strokeWidth="3.5" />
+    {variant === 2 && <g transform={`translate(${index % 2 ? -52 : 52} -26) scale(.7)`}><path d="M-22 0V-32H22V0Z" fill="#f9e6b8" stroke="#987349" strokeWidth="3" /><path d="M-29-32 0-56 29-32Z" fill={theme.accent} stroke="#987349" strokeWidth="3" /><circle cy="-15" r="7" fill="#658e83" /></g>}
+  </>;
+}
+
+function CliffTowers({ theme, variant, index }: DecorationProps) {
+  return <>
+    {[-1, 0, 1].map(column => {
+      const top = column === 0 ? -105 : column === (index % 2 ? 1 : -1) ? -72 : -47;
+      return <g key={column} transform={`translate(${column * 31} 0)`}>
+        <path d={`M-21 0V${top + 12}L0 ${top} 23 ${top + 12}V0L0 12Z`} fill={theme.cliff} stroke={theme.darkLeaf} strokeWidth="2.5" />
+        <path d={`M0 12V${top + 24}L23 ${top + 12}V0Z`} fill={theme.darkLeaf} />
+        <path d={`M-21 ${top + 12} 0 ${top} 23 ${top + 12} 0 ${top + 24}Z`} fill={variant === 2 ? "#fffdf4" : theme.light} />
+        <path d={`M-14 ${top + 27}V-7`} stroke={theme.light} strokeWidth="4" opacity=".5" />
+      </g>;
+    })}
+    {variant === 2 && <path d="M8-75V-5Q8 16 31 18" fill="none" stroke="#a9deed" strokeWidth="10" strokeLinecap="round" />}
+  </>;
+}
+
+function BalanceRocks({ theme, variant, index }: DecorationProps) {
+  return <>
+    <path d="M-16 7-22-14-8-32 11-28 22-6 13 7Z" fill={theme.cliff} stroke={theme.darkLeaf} strokeWidth="3" />
+    <path d="M-49-34-36-55 33-58 51-42 26-27-23-24Z" fill={theme.leaf} stroke={theme.darkLeaf} strokeWidth="3" />
+    <path d="M-33-50 27-52" stroke={theme.light} strokeWidth="6" strokeLinecap="round" />
+    {variant === 1 ? <>
+      <path d={index % 2 === 0 ? "M-7-55-23-78-8-100 18-92 29-66 13-55Z" : "M-16-55-29-83-9-108 23-87 20-62Z"} fill={theme.accent} stroke="#ad8795" strokeWidth="3" />
+      <path d="M-9-88 4-90" stroke="#f9e3bc" strokeWidth="5" strokeLinecap="round" />
+    </> : <>
+      <path d="M0-57V-102M-58-99H58M-42-98-58-66M-42-98-26-66M42-98 26-66M42-98 58-66" fill="none" stroke={theme.darkLeaf} strokeWidth="4" strokeLinecap="round" />
+      <path d="M-62-66Q-42-43-22-66ZM22-66Q42-43 62-66Z" fill={theme.accent} stroke={theme.darkLeaf} strokeWidth="3" />
+      <circle cy="-105" r="8" fill={theme.light} stroke={theme.darkLeaf} strokeWidth="3" />
+    </>}
+  </>;
+}
+
+const LANDMARKS = { coast: Lighthouse, mirror: MirrorGarden, orchard: Orchard, pattern: PatternGarden, shapes: Shapes, lagoon: LagoonArch, desert: DesertRuin, canopy: CanopyHouse, cliffs: CliffTowers, balance: BalanceRocks };
+
+function SurfaceDetails({ island, landscape, theme, variant, mobile }: { island: MapIsland; landscape: MapLandscape; theme: Theme; variant: 1 | 2; mobile: boolean }) {
+  const main = island.stopIndex !== undefined;
+  const x = island.x + (mobile ? -island.rx * .64 : 0);
+  const y = island.y + (mobile ? -island.ry * .01 : -island.ry * .39);
+  const Landmark = LANDMARKS[landscape];
+  const scale = mobile ? .38 : .62;
+  return <g data-landmark={main ? landscape : `${landscape}-garden`}>
+    {main && <g transform={`translate(${x} ${y}) scale(${scale})`}><Landmark theme={theme} variant={variant} index={island.stopIndex ?? 0} /></g>}
+    {landscape === "mirror" && <g fill="none" stroke={theme.light} strokeWidth={mobile ? 2 : 3} opacity=".75">
+      <path d={`M${island.x - island.rx * .47} ${island.y + island.ry * .66}q${island.rx * .47} 13 ${island.rx * .94} 0`} />
+      <path d={`M${island.x - island.rx * .37} ${island.y + island.ry * .75}q${island.rx * .37} 8 ${island.rx * .74} 0`} />
+    </g>}
+    {(landscape === "desert" || landscape === "cliffs") && <g fill="none" stroke={theme.light} strokeWidth={mobile ? 2.5 : 4} opacity=".7">
+      <path d={`M${island.x - island.rx * .67} ${island.y + island.ry * .57}q${island.rx * .66} ${island.ry * .32} ${island.rx * 1.31} 0`} />
+      {variant === 2 && <path d={`M${island.x - island.rx * .51} ${island.y + island.ry * .7}q${island.rx * .48} ${island.ry * .2} ${island.rx} 0`} />}
+    </g>}
+    {landscape === "pattern" && [-1, 0, 1].map(index => <g key={index} transform={`translate(${island.x + index * island.rx * .33} ${island.y + island.ry * .63})`}>
+      {variant === 1 ? <circle r={mobile ? 4 : 6} fill={index === 0 ? theme.accent : theme.light} /> : <path d={mobile ? "M0-5 5 0 0 5-5 0Z" : "M0-7 7 0 0 7-7 0Z"} fill={index === 0 ? theme.accent : theme.light} />}
+    </g>)}
+    {landscape === "orchard" && <g transform={`translate(${island.x + island.rx * (mobile ? .63 : -.65)} ${island.y + island.ry * .26}) scale(${mobile ? .55 : .8})`}>
+      <path d="M-16 0H16L12 17H-12Z" fill="#c09351" stroke="#a37e47" strokeWidth="2" /><path d="M-13 7H13M-4 0V17M5 0V17" stroke="#e7c588" strokeWidth="2" />
+      <circle cx="-7" cy="-2" r="6" fill={theme.accent} /><circle cx="5" cy="-4" r="7" fill="#f2c65b" />
+    </g>}
+    {(landscape === "coast" || landscape === "lagoon") && <g transform={`translate(${island.x + island.rx * .57} ${island.y + island.ry * .52}) scale(${mobile ? .7 : 1})`} fill={theme.light}>
+      <path d="M-9 4Q-17-14 0-13Q17-14 9 4Z" stroke={theme.accent} strokeWidth="2" /><path d="M0 3V-9M-3 3-7-8M3 3 7-8" stroke={theme.accent} strokeWidth="1.5" />
+    </g>}
+    {!main && <g transform={`translate(${island.x - island.rx * .62} ${island.y + island.ry * .04}) scale(${mobile ? .36 : .45})`}>
+      {landscape === "coast" ? <Palm theme={theme} /> : landscape === "orchard" ? <FruitTree theme={theme} variant={variant} index={0} /> : <>
+        <path d="M-15 6Q-30-15-13-29Q-5-40 4-21Q24-42 31-19Q39 4 20 8Z" fill={theme.leaf} /><path d="M0 6V-17M11 7 22-9" stroke={theme.darkLeaf} strokeWidth="4" strokeLinecap="round" />
+        <circle cx="-11" cy="-19" r="5" fill={theme.accent} /><circle cx="25" cy="-12" r="5" fill={theme.light} />
+      </>}
+    </g>}
   </g>;
 }
 
-function Bridge({ from, to, width = 39 }: { from: Point; to: Point; width?: number }) {
-  const length = Math.hypot(to[0] - from[0], to[1] - from[1]);
-  const angle = Math.atan2(to[1] - from[1], to[0] - from[0]) * 180 / Math.PI;
-  return <g transform={`translate(${from[0]} ${from[1]}) rotate(${angle})`}>
-    <rect x="-8" y={-width / 2 + 7} width={length + 16} height={width} rx="8" fill="#157f87" opacity=".24" />
-    <rect x="-8" y={-width / 2} width={length + 16} height={width} rx="5" fill="#a96337" />
-    {Array.from({ length: Math.ceil(length / 13) + 1 }, (_, index) => <rect key={index} x={index * 13 - 6} y={-width / 2 + 3} width="10" height={width - 6} rx="2" fill="#edbf72" />)}
-    <path d={`M-10 ${-width / 2}H${length + 10}M-10 ${width / 2}H${length + 10}`} stroke="#814c2c" strokeWidth="5" strokeLinecap="round" />
-    {[0, length].map((x) => <g key={x} fill="#bd7c40" stroke="#7d4e31" strokeWidth="2"><rect x={x - 4} y={-width / 2 - 8} width="8" height="14" rx="2" /><rect x={x - 4} y={width / 2 - 5} width="8" height="14" rx="2" /></g>)}
-  </g>;
+function Background({ layout, landscape, theme, variant }: { layout: MapLayout; landscape: MapLandscape; theme: Theme; variant: 1 | 2 }) {
+  const { width, height } = layout;
+  const mobile = width < 500;
+  const count = mobile ? 14 : 26;
+  return <>
+    <path d={`M-30 ${height * .15}Q${width * .22} ${height * .03} ${width * .55} ${height * .18}T${width + 50} ${height * .09}`} fill="none" stroke={theme.light} strokeWidth={mobile ? 32 : 65} opacity=".13" />
+    <path d={`M-40 ${height * .78}Q${width * .24} ${height * .97} ${width * .55} ${height * .81}T${width + 50} ${height * .88}`} fill="none" stroke={theme.deep} strokeWidth={mobile ? 40 : 80} opacity=".14" />
+    {Array.from({ length: count }, (_, index) => {
+      const x = 22 + ((index * 173 + variant * 83) % (width - 44));
+      const y = 24 + ((index * 137 + variant * 59) % (height - 48));
+      if (landscape === "canopy") return <path key={index} d={`M${x} ${y}q-22-38 14-53q15 28-14 53Z`} fill={theme.darkLeaf} opacity=".11" />;
+      if (landscape === "desert") return <path key={index} d={`M${x - 19} ${y}q19-13 39 0m-29 8q15-8 29 0`} fill="none" stroke={theme.light} strokeWidth="2.5" opacity=".36" />;
+      if (landscape === "pattern") return <path key={index} d={`M${x} ${y - 8}l7 8-7 8-7-8Z`} fill={theme.light} opacity=".25" />;
+      if (landscape === "shapes") return <g key={index} transform={`translate(${x} ${y})`} fill="none" stroke={theme.light} strokeWidth="2" opacity=".3">{index % 2 ? <path d="M-9 8 0-8 9 8Z" /> : <rect x="-7" y="-7" width="14" height="14" rx="2" />}</g>;
+      if (landscape === "mirror" || landscape === "balance") return <g key={index} transform={`translate(${x} ${y})`} stroke={theme.light} strokeWidth="2" strokeLinecap="round" opacity=".4"><path d="M-6 0H6M0-6V6" /><circle r="11" fill="none" opacity=".4" /></g>;
+      if (landscape === "cliffs") return <path key={index} d={`M${x - 19} ${y}q18-8 38 0q13 5 22 0`} fill="none" stroke={theme.light} strokeWidth="3" strokeLinecap="round" opacity=".35" />;
+      return <path key={index} d={`M${x} ${y}q9 6 18 0m9 0q9 6 18 0`} fill="none" stroke={theme.light} strokeWidth="3" strokeLinecap="round" opacity=".45" />;
+    })}
+    {landscape === "coast" && !mobile && <g transform={`translate(${variant === 1 ? 1075 : 86} 628) scale(.7)`}>
+      <ellipse cy="14" rx="45" ry="7" fill={theme.light} opacity=".4" /><path d="M-35 0H35L22 15H-21Z" fill="#fff7dc" /><path d="M0 0V-73M-1-67-31-9H-1ZM6-59 33-9H6Z" fill="#fff0b6" stroke="#5b919a" strokeWidth="3" />
+    </g>}
+  </>;
 }
 
-function Lighthouse({ x, y, scale = 1 }: { x: number; y: number; scale?: number }) {
-  return <g transform={`translate(${x} ${y}) scale(${scale})`}>
-    <ellipse cy="5" rx="43" ry="12" fill="#248052" opacity=".21" />
-    <path d="M-30 4-21-85H21L30 4Z" fill="#fff9dd" stroke="#284e56" strokeWidth="3" />
-    <path d="M-25-45H25L27-23H-27ZM-21-85H21L23-65H-23Z" fill="var(--scene-accent, #f27960)" />
-    <path d="M10-83H20L28 2H14Z" fill="#d1d9c3" opacity=".45" />
-    <path d="M-8 5V-16C-8-27 8-27 8-16V5" fill="#285168" />
-    <rect x="-7" y="-54" width="14" height="17" rx="6" fill="#4aa9ba" stroke="#fff6d9" strokeWidth="3" />
-    <rect x="-23" y="-106" width="46" height="23" rx="2" fill="#25556a" />
-    <path d="M-15-101H15V-85H-15Z" fill="#ffe18b" />
-    <path d="M0-101V-84" stroke="#fff5c9" strokeWidth="4" />
-    <path d="M-31-106 0-127 31-106Z" fill="#ea654f" stroke="#ba503e" strokeWidth="3" strokeLinejoin="round" />
-    <path d="M-30-81H30M-29-88V-77M29-88V-77" stroke="#315d63" strokeWidth="4" strokeLinecap="round" />
-    <path d="M0-128V-149" stroke="#315d63" strokeWidth="3" />
-    <path d="M2-149 23-143 2-137Z" fill="#f2be42" />
-  </g>;
-}
-
-function Cloud({ x, y, scale = 1 }: { x: number; y: number; scale?: number }) {
-  return <g transform={`translate(${x} ${y}) scale(${scale})`} fill="#efffff" opacity=".9">
-    <path d="M-39 9C-53 8-55-12-41-17C-43-39-9-44 0-25C17-40 40-27 38-11C63-8 58 17 38 18H-28Z" />
-    <path d="M-36 17H32" fill="none" stroke="#bdebec" strokeWidth="5" strokeLinecap="round" />
-  </g>;
-}
-
-function Boat({ x, y, scale = 1 }: { x: number; y: number; scale?: number }) {
-  return <g transform={`translate(${x} ${y}) scale(${scale})`}>
-    <ellipse cy="18" rx="42" ry="7" fill="#d9ffff" opacity=".35" />
-    <path d="M-33 3H33L21 16H-17Z" fill="#fff4d7" />
-    <path d="M-33 3H33L28 8H-28Z" fill="#ed7d60" />
-    <path d="M0 3V-61" stroke="#376a77" strokeWidth="3" strokeLinecap="round" />
-    <path d="M-5-53-30-5H-5Z" fill="#fffbe5" />
-    <path d="M5-51 29-8H5Z" fill="#ffd277" />
-    <path d="M3-62 18-57 3-52Z" fill="#f47864" />
-  </g>;
-}
-
-function Island({ d, grass, sand, cliff, scale = 1 }: { d: string; grass: string; sand: string; cliff: string; scale?: number }) {
-  return <g>
-    <path d={d} fill="none" stroke="#b3f7e4" strokeWidth={31 * scale} opacity=".58" transform={`translate(0 ${11 * scale})`} />
-    <path d={d} fill={`var(--scene-cliff, ${cliff})`} stroke={`var(--scene-cliff, ${cliff})`} strokeWidth={13 * scale} transform={`translate(0 ${19 * scale})`} />
-    <path d={d} fill={`var(--scene-sand, ${sand})`} stroke={`var(--scene-sand, ${sand})`} strokeWidth={15 * scale} transform={`translate(0 ${5 * scale})`} />
-    <path d={d} fill={grass} stroke="#dbec80" strokeWidth={3 * scale} />
-  </g>;
-}
-
-function Road({ segments, completedRoadSlot, mobile }: { segments: string[]; completedRoadSlot: number; mobile: boolean }) {
+function Routes({ layout, theme, landscape, completedRoadSlot, mobile, landClipId }: { layout: MapLayout; theme: Theme; landscape: MapLandscape; completedRoadSlot: number; mobile: boolean; landClipId: string }) {
+  const wood = landscape === "canopy";
+  const line = mobile ? 13 : 20;
   return <g fill="none" strokeLinecap="round" strokeLinejoin="round">
-    {segments.map((d, index) => <g key={d}>
-      <path d={d} stroke="#468c49" strokeWidth={mobile ? 21 : 28} opacity=".2" transform="translate(0 3)" />
-      <path d={d} stroke="#ce9e4d" strokeWidth={mobile ? 18 : 24} />
-      <path d={d} stroke={index < completedRoadSlot ? "#ffe39a" : "#f9d377"} strokeWidth={mobile ? 14 : 19} />
-      <path d={d} stroke="#fff0b3" strokeWidth="2" strokeDasharray="1 16" opacity=".8" />
+    {layout.storyPaths.map((d, index) => <g key={`story-${index}`} data-story-path="true">
+      <path d={d} stroke={theme.deep} strokeWidth={mobile ? 10 : 13} opacity=".24" transform="translate(0 3)" />
+      <path d={d} stroke={theme.edge} strokeWidth={mobile ? 7 : 10} strokeDasharray={mobile ? "2 12" : "3 17"} />
+    </g>)}
+    {layout.roads.map((d, index) => <g key={`road-${index}`} data-map-road={index}>
+      <path d={d} stroke={theme.deep} strokeWidth={line + 7} opacity=".25" transform="translate(0 4)" />
+      <path data-road-segment={index} d={d} stroke="#8f704c" strokeWidth={line + 6} />
+      <path d={d} stroke="#e7c387" strokeWidth={line + 1} />
+      <path d={d} stroke="#ad8453" strokeWidth={line + 1} strokeDasharray="2 9" strokeLinecap="butt" />
+      {!wood && <g clipPath={`url(#${landClipId})`}>
+        <path d={d} stroke="#c29e60" strokeWidth={line + 5} />
+        <path d={d} stroke={index < completedRoadSlot ? "#fff1bf" : theme.road} strokeWidth={line + 1} />
+        <path d={d} stroke="#fff6dc" strokeWidth="2" strokeDasharray="1 14" opacity=".8" />
+      </g>}
     </g>)}
   </g>;
 }
 
-/** Original decorative world art. Interactive stops are semantic HTML above it. */
-export default function CoastScene({ mobile = false, completedCount = 0, completedRoadSlot = completedCount - 1, worldNumber = 1, showDetours = true, className }: CoastSceneProps) {
-  const palette = SCENE_PALETTES[(worldNumber - 1) % SCENE_PALETTES.length] ?? SCENE_PALETTES[0];
-  const landmark = (worldNumber - 1) % 5;
-  const sceneStyle = {
-    "--scene-leaf": palette[4], "--scene-leaf-dark": palette[5],
-    "--scene-leaf-light": palette[2], "--scene-leaf-warm": palette[3],
-    "--scene-accent": palette[6],
-    ...(worldNumber > 1 ? { "--scene-hill": palette[4] } : {}),
-  } as CSSProperties;
+/** Decorative SVG and semantic HTML controls consume the same island layout. */
+export default function CoastScene(props: CoastSceneProps) {
+  if (WORLD_MODE === "prototype") return <LegacyCoastScene {...props} />;
+  return <WorldScene {...props} />;
+}
+
+function WorldScene({ mobile = false, completedCount = 0, completedRoadSlot = completedCount - 1, worldNumber = 1, className }: CoastSceneProps) {
+  const world = getWorldMapLayout(worldNumber);
+  const layout = mobile ? world.mobile : world.desktop;
+  const theme = THEMES[world.landscape][world.variant - 1];
   const id = useId().replace(/:/g, "");
-  const ocean = `${id}-ocean`;
-  const grass = `${id}-grass`;
-  const reef = `${id}-reef`;
-  const width = mobile ? 400 : 1200;
-  const height = mobile ? 960 : 740;
-  return <svg className={className} style={sceneStyle} data-scene-world={worldNumber} viewBox={`0 0 ${width} ${height}`} width="100%" height="100%" aria-hidden="true" focusable="false">
+  const backgroundId = `${id}-landscape`;
+  const landClipId = `${id}-land-surfaces`;
+  return <svg className={className} data-scene-world={worldNumber} data-landscape={world.landscape} data-landscape-variant={world.variant} viewBox={`0 0 ${layout.width} ${layout.height}`} width="100%" height="100%" aria-hidden="true" focusable="false">
     <defs>
-      <linearGradient id={ocean} x2=".35" y2="1"><stop stopColor={palette[0]} /><stop offset="1" stopColor={palette[1]} /></linearGradient>
-      <linearGradient id={grass} x2=".3" y2="1"><stop stopColor={palette[2]} /><stop offset="1" stopColor={palette[3]} /></linearGradient>
-      <linearGradient id={reef} x2="1" y2="1"><stop stopColor="#8cecdc" /><stop offset="1" stopColor="#46c8c3" /></linearGradient>
+      <linearGradient id={backgroundId} x2=".3" y2="1"><stop stopColor={theme.sky} /><stop offset="1" stopColor={theme.deep} /></linearGradient>
+      <clipPath id={landClipId}>{layout.islands.map(island => <path key={island.id} d={SHAPES[island.shape]} transform={`translate(${island.x} ${island.y}) rotate(${island.rotation ?? 0}) scale(${island.rx / 100} ${island.ry / 100})`} />)}</clipPath>
     </defs>
-    <rect width={width} height={height} fill={`url(#${ocean})`} />
-    {mobile ? <MobileScene grass={`url(#${grass})`} reef={`url(#${reef})`} completedRoadSlot={completedRoadSlot} landmark={landmark} showDetours={showDetours} /> : <DesktopScene grass={`url(#${grass})`} reef={`url(#${reef})`} completedRoadSlot={completedRoadSlot} landmark={landmark} showDetours={showDetours} />}
+    <rect width={layout.width} height={layout.height} fill={`url(#${backgroundId})`} />
+    <Background layout={layout} landscape={world.landscape} theme={theme} variant={world.variant} />
+    {layout.islands.map(island => <Land key={island.id} island={island} theme={theme} landscape={world.landscape} mobile={mobile} />)}
+    <Routes layout={layout} theme={theme} landscape={world.landscape} completedRoadSlot={completedRoadSlot} mobile={mobile} landClipId={landClipId} />
+    {layout.islands.map(island => <SurfaceDetails key={island.id} island={island} landscape={world.landscape} theme={theme} variant={world.variant} mobile={mobile} />)}
   </svg>;
-}
-
-type SceneProps = { grass: string; reef: string; completedRoadSlot: number; landmark: number; showDetours: boolean };
-
-function DesktopScene({ grass, reef, completedRoadSlot, landmark, showDetours }: SceneProps) {
-  return <>
-    <path d="M-30 285C119 146 271 333 437 188S714 46 930 119S1107 53 1240 8V-10H-30Z" fill="#a3eeee" opacity=".25" />
-    <path d="M-28 648C162 690 213 603 367 670S650 701 826 614S1075 583 1250 682" fill="none" stroke="#5fd9d7" strokeWidth="70" opacity=".35" />
-    <g fill="none" stroke="#c6f8ef" strokeWidth="4" strokeLinecap="round" opacity=".58">
-      {[ [75, 300], [90, 672], [193, 113], [398, 259], [522, 691], [658, 604], [757, 107], [837, 680], [1017, 557], [1123, 374], [1150, 612], [402, 92] ].map(([x,y], i) => <path key={i} d={`M${x} ${y}q10 6 20 0m11 0q10 6 20 0`} />)}
-    </g>
-    <ellipse cx="92" cy="122" rx="73" ry="40" fill={reef} opacity=".7" />
-    <Island d="M49 122C48 97 104 86 125 108C151 113 154 140 122 149C99 166 45 151 49 122Z" grass="#a6d76a" sand="#ffe6a2" cliff="#d0a766" scale={.55} />
-    <Tree x={91} y={127} scale={.58} />
-    <Cloud x={173} y={66} scale={1.05} />
-    <Cloud x={758} y={62} scale={.75} />
-    <Cloud x={1144} y={308} scale={.7} />
-
-    <Island d="M204 195C196 151 228 126 269 134C307 113 351 145 344 183C366 211 343 248 312 245C278 269 211 249 204 222Z" grass={grass} sand="#ffe2a0" cliff="#c79651" />
-    <Island d="M527 160C535 122 577 103 612 119C659 102 702 130 693 164C723 190 688 225 649 220C614 247 548 227 542 207C515 200 511 176 527 160Z" grass={grass} sand="#ffe2a0" cliff="#c79651" />
-    <Bridge from={[262, 246]} to={[268, 366]} />
-    <Bridge from={[581, 218]} to={[553, 303]} />
-    <Bridge from={[459, 508]} to={[501, 421]} width={47} />
-    <Bridge from={[955, 296]} to={[953, 226]} width={47} />
-
-    <Island d="M52 450C69 407 158 389 204 377C249 339 319 353 349 405C365 433 351 465 390 480C454 468 491 498 488 555C510 605 466 653 407 651C365 655 336 613 292 617C247 623 222 653 160 636C111 628 79 600 86 571C39 554 17 507 52 450Z" grass={grass} sand="#ffe2a0" cliff="#c79651" />
-    <Island d="M496 310C530 270 607 283 649 302C698 256 792 253 839 287C884 264 935 279 959 311C1009 316 1050 363 1030 407C1052 450 1018 478 975 474C931 505 885 469 853 482C810 511 783 547 727 541C671 558 644 516 606 514C552 522 515 481 506 443C460 421 454 351 496 310Z" grass={grass} sand="#ffe2a0" cliff="#c79651" />
-    <Island d="M874 120C898 77 948 82 981 94C1020 67 1074 83 1093 104C1140 96 1180 143 1157 183C1172 225 1133 254 1092 246C1063 271 1011 245 979 253C931 268 889 234 897 205C858 190 852 148 874 120Z" grass={grass} sand="#ffe2a0" cliff="#c79651" />
-
-    <g fill="none" stroke="#e2bd78" strokeWidth="3" strokeLinecap="round" opacity=".8">
-      <path d="M114 624l9 8m15 7 11 4M381 650l9 7m18 1 10-1M680 547l11 4m20-1 10 1M985 266l13-1m22-5 8 2" />
-    </g>
-    <g fill="#60b95a" opacity=".32">
-      <ellipse cx="155" cy="462" rx="60" ry="27" /><ellipse cx="279" cy="577" rx="40" ry="19" /><ellipse cx="589" cy="326" rx="53" ry="23" /><ellipse cx="862" cy="421" rx="47" ry="26" /><ellipse cx="1033" cy="213" rx="31" ry="13" />
-    </g>
-    {showDetours && <g fill="none" strokeLinecap="round"><path d={desktopBonusRoad.map(({ path }) => path).join("")} stroke="#ceaa60" strokeWidth="14" /><path d={desktopBonusRoad.map(({ path }) => path).join("")} stroke="#ffe3a3" strokeWidth="9" strokeDasharray="1 14" /></g>}
-    <Road segments={desktopRoad} completedRoadSlot={completedRoadSlot} mobile={false} />
-
-    <Hill x={190} y={478} scale={.88} color="#30b967" /><Hill x={136} y={479} scale={.66} color="#56c964" />
-    <Tree x={84} y={436} scale={.55} warm /><Tree x={348} y={391} scale={.6} />
-    <Tree x={292} y={598} scale={.75} /><Tree x={330} y={613} scale={.55} warm />
-    <Flowers x={196} y={596} scale={.85} color="#fff3d7" /><Flowers x={365} y={525} scale={.8} color="#ff9783" />
-    <Flowers x={73} y={506} scale={.65} /><Flowers x={459} y={609} scale={.75} color="#fff3d7" />
-    <Hill x={620} y={333} scale={.87} color="#55bf61" /><Hill x={668} y={339} scale={.55} color="#32ad60" />
-    <Tree x={584} y={468} scale={.66} /><Tree x={612} y={485} scale={.45} warm />
-    <Tree x={853} y={461} scale={.8} /><Tree x={888} y={448} scale={.62} warm />
-    <Flowers x={748} y={326} scale={.7} color="#f58ba2" /><Flowers x={762} y={506} scale={.6} />
-    <Flowers x={922} y={347} scale={.65} /><Flowers x={1010} y={439} scale={.65} color="#fff3d7" />
-    <Tree x={327} y={174} scale={.54} /><Flowers x={218} y={212} scale={.55} color="#ff8f83" />
-    <Hill x={663} y={155} scale={.44} color="#38b768" /><Flowers x={550} y={170} scale={.5} />
-    <Tree x={999} y={113} scale={.52} /><Tree x={1026} y={118} scale={.65} warm />
-    <Flowers x={1009} y={218} scale={.6} color="#fff3d7" /><Flowers x={1140} y={205} scale={.6} color="#ff9783" />
-    <Landmark x={1113} y={118} scale={.69} variant={landmark} />
-    <Boat x={612} y={654} scale={.82} />
-    <g transform="translate(1128 579)" fill="none" stroke="#e0fffa" strokeWidth="3" strokeLinecap="round" opacity=".85"><path d="M-18 0q8-9 16 0m2 0q8-9 16 0M-50 26q6-7 12 0m1 0q6-7 12 0" /></g>
-    <Cloud x={31} y={693} scale={1.35} /><Cloud x={1160} y={698} scale={1.6} />
-  </>;
-}
-
-function MobileScene({ grass, reef, completedRoadSlot, landmark, showDetours }: SceneProps) {
-  return <>
-    <path d="M-40 101C60 62 200 176 310 109S470 55 440 1H-40ZM-40 484C66 453 241 541 460 468V509C256 580 49 498-40 521Z" fill="#b2f4e9" opacity=".2" />
-    <g fill="none" stroke="#c4fbef" strokeWidth="3" strokeLinecap="round" opacity=".65">
-      {[[32,196],[346,266],[24,387],[340,444],[24,581],[337,636],[26,749],[325,867],[175,930]].map(([x,y],i) => <path key={i} d={`M${x} ${y}q6 4 12 0m7 0q6 4 12 0`} />)}
-    </g>
-    <ellipse cx="349" cy="87" rx="40" ry="31" fill={reef} />
-    <Island d="M328 79C334 62 363 64 370 79C388 101 353 116 332 100C321 94 320 85 328 79Z" grass="#a8d764" sand="#ffe2a0" cliff="#c79651" scale={.45} />
-    <Tree x={348} y={88} scale={.4} />
-    <Bridge from={[224, 744]} to={[178, 716]} width={30} />
-    <Bridge from={[213, 537]} to={[164, 515]} width={30} />
-    <Bridge from={[218, 340]} to={[169, 320]} width={30} />
-    <Island d="M77 739C109 715 150 738 174 750C211 728 263 716 298 734C336 740 348 774 324 801C328 833 284 849 250 842C216 859 191 861 167 886C139 919 88 919 63 891C38 874 38 842 60 822C52 797 36 766 77 739Z" grass={grass} sand="#ffe2a0" cliff="#c79651" scale={.65} />
-    <Island d="M64 568C89 540 135 563 163 566C196 544 253 541 288 553C326 559 343 590 321 615C328 640 290 658 261 653C216 649 184 675 153 699C119 725 73 710 64 686C38 667 42 640 69 625C46 608 44 587 64 568Z" grass={grass} sand="#ffe2a0" cliff="#c79651" scale={.65} />
-    <Island d="M70 373C96 346 136 366 166 372C203 347 261 347 298 360C333 371 342 400 320 422C330 441 320 451 311 458C346 471 338 504 307 509C272 519 257 487 224 481C189 479 172 496 145 509C111 527 68 513 62 488C36 469 40 442 67 427C47 410 44 392 70 373Z" grass={grass} sand="#ffe2a0" cliff="#c79651" scale={.65} />
-    <Island d="M153 53C185 34 223 49 227 82C239 118 270 125 297 151C330 168 342 205 315 229C294 252 248 236 221 254C186 268 166 297 133 313C102 331 63 316 59 292C35 275 41 247 67 232C46 214 51 188 71 177C93 151 139 170 156 146C175 126 122 88 153 53Z" grass={grass} sand="#ffe2a0" cliff="#c79651" scale={.65} />
-    <Road segments={mobileRoad} completedRoadSlot={completedRoadSlot} mobile />
-    {showDetours && <g fill="none" strokeLinecap="round"><path d={mobileBonusRoad.map(({ path }) => path).join("")} stroke="#c9a35c" strokeWidth="12" /><path d={mobileBonusRoad.map(({ path }) => path).join("")} stroke="#ffe5a8" strokeWidth="7" strokeDasharray="1 12" /></g>}
-    <Hill x={196} y={796} scale={.44} color="#32ba68" /><Hill x={167} y={800} scale={.34} color="#65c95d" />
-    <Tree x={261} y={832} scale={.42} /><Flowers x={68} y={846} scale={.45} color="#fff3d7" />
-    <Flowers x={158} y={886} scale={.45} color="#ff9385" />
-    <Tree x={234} y={680} scale={.46} /><Tree x={262} y={670} scale={.32} warm />
-    <Hill x={149} y={589} scale={.4} /><Flowers x={70} y={615} scale={.43} />
-    <Tree x={185} y={647} scale={.33} warm /><Flowers x={295} y={620} scale={.43} color="#ff9488" />
-    <Hill x={191} y={422} scale={.43} color="#35b866" /><Hill x={164} y={426} scale={.32} color="#69c960" />
-    <Tree x={80} y={395} scale={.39} /><Flowers x={309} y={426} scale={.42} color="#fff3d7" />
-    <Tree x={264} y={280} scale={.44} /><Tree x={290} y={269} scale={.32} warm />
-    <Hill x={136} y={201} scale={.4} /><Flowers x={74} y={250} scale={.4} color="#fff3d7" />
-    <Flowers x={211} y={140} scale={.38} color="#ff9488" />
-    <Landmark x={223} y={84} scale={.44} variant={landmark} />
-    <Boat x={335} y={563} scale={.55} /><Boat x={52} y={130} scale={.4} />
-    <Cloud x={34} y={43} scale={.7} /><Cloud x={391} y={929} scale={.8} />
-    <g transform="translate(334 712)" fill="none" stroke="#e0fffa" strokeWidth="2.5" strokeLinecap="round" opacity=".85"><path d="M-12 0q6-7 12 0m1 0q6-7 12 0M-25 17q4-5 8 0m1 0q4-5 8 0" /></g>
-  </>;
 }

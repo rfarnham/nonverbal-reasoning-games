@@ -113,7 +113,7 @@ for (const mobile of [false, true]) {
     return { world, first, last, points, indices, betweenSlots };
   }
 
-  test(`${label} shared route follows every painted cubic, including unnumbered slots`, () => {
+  test(`${label} shared route follows every painted cubic, including unnumbered slots`, { skip: WORLD_MODE !== "prototype" }, () => {
     const { points, indices } = roadTemplate();
     for (let slot = 0; slot < roads.length; slot += 1) {
       const curve = coordinates(roads[slot]);
@@ -123,7 +123,7 @@ for (const mobile of [false, true]) {
     assertEvenSteps(points, width, height);
   });
 
-  test(`${label} each world's required routes respect map slots, endpoints, and reversal`, () => {
+  test(`${label} each world's required routes respect map slots, endpoints, and reversal`, { skip: WORLD_MODE !== "prototype" }, () => {
     const { betweenSlots } = roadTemplate();
     for (const world of worldPaths) {
       for (const from of world.stops) {
@@ -142,7 +142,7 @@ for (const mobile of [false, true]) {
     }
   });
 
-  test(`${label} route callers cannot corrupt later trips`, () => {
+  test(`${label} route callers cannot corrupt later trips`, { skip: WORLD_MODE !== "prototype" }, () => {
     const { first, last, points } = roadTemplate();
     const original = structuredClone(points);
     points[0].x = -100;

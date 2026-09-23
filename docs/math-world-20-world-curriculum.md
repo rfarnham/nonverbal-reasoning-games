@@ -19,6 +19,13 @@ full-width instruction crop and use image columns split only at blank gaps.
 Printing waits for all artwork to load and does not change saved progress.
 The browser print dialog can also save the workbook as a PDF.
 
+Each world has its own island arrangement, connecting quiz route, and scenic
+landmarks, with separately composed portrait maps. Each world has exactly two
+book markers, on small story islands branching off the four quiz islands. Books currently
+open an accessible **Story coming soon** placeholder; no storyline has been
+authored, and opening a book does not change quiz progress or add questions.
+The numbered quiz route remains four sequential stops of six questions.
+
 | World | Learning focus | Return visit |
 | --- | --- | --- |
 | 1. Counting 1 | Count a given collection, reconstruct missing objects, and distinguish objects from gaps. | 11. Counting 2: count systematically, combine conditions, and avoid double counting. |

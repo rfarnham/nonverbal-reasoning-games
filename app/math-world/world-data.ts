@@ -1,3 +1,4 @@
+import { getWorldMapLayout } from "./map-layouts.ts";
 import runtimeManifest from "./data/runtime.generated.json" with { type: "json" };
 
 export type RealmId = "number_arithmetic" | "geometry_spatial" | "measurement_time" | "logic_constraints";
@@ -55,7 +56,20 @@ export const WORLD_CONTENT_VERSION = manifest.contentVersion;
 export const WORLD_ONTOLOGY_VERSION = manifest.ontologyVersion;
 export const WORLD_MODE = manifest.mode;
 export const WORLD_DEFINITIONS = manifest.worlds;
-export const REQUIRED_STOPS = manifest.stops;
+// Map presentation can evolve without invalidating the child's saved questions.
+// Prototype data retains its original nine-stop coordinates and detours.
+export const REQUIRED_STOPS: readonly MathStop[] = manifest.mode === "spiral-preview"
+  ? manifest.stops.map(stop => {
+    const world = manifest.worlds.find(candidate => candidate.id === stop.worldId);
+    if (!world) throw new Error(`Unknown map world: ${stop.worldId}.`);
+    const mapSlot = world.stopIds.indexOf(stop.id);
+    const layout = getWorldMapLayout(world.number);
+    const desktop = layout.desktop.stopPoints[mapSlot];
+    const mobile = layout.mobile.stopPoints[mapSlot];
+    if (!desktop || !mobile) throw new Error(`Missing map position: ${stop.id}.`);
+    return { ...stop, mapSlot, x: desktop.x, y: desktop.y, mobileX: mobile.x, mobileY: mobile.y };
+  })
+  : manifest.stops;
 export const BREAK_STOPS = manifest.breaks;
 export const WORLD_STOPS: readonly WorldStop[] = [...REQUIRED_STOPS, ...BREAK_STOPS];
 export const WORLD_QUESTIONS = manifest.questions;

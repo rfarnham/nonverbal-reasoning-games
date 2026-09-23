@@ -7,6 +7,7 @@ import { Avatar } from "@/components/progression/avatar";
 import {
   QUESTIONS_BY_STOP,
   WORLD_DEFINITIONS,
+  WORLD_MODE,
   stopsForWorld,
   breaksForWorld,
   type BreakStop,
@@ -25,6 +26,7 @@ import styles from "./math-world.module.css";
 import CoastScene from "./CoastScene";
 import { useMapTravel } from "./useMapTravel";
 import { printWorldWorkbook } from "./workbook";
+import { getWorldMapLayout } from "./map-layouts";
 
 type MapProps = Readonly<{
   progress: WorldProgress;
@@ -44,6 +46,15 @@ function stopStyle(stop: WorldStop): CSSProperties {
     "--mobile-stop-x": `${stop.mobileX}%`,
     "--mobile-stop-y": `${stop.mobileY}%`,
   } as CSSProperties;
+}
+
+function StoryBookIcon() {
+  return <svg viewBox="0 0 48 40" aria-hidden="true" focusable="false" fill="none">
+    <path d="M24 8C17 3 9 3 3 5v28c8-2 14-1 21 3 7-4 13-5 21-3V5c-6-2-14-2-21 3Z" fill="#de9650" stroke="#70482a" strokeWidth="2.4" strokeLinejoin="round" />
+    <path d="M24 8C18 4 11 4 6 6v23c7-1 12 0 18 4 6-4 11-5 18-4V6c-5-2-12-2-18 2Z" fill="#fff8dc" />
+    <path d="M24 8v25M10 12c4 0 6 1 10 3m-10 3c4 0 6 1 10 3m8-6c4-2 6-3 10-3m-10 9c4-2 6-3 10-3" stroke="#ac8143" strokeWidth="2" strokeLinecap="round" />
+    <path d="M31 5v12l3-2 3 1V4" fill="#db6854" />
+  </svg>;
 }
 
 function StopGlyph({ stop, ordinal }: Readonly<{ stop: WorldStop; ordinal?: number }>) {
@@ -158,6 +169,7 @@ export function WorldMap({
   world,
   onChooseWorld,
 }: MapProps) {
+  const mapLayout = WORLD_MODE === "spiral-preview" ? getWorldMapLayout(world.number) : null;
   const requiredStops = stopsForWorld(world.id);
   const breakStops = breaksForWorld(world.id);
   const questionCount = requiredStops.reduce((count, stop) => count + (QUESTIONS_BY_STOP.get(stop.id)?.length ?? 0), 0);
@@ -190,7 +202,14 @@ export function WorldMap({
   const preparingWorkbookRef = useRef(false);
   const [preparingWorkbook, setPreparingWorkbook] = useState(false);
   const [workbookError, setWorkbookError] = useState<string | null>(null);
+  const [activeStory, setActiveStory] = useState<number | null>(null);
+  const storyDialogRef = useRef<HTMLDialogElement>(null);
+  const storyOpenerRef = useRef<HTMLButtonElement | null>(null);
   const busy = travel !== null;
+
+  useEffect(() => {
+    if (activeStory !== null && !storyDialogRef.current?.open) storyDialogRef.current?.showModal();
+  }, [activeStory]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -225,7 +244,7 @@ export function WorldMap({
   }
 
   return (
-    <main className={styles.worldShell} data-world-id={world.id} data-launch-phase={travel?.phase ?? "idle"}>
+    <main className={styles.worldShell} data-world-id={world.id} data-map-layout={mapLayout ? "islands" : "legacy"} data-launch-phase={travel?.phase ?? "idle"}>
       <nav className={styles.worldNavigation} aria-label="World navigation">
         <div className={styles.worldPicker}>
           <button type="button" className={styles.worldArrow} aria-label="Previous world"
@@ -337,10 +356,30 @@ export function WorldMap({
             )}
           </ol>
 
+          {mapLayout && <ul className={styles.storyList} aria-label="Island storybooks">
+            {mapLayout.desktop.books.map((book, index) => {
+              const mobileBook = mapLayout.mobile.books.find(candidate => candidate.id === book.id)!;
+              const position = {
+                "--story-x": `${book.x}%`, "--story-y": `${book.y}%`,
+                "--mobile-story-x": `${mobileBook.x}%`, "--mobile-story-y": `${mobileBook.y}%`,
+              } as CSSProperties;
+              return <li key={book.id} className={styles.storyMarker} style={position}>
+                <button type="button" className={styles.storyButton} disabled={busy}
+                  data-story-island-id={book.islandId} data-story-book-id={book.id}
+                  aria-label={`Storybook on island ${index + 1}: coming soon`}
+                  aria-haspopup="dialog" title="Story coming soon"
+                  onClick={event => { storyOpenerRef.current = event.currentTarget; setActiveStory(index); }}>
+                  <StoryBookIcon />
+                </button>
+              </li>;
+            })}
+          </ul>}
+
           <span ref={avatarRef} className={styles.mapAvatar} style={stopStyle(restingStop)} aria-hidden="true">
             <span ref={spriteRef} className={styles.avatarSprite}><Avatar avatar="hedgehog" size={62} state="idle" decorative eager /></span>
           </span>
         </div>
+        {mapLayout && <div className={styles.mapLegend}><StoryBookIcon /><span>Island stories are coming soon.</span></div>}
       </section>
 
       <section className={styles.mapActions} aria-label="World actions">
@@ -380,6 +419,14 @@ export function WorldMap({
         </details>
         <button type="button" disabled={busy} className={styles.notesLink} onClick={onExportQa}>↓ Export playtest notes</button>
       </section>
+      <dialog ref={storyDialogRef} className={styles.storyDialog} aria-labelledby="island-story-title" aria-describedby="island-story-description"
+        onClose={() => { setActiveStory(null); storyOpenerRef.current?.focus({ preventScroll: true }); }}>
+        <div className={styles.storyIllustration}><StoryBookIcon /></div>
+        <p className={styles.kicker}>{world.title}{activeStory !== null ? ` · Island ${activeStory + 1}` : ""}</p>
+        <h2 id="island-story-title">Story coming soon</h2>
+        <p id="island-story-description">A little story will connect this island to the rest of the adventure.</p>
+        <button type="button" className={styles.primaryButton} onClick={() => storyDialogRef.current?.close()}>Back to the map</button>
+      </dialog>
       <div ref={irisRef} className={styles.mapIris} aria-hidden="true" />
     </main>
   );

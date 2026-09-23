@@ -1,4 +1,5 @@
-import { BREAK_STOPS, REQUIRED_STOPS } from "./world-data.ts";
+import { getWorldMapLayout } from "./map-layouts.ts";
+import { BREAK_STOPS, REQUIRED_STOPS, WORLD_DEFINITIONS, WORLD_MODE } from "./world-data.ts";
 
 export type MapTravelPoint = { x: number; y: number };
 
@@ -75,14 +76,25 @@ function sampleRoadSegment(path: string): MapTravelPoint[] {
 }
 
 const desktopSamples = desktopRoad.map(sampleRoadSegment);
+const authoredSamples = new Map<string, MapTravelPoint[][]>();
+function worldSamples(worldNumber: number, mobile: boolean): MapTravelPoint[][] {
+  const key = `${worldNumber}:${mobile}`;
+  let samples = authoredSamples.get(key);
+  if (!samples) {
+    const layout = getWorldMapLayout(worldNumber)[mobile ? "mobile" : "desktop"];
+    samples = layout.roads.map(sampleRoadSegment);
+    authoredSamples.set(key, samples);
+  }
+  return samples;
+}
 const mobileSamples = mobileRoad.map(sampleRoadSegment);
 const desktopBonusSamples = desktopBonusRoad.map(({ path }) => sampleRoadSegment(path));
 const mobileBonusSamples = mobileBonusRoad.map(({ path }) => sampleRoadSegment(path));
 
 /**
- * Percentage coordinates along the actual island road, including unnumbered
- * intermediate anchors. World data places four to nine real stops on these
- * anchors; world IDs never affect geometry or introduce cross-world travel.
+ * Percentage coordinates along the selected world's painted roads. The spiral
+ * has four authored anchors per world; prototype routes retain their original
+ * unnumbered junctions. Story islands do not change quiz travel or progression.
  */
 export function getMapTravelPoints(fromStopId: string, toStopId: string, mobile = false): MapTravelPoint[] {
   const origin = REQUIRED_STOPS.find(({ id }) => id === fromStopId);
@@ -92,7 +104,11 @@ export function getMapTravelPoints(fromStopId: string, toStopId: string, mobile 
 
   const width = mobile ? 400 : 1200;
   const height = mobile ? 960 : 740;
-  const samples = mobile ? mobileSamples : desktopSamples;
+  const world = WORLD_DEFINITIONS.find(candidate => candidate.id === origin.worldId);
+  if (!world) return [];
+  const samples = WORLD_MODE === "spiral-preview"
+    ? worldSamples(world.number, mobile)
+    : mobile ? mobileSamples : desktopSamples;
   const toPercentage = ({ x, y }: MapTravelPoint): MapTravelPoint => ({ x: x / width * 100, y: y / height * 100 });
   const slotPoint = (slot: number): MapTravelPoint => {
     const point = toPercentage(slot === samples.length ? samples.at(-1)!.at(-1)! : samples[slot][0]);
@@ -115,6 +131,7 @@ export function getMapTravelPoints(fromStopId: string, toStopId: string, mobile 
     : { x: stop.x, y: stop.y };
 
   if (destination.kind === "turbo" || destination.kind === "minigame") {
+    if (WORLD_MODE !== "prototype") return [];
     const branchIndex = destination.kind === "turbo" ? 0 : 1;
     const branch = (mobile ? mobileBonusRoad : desktopBonusRoad)[branchIndex];
     const branchSamples = (mobile ? mobileBonusSamples : desktopBonusSamples)[branchIndex];

@@ -98,6 +98,22 @@
 .breakStop .stopButton { width: 50px; min-width: 50px; height: 50px; border-radius: 16px; color: #fff; background: #7452cb; box-shadow: 0 4px 0 #513196, 0 7px 0 3px rgb(43 90 57 / 15%); font-size: 1.3rem; }
 .breakStop[data-state="locked"] .stopButton { background: #6c756b; box-shadow: 0 4px 0 #495748; }
 .mapAvatar { position: absolute; z-index: 8; top: calc(var(--stop-y) - 7%); left: calc(var(--stop-x) - 1%); transform: translate(-50%, -50%); pointer-events: none; filter: drop-shadow(0 4px 3px rgb(23 33 61 / 20%)); }
+.storyList { position: absolute; inset: 0; z-index: 6; margin: 0; padding: 0; list-style: none; pointer-events: none; }
+.storyMarker { position: absolute; left: var(--story-x); top: var(--story-y); transform: translate(-50%, -50%); }
+.storyButton { width: 48px; height: 48px; display: grid; place-items: center; padding: 6px; border: 2px solid #fffdf2; border-radius: 14px; background: #fff1c9; box-shadow: 0 3px 0 #b98c45, 0 5px 10px #244f4c30; cursor: pointer; pointer-events: auto; transition: transform 160ms ease; }
+.storyButton svg { width: 34px; height: 30px; }
+.storyButton:hover:not(:disabled) { transform: translateY(-2px); background: #fff9e6; }
+.storyButton:disabled { cursor: default; }
+.storyButton:focus-visible { outline: 3px solid #1679d2; outline-offset: 4px; }
+.mapLegend { display: flex; justify-content: center; align-items: center; gap: 10px; min-height: 44px; padding: 8px 18px; border-top: 1px solid #c8e0d6; color: #486355; background: #f2f7e9; font-size: .75rem; font-weight: 650; }
+.mapLegend svg { width: 26px; height: 24px; }
+.storyDialog { width: min(420px, calc(100% - 36px)); max-height: calc(100dvh - 40px); overflow-y: auto; padding: 30px; border: 1px solid #d8cfbb; border-radius: 24px; color: #17213d; background: #fffdf8; box-shadow: 0 24px 80px #17213d40; text-align: center; }
+.storyDialog::backdrop { background: #17213d70; }
+.storyIllustration { width: 102px; height: 88px; display: grid; place-items: center; margin: 0 auto 24px; border-radius: 26px; background: #fff1c9; }
+.storyIllustration svg { width: 76px; height: 64px; }
+.storyDialog h2 { margin: 0 0 12px; font-size: 1.8rem; font-weight: 900; letter-spacing: -.045em; }
+.storyDialog > p:not(.kicker) { margin: 0 0 24px; color: #657087; font-size: .95rem; line-height: 1.6; }
+.storyDialog .primaryButton { width: 100%; box-shadow: none; }
 .mapActions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; padding: 23px 26px; border: 1px solid #d6dbce; border-top: 0; border-radius: 0 0 24px 24px; background: #fffdf8; box-shadow: 0 16px 40px rgb(34 105 93 / 7%); }
 .nextTrail { display: flex; align-items: center; gap: 13px; }
 .nextTrailIcon { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 14px; color: #16836b; background: #eaf1da; font-size: 1.6rem; }
@@ -801,6 +817,14 @@
 .mapIntro h1:focus, .mapCompletion h2:focus { outline: none; }
 .worldShell[data-launch-phase="travel"] .mapAvatar, .worldShell[data-launch-phase="bounce"] .mapAvatar { will-change: top, left; }
 .worldShell[data-launch-phase="iris"] .mapIris { will-change: clip-path; }
+.worldShell[data-map-layout="islands"] .mapAvatar { left: var(--stop-x); top: calc(var(--stop-y) - 38px); }
+@media (max-width: 620px) {
+  .storyMarker { left: var(--mobile-story-x); top: var(--mobile-story-y); }
+  .worldShell[data-map-layout="islands"] .mapLocation { display: none; }
+  .worldShell[data-map-layout="islands"] .mapAvatar { left: var(--mobile-stop-x); top: calc(var(--mobile-stop-y) - 38px); }
+  .storyDialog { padding: 26px 22px; }
+}
+@media (prefers-reduced-motion: reduce) { .storyButton { transition: none; } }
 
 .worldNavigation { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-top: 24px; }
 .worldPicker { display: flex; align-items: flex-end; gap: 10px; min-width: 0; }

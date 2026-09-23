@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getMapTravelPoints } from "./map-travel";
-import type { WorldStop } from "./world-data";
+import { WORLD_MODE, type WorldStop } from "./world-data";
 
 type Trip = {
   animations: Animation[];
@@ -101,8 +101,8 @@ export function useMapTravel(origin: WorldStop) {
       }));
       await Promise.all([
         animate(avatar, points.map(({ x, y }) => ({
-          left: `calc(${x}% ${mobile ? "+ 18%" : "- 1%"})`,
-          top: `calc(${y}% - ${mobile ? "1.5%" : "7%"})`,
+          left: WORLD_MODE === "spiral-preview" ? `${x}%` : `calc(${x}% ${mobile ? "+ 18%" : "- 1%"})`,
+          top: WORLD_MODE === "spiral-preview" ? `calc(${y}% - 38px)` : `calc(${y}% - ${mobile ? "1.5%" : "7%"})`,
         })), duration),
         animate(sprite, hopFrames, duration),
       ]);
