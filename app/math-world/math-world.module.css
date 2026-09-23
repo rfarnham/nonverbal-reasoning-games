@@ -58,6 +58,16 @@
 .mapIntro h1, .courseTopline h1, .checkpointShell h1 { margin: 0; font-size: clamp(2.7rem, 5vw, 4.5rem); font-weight: 900; letter-spacing: -.065em; line-height: 1; }
 .mapIntro h1 > span { color: #16836b; }
 .mapIntro > div:first-child > p:last-child { margin: 13px 0 0; color: #657087; font-size: .92rem; line-height: 1.5; }
+.worldTools { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 18px; margin-top: 13px; }
+.worldQuestionCount { margin: 0; color: #657087; font-size: .92rem; line-height: 1.5; }
+.workbookButton { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; padding: 9px 16px; border: 1px solid #cfcabd; border-radius: 999px; color: #17213d; background: #fffdf8; font: inherit; font-size: .8rem; font-weight: 750; cursor: pointer; }
+.workbookButton:not(:disabled):hover { border-color: #657087; background: #fff; }
+.workbookButton:disabled { color: #657087; cursor: default; }
+.workbookButton:focus-visible { outline: 3px solid #1679d2; outline-offset: 4px; }
+.workbookSpinner { width: 15px; height: 15px; flex: 0 0 15px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: workbookSpin 800ms linear infinite; }
+.mapIntro > div:first-child > .workbookError { margin: 10px 0 0; color: #a5322c; font-size: .85rem; line-height: 1.5; }
+@keyframes workbookSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .workbookSpinner { animation: none; } }
 .mapProgress { display: grid; gap: 10px; }
 .progressCopy { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; color: #526047; font-size: .78rem; font-weight: 750; }
 .progressCopy strong { color: var(--world-ink); font-size: 1.3rem; }

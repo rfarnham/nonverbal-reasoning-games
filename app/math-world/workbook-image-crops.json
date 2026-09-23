@@ -1,0 +1,2873 @@
+{
+  "schemaVersion": 1,
+  "coordinateSystem": "Original image pixels, or printAsset pixels when present; sourceLeft/sourceTop inclusive, sourceRight/sourceBottom/headerBottom exclusive. Absent horizontal bounds mean full width. assetSha256 always binds to the selected game asset; printAsset.sha256 binds to the verified alternate crop.",
+  "purpose": "Workbook-only source-card layout bounds. Crops remove generated provenance or answer footers, capture chrome, or empty canvas, never source question or answer-choice content. No answer key is included.",
+  "crops": {
+    "oasis-online-2023-grades-1-2-q01": {
+      "assetSha256": "1397302fdc02c79296cbdf9ef8f23cccf9b0906b962c6069eea5bc64f2faf52c",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2022-grades-1-2-q01": {
+      "assetSha256": "2cc816fb038f05d653514f2b24178152407ee23e71c246ff49b6d7300a0ddcfe",
+      "sourceTop": 0,
+      "sourceBottom": 1632,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 182,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2017-grades-1-2-q02": {
+      "assetSha256": "15616453765d0222dc4d5af53bbaeeb3ddfed05a6e74add1cbb095b9fc88842d",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2016-grades-1-2-q03": {
+      "assetSha256": "9ec80e48c465c42ddf84521b44d83b020b6e2aabe66328845b7523d9aafbc70f",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2015-grades-1-2-q03": {
+      "assetSha256": "18d3237aff967ab29762a6787d1984b695216783039933ba528d72b6c7c93523",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1872,
+      "sourceBottom": 268,
+      "basis": "Verified original contest-paper crop for printing; question and all choices retained.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2015-grades-1-2-q03.webp",
+        "width": 1872,
+        "height": 268,
+        "sha256": "c490bb3d6fa24db9e255b2030db1f030e224038ac07a5c7633053f594c5d1920",
+        "sourceBasis": "Original Math Kangaroo USA 2015 Grades 1–2 contest paper, page 1, question 3. Original prompt, diagrams, and ordered choices visually compared with the selected question; page headers and neighboring questions excluded. Original publisher artwork and typography retained."
+      }
+    },
+    "oasis-online-2012-grades-1-2-q01": {
+      "assetSha256": "a984d80bbb89e4c24997c40973d64a2b99b3075afcee3db2a7f6d880b67c4c5e",
+      "sourceTop": 0,
+      "sourceBottom": 168,
+      "basis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 1, question 1. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2012-grades-1-2-q01-original.webp",
+        "width": 860,
+        "height": 168,
+        "sha256": "0478f4fbe4dad656fc7f3920d4bca1c7c81aff158d7c4f6a779a2c0796ab86c6",
+        "sourceBasis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 1, question 1. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2012-grades-1-2-q03": {
+      "assetSha256": "1ece477b5d376658d5eeec3c2d89290b30017b3d3deb255798bc219d1c402671",
+      "sourceTop": 0,
+      "sourceBottom": 107,
+      "basis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 1, question 3. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2012-grades-1-2-q03-original.webp",
+        "width": 860,
+        "height": 107,
+        "sha256": "09e90803a40da4a54f9d743b8746b766461bae7816ca328d2b2ff74322b968d4",
+        "sourceBasis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 1, question 3. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2012-grades-1-2-q04": {
+      "assetSha256": "71ca996dea286272b6abf9f9ff1c6fe3201728b6270350bfdd92424024592fea",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2024-grades-1-2-q05": {
+      "assetSha256": "605ec9b6d74144ca52e741df14b0cba12422874f22da8f479775434ef572e0d9",
+      "sourceTop": 0,
+      "sourceBottom": 745,
+      "basis": "Visually verified blank gap after all five choices and before generated provenance footer containing the answer."
+    },
+    "oasis-online-2022-grades-1-2-q08": {
+      "assetSha256": "57cb59c3a6ca1d55b6b079c2b4d4d7f30e3dc03a4f3fb99a1ad5404b9096f398",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2019-grades-1-2-q06": {
+      "assetSha256": "0c472a4e50b3666004ce53b0d30633b4985258d263955f0a762883feef774dfe",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2019-grades-1-2-q07": {
+      "assetSha256": "7d92a7422e7350472aacbbd8794a350b97833453345a9d876ecf9d934ac57db5",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2018-grades-1-2-q04": {
+      "assetSha256": "658d44ade149f354b829b9473c1e9c8fb7cee3ddc2c57a0f89d206813628f910",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2017-grades-1-2-q04": {
+      "assetSha256": "d3c840ced372374893374eff35442fa8df231024a1da54c4a8ba5065d12e15d3",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2017-grades-1-2-q06": {
+      "assetSha256": "6a08e04d9710690eb45833e09a2db6ebd2ad2f7e03ee27702b4a8e7f4f7f0572",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2016-grades-1-2-q02": {
+      "assetSha256": "132431df69819b7a399af730b9bc45bafac832ea27ed12952924824676db3168",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2016-grades-1-2-q07": {
+      "assetSha256": "2731a5d302b5900061b9785765ed5fc0b61d0b69fbc864e6c00a8b314ec3444f",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2014-grades-1-2-q07": {
+      "assetSha256": "5b235ccb97e41aa277979cd18c1be4dd82e6e2334c251dc4dd3ba5b3ddc09a12",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2017-grades-1-2-q14": {
+      "assetSha256": "a1601e42084b6b47ed30e217db9c2b990aaec0fcffb14c0dca1abf79ae4353a1",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2015-grades-1-2-q09": {
+      "assetSha256": "31f172e062094ce556d44462f80a2d41cef4ac33a2ee7066cc655f2cdc39fe75",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1872,
+      "sourceBottom": 220,
+      "basis": "Verified original contest-paper crop for printing; question and all choices retained.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2015-grades-1-2-q09.webp",
+        "width": 1872,
+        "height": 220,
+        "sha256": "4c59fb90532d8c7776d36118d7abe62ad80d735f7135476244d99054c17095c2",
+        "sourceBasis": "Original Math Kangaroo USA 2015 Grades 1–2 contest paper, page 2, question 9. Original prompt, diagrams, and ordered choices visually compared with the selected question; page headers and neighboring questions excluded. Original publisher artwork and typography retained. Original spelling “meters” is retained; the LMS card misspells this unit as “merers”."
+      }
+    },
+    "oasis-online-2012-grades-1-2-q10": {
+      "assetSha256": "253d46ef8580980e3b80e364a30d48e2230470602fd553f8e72eb3d3a3a4a030",
+      "sourceTop": 0,
+      "sourceBottom": 187,
+      "basis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 2, question 10. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2012-grades-1-2-q10-original.webp",
+        "width": 860,
+        "height": 187,
+        "sha256": "2c4c1830d137a0ba9f0415a71f6d278901f257275847d06454e0e01102821441",
+        "sourceBasis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 2, question 10. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2023-grades-1-2-q21": {
+      "assetSha256": "81f99a91f81e572428331989cb102a934f71a910c0321586af9617a9b3970739",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2017-grades-1-2-q11": {
+      "assetSha256": "1dbee9f008ba966d4dbc96cbd2fc414b8d14a8f5836791049c49a3fa556be7a4",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-1-2-q05": {
+      "assetSha256": "02d920c163ddc50baf5e0f4514b44b70a0814b1c2546e42d42887f73793438b0",
+      "sourceTop": 0,
+      "sourceBottom": 2231,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 186,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2012-grades-1-2-q08": {
+      "assetSha256": "0e3fb8be380f74db9ab8362ae61dc7401a55076794bc7368a95c1a7eab1dfc3c",
+      "sourceTop": 0,
+      "sourceBottom": 326,
+      "basis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 2, question 8. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2012-grades-1-2-q08-original.webp",
+        "width": 860,
+        "height": 326,
+        "sha256": "11b1936ca3f61de79f7a4c243dd9c588a664a5d0bb81ed04b50b0aead8a9e55d",
+        "sourceBasis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 2, question 8. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2022-grades-1-2-q02": {
+      "assetSha256": "bb1ec9ba9865fc1e4fd3eef1ec795ab3c8439dd53a2a799b60edf3dfeea78343",
+      "sourceTop": 0,
+      "sourceBottom": 2231,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 178,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2015-grades-1-2-q04": {
+      "assetSha256": "983314b1bf42d8372171790b240d81423fa5d6e82648a478d3461501ab839abe",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1872,
+      "sourceBottom": 364,
+      "basis": "Verified original contest-paper crop for printing; question and all choices retained.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2015-grades-1-2-q04.webp",
+        "width": 1872,
+        "height": 364,
+        "sha256": "25d77184897941b92e1dc6733a0e2e66fd48acb316009d62e8163cc0aad832db",
+        "sourceBasis": "Original Math Kangaroo USA 2015 Grades 1–2 contest paper, page 2, question 4. Original prompt, diagrams, and ordered choices visually compared with the selected question; page headers and neighboring questions excluded. Original publisher artwork and typography retained."
+      }
+    },
+    "oasis-online-2023-grades-1-2-q14": {
+      "assetSha256": "8144b35e4ebc60041f0f1cf82996feaceb420e25e6af91cda8a262fff32bba85",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2022-grades-1-2-q14": {
+      "assetSha256": "fdaeff0d9bb7654d7d8f10aea6452cfb49d4a7e2a7f74fa2355f6082b3613bce",
+      "sourceTop": 0,
+      "sourceBottom": 2197,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 163,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2017-grades-1-2-q10": {
+      "assetSha256": "85ab1e219980ba409c5405390341d38a24d7d38228b1a4ffc3e7810c5b440471",
+      "sourceTop": 0,
+      "sourceBottom": 2231,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 175,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2017-grades-1-2-q21": {
+      "assetSha256": "9a71dfd87a6e3b067d6d1e8ab35213d6a0fe59cc7cc1ff69144f18a1d69c540d",
+      "sourceTop": 0,
+      "sourceBottom": 2197,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 143,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2014-grades-3-4-q09": {
+      "assetSha256": "1e9cc93cb72f5260c5b51c1697389c29bc52b02576bbcbe7619b3f86d4f91177",
+      "sourceTop": 0,
+      "sourceBottom": 1375,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 172,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2011-grades-3-4-q13": {
+      "assetSha256": "979950aaf66a2ca136d5eb802c5a17b7b08bab7b55f12f307a80e8cce52cc32e",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2019-grades-1-2-q13": {
+      "assetSha256": "beaf844a7398d0ca81386f205ebccd883a0d38b9702b4e3b974659b1cd5c3be5",
+      "sourceTop": 0,
+      "sourceBottom": 2231,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 171,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2018-grades-1-2-q10": {
+      "assetSha256": "53af78e79738112fa2952df851ecf96b8682f23d3fae7b83e4958db90e336493",
+      "sourceTop": 0,
+      "sourceBottom": 2008,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 173,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2019-grades-3-4-q11": {
+      "assetSha256": "2a3c70c7045cd6fec7fc20c59925dd34434457fd06fd3b1cdb6f83174c5d34a6",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2010-grades-3-4-q15": {
+      "assetSha256": "52a233265b8ac5717f23d975ffc8414ef2fcde7170969e7b6440d897e7ff7196",
+      "sourceTop": 0,
+      "sourceBottom": 1649,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 205,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2023-grades-1-2-q03": {
+      "assetSha256": "2dd4ff86e49a1fc5672553791b585bafb9304f133122631d0640f1d9f6accbcf",
+      "sourceTop": 0,
+      "sourceBottom": 1649,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 215,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2023-grades-1-2-q07": {
+      "assetSha256": "25c7a76efc314733d5cdb253332b289996d73f765d84f4ca0596d9baa9db8462",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2019-grades-1-2-q03": {
+      "assetSha256": "ac7a399fb4858e764a10736f8ce29f46cf72f82199841fd9732ccbb1aa038b95",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2017-grades-1-2-q03": {
+      "assetSha256": "7bd326525b5fc7917f5cdf5afd45526365fa221d523b08d43c30f2b10fd61ea9",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2016-grades-1-2-q04": {
+      "assetSha256": "77ca4086ac239954afdec165807fc3ce56e0b0781e3290fcb4e8ca36618953f4",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2015-grades-1-2-q06": {
+      "assetSha256": "6b864de8caf6bc4273cfb41e097975d5ee5056f785895a42af49e0b10a522c25",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1872,
+      "sourceBottom": 300,
+      "basis": "Verified original contest-paper crop for printing; question and all choices retained.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2015-grades-1-2-q06.webp",
+        "width": 1872,
+        "height": 300,
+        "sha256": "df640fcd28beaeb97ca98c9ba8b385543987c3d3c934332fb7fdb5433403ca1e",
+        "sourceBasis": "Original Math Kangaroo USA 2015 Grades 1–2 contest paper, page 2, question 6. Original prompt, diagrams, and ordered choices visually compared with the selected question; page headers and neighboring questions excluded. Original publisher artwork and typography retained."
+      }
+    },
+    "oasis-online-2014-grades-1-2-q03": {
+      "assetSha256": "68fa541701c829ecc5cffe0f6375bd911fad8a8c78f177e3a2ca1a97e1dcd433",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2013-grades-1-2-q02": {
+      "assetSha256": "c7a8e05eb64a03dd13db942631293bc034709cd1a7604c0ed638a5b9f38c1fd1",
+      "sourceTop": 0,
+      "sourceBottom": 108,
+      "basis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 1, question 2. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2013-grades-1-2-q02-original.webp",
+        "width": 785,
+        "height": 108,
+        "sha256": "1c27af8be27adfedc13aec1dfe93ce7444f3d42e72729645513675824f75e960",
+        "sourceBasis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 1, question 2. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2018-grades-1-2-q06": {
+      "assetSha256": "2033eefeac8d830bfe3e2a1d9b1e5d0afb2d88f2ddf21dfc6aae6754c7810dab",
+      "sourceTop": 0,
+      "sourceBottom": 1803,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 142,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2016-grades-1-2-q06": {
+      "assetSha256": "7c3c097c68e2087b56661c338d7df35b1ffa4f8c49ba45015328464c1adb6170",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2023-grades-1-2-q12": {
+      "assetSha256": "cd881e2b269d924dca8b1c1de2a66d826ab387b94df34ac9fce15f1be3eb56a4",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-1-2-q11": {
+      "assetSha256": "1f72ee95c9ad06f4cfaccd4a576b9de18b8feaa4c391c75b3db1441b1e3e1fd4",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-1-2-q14": {
+      "assetSha256": "12e13f9f91553cc27b17db2cb3bc89d4cbace4fd1b4ce9b35d664a044f5340ea",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2020-grades-1-2-q16": {
+      "assetSha256": "08cc95c810d04f936b51f3e840e3d81b4c77e7fe20e96a81b8f292de126b4cb9",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2016-grades-1-2-q14": {
+      "assetSha256": "cb96c04459435cd829ba812f390cb4164828f14bc9233e001fb08d79c6c2dc5b",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2015-grades-1-2-q14": {
+      "assetSha256": "83990e5af3622a175e07d35f0a2c23a81e582d75da0851863098a9becde6a67a",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1872,
+      "sourceBottom": 212,
+      "basis": "Verified original contest-paper crop for printing; question and all choices retained.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2015-grades-1-2-q14.webp",
+        "width": 1872,
+        "height": 212,
+        "sha256": "1e81157319bc135f6beefb51bc400b4021c9dfcc5317d7a33b94ff8737b4ab9d",
+        "sourceBasis": "Original Math Kangaroo USA 2015 Grades 1–2 contest paper, page 3, question 14. Original prompt, diagrams, and ordered choices visually compared with the selected question; page headers and neighboring questions excluded. Original publisher artwork and typography retained."
+      }
+    },
+    "oasis-online-2012-grades-1-2-q13": {
+      "assetSha256": "be558bfd1fadfef1b7579be2a210969c515bcf97359ee888d711119db223680e",
+      "sourceTop": 0,
+      "sourceBottom": 92,
+      "basis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 3, question 13. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2012-grades-1-2-q13-original.webp",
+        "width": 860,
+        "height": 92,
+        "sha256": "95aa80feadd17f9a0b517b8ae23d507382c36438ab892ba578ed7d618329ce3e",
+        "sourceBasis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 3, question 13. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2012-grades-1-2-q15": {
+      "assetSha256": "c147f98f319e58e2c9a7e232d07dec7a748833791a04eb6b18e17e27709ab061",
+      "sourceTop": 0,
+      "sourceBottom": 118,
+      "basis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 3, question 15. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2012-grades-1-2-q15-original.webp",
+        "width": 860,
+        "height": 118,
+        "sha256": "c08cd3a8d00731ceff094051e2675810cdedb9ac6f1076b5aebbf393b9d3f65c",
+        "sourceBasis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 3, question 15. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2012-grades-1-2-q20": {
+      "assetSha256": "4cdc488d9b52666c9b87278e79d871619b8bb06c8506019c70c42fc06edc4dd5",
+      "sourceTop": 0,
+      "sourceBottom": 119,
+      "basis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 4, question 20. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2012-grades-1-2-q20-original.webp",
+        "width": 860,
+        "height": 119,
+        "sha256": "371f9a5c6a4a24661eeb43e51a40ea3ecc28e1ac4853a1b8baac6a29e3a12475",
+        "sourceBasis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 4, question 20. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2020-grades-1-2-q04": {
+      "assetSha256": "04514a4f9b0c2da9629f4d40e98fc45ea0cd01c7b7cdeb232041105c3ca96632",
+      "sourceTop": 0,
+      "sourceBottom": 1786,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 208,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2012-grades-1-2-q06": {
+      "assetSha256": "de40f0e7e3ba2e9e2fecd7ad592844b04996554086aae76148bd5fb918071004",
+      "sourceTop": 0,
+      "sourceBottom": 92,
+      "basis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 2, question 6. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2012-grades-1-2-q06-original.webp",
+        "width": 860,
+        "height": 92,
+        "sha256": "ba93d2d85cb8f9c811b167771d551b3fe4e1d89cb6abc778aeaf1d73dca8350f",
+        "sourceBasis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 2, question 6. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2018-grades-1-2-q07": {
+      "assetSha256": "ee2acd661f86f5da92bb21918c9bd92c2d268987c5e60b3a0fc18b98f5bfde09",
+      "sourceTop": 0,
+      "sourceBottom": 2008,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 143,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2012-grades-1-2-q05": {
+      "assetSha256": "ee4574249d26f65bbe8cc43ade9f4ce85747fdfd51c7c10e746fa9f0b514a7d5",
+      "sourceTop": 0,
+      "sourceBottom": 237,
+      "basis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 2, question 5. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2012-grades-1-2-q05-original.webp",
+        "width": 860,
+        "height": 237,
+        "sha256": "7939c7829f419fe94ac7f848006294f8005e86300f9c2ac1f7ac6953f3b3b386",
+        "sourceBasis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 2, question 5. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2016-grades-1-2-q09": {
+      "assetSha256": "91314877a7ec226bb3533a6aa25afcfc608a11193237d63cdcb160c4315b1eb6",
+      "sourceTop": 0,
+      "sourceBottom": 2111,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 180,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2013-grades-1-2-q16": {
+      "assetSha256": "9b77fe1b14d608643a7cfe558543c010157fc22b1ff198ef4843c0db1fffa53b",
+      "sourceTop": 0,
+      "sourceBottom": 175,
+      "basis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 3, question 16. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2013-grades-1-2-q16-original.webp",
+        "width": 785,
+        "height": 175,
+        "sha256": "7ff6fd9d4d7c51aabd906e9e2da5338f57f2278e73a7e8aac44e0a7738bca697",
+        "sourceBasis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 3, question 16. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2022-grades-1-2-q19": {
+      "assetSha256": "1b6dbe104e267167969af12ad939f429fcfd6fa2cd460007b50954e13f889dae",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2018-grades-1-2-q11": {
+      "assetSha256": "4a98c58e557522e730fc5ba988ddd4f01e39b83a7e9d54024de8474d434de2b7",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2012-grades-1-2-q14": {
+      "assetSha256": "ffbf065524b6f894e0e742245db9694463394b0089091aaea9fe66e23a7de0cb",
+      "sourceTop": 0,
+      "sourceBottom": 224,
+      "basis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 3, question 14. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2012-grades-1-2-q14-original.webp",
+        "width": 860,
+        "height": 224,
+        "sha256": "a1f04057a98a517dc62a4988f54d40a920c682eba033c4834a75e2f53bae63da",
+        "sourceBasis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 3, question 14. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2010-grades-1-2-q10": {
+      "assetSha256": "4bad0688a1b66922c8615e4adc4222ed67c205b48a96c064108862125a533cd4",
+      "sourceTop": 0,
+      "sourceBottom": 225,
+      "basis": "Original Math Kangaroo USA 2010 Grades 1–2 paper, source PDF page 4, question 10. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2010-grades-1-2-q10-original.webp",
+        "width": 803,
+        "height": 225,
+        "sha256": "5ff8013962d32f0789799a9565ac77f843f832b31cf41b44cee7a1f74db39cec",
+        "sourceBasis": "Original Math Kangaroo USA 2010 Grades 1–2 paper, source PDF page 4, question 10. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2017-grades-1-2-q20": {
+      "assetSha256": "f05adf9fb44d95bc0d843dc5a59c1daf70273a3b9ce606ef1783367775afa3c4",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2015-grades-1-2-q19": {
+      "assetSha256": "bd34a93037628456b9236a01b9a8f9d17f6d502e1653d6ed5f9702482ffb5b67",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1872,
+      "sourceBottom": 280,
+      "basis": "Verified original contest-paper crop for printing; question and all choices retained.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2015-grades-1-2-q19.webp",
+        "width": 1872,
+        "height": 280,
+        "sha256": "97c370d378c0bf7ab2cfd1c5b98fec22892e94b0cbf2fd5a810a588019122487",
+        "sourceBasis": "Original Math Kangaroo USA 2015 Grades 1–2 contest paper, page 4, question 19. Original prompt, diagrams, and ordered choices visually compared with the selected question; page headers and neighboring questions excluded. Original publisher artwork and typography retained."
+      }
+    },
+    "oasis-online-2013-grades-1-2-q20": {
+      "assetSha256": "22de8fe4e72f2b6e2132b414d03971b671f5805dcb81eb456989aeac58308e08",
+      "sourceTop": 0,
+      "sourceBottom": 132,
+      "basis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 4, question 20. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2013-grades-1-2-q20-original.webp",
+        "width": 785,
+        "height": 132,
+        "sha256": "cc2609916236751fe52fa655220e88112145f395bcde7a49d79ea5b003dec192",
+        "sourceBasis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 4, question 20. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2012-grades-1-2-q18": {
+      "assetSha256": "c558e970e58b10b580bc97674cb81452f9b3f53b0a868d5613f9c62b50b36490",
+      "sourceTop": 0,
+      "sourceBottom": 191,
+      "basis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 4, question 18. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2012-grades-1-2-q18-original.webp",
+        "width": 860,
+        "height": 191,
+        "sha256": "750eec60b6011ba5d0036f078563eed32e6b219c9dc9bafc7dc081b3a336a758",
+        "sourceBasis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 4, question 18. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2024-grades-1-2-q02": {
+      "assetSha256": "50fad37e63cc23bcde6372420c955fb68eb1749ac71fcae0265d0f1f47bd50f9",
+      "sourceTop": 0,
+      "sourceBottom": 665,
+      "basis": "Already repaired source crop: complete question and five choices; no generated footer."
+    },
+    "oasis-online-2023-grades-1-2-q04": {
+      "assetSha256": "d889d2d11a64f73db460ac5b02114b90233f72cdf3c428ff1a6b43a8c38079f7",
+      "sourceTop": 0,
+      "sourceBottom": 2162,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 145,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2022-grades-1-2-q06": {
+      "assetSha256": "270c20f2b08438f5e34206f4b8d5ad23334a1fd131bb6537685a9c9693a3ed56",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-1-2-q01": {
+      "assetSha256": "c4a1bd826a6936bce5d199075395bcb11bb47668b7f41a98359629c51991fd4b",
+      "sourceTop": 0,
+      "sourceBottom": 1871,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 212,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2020-grades-1-2-q03": {
+      "assetSha256": "a4666c4d2160b59f4203c6bb247279b259779c8e5a9c949c14ebfc49fc2ed4a9",
+      "sourceTop": 0,
+      "sourceBottom": 2197,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 142,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2019-grades-1-2-q02": {
+      "assetSha256": "6a54c569addd8fa99d267a922adc868fbe467e3fb9afaea32ce5182011e86ea7",
+      "sourceTop": 0,
+      "sourceBottom": 2060,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 142,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2019-grades-1-2-q04": {
+      "assetSha256": "2bbcbe2e3852f22726b2d7135adc4553e3b901a2656795950b85ee64730c3ae9",
+      "sourceTop": 0,
+      "sourceBottom": 1940,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 142,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2015-grades-1-2-q01": {
+      "assetSha256": "349eabcdeec472c72a86c3c1fdfe8111838c5bade48f7301a654a8904d1aeb77",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1872,
+      "sourceBottom": 600,
+      "basis": "Verified original contest-paper crop for printing; question and all choices retained.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2015-grades-1-2-q01.webp",
+        "width": 1872,
+        "height": 600,
+        "sha256": "5bf0c4c886b2b032ae105b6a96d5df9e9dd09d978ea4db0f7e7795c31715d678",
+        "sourceBasis": "Original Math Kangaroo USA 2015 Grades 1–2 contest paper, page 1, question 1. Original prompt, diagrams, and ordered choices visually compared with the selected question; page headers and neighboring questions excluded. Original publisher artwork and typography retained."
+      }
+    },
+    "oasis-online-2015-grades-1-2-q02": {
+      "assetSha256": "2008e8efbace7038e61639ae5500213a4025a0fe516924cc056553620a39b9e2",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1872,
+      "sourceBottom": 572,
+      "basis": "Verified original contest-paper crop for printing; question and all choices retained.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2015-grades-1-2-q02.webp",
+        "width": 1872,
+        "height": 572,
+        "sha256": "621eb1fd3ce2861b82a3c10be7430ca9df32222a00251a845eadc770800a93ad",
+        "sourceBasis": "Original Math Kangaroo USA 2015 Grades 1–2 contest paper, page 1, question 2. Original prompt, diagrams, and ordered choices visually compared with the selected question; page headers and neighboring questions excluded. Original publisher artwork and typography retained."
+      }
+    },
+    "oasis-online-2012-grades-1-2-q02": {
+      "assetSha256": "bbe1e09adcb6ec661d4859d9f801e1f3214dc8f174577e95d8fff20cc16b9f09",
+      "sourceTop": 0,
+      "sourceBottom": 187,
+      "basis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 1, question 2. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2012-grades-1-2-q02-original.webp",
+        "width": 860,
+        "height": 187,
+        "sha256": "8e3db3cb675bc785bc79d51a81824e8cef22acdd1d9be500bb7dd28891fb2e69",
+        "sourceBasis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 1, question 2. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2022-grades-1-2-q07": {
+      "assetSha256": "2cb73f7c9c64c732bec9d97a37f324a6dbcaac1fa0e9a98f4bd966c8e97db8f4",
+      "sourceTop": 0,
+      "sourceBottom": 1974,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 177,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2010-grades-1-2-q04": {
+      "assetSha256": "fd2c6431ede8c1f0009a2a76d586f107587fc50ef331b5aaa943c71f9aca2aec",
+      "sourceTop": 0,
+      "sourceBottom": 256,
+      "basis": "Original Math Kangaroo USA 2010 Grades 1–2 paper, source PDF page 3, question 4. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2010-grades-1-2-q04-original.webp",
+        "width": 803,
+        "height": 256,
+        "sha256": "32a85f5a6f426dfd393f781803c4280c1819e579b7c9c4fa3b9b3dc0bac6fcee",
+        "sourceBasis": "Original Math Kangaroo USA 2010 Grades 1–2 paper, source PDF page 3, question 4. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2022-grades-1-2-q12": {
+      "assetSha256": "3e15255fe1053264467c5a29ba1da1daca5f3edb13b735a3f6be2ebafbb3d750",
+      "sourceTop": 0,
+      "sourceBottom": 1632,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 183,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2022-grades-1-2-q15": {
+      "assetSha256": "91eaef43f34fe96949356b056545e96243741e33da2a4cd3129ca50f6157cb61",
+      "sourceTop": 0,
+      "sourceBottom": 1306,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 177,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2021-grades-1-2-q13": {
+      "assetSha256": "a2fe63b1b4524eba5be2629da93f8d4f7f09489144dfdb3a0b337dca5563decc",
+      "sourceTop": 0,
+      "sourceBottom": 2128,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 142,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2020-grades-1-2-q09": {
+      "assetSha256": "86b5a6ebe29a8769908ad9f567e21b0640cf8af6f984b3ccf3b45dc7683e8c86",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2019-grades-1-2-q15": {
+      "assetSha256": "3fd109270fc562c9fd0cb1ab3151585eee0b566544fe0f59867c24f31dee8467",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2018-grades-1-2-q12": {
+      "assetSha256": "de92657aa87cdf40b1363af79f3a4783714d9553e83f2edc5eeba67b883caa47",
+      "sourceTop": 0,
+      "sourceBottom": 1289,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2015-grades-1-2-q16": {
+      "assetSha256": "a3c2b539447f25bfcd331f611477eea11b8cfc513ec9eab699718568add507e9",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1872,
+      "sourceBottom": 476,
+      "basis": "Verified original contest-paper crop for printing; question and all choices retained.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2015-grades-1-2-q16.webp",
+        "width": 1872,
+        "height": 476,
+        "sha256": "2e0e6cddd337ad99b8b4f513ed29b7b45daa49ae72194eeadde5f0ff7f82a49e",
+        "sourceBasis": "Original Math Kangaroo USA 2015 Grades 1–2 contest paper, page 3, question 16. Original prompt, diagrams, and ordered choices visually compared with the selected question; page headers and neighboring questions excluded. Original publisher artwork and typography retained."
+      }
+    },
+    "oasis-online-2014-grades-1-2-q12": {
+      "assetSha256": "2d72f4b8adf7068b4a80e1888d89af377cfe18628fd5f771e45be5884402b4c9",
+      "sourceTop": 0,
+      "sourceBottom": 1957,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 152,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2011-grades-1-2-q10": {
+      "assetSha256": "d8a2dd920d1c5545db476ad4076dedbb80aad5b3f4a6e9e006221ab9aaec58de",
+      "sourceTop": 0,
+      "sourceBottom": 316,
+      "basis": "Original Math Kangaroo USA 2011 Grades 1–2 paper, source PDF page 2, question 10. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2011-grades-1-2-q10-original.webp",
+        "width": 857,
+        "height": 316,
+        "sha256": "3e0786e3ed80b46b2610a931777f733c29abe8a7898f7041008553b494748a2b",
+        "sourceBasis": "Original Math Kangaroo USA 2011 Grades 1–2 paper, source PDF page 2, question 10. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2023-grades-1-2-q16": {
+      "assetSha256": "b85deed444b12f24606f2966ddd5d2f088f1415fc8a24fb4b9ffbc85bbcd412f",
+      "sourceTop": 0,
+      "sourceBottom": 2231,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 173,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2016-grades-1-2-q18": {
+      "assetSha256": "a2e340a830246f7a8b7103b270040c18231abac3c2939301e35af2ee30d04b76",
+      "sourceTop": 0,
+      "sourceBottom": 2197,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 143,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2022-grades-1-2-q05": {
+      "assetSha256": "09d20238610657e807938b53efcddc390fc143b1fe8c6adc60589d2f14a080a3",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-1-2-q06": {
+      "assetSha256": "c1ad9036bd33b65b3b94c956611e5146a5437567d8bf2495e0ebb6837ee9b00a",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-1-2-q08": {
+      "assetSha256": "cd832d85751746f290553f5e66991e2869a1a2d98db1261ad3af3924f301de7c",
+      "sourceTop": 0,
+      "sourceBottom": 1649,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 215,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2020-grades-1-2-q07": {
+      "assetSha256": "8299c890213347b0cc32bcf644ab335e8e5ffb7c447824436160d4b58c6aded3",
+      "sourceTop": 0,
+      "sourceBottom": 1649,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 213,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2014-grades-1-2-q01": {
+      "assetSha256": "a62add7c4aadcf8745e13fe4c3ecb64419cb1e42f44b2b5efff5a90fa0810421",
+      "sourceTop": 0,
+      "sourceBottom": 1649,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 213,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2010-grades-1-2-q02": {
+      "assetSha256": "dd8da23d187aa6d51eea1bc8b3fb7999eceed19652a6c00779a9b68e3b153972",
+      "sourceTop": 0,
+      "sourceBottom": 185,
+      "basis": "Original Math Kangaroo USA 2010 Grades 1–2 paper, source PDF page 3, question 2. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2010-grades-1-2-q02-original.webp",
+        "width": 803,
+        "height": 185,
+        "sha256": "ae9fc03e99af77149b952a9fa3878d0f90b6eb9e8b53a6cbc3b47823a864d27f",
+        "sourceBasis": "Original Math Kangaroo USA 2010 Grades 1–2 paper, source PDF page 3, question 2. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2023-grades-1-2-q05": {
+      "assetSha256": "47de7d14d494f1d00fc404d17770155c19cd7bfd15dc93a234c07479a2154a32",
+      "sourceTop": 0,
+      "sourceBottom": 1649,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 215,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2022-grades-1-2-q10": {
+      "assetSha256": "510a72e0d7c968f364193e5386e114e4060ba4ddcc6b1d2dc4fb1a7e0f6bc842",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2022-grades-1-2-q16": {
+      "assetSha256": "e2d81953518d48b934d3373d45b1e438ecb449fb6db9d54b857bb31b12a2ea98",
+      "sourceTop": 0,
+      "sourceBottom": 1923,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 173,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2021-grades-1-2-q15": {
+      "assetSha256": "a2b8abcb6a1b4e4d023544c7a56cd2da4bbcef960220fd7002a10adb0416692e",
+      "sourceTop": 0,
+      "sourceBottom": 2197,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 210,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2020-grades-1-2-q10": {
+      "assetSha256": "b6f970dba6bad0520d8f0db2987f45a9cb2b6733f00dfe1db176ca193480c252",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2016-grades-1-2-q10": {
+      "assetSha256": "8d44ad7a9bdf5a5ffe0a77d4517226b9e77f30d07c437bc1edcd2d6d288fe2a1",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2015-grades-1-2-q13": {
+      "assetSha256": "21389761a8cc766d1703f91df0555aedc437a6e2ebbe8e2d80c469a35a85f6b8",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1872,
+      "sourceBottom": 264,
+      "basis": "Verified original contest-paper crop for printing; question and all choices retained.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2015-grades-1-2-q13.webp",
+        "width": 1872,
+        "height": 264,
+        "sha256": "1cbc796662b10dcd111624f7623832fff0688c94f103572d0d153c953fde6876",
+        "sourceBasis": "Original Math Kangaroo USA 2015 Grades 1–2 contest paper, page 3, question 13. Original prompt, diagrams, and ordered choices visually compared with the selected question; page headers and neighboring questions excluded. Original publisher artwork and typography retained."
+      }
+    },
+    "oasis-online-2014-grades-1-2-q16": {
+      "assetSha256": "0e2473cfc4b144803941b03b0b9758bcb01d16ae4867633ce50729955862c7ad",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2013-grades-1-2-q15": {
+      "assetSha256": "8dcea3a0f7a86edc9c671a105c2d0b3bf313bd14d952bbb4259785fab6a854dd",
+      "sourceTop": 0,
+      "sourceBottom": 86,
+      "basis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 3, question 15. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2013-grades-1-2-q15-original.webp",
+        "width": 785,
+        "height": 86,
+        "sha256": "46760787cb0f5b5e4e20144d247c0d831bcf2827b63beb68396842ebc32208ad",
+        "sourceBasis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 3, question 15. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2023-grades-1-2-q06": {
+      "assetSha256": "88f02c120931bb869d181fc133190b71e6552541cd48d6a1f0e140a83b5364dc",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2013-grades-1-2-q01": {
+      "assetSha256": "8fb84ab43d328c6bf838b0907f939dd56967f2f21b60149daba52f35c484843b",
+      "sourceTop": 0,
+      "sourceBottom": 192,
+      "basis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 1, question 1. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2013-grades-1-2-q01-original.webp",
+        "width": 785,
+        "height": 192,
+        "sha256": "de77348484f9ac44e7733a0c9112437799c66b7e03f79592b8ff21d35a8dfd74",
+        "sourceBasis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 1, question 1. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2022-grades-1-2-q09": {
+      "assetSha256": "4f7b45eac69c5c87416a139e39dfd00f321dfe1958fb1d9bfd0b647ce4e708e8",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2014-grades-1-2-q14": {
+      "assetSha256": "74b70cd50f36f987ec7317950c3ca04e01eebe3604f2fc00a30cf96d8ab97a18",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2022-grades-1-2-q24": {
+      "assetSha256": "7d9eb6f17ccad227dfbf662fb6654a9a47d073c771d86723d3b2ff6acee03efb",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2017-grades-1-2-q22": {
+      "assetSha256": "bb51772e54d28b42b201cf836ad963852eef60845c9b87176f65788811573b72",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-1-2-q03": {
+      "assetSha256": "331fb9d72858ea139e88dc1e34672cb1d84c7c3611a464ad30854574d50ea719",
+      "sourceTop": 0,
+      "sourceBottom": 1632,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 182,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2018-grades-1-2-q02": {
+      "assetSha256": "f2415ec9f5b782f1e7c48aea84428e4300c6c823b704d17bdd248286503a2362",
+      "sourceTop": 0,
+      "sourceBottom": 2231,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 176,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2016-grades-1-2-q05": {
+      "assetSha256": "6f9f5b38e1a625fa216fd280a868b673010181682341921a3f89d7d5df62d2e8",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2014-grades-1-2-q02": {
+      "assetSha256": "5c3434c67d250d14ca0f1149d76214c21c2152e7a475c70ced66cb896d2078b9",
+      "sourceTop": 0,
+      "sourceBottom": 2197,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 143,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2014-grades-1-2-q05": {
+      "assetSha256": "b09bbcf5567fc565163f9836e9f6a6849ebaa55b010f9854a1c788e6cda2e9bb",
+      "sourceTop": 0,
+      "sourceBottom": 2522,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 216,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2012-grades-1-2-q07": {
+      "assetSha256": "fd5a4c973b2140c9a77ba26b3a81b5f68bd2564b36ec6f0adf7f631d57eafae4",
+      "sourceTop": 0,
+      "sourceBottom": 110,
+      "basis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 2, question 7. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2012-grades-1-2-q07-original.webp",
+        "width": 860,
+        "height": 110,
+        "sha256": "e2fe9b497052f62c809431d8704f9df647c93b5850472e27a312c84ed20f9b76",
+        "sourceBasis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 2, question 7. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2022-grades-1-2-q11": {
+      "assetSha256": "77993debb85fc7a945265740cca2aa2a2434303397c12c8479ce5c0b2fb9b431",
+      "sourceTop": 0,
+      "sourceBottom": 1529,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 178,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2021-grades-1-2-q10": {
+      "assetSha256": "869411f7ea6a303ea6a0a496bc378960cabbc412cffa8ff8d65543260328aab8",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-1-2-q12": {
+      "assetSha256": "c0337b3d52ef2e2f292e1b2a8f7b0cfabc539165df5b15e76a878c2e7a883587",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2019-grades-1-2-q09": {
+      "assetSha256": "08b8966c385e3a7f9ce313cfefb1093d79af61f6c529294f39c80dc76b82ffc8",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2019-grades-1-2-q12": {
+      "assetSha256": "10b4ee60e4a0ce1eec8230754eef7dbc794dcb00f1bcd365e2a780f51cf43f9b",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2018-grades-1-2-q14": {
+      "assetSha256": "47c77aebbe12886c283c006599750d688ca73e6afae4764d84b13a0e85efde79",
+      "sourceTop": 0,
+      "sourceBottom": 1649,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 165,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2016-grades-1-2-q13": {
+      "assetSha256": "df637db3f52bfbf062765472ed4dd643deefaf6b1081d9cf6fe09dd2f930c1d3",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2016-grades-1-2-q15": {
+      "assetSha256": "af33253ee608f348f6df75fc27dca45b9d087ca088d34c5b6f4f1c9c6f1094af",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2014-grades-1-2-q09": {
+      "assetSha256": "efc3ffcfac69fb6e7eb3644e8da109fd87a4e45c4fbdb5411042f7da8ff5465d",
+      "sourceTop": 0,
+      "sourceBottom": 1597,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 221,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2014-grades-1-2-q13": {
+      "assetSha256": "8a3d2a6859de3bdbc19898ed6e68949594783fe1ef58d5789da1735ca1d08a9a",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2013-grades-1-2-q12": {
+      "assetSha256": "4623550871cd6d1538f3bd0889b5659bc48be727587c0c86b1f91b3807608e03",
+      "sourceTop": 0,
+      "sourceBottom": 183,
+      "basis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 3, question 12. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2013-grades-1-2-q12-original.webp",
+        "width": 785,
+        "height": 183,
+        "sha256": "aedbfb365cdfec768ba57fba7cf3e20822eb914a7c90507fd1f597923600994a",
+        "sourceBasis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 3, question 12. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2011-grades-1-2-q14": {
+      "assetSha256": "ba8cf393b2c9e29bb81419369c3a2cd054ae9e9d09f8bd94314d79edbe84be9f",
+      "sourceTop": 0,
+      "sourceBottom": 443,
+      "basis": "Original Math Kangaroo USA 2011 Grades 1–2 paper, source PDF page 3, question 14. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2011-grades-1-2-q14-original.webp",
+        "width": 857,
+        "height": 443,
+        "sha256": "9494404e3102432a15061968a2eb3115d504a7ead27fdc3771a0977d892dd319",
+        "sourceBasis": "Original Math Kangaroo USA 2011 Grades 1–2 paper, source PDF page 3, question 14. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2023-grades-1-2-q02": {
+      "assetSha256": "6f3027eede5a2ef983b23b5fe7787b53a611d8e8f866af06d08f46bd9e303b0d",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-1-2-q04": {
+      "assetSha256": "da6c293020e96dc6a2ac29e943e64c8a00ae9c58fe418b2932ec5c6eb9512ee5",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2020-grades-1-2-q02": {
+      "assetSha256": "d6c7a82237b44f649fd4a18a55a4cf4b2a4734b2a533c8b66bdec7415a221a2e",
+      "sourceTop": 0,
+      "sourceBottom": 2077,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 176,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2020-grades-1-2-q05": {
+      "assetSha256": "6de4c78f9714009eb0460923e45cc502eb592f779f7a79c9a8ec1b48886777c7",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2018-grades-1-2-q08": {
+      "assetSha256": "ed6c708298cbb33ac6d3b5ca03e71d7a7f4781ed43ea58084f7785692d4adca5",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2015-grades-1-2-q05": {
+      "assetSha256": "73ec6f0b26a94027683bff4a17fb8a4ee81101a71432f6e1d3d2805dc46f81ee",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1872,
+      "sourceBottom": 312,
+      "basis": "Verified original contest-paper crop for printing; question and all choices retained.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2015-grades-1-2-q05.webp",
+        "width": 1872,
+        "height": 312,
+        "sha256": "68ff916a70a75573ef1d3112db267e0c61233928c569be0467c54a1fdb344a43",
+        "sourceBasis": "Original Math Kangaroo USA 2015 Grades 1–2 contest paper, page 2, question 5. Original prompt, diagrams, and ordered choices visually compared with the selected question; page headers and neighboring questions excluded. Original publisher artwork and typography retained."
+      }
+    },
+    "oasis-online-2014-grades-1-2-q06": {
+      "assetSha256": "1f694f62e04cce40b837aa2e6b4ffdbd1bb74886ba4309a3909d723f8a6fd0d8",
+      "sourceTop": 0,
+      "sourceBottom": 2197,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 143,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2022-grades-1-2-q03": {
+      "assetSha256": "31df5111d96c4c08c04f573e76cf0db83f82bdf800e6a04d2acd9d4dadca95e5",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2020-grades-1-2-q06": {
+      "assetSha256": "98dbae2e4f635b1d162a4b272f7ffc8ee9699950f13a8818fc777e73e99cfd35",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2020-grades-1-2-q08": {
+      "assetSha256": "3d0564f55ad023e7eef60073cec91c3b965f3796ce85f31d3d6b3d4cd9e71c17",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2016-grades-1-2-q08": {
+      "assetSha256": "88ff40e884658b42698f5ea80500b4ed1863cfed85b33ff53a7515ea59ed0583",
+      "sourceTop": 0,
+      "sourceBottom": 1632,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 182,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2023-grades-1-2-q09": {
+      "assetSha256": "55c061f17215299de3417c6b7aaab88c7d4321cdbaf1cce65f5e2ecaafe7a865",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2022-grades-1-2-q13": {
+      "assetSha256": "edf9d351fc407801d6073534a8e5c08d77ab5552bae65c8c6e07a074cecc6b0d",
+      "sourceTop": 0,
+      "sourceBottom": 2197,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 144,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2020-grades-1-2-q11": {
+      "assetSha256": "8732432f38fa8eb603bcaf30eac86a14d643bcf88186709dae2ce6769e05a00a",
+      "sourceTop": 0,
+      "sourceBottom": 1649,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 213,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2013-grades-1-2-q14": {
+      "assetSha256": "0a4585f1434a7678de132afccbe64f72535751c07ea84d588a121cfd206c4362",
+      "sourceTop": 0,
+      "sourceBottom": 89,
+      "basis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 3, question 14. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2013-grades-1-2-q14-original.webp",
+        "width": 785,
+        "height": 89,
+        "sha256": "68edd09f7f7588c3178faa53e4d2030d661d2419c400ec00461ffe2e14b7b241",
+        "sourceBasis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 3, question 14. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2019-grades-1-2-q14": {
+      "assetSha256": "db9c87525ab98573137c98167d8a72fde966d8364355ad1a3f923defd185f3c8",
+      "sourceTop": 0,
+      "sourceBottom": 1649,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 214,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2022-grades-1-2-q04": {
+      "assetSha256": "6e4e437fdd575114e791df6c6619c60b4897fb887cfb282b110bd31b4e5c0def",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2023-grades-1-2-q11": {
+      "assetSha256": "0980751f0df7720b957b5e98c75b37b5c90e23c37950caa864abf1b82db97e76",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2018-grades-1-2-q05": {
+      "assetSha256": "52863fe2fa168dd2eb05e11f8d72c496b891346391fbd2ca68b5508305e87012",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2014-grades-1-2-q08": {
+      "assetSha256": "ecef11d26acde1ffac8d17fb0604738587c5ec62dfc9b061d856c4bf0d322fef",
+      "sourceTop": 0,
+      "sourceBottom": 1854,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 150,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2020-grades-1-2-q12": {
+      "assetSha256": "af7ed0cf3f92fe5289855cf82881e69be9004e013753e19ec79de8bf68640364",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2020-grades-1-2-q14": {
+      "assetSha256": "7c5b767683b4d5b50f6943fd3a97f5fe2f9d4d73c1816ae3b24a35e66c81b020",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2018-grades-1-2-q13": {
+      "assetSha256": "abec67fc9b91d006277d6c1628ed4d0b91f7fc5de63695544dc330beaaa1bd20",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2017-grades-1-2-q09": {
+      "assetSha256": "cf35fbbd07469068854b2ec2288fc927c7040f0a6b7ff68a0e0729ee6f154c7e",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2016-grades-1-2-q12": {
+      "assetSha256": "4e27cfa6aa869d4d6f33096f1aaaf5c6a54f40a92af20afe6fc2d2e80dbff211",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2016-grades-1-2-q16": {
+      "assetSha256": "7cfbf2431c895cd3eef28fafbb9dde8d8ebc857b1a8e20d92a705bdac1853ec5",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2015-grades-1-2-q10": {
+      "assetSha256": "954900add6331d0a35545fb7113bfd9528391e2c3548da44dc529d8e5098384c",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1872,
+      "sourceBottom": 200,
+      "basis": "Verified original contest-paper crop for printing; question and all choices retained.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2015-grades-1-2-q10.webp",
+        "width": 1872,
+        "height": 200,
+        "sha256": "5fdf8c78499e4968342f9c2ff4489065ea362ac1ddcdc88bf54b57fa68857f8e",
+        "sourceBasis": "Original Math Kangaroo USA 2015 Grades 1–2 contest paper, page 2, question 10. Original prompt, diagrams, and ordered choices visually compared with the selected question; page headers and neighboring questions excluded. Original publisher artwork and typography retained."
+      }
+    },
+    "oasis-online-2013-grades-1-2-q10": {
+      "assetSha256": "a9307b17777ca8303fdd7c4c3d4b092cc67206b0f51c0100c334caa14973929b",
+      "sourceTop": 0,
+      "sourceBottom": 215,
+      "basis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 2, question 10. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded. Neighboring question 9 choice line excluded above the stem, while the raised question 10 illustration remains at its original position.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2013-grades-1-2-q10-original.webp",
+        "width": 785,
+        "height": 215,
+        "sha256": "627f9b852795d74a6524f9060753c6da6d8e3055c305a03c5e4af936769d075d",
+        "sourceBasis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 2, question 10. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded. Neighboring question 9 choice line excluded above the stem, while the raised question 10 illustration remains at its original position."
+      }
+    },
+    "oasis-online-2022-grades-1-2-q22": {
+      "assetSha256": "832396285b66c71796b508f488e9b882d474db55869a1d59d2a8bbba57181eaa",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2017-grades-1-2-q17": {
+      "assetSha256": "ada03dbc0c82fa96b5bbc4ffdfeb15264c38b421ebb3de5abfda95040089ed19",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2017-grades-1-2-q18": {
+      "assetSha256": "d22ff6965ecde04242ea16a166ac4dc3d4a09129e15f3cfb5fe38f17370d35e0",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2012-grades-1-2-q17": {
+      "assetSha256": "b95d092e7c52567cdb264bce5a978064d7e0087656a491d1444a7427c5e9c28d",
+      "sourceTop": 0,
+      "sourceBottom": 85,
+      "basis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 3, question 17. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2012-grades-1-2-q17-original.webp",
+        "width": 860,
+        "height": 85,
+        "sha256": "fd9b134cd24e193c578d887a3054aa934b1a1c1c2f9242ca782c1631dc61d40d",
+        "sourceBasis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 3, question 17. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2012-grades-1-2-q21": {
+      "assetSha256": "579f6e12f0d9ed732c14aee02b062140d6fed80ee2a7f610b30268e70e74dfbe",
+      "sourceTop": 0,
+      "sourceBottom": 167,
+      "basis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 4, question 21. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2012-grades-1-2-q21-original.webp",
+        "width": 860,
+        "height": 167,
+        "sha256": "016439b781ec90d866761ae40829f7d244029aa0928346e8102eb78a7d61423b",
+        "sourceBasis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 4, question 21. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2019-grades-1-2-q17": {
+      "assetSha256": "062229930ac5491215b7a8a6b1e71ab8b91270e0f4c35439385ac683a19350ad",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2018-grades-1-2-q20": {
+      "assetSha256": "1f6b74d0c91e676f4a125b238f2a53d319fc4b17172afa29f0d440fa950bd3f0",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2018-grades-3-4-q01": {
+      "assetSha256": "f519e729b7e25c92b06a2556870319d0fc60c57bca227057e96e0e9f111c6860",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2012-grades-3-4-q01": {
+      "assetSha256": "f4e0ac15cc7ebca719de2f9c7471a1409c78b671097a469f5ccfef8bb9a6813e",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-1-2-q21": {
+      "assetSha256": "ea90f666804a498b8905e21a3e5f08a0bd945eb6b7c28a04d545ae7d470f22b0",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2015-grades-1-2-q18": {
+      "assetSha256": "aacf58e0b6955a816701ae6dd63c913905a5e958de9688993c68409e385c6124",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1872,
+      "sourceBottom": 260,
+      "basis": "Verified original contest-paper crop for printing; question and all choices retained.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2015-grades-1-2-q18.webp",
+        "width": 1872,
+        "height": 260,
+        "sha256": "d148063a25f599f8f9b8845359ba905106a5c859bec8adb3a2bab9a693c11369",
+        "sourceBasis": "Original Math Kangaroo USA 2015 Grades 1–2 contest paper, page 3, question 18. Original prompt, diagrams, and ordered choices visually compared with the selected question; page headers and neighboring questions excluded. Original publisher artwork and typography retained."
+      }
+    },
+    "oasis-online-2019-grades-3-4-q07": {
+      "assetSha256": "a98b77d5e8d88b56859dd5cf801740bf1b0da8d1ddc50baa714c0d67fb52cb27",
+      "sourceTop": 0,
+      "sourceBottom": 2162,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 171,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2017-grades-3-4-q07": {
+      "assetSha256": "80c54914568f5e83cb0d9cbb14a22013ca62f1a91145b2751151cc1bd309dad6",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2015-grades-3-4-q07": {
+      "assetSha256": "2ef1e70143e1b548c04539210aea83eb7e79af77d34f1a7328412b155b7f3f22",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1992,
+      "sourceBottom": 572,
+      "basis": "Verified original contest-paper crop for printing; question and all choices retained.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2015-grades-3-4-q07.webp",
+        "width": 1992,
+        "height": 572,
+        "sha256": "221827f46864acad160abd85c47d072f92cba1861eb8d7156a43d73aa4fc2ae0",
+        "sourceBasis": "Original Math Kangaroo USA 2015 Grades 3–4 contest paper, page 2, question 7. Original prompt, diagrams, and ordered choices visually compared with the selected question; page headers and neighboring questions excluded. Original publisher artwork and typography retained."
+      }
+    },
+    "oasis-online-2013-grades-3-4-q01": {
+      "assetSha256": "97477c929dec9ab8ed2ca88d9963f3f8b0f276171ec77109a40e1e57e9736c12",
+      "sourceTop": 0,
+      "sourceBottom": 3293,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 142,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2022-grades-3-4-q15": {
+      "assetSha256": "9b018314f336a12e6eb13167f09b1509cbbaef7b92bcc857d5659198d3b30d6c",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2012-grades-3-4-q16": {
+      "assetSha256": "bc62866d37ec5247100833e2d47b31eb1a4dffa81d0146cdda3ba9f0ef2daf18",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2018-grades-1-2-q03": {
+      "assetSha256": "56b317552182ac7ba9334c423d6d5ce5eb5135c6857553c06d9da04e7498b0d1",
+      "sourceTop": 0,
+      "sourceBottom": 1614,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 177,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2023-grades-1-2-q13": {
+      "assetSha256": "c8a422e4b204eaa8fa374936ea833fbbfb45730e0cf5105c58cc466c7c1dc043",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-1-2-q09": {
+      "assetSha256": "e3800baa2e44939e292374229baa54c45c01f493a6dac602d436a9681f0b8e02",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-1-2-q22": {
+      "assetSha256": "60cf31c884afb2bf618b5b136ac27475e76c235a98463f0d96c60bce02bb892f",
+      "sourceTop": 0,
+      "sourceBottom": 1460,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 202,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2020-grades-1-2-q18": {
+      "assetSha256": "1f490029b2ff9d3d0501c05dae3fa8395d6df31f029a5f77d97d8cd57e9be7ef",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2016-grades-1-2-q20": {
+      "assetSha256": "16bcd699e407c503c59bb27587a1d6ff0c06403496ca39cfc6bf8dc719b668e0",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2014-grades-1-2-q17": {
+      "assetSha256": "a44007a0adf85e564ffeada2448f41b5b9e4aaa337bd51336badfa38ce8e335f",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2013-grades-1-2-q22": {
+      "assetSha256": "bfa1691bdbe8592159f1c7969b289c1a212d7f86ea7ccc51e6857d43f420427a",
+      "sourceTop": 0,
+      "sourceBottom": 95,
+      "basis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 4, question 22. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2013-grades-1-2-q22-original.webp",
+        "width": 785,
+        "height": 95,
+        "sha256": "390fbc94bda673b4d9ac6ba42a3fc30bf1390eacdc7ba72e55760b03f197c65c",
+        "sourceBasis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 4, question 22. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2012-grades-1-2-q19": {
+      "assetSha256": "acef0fc3dbafd33bc7495a88f13da8f8762c6dc136008215c2e2343598b0f7e1",
+      "sourceTop": 0,
+      "sourceBottom": 94,
+      "basis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 4, question 19. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2012-grades-1-2-q19-original.webp",
+        "width": 860,
+        "height": 94,
+        "sha256": "f8a6dc9fddc79eb9b0f48612d649e3dfff3ddb52a014fec79dbb2386e5ffd0de",
+        "sourceBasis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 4, question 19. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2013-grades-3-4-q04": {
+      "assetSha256": "32a6241144c285f8144df5cea275c54281c6c244b5aefe0f0f0c1afef0ef7d0c",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2022-grades-3-4-q13": {
+      "assetSha256": "c35f3330dd3b3c36f1cb7f708eb01e81d4e1b3068299f76ec26fb76c0b116830",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2014-grades-3-4-q16": {
+      "assetSha256": "2beb045a5d935b69f017dd60eada94c0a6df24ffef60601fa2ce5387322ae73b",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2023-grades-1-2-q24": {
+      "assetSha256": "0787b312a68603cd1259faa568acd4e5bbbecadb896b9f2484b72c7a97610930",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2023-grades-3-4-q03": {
+      "assetSha256": "bab1f04c32dd59cf1c9c10aebcbefe796c69bd4087fe3c6f556397e0b2594092",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2023-grades-3-4-q06": {
+      "assetSha256": "3c3747320749c4d72f4f80c4a49b3c9a96b2c318e02054a8b5fa4683dd887798",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2019-grades-3-4-q04": {
+      "assetSha256": "89dbe1a5fdb3ee21fb560f105bd9348b815a0ae3d7606e003dae3697b1d745b5",
+      "sourceTop": 0,
+      "sourceBottom": 1683,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 173,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2018-grades-3-4-q05": {
+      "assetSha256": "5f7cc0800ed6750ab3c4ff9fee711c1c723996a97289aec367adea351c068e73",
+      "sourceTop": 0,
+      "sourceBottom": 2197,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 142,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2018-grades-3-4-q06": {
+      "assetSha256": "b4e042caa5e923a2e006f83e1c6e717dbc5136078e9fcdd57aa65906462268a4",
+      "sourceTop": 0,
+      "sourceBottom": 2231,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 173,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2017-grades-3-4-q04": {
+      "assetSha256": "e4076bfec9857448db7c9524d04306724d50beec08847767656ec88f38f6f02c",
+      "sourceTop": 0,
+      "sourceBottom": 1871,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 142,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2016-grades-3-4-q04": {
+      "assetSha256": "8961fac4a0982e360c8bd67d5527c8bc06974a10e9adc140b79bda23af21168e",
+      "sourceTop": 0,
+      "sourceBottom": 2197,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 141,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2020-grades-1-2-q15": {
+      "assetSha256": "922f895dd2a41066cbacea5e61eea4805d507d55b391447eecafd5d8df1da9f6",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2019-grades-1-2-q10": {
+      "assetSha256": "0d558050546e17fa1392af3963486c8a9f274cef9fa6332094d18908f1b3b776",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2017-grades-1-2-q12": {
+      "assetSha256": "eba5c001d52154dc67be1d8abf4d8690334aa8cd585b49db775a8200feaca81b",
+      "sourceTop": 0,
+      "sourceBottom": 1957,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 173,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2021-grades-1-2-q20": {
+      "assetSha256": "00be74b5087ac641378d062280fb9235650de99e4c1282ba37b7905774cbcd61",
+      "sourceTop": 0,
+      "sourceBottom": 2231,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 173,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2024-grades-3-4-q15": {
+      "assetSha256": "adc7c00edd95526f37a8a179fce764abdeec30e8099844695fa61265c1578acc",
+      "sourceTop": 0,
+      "sourceBottom": 1614,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 238,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2022-grades-3-4-q14": {
+      "assetSha256": "ff8a354faa08be248da91ddfb7b99fa6d7f2c9a5a9acfdb6c27ce3761aedf2f8",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2018-grades-3-4-q12": {
+      "assetSha256": "cf3c3a77687939c5e2e107cacdb54b5db0a68fe7b2179e6a10b3a0c6763556e1",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2017-grades-3-4-q12": {
+      "assetSha256": "c1ded92e699647bfd7acbb8ff76da1430ba0d84362e4aa10eef130ced0c01b2d",
+      "sourceTop": 0,
+      "sourceBottom": 2231,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 174,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2015-grades-3-4-q09": {
+      "assetSha256": "8d1516f04b715abd825f8821f819f12182d02c442fbfc7fb10cb7792e7ee0357",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1872,
+      "sourceBottom": 368,
+      "basis": "Verified original contest-paper crop for printing; question and all choices retained.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2015-grades-3-4-q09.webp",
+        "width": 1872,
+        "height": 368,
+        "sha256": "963bf5a5ab3d582af8a098b87059cc0d90ae5ca4f3d2490b50d2929fd5f93a63",
+        "sourceBasis": "Original Math Kangaroo USA 2015 Grades 3–4 contest paper, page 2, question 9. Original prompt, diagrams, and ordered choices visually compared with the selected question; page headers and neighboring questions excluded. Original publisher artwork and typography retained."
+      }
+    },
+    "oasis-online-2014-grades-1-2-q24": {
+      "assetSha256": "2ec8061d295b3be6630ed8bd8e1372100d95d9a6a79092fe883c84a2a8b1bfac",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2019-grades-3-4-q02": {
+      "assetSha256": "c7c57fd4fcc507b2d8af39650421a881c63bc43b6f7ecbeb6dfb00786c914d6f",
+      "sourceTop": 0,
+      "sourceBottom": 1906,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 173,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2016-grades-3-4-q01": {
+      "assetSha256": "5ec8c03fab39178f7535daec9186c78638ab4af731464f5e5d7c0e53964d88da",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2013-grades-3-4-q05": {
+      "assetSha256": "2be22076e53596f4534eb3f4bc49f34ac734ebbffde6159e12c48283226cf43d",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2022-grades-3-4-q07": {
+      "assetSha256": "10331c13869d00bffaa2242e406e1d4b060c6e3850f27ed9b6b5d7f8f37c0708",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-3-4-q05": {
+      "assetSha256": "daf7a505ab563b145cd1d73719240b1227f30fd4e9091efad6765c245f1a347b",
+      "sourceTop": 0,
+      "sourceBottom": 1649,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 214,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2020-grades-3-4-q03": {
+      "assetSha256": "d45e994e7472c504dad9f777d659ce4e236b5cf2f37af767bd3cb598bc7dc97e",
+      "sourceTop": 0,
+      "sourceBottom": 2197,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 145,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2018-grades-3-4-q03": {
+      "assetSha256": "6d10080ac8aec9b4ca40c1491f99f0e201e267bee66ca91fafb5b23ca19b0e30",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2017-grades-3-4-q01": {
+      "assetSha256": "904674f80e54d94bf38ad24d4473a01ac0aaf7c27f8a81089d0231e046dc8d5e",
+      "sourceTop": 0,
+      "sourceBottom": 1888,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 174,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2014-grades-3-4-q07": {
+      "assetSha256": "a8eaf58ec8c28e32f61fb8b254cf2aabb90ccca57179ba58dc16fcde387566a8",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2014-grades-3-4-q05": {
+      "assetSha256": "4da7fc8e66344dcde7399b3f94ba57fe75e30c5b1c0b395be9ebb7d7d5f299db",
+      "sourceTop": 0,
+      "sourceBottom": 2248,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 204,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2013-grades-3-4-q07": {
+      "assetSha256": "918edd845b551de02960d839a40df1efaf96e59a0704e5dbd44d77eb3248a02e",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-1-2-q16": {
+      "assetSha256": "e8f8ce7c67190e0d6e0c9889815a624a4b4b84e155db89f7556bb9bb547b9a82",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2013-grades-1-2-q09": {
+      "assetSha256": "c418ee873fffaa7a829c48841c4e8bc6f42a9693ccf2fa915aab2ac1785e990c",
+      "sourceTop": 0,
+      "sourceBottom": 85,
+      "basis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 2, question 9. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded. Neighboring question 10 illustration excluded in the bottom-right margin; question 9 text and all five choices remain unchanged.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2013-grades-1-2-q09-original.webp",
+        "width": 785,
+        "height": 85,
+        "sha256": "bd713a92f5f423140b229e0edea67221803a39486b028a29a0ebef327e2e23a5",
+        "sourceBasis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 2, question 9. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded. Neighboring question 10 illustration excluded in the bottom-right margin; question 9 text and all five choices remain unchanged."
+      }
+    },
+    "oasis-online-2010-grades-1-2-q14": {
+      "assetSha256": "9d35110d42439e664145f8ca0bc301c32ab1583327be797c3ddf359392ee5812",
+      "sourceTop": 0,
+      "sourceBottom": 439,
+      "basis": "Original Math Kangaroo USA 2010 Grades 1–2 paper, source PDF page 5, question 14. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2010-grades-1-2-q14-original.webp",
+        "width": 803,
+        "height": 439,
+        "sha256": "30894df96c6e510bd70f889dfb23eb91bb6af22abb5df3e102d643f3ffc07b11",
+        "sourceBasis": "Original Math Kangaroo USA 2010 Grades 1–2 paper, source PDF page 5, question 14. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2023-grades-1-2-q22": {
+      "assetSha256": "8c5bd1d1f6f27cb9f04f78224604dd894d7a73af35c14610646a688c65f96961",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-1-2-q23": {
+      "assetSha256": "d3908df222eb8ec37abfbe2bc7844912e962ed8bcffac090e7ef17d6ec4d19f3",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2019-grades-1-2-q23": {
+      "assetSha256": "0c72bd601c5f9cee69023ed81a60dc118abc2ddb5e641abb5f39262495fc1e65",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2018-grades-1-2-q17": {
+      "assetSha256": "d5fe8a0bacf933996e27f8b8a556913454a543300e58a561bff0e07557f07159",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2018-grades-1-2-q18": {
+      "assetSha256": "e8cb944041797bf4333b8eeeec1a3f16ca8943f9c364951ecce56551c094e9a1",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2018-grades-1-2-q21": {
+      "assetSha256": "2dab45877836508235a3bf061d66fd184e6ecee892d60e101693d53bfb247205",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2014-grades-1-2-q18": {
+      "assetSha256": "86ad407d3ca989498892164b6333b7c3bd17efa36b3a93a1ac274f24a05c4104",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2015-grades-3-4-q04": {
+      "assetSha256": "3143f018f4d8dfe73431ed2559ef3c7e1bd1ab385a3666129bbd5875fca08ff1",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2016-grades-1-2-q24": {
+      "assetSha256": "6ee6ae716e6f8897276da20d0333a924daa8134140f7d2232f9a4e4b423b4348",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2024-grades-3-4-q08": {
+      "assetSha256": "6689a7e032a20b9d7c023b530bd6d7106d4baf9df1bca3f4886adaf90758b3b9",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2022-grades-3-4-q05": {
+      "assetSha256": "9aea1723b38202ff2fd4ac4115769fbddba7bf2e0f6b85e17edafd521fc183aa",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2020-grades-3-4-q06": {
+      "assetSha256": "ab0ffbff8feb5241de833ad57e8ed3a30b958b1c8a52d593359ef8bda3da52fa",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2013-grades-3-4-q03": {
+      "assetSha256": "39b208107da85c2bc78bfc1bfba2954ea2c9922a4ce73cc4dbb2f282d3a32ea2",
+      "sourceTop": 0,
+      "sourceBottom": 1512,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 142,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2012-grades-3-4-q07": {
+      "assetSha256": "c52c990de2da1ed0c0c3be54310bfae34279f717d117a266688b8a3e5e66002e",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2019-grades-3-4-q09": {
+      "assetSha256": "e237a2011eb47bd34d9bdfb97ddeda736acb0de9c8bb2fb0a568a5cbfa73ebea",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2024-grades-3-4-q04": {
+      "assetSha256": "9dc9bebcfab3d376fa56400da1dcf8447c76fd2bb18b42d78c70c8b78a428938",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2015-grades-3-4-q05": {
+      "assetSha256": "c4d1c0421817039f447e253d3587f5335a79940a4fc31ae4539149af232e95d6",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1872,
+      "sourceBottom": 432,
+      "basis": "Verified original contest-paper crop for printing; question and all choices retained.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2015-grades-3-4-q05.webp",
+        "width": 1872,
+        "height": 432,
+        "sha256": "e553f811cd52bb67b1ec83544c13c809bc0b32ce45780a1b9ef4f86a707846de",
+        "sourceBasis": "Original Math Kangaroo USA 2015 Grades 3–4 contest paper, page 2, question 5. Original prompt, diagrams, and ordered choices visually compared with the selected question; page headers and neighboring questions excluded. Original publisher artwork and typography retained."
+      }
+    },
+    "oasis-online-2023-grades-3-4-q14": {
+      "assetSha256": "10613f5aca398edf76ef48df0b4181fa112e3ba516a12680e079ec7deae84382",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-3-4-q16": {
+      "assetSha256": "ae476f3e8d151fa475eea893fce247c92b615125248ffb67eb450997501dda62",
+      "sourceTop": 0,
+      "sourceBottom": 1974,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 204,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2020-grades-3-4-q12": {
+      "assetSha256": "ad499dee32fa23fda8fc20349aff7052b10673f8a8c97b99f7188497b069a20d",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2020-grades-3-4-q15": {
+      "assetSha256": "df3e59b0c1443b0be751b664c9f1a14c4842d74702d799dec5448f225768a3f5",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-1-2-q18": {
+      "assetSha256": "bf7b702cc3a5255f187b2681f60f1690742a7b2d8bdda3824d36ec03f7a2285e",
+      "sourceTop": 0,
+      "sourceBottom": 2248,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 214,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2023-grades-3-4-q04": {
+      "assetSha256": "7624ae5d5f40e42da49cd30d0f20ba19c0a3f06a931ef5440618e1af5b664ca6",
+      "sourceTop": 0,
+      "sourceBottom": 1358,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 175,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2021-grades-3-4-q04": {
+      "assetSha256": "0998281d8f73d0cd38f0afb7c0f5a0f09b24001c60e441e4fd3718da67648ab7",
+      "sourceTop": 0,
+      "sourceBottom": 2197,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 142,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2020-grades-3-4-q05": {
+      "assetSha256": "8c349cd20468bb8cf513a4117a0037e78e50ca5c2273d608a43ed1a10be38e87",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2020-grades-3-4-q02": {
+      "assetSha256": "90d9eb35f63b4ea74b24f9d8a76c437844d919fc5b192204934d50b8a38893d3",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2019-grades-3-4-q05": {
+      "assetSha256": "1ec278397340f5e84f4eafe8db9a32063098e49ac50fd0e25871a214bb01a63a",
+      "sourceTop": 0,
+      "sourceBottom": 2522,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 173,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2013-grades-3-4-q15": {
+      "assetSha256": "438f839d68b36825c843ca725cf2e537e4d60a3b55545ea7920e35440b62dac0",
+      "sourceTop": 0,
+      "sourceBottom": 2231,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 173,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2014-grades-1-2-q11": {
+      "assetSha256": "f069d1764e6cff75a6b53e5b8982c19d170edbdceb9c8548006755041765e728",
+      "sourceTop": 0,
+      "sourceBottom": 2231,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 176,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2023-grades-1-2-q17": {
+      "assetSha256": "6d80399c56c8012503e7833c62190cb8d9d76b7c368f6dde3dcbf3bb7e00f93f",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2022-grades-1-2-q18": {
+      "assetSha256": "08f831e8f5b46703f820cc44e47b4c6d07e4d1f553443d66c8d0b94ad70b2000",
+      "sourceTop": 0,
+      "sourceBottom": 1632,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 182,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2021-grades-1-2-q17": {
+      "assetSha256": "97275c90c64c92de9ade6b448e6d0c45d5947ceb8c756ce1ff9256a9ad75e20d",
+      "sourceTop": 0,
+      "sourceBottom": 2231,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 171,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2019-grades-1-2-q18": {
+      "assetSha256": "35603556c6f7afdfa5df9c59bcf5b28fd095059cabb7f0fc25cce946fabd8e6f",
+      "sourceTop": 0,
+      "sourceBottom": 1888,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 142,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2017-grades-1-2-q19": {
+      "assetSha256": "6ebd275d69337ac67996ec32d61406647201e8afcc34179706e86d7253d20434",
+      "sourceTop": 0,
+      "sourceBottom": 1392,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 178,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2016-grades-1-2-q17": {
+      "assetSha256": "0ac32467f5fac68a6c1ffcffb7fa3fe339a993b0335040342b618c151ef4157d",
+      "sourceTop": 0,
+      "sourceBottom": 1888,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 173,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2016-grades-1-2-q19": {
+      "assetSha256": "623c86c182bd69d20955304435df6334f347e709a5b7b809cd527380ee9c2ff4",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2016-grades-1-2-q21": {
+      "assetSha256": "825de4b73c916c5028b11212c41d5a0df3bdcf57630083cb10292939af07b43c",
+      "sourceTop": 0,
+      "sourceBottom": 1906,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 142,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2012-grades-1-2-q22": {
+      "assetSha256": "5032b6a83b4a2901d1268921a1fc12ffbd69c5ddf3370daee5886c3fa57bf817",
+      "sourceTop": 0,
+      "sourceBottom": 271,
+      "basis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 4, question 22. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2012-grades-1-2-q22-original.webp",
+        "width": 860,
+        "height": 271,
+        "sha256": "ea72527356c6b17a996b0c947b3531e7d23a552b7740c156f841c368f7a1b828",
+        "sourceBasis": "Original Math Kangaroo USA 2012 Grades 1–2 paper, source PDF page 4, question 22. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2023-grades-3-4-q09": {
+      "assetSha256": "16354542f2063c942d3d1accc93fab8d0a075dd5821610066098742561c6e29f",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2020-grades-3-4-q16": {
+      "assetSha256": "932ffc06096cc2e945faaf840cbe8a1ddc0337878834dd159bf4538d3b604ba5",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2019-grades-3-4-q10": {
+      "assetSha256": "70b4e7ee56f4f24e0a7c329ac12a000f3a2f7c88e96160350e46c944a2a71bf2",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2018-grades-3-4-q09": {
+      "assetSha256": "5f762f33512a807ab6b9c7427061aba592d5fe060af8dcab0e966e0e0f4e9c5f",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2018-grades-3-4-q11": {
+      "assetSha256": "4190da0e88e7fdaa8494123c4594dd6f23081b5f21d21f312cbe72be19997188",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2016-grades-3-4-q14": {
+      "assetSha256": "5343f7f0f29e0131d62b94e19397ab0366d9b8a36cc966c88cf4f5f5812b624f",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2014-grades-1-2-q21": {
+      "assetSha256": "6e894f90cd5df26e125c9a205cdbe725511bfeb9468c486a4e9950a4c1e8a4b3",
+      "sourceTop": 0,
+      "sourceBottom": 2145,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 177,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2013-grades-1-2-q19": {
+      "assetSha256": "df62dfbad90e28d5e0aa3454ee63c8decda9cd3e7f4724ea2b8cee968eba817e",
+      "sourceTop": 0,
+      "sourceBottom": 219,
+      "basis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 4, question 19. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2013-grades-1-2-q19-original.webp",
+        "width": 785,
+        "height": 219,
+        "sha256": "b622392d24904df294b9a1bfe9f89c6fe7c33cd81c4815160641ed767e98f7f1",
+        "sourceBasis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 4, question 19. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2022-grades-3-4-q03": {
+      "assetSha256": "1f26bcef9a971e97be8a620aa7ff51e36f5005558cfd32c01e00722c1aff817e",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2022-grades-3-4-q06": {
+      "assetSha256": "36443c906d0eecb48bdd08d7eacdd3dc9ed6d1a3f73495d1868501c2f16016b7",
+      "sourceTop": 0,
+      "sourceBottom": 2231,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 173,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2014-grades-3-4-q06": {
+      "assetSha256": "49870aca5be1982b15e83454011bcc328a8034779c03bb2b7309c8770fb6ad6a",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2024-grades-3-4-q10": {
+      "assetSha256": "3e413441bdfcc56a241e7b981c692f63663e3d59e3719076d88613c2855c4cbe",
+      "sourceTop": 0,
+      "sourceBottom": 2231,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 175,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2022-grades-3-4-q12": {
+      "assetSha256": "3715cfcd89c130cfa24aee05d8e5f31984dc6cad623100f22698e9e836c8dab7",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-3-4-q10": {
+      "assetSha256": "6d34930cd17a11048de2299239a1cf7eb019eccf154552d4aa88ed88a3d8b23e",
+      "sourceTop": 0,
+      "sourceBottom": 1906,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 173,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2023-grades-1-2-q18": {
+      "assetSha256": "4d8f34981cdd538098526686587ba012788e9dbe9078023532a565c40397c755",
+      "sourceTop": 0,
+      "sourceBottom": 1649,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 214,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2021-grades-1-2-q24": {
+      "assetSha256": "9f2344579cb5ecc09d3699022864e5da9e1f8491825e2c30ae80c96521a5a11c",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2020-grades-1-2-q17": {
+      "assetSha256": "afdc4547c9c76f69bcbe5ac6b3123e19b45d27a3716adde33965abd34a0cda7f",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2020-grades-1-2-q20": {
+      "assetSha256": "10ff0cdcb209410ecfcf9f75bb195e3c86e211bd8b67a435f893a76448efe55a",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2019-grades-1-2-q20": {
+      "assetSha256": "10d33948b73821fc553105dc2cff52c823f72c91d7db32a41f0eeb164c2abbaa",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2017-grades-1-2-q23": {
+      "assetSha256": "7fc98ca5be21ff434e066c56c5cda4fd4c0d982e838712751f0d4261895a5725",
+      "sourceTop": 0,
+      "sourceBottom": 2436,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 173,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2016-grades-1-2-q22": {
+      "assetSha256": "e686827dfadfd5bafd9a68b02ab687236d517b6c71b07837f79b92314c272b3a",
+      "sourceTop": 0,
+      "sourceBottom": 1871,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 232,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2011-grades-1-2-q22": {
+      "assetSha256": "a17de1db859dff1594dbfce3faca3bcb1a0cb637cb02d5edcfb4e99e09e46fb5",
+      "sourceTop": 0,
+      "sourceBottom": 119,
+      "basis": "Original Math Kangaroo USA 2011 Grades 1–2 paper, source PDF page 4, question 22. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2011-grades-1-2-q22-original.webp",
+        "width": 857,
+        "height": 119,
+        "sha256": "1ba4d3ae4d81b6804121edb36abae29fa9d8109021e623659420caa08e83dcc1",
+        "sourceBasis": "Original Math Kangaroo USA 2011 Grades 1–2 paper, source PDF page 4, question 22. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2024-grades-3-4-q13": {
+      "assetSha256": "28e6333b0baa2504b1f4bb179fe3a63af78847a5320d6278d544b7d012f8e0f7",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2023-grades-3-4-q15": {
+      "assetSha256": "3c88db8864c37fd8c546d73e4350df62a94cf31cd7f7459276395506f7d4390f",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2022-grades-3-4-q11": {
+      "assetSha256": "bb4daf2a6bda0bac60948428bbb6147ccc1425f439c495e82054a8f95cc77294",
+      "sourceTop": 0,
+      "sourceBottom": 1717,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 277,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2020-grades-3-4-q09": {
+      "assetSha256": "6e3b117a2d0522ffcb89ba6ec77767f6f878e15fbca0f9f7629c5c8e52148036",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2018-grades-3-4-q10": {
+      "assetSha256": "11ee1c99ed7ddef3a4fb4cd89ae0cdb186d763129f1896809647d107d7526bd3",
+      "sourceTop": 0,
+      "sourceBottom": 2436,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 177,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2016-grades-3-4-q15": {
+      "assetSha256": "43faa1ea1c8514b9400b074baede51ced72cf6d622f080d7d2572010c62f28eb",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2013-grades-3-4-q06": {
+      "assetSha256": "43e9d7c7669c667a1302c8f14aa5660efc2d9a6a25b876d4f9a9ce790616df87",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2017-grades-1-2-q08": {
+      "assetSha256": "979c0a7bb26c348ad2fa3ac6c2be89e7666c0875d91887f6359ab8fadcd9b97a",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2015-grades-1-2-q12": {
+      "assetSha256": "b593656d74949acadf1584041e11b9db41ab975395175b9c41d9dc8563112db0",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1872,
+      "sourceBottom": 272,
+      "basis": "Verified original contest-paper crop for printing; question and all choices retained.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2015-grades-1-2-q12.webp",
+        "width": 1872,
+        "height": 272,
+        "sha256": "78b7ec23491437a6ca32484aec81135515a30e06f8cb1fba800ae21bd8e5c384",
+        "sourceBasis": "Original Math Kangaroo USA 2015 Grades 1–2 contest paper, page 3, question 12. Original prompt, diagrams, and ordered choices visually compared with the selected question; page headers and neighboring questions excluded. Original publisher artwork and typography retained."
+      }
+    },
+    "oasis-online-2024-grades-3-4-q05": {
+      "assetSha256": "18f643b886f2d160948bdb30ab2f1fc9280b850821a9447d9bf7ec470217a05f",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2015-grades-3-4-q06": {
+      "assetSha256": "f7c4c84f7f92f673d16e64f84eeca5a48aea5b4dd89e1911b7bf49382c3e138a",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1872,
+      "sourceBottom": 208,
+      "basis": "Verified original contest-paper crop for printing; question and all choices retained.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2015-grades-3-4-q06.webp",
+        "width": 1872,
+        "height": 208,
+        "sha256": "96681338a3d671aab004bf524be741e69bf5eac59e09160afa97243df04e023f",
+        "sourceBasis": "Original Math Kangaroo USA 2015 Grades 3–4 contest paper, page 2, question 6. Original prompt, diagrams, and ordered choices visually compared with the selected question; page headers and neighboring questions excluded. Original publisher artwork and typography retained."
+      }
+    },
+    "oasis-online-2014-grades-3-4-q02": {
+      "assetSha256": "6e0370b5f3fbd6aab4a15a995fddad40f4f1490a726deb1df117be1ed388ece6",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2013-grades-3-4-q08": {
+      "assetSha256": "21b76462702967874cfc52e04a5c1ea9fcb62117193f9c3191bae8c409723d6b",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2017-grades-3-4-q13": {
+      "assetSha256": "11cec2c888aa21c7d35e5cebd41f8d34ebaef19b72f0482e0d2412ce6b7653bd",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2016-grades-3-4-q09": {
+      "assetSha256": "763d359849db53f3082c348a320f716107754ae7015031d2d4235f49ff1de8ba",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2018-grades-1-2-q19": {
+      "assetSha256": "e19fcca86f92b684e531acac3cd8b4f76ed10a49807998b6d860e707f8ac728d",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2014-grades-1-2-q20": {
+      "assetSha256": "5291bc64ed87ea0ef5a846d0d7d600922012b676cdf8a4fe606a62b58898246b",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2014-grades-1-2-q22": {
+      "assetSha256": "703023e3a0b6f5b77827d3f5ffc10a8b80daf4b7be8a1b4fde8ae0c871784b02",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2019-grades-3-4-q14": {
+      "assetSha256": "a5dcc6c4823bfeac50d8416ede4052834af94a32898adf541c620894077abea3",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2013-grades-3-4-q16": {
+      "assetSha256": "8e95e163d516172a10f9824befe4599560252ed7b255b34d947c89d6f3e6d3c2",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2012-grades-3-4-q13": {
+      "assetSha256": "16f4334cfb3cabb5cb1720dbfbc1d77bf215843a79d54af9c3d8418c7300dfa9",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2022-grades-3-4-q01": {
+      "assetSha256": "bcb610de3784f7496bb50d4c81cff197f6ef3294d0b2dbc237a6795843394589",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2020-grades-1-2-q01": {
+      "assetSha256": "f43989df73ae51c26f36af6672318afc114d71947a1f270ea6ba0667c9295acf",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2019-grades-1-2-q16": {
+      "assetSha256": "e647a02e6e208c86bb2b0dcf2745852d9d17bb1920c32ddc96df7b2c2227227b",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2013-grades-1-2-q13": {
+      "assetSha256": "e18eb1c1ffc169ee18bddadcb2ec1982536f9aa07dafce1bf4b5499e3d3dbda1",
+      "sourceTop": 0,
+      "sourceBottom": 157,
+      "basis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 3, question 13. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2013-grades-1-2-q13-original.webp",
+        "width": 785,
+        "height": 157,
+        "sha256": "7ffe3ab442861fd82195aab9decf5a50ddf84ecef1b93543b06200a34d27bca4",
+        "sourceBasis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 3, question 13. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2022-grades-3-4-q02": {
+      "assetSha256": "0b8897d9ff12ad628e8b2d3fb43f55f778a9e39f7cee796c8d14485d4a963fbe",
+      "sourceTop": 0,
+      "sourceBottom": 1614,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 171,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2012-grades-3-4-q04": {
+      "assetSha256": "4a862e84df16ba3a3fcc9d2112817d65c43876a5141d360694c8cfbbdf9108f1",
+      "sourceTop": 0,
+      "sourceBottom": 2197,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 149,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2011-grades-3-4-q05": {
+      "assetSha256": "d3de47fe00f0d09dd91fc74d34fa69eb2f06697c5456bfb9a171a0b74897f8d2",
+      "sourceTop": 0,
+      "sourceBottom": 2282,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 235,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2023-grades-1-2-q08": {
+      "assetSha256": "591829b02c18e0cb571c2fcebc3058c9fa35ae79bebcaee06cec0e30bbf6d3a3",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2023-grades-1-2-q19": {
+      "assetSha256": "beebc8e3aa87b66430a3e35d8130a345e4436f0b811e9413b4f00f9b735c418f",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2023-grades-1-2-q20": {
+      "assetSha256": "15edb9209040f513445198a0f69141b7020d239780ab45d5f338641ef5177225",
+      "sourceTop": 0,
+      "sourceBottom": 1443,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 171,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2022-grades-1-2-q20": {
+      "assetSha256": "2fe25d51ff4d452fab209d1a3f789399f5eabe4259db054742278add079bb06b",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2022-grades-1-2-q23": {
+      "assetSha256": "a1f29a1faab3a8ace1a949c36476f83f89cee75b3bba84d44b760623ec2e9546",
+      "sourceTop": 0,
+      "sourceBottom": 1649,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 214,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2020-grades-1-2-q19": {
+      "assetSha256": "61f194527487b2b106c3c26a14d301fe9ffca6d84750d9d68e51c6681146f4b6",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2018-grades-1-2-q23": {
+      "assetSha256": "f4cf6580469df334a948e274c835025a32b53c70cd0f767c8635fac343337202",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2015-grades-1-2-q17": {
+      "assetSha256": "733743fe6d62e38f31afb28dfa337f8768a0377d19330b63d574eefb3d9a018a",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1872,
+      "sourceBottom": 360,
+      "basis": "Verified original contest-paper crop for printing; question and all choices retained.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2015-grades-1-2-q17.webp",
+        "width": 1872,
+        "height": 360,
+        "sha256": "0a00225ffb8f7b1048ac60887d123ab0bcd51e19c74426cc7bae008b9b2320da",
+        "sourceBasis": "Original Math Kangaroo USA 2015 Grades 1–2 contest paper, page 3, question 17. Original prompt, diagrams, and ordered choices visually compared with the selected question; page headers and neighboring questions excluded. Original publisher artwork and typography retained."
+      }
+    },
+    "oasis-online-2024-grades-3-4-q02": {
+      "assetSha256": "0fff95e15975474e7b9eceecab4af693414801a6f829a2cfa731bb4adc559f5a",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2016-grades-3-4-q10": {
+      "assetSha256": "485e1e0bf476df1eb5721a4d31a62bceba33bfdf48eaa16268a16fb779de6afc",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2015-grades-3-4-q15": {
+      "assetSha256": "8adf0a6a5aea701f0f88724033236430f81c32a57772cfce980a1df56235aeb3",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1992,
+      "sourceBottom": 456,
+      "basis": "Verified original contest-paper crop for printing; question and all choices retained.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2015-grades-3-4-q15.webp",
+        "width": 1992,
+        "height": 456,
+        "sha256": "1ee7ba1982a1e51e27f3fd9ce1483ead3d8dca0f1e69f6d20f91a7875ecc02f6",
+        "sourceBasis": "Original Math Kangaroo USA 2015 Grades 3–4 contest paper, page 3, question 15. Original prompt, diagrams, and ordered choices visually compared with the selected question; page headers and neighboring questions excluded. Original publisher artwork and typography retained."
+      }
+    },
+    "oasis-online-2013-grades-3-4-q12": {
+      "assetSha256": "1c4f2dac29a4c5e8791d4c558f39dfddb22edb09ce8cf46bc3e8382aa0a495cd",
+      "sourceTop": 0,
+      "sourceBottom": 2282,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 233,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2011-grades-3-4-q16": {
+      "assetSha256": "3e096e23a9308b44899f95782102756b2ab96ab61e0df7761c4100f9d4e63977",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2018-grades-1-2-q09": {
+      "assetSha256": "4a06a748cb5035afccdf3bf2614e22de60e111a2d45bbadbb704bc3b61130110",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2015-grades-1-2-q15": {
+      "assetSha256": "c035b63d7ffd23583ecdd0ca5544155f8849114933005265715b23ed5124cabc",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1872,
+      "sourceBottom": 352,
+      "basis": "Verified original contest-paper crop for printing; question and all choices retained.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2015-grades-1-2-q15.webp",
+        "width": 1872,
+        "height": 352,
+        "sha256": "fffdace76713e1fc73498fbef93b043e1d6842fe2b8c0a8d6263042a6701eee8",
+        "sourceBasis": "Original Math Kangaroo USA 2015 Grades 1–2 contest paper, page 3, question 15. Original prompt, diagrams, and ordered choices visually compared with the selected question; page headers and neighboring questions excluded. Original publisher artwork and typography retained."
+      }
+    },
+    "oasis-online-2024-grades-3-4-q07": {
+      "assetSha256": "1c9fcc4bba4b0063dce15cd14b3a68b3221f0cc8d073fed4c1f2a1b151bf0fb0",
+      "sourceTop": 0,
+      "sourceBottom": 2162,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 173,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2022-grades-3-4-q08": {
+      "assetSha256": "76001253b3449bec95f4a09e82b5412e56f8fa92c36489009058b91d0695991f",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-3-4-q01": {
+      "assetSha256": "36ba3c7a34860eee99fa774e177dbf118fab0df9309eb3ecce9f937f129e961d",
+      "sourceTop": 0,
+      "sourceBottom": 1751,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 140,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2020-grades-3-4-q07": {
+      "assetSha256": "0a76e6bc3eb68954f8cc09e9d0185a04b3e1103900cbda47c4d0125190b6ec95",
+      "sourceTop": 0,
+      "sourceBottom": 2522,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 173,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2023-grades-1-2-q15": {
+      "assetSha256": "02354715785a2daf3e4c7917648b4c001969780adbaaee574dc530e50f5f4cd7",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2016-grades-1-2-q23": {
+      "assetSha256": "9a0acfaffc8575d180b947beada9f58ca9827bc85ab5dc7b8f50d775597880b0",
+      "sourceTop": 0,
+      "sourceBottom": 2282,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 211,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2015-grades-1-2-q22": {
+      "assetSha256": "995665d8a4590d3d8cee7329ae2b50c649c48463d55d1dfb8df9f6309ddbdce0",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1872,
+      "sourceBottom": 784,
+      "basis": "Verified original contest-paper crop for printing; question and all choices retained.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2015-grades-1-2-q22.webp",
+        "width": 1872,
+        "height": 784,
+        "sha256": "7df15c194e179cf9aab08c35805018cf4cbbce5ff46f07e5b3984cf2718dc73d",
+        "sourceBasis": "Original Math Kangaroo USA 2015 Grades 1–2 contest paper, page 4, question 22. Original prompt, diagrams, and ordered choices visually compared with the selected question; page headers and neighboring questions excluded. Original publisher artwork and typography retained."
+      }
+    },
+    "oasis-online-2011-grades-1-2-q24": {
+      "assetSha256": "ee28c4bec9f3afe35a7713d6e4800b61e43c8f0d648aaf9681c6ef19acd9b1f3",
+      "sourceTop": 0,
+      "sourceBottom": 324,
+      "basis": "Original Math Kangaroo USA 2011 Grades 1–2 paper, source PDF page 4, question 24. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2011-grades-1-2-q24-original.webp",
+        "width": 857,
+        "height": 324,
+        "sha256": "f7591368fd8b27490eb4d48fdeda9846de84a97392c0df6cf2cc54737f4e491b",
+        "sourceBasis": "Original Math Kangaroo USA 2011 Grades 1–2 paper, source PDF page 4, question 24. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2022-grades-3-4-q16": {
+      "assetSha256": "986b55a79e972c9a02f1613b58396b307c74bebd6e7d3f3fc33cb6ecc718f787",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-3-4-q11": {
+      "assetSha256": "58cda6ac5e9d0c3efd50a9f771ced3d3cadcbd530e0377526d2d124980675d47",
+      "sourceTop": 0,
+      "sourceBottom": 1906,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 173,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2020-grades-3-4-q10": {
+      "assetSha256": "78ebe6ab9ea31b7420162ddd175123d0dea369f52ce73a46bb1e903b4f7b00b6",
+      "sourceTop": 0,
+      "sourceBottom": 2197,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 143,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2018-grades-3-4-q14": {
+      "assetSha256": "e92808f4847235c1322314ccad2788ec7336630ec87d580eb9cbdb4bbcbe38dd",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2014-grades-3-4-q15": {
+      "assetSha256": "5a503ba7288af6f9a1328d5ac704ef3edb067140732ec7ac3fbf64bdb8d74806",
+      "sourceTop": 0,
+      "sourceBottom": 1991,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 173,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2012-grades-3-4-q15": {
+      "assetSha256": "dba133711991be9f605ea144904c4af4c745b59fc56352bb7bd4947f2f92af89",
+      "sourceTop": 0,
+      "sourceBottom": 2197,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained.",
+      "headerBottom": 176,
+      "headerBasis": "Blank band after the complete title/instruction block and before the first diagram or choice block."
+    },
+    "oasis-online-2010-grades-3-4-q12": {
+      "assetSha256": "14af9dab45d24b38f6b2fe0e131098a011045029ecd2329a6079adf618be31f5",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2023-grades-3-4-q02": {
+      "assetSha256": "d02a466c0764ee77ef1545d9c51a34fae55d51ca83ee95d20eaca3977fe5c7a7",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-3-4-q07": {
+      "assetSha256": "e1a7def713853dda7cb4298f39dec3fdd81f17fe313d531cdc3becb8f2e11e4a",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2019-grades-3-4-q08": {
+      "assetSha256": "238dd6014c1973c370bc39cbb014b23e445b3da4b9f293c0debae12b1eb15d4a",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2018-grades-3-4-q07": {
+      "assetSha256": "fa6c17013760973467c6e70299a53387d2c3a5058e36c2a5b65798d0938faa59",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2023-grades-3-4-q13": {
+      "assetSha256": "b78e61166657b9afb22d3b7f3a273c31952c99b3fec2be03113150c60d9dbe02",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2023-grades-1-2-q23": {
+      "assetSha256": "3ceea63bc2637878f0fd3a299e9758dff7fa3332578b938f6baa583ee8b28196",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2022-grades-1-2-q17": {
+      "assetSha256": "0a32618761dc0c9c80f1ab5e2824c7d43b4b49706ccc78fea2e99a7d59b7002b",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2022-grades-1-2-q21": {
+      "assetSha256": "6fc4ce972e90ebeb099e0e44cf059f939d3f473e2b6e14b40e196b7d59426964",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2020-grades-1-2-q21": {
+      "assetSha256": "417ce91fb381357c78c94f8c22a7d32911651445c3e815d4911499afcce8aa42",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2020-grades-1-2-q22": {
+      "assetSha256": "559603d7ebac62eef91744f70982247849e0269798cf7f85361dfa1c7ef23668",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2020-grades-1-2-q24": {
+      "assetSha256": "4412f81625631354d497ef134f70482183ea7f3b4eb7c538a7a18d3f17ccde1c",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2019-grades-1-2-q19": {
+      "assetSha256": "e360f632f039e3ceab1dd7fac4c9b8aa807c749a3c407a2c646b8b7eb645954b",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2014-grades-1-2-q19": {
+      "assetSha256": "63b7b468e1a751f554a9adb980e31e1d177fde0146a3d00a50bef41bf0484492",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2013-grades-1-2-q18": {
+      "assetSha256": "895ae02dcddd4c3ee4c29c912314553c752712d9fa1267deca954225d80a7398",
+      "sourceTop": 0,
+      "sourceBottom": 285,
+      "basis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 3, question 18. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/oasis-online-2013-grades-1-2-q18-original.webp",
+        "width": 785,
+        "height": 285,
+        "sha256": "352bd70880f9c5cac106eafeb532db60313b20b1c1d479357c92236e3ebf7bd7",
+        "sourceBasis": "Original Math Kangaroo USA 2013 Grades 1–2 paper, source PDF page 3, question 18. Native embedded scan pixels retained; original question and answer-choice order visually compared to the selected LMS card. Page headers, neighboring questions, and footer excluded."
+      }
+    },
+    "oasis-online-2021-grades-3-4-q08": {
+      "assetSha256": "b4fec53e2f42aace6f0f388b021eeee2b22c09b9a180f7c19b6fecf3ea23078e",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2024-grades-3-4-q12": {
+      "assetSha256": "d9966fa2a907eeb668ced78c58fd3fbd0a5a72a5db8d0e926e6117ae7400d4ae",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-3-4-q13": {
+      "assetSha256": "51f3811e653c1dc1b77b437a73a0f1d95cbc7c47d4968f1285232250715a4dbe",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2021-grades-3-4-q15": {
+      "assetSha256": "b81d92405065fa725f133825802456b25d2015ce4838fa4d25fdfd9ef336a15d",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2020-grades-3-4-q14": {
+      "assetSha256": "0a14a41f89dac53ca0f3263e82dfb702911996c856d114683f70fbac7474b28d",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2019-grades-3-4-q12": {
+      "assetSha256": "faf898a0b92471c8308503ccaed2616487f60517c58baf0079739374dc4f5251",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "oasis-online-2019-grades-3-4-q13": {
+      "assetSha256": "d45e13573d624b4b19fd37c7db8838618498c47c8a5081570f0f3f63d6128dd8",
+      "sourceTop": 0,
+      "sourceBottom": 1241,
+      "basis": "Generated provenance footer removed below its full-width gray separator; all question and choice pixels retained."
+    },
+    "usa-2017-grades-1-2-q15": {
+      "assetSha256": "32f1cbc34a47a9a743cdc1d4e2c2968c6c0ad5fadf01cf31c0fe5de0629bd610",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1370,
+      "sourceBottom": 550,
+      "basis": "Verified clearer print-only crop of the exact same source question and all five choices. Game content and source asset remain unchanged.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/usa-2017-grades-1-2-q15.webp",
+        "width": 1370,
+        "height": 550,
+        "sha256": "b42959102d79cc8e09a4f79cc127752d9d10d5b4b16225de6503b295e4360a83",
+        "sourceBasis": "Math Kangaroo USA 2017 online practice, Grades 1–2, question 15. Legibility fallback: a ReportLab evidence export of the original LMS HTML prompt and choices, matched verbatim to the captured question. No OCR was used. An original full contest paper was unavailable locally; this image preserves the verified source wording and choice order but is not the original page typography."
+      }
+    },
+    "usa-2015-grades-1-2-q23": {
+      "assetSha256": "939b03fa6e4f5513f299093caeee3b775020a84a61a3746b98b3871c1ee6dd82",
+      "sourceLeft": 0,
+      "sourceTop": 0,
+      "sourceRight": 1872,
+      "sourceBottom": 624,
+      "basis": "Verified clearer print-only crop of the exact same source question and all five choices. Game content and source asset remain unchanged.",
+      "printAsset": {
+        "src": "/math-world/workbook-questions/usa-2015-grades-1-2-q23.webp",
+        "width": 1872,
+        "height": 624,
+        "sha256": "1b44005fd4824cf55dbf814616e6baa72c1504cdfce126605f1ed7c796005ec6",
+        "sourceBasis": "Math Kangaroo USA 2015, Levels 1–2, question 23, original contest paper page 4. Exact question, all three conditions, and choices A–E independently compared with the selected source card; original PDF crop, no OCR or re-typesetting."
+      }
+    },
+    "think300-l1-2-5-points-q040": {
+      "assetSha256": "11d929e3eb7cea0fc948a9223e480e947afcce111eeeb3a20556a2dbafe7c3a4",
+      "sourceLeft": 20,
+      "sourceTop": 20,
+      "sourceRight": 990,
+      "sourceBottom": 440,
+      "basis": "Visually verified crop retaining the complete witch-transformation question, both transformation diagrams, and all five original visual choices; removes empty lower canvas."
+    }
+  }
+}

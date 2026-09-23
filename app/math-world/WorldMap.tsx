@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/progression/avatar";
 import {
@@ -24,6 +24,7 @@ import {
 import styles from "./math-world.module.css";
 import CoastScene from "./CoastScene";
 import { useMapTravel } from "./useMapTravel";
+import { printWorldWorkbook } from "./workbook";
 
 type MapProps = Readonly<{
   progress: WorldProgress;
@@ -185,11 +186,37 @@ export function WorldMap({
   const router = useRouter();
   const mapHeadingRef = useRef<HTMLHeadingElement>(null);
   const completedHeadingRef = useRef<HTMLHeadingElement>(null);
+  const mountedRef = useRef(true);
+  const preparingWorkbookRef = useRef(false);
+  const [preparingWorkbook, setPreparingWorkbook] = useState(false);
+  const [workbookError, setWorkbookError] = useState<string | null>(null);
   const busy = travel !== null;
 
   useEffect(() => {
+    mountedRef.current = true;
     (completedHeadingRef.current ?? mapHeadingRef.current)?.focus({ preventScroll: true });
+    return () => { mountedRef.current = false; };
   }, []);
+
+  async function prepareWorkbook() {
+    if (busy || preparingWorkbookRef.current) return;
+    preparingWorkbookRef.current = true;
+    setPreparingWorkbook(true);
+    setWorkbookError(null);
+    try {
+      // Invoke within the click gesture so the helper can open its print window.
+      await printWorldWorkbook(world);
+    } catch (error) {
+      if (mountedRef.current) {
+        setWorkbookError(error instanceof Error && error.message
+          ? error.message
+          : "We couldn’t prepare the workbook. Please try again.");
+      }
+    } finally {
+      preparingWorkbookRef.current = false;
+      if (mountedRef.current) setPreparingWorkbook(false);
+    }
+  }
 
   function openWithTravel(stopId: string) {
     const stop = requiredStops.find(({ id }) => id === stopId);
@@ -228,7 +255,27 @@ export function WorldMap({
           <p className={styles.kicker}><span className={styles.worldNumber}>{String(world.number).padStart(2, "0")}</span> {world.concept} {world.spiral}</p>
           <h1 ref={mapHeadingRef} tabIndex={-1} id="world-title">{titleParts.join(" ")} <span>{lastTitlePart}</span></h1>
           <p>{world.description}</p>
-          <p>{requiredStops.length} stops · {questionCount} questions</p>
+          <div className={styles.worldTools}>
+            <p className={styles.worldQuestionCount}>{requiredStops.length} stops · {questionCount} questions</p>
+            <button
+              type="button"
+              className={styles.workbookButton}
+              disabled={busy || preparingWorkbook}
+              aria-busy={preparingWorkbook}
+              aria-label={preparingWorkbook ? `Preparing workbook for ${world.title}` : `Print workbook for ${world.title}`}
+              onClick={() => void prepareWorkbook()}
+            >
+              {preparingWorkbook ? <span className={styles.workbookSpinner} aria-hidden="true" /> : (
+                <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+                  <path d="M5 7V2.5h10V7M5 14H2.5V7h15v7H15M5 11.5h10v6H5Z" />
+                  <path d="M14.5 9h.5" strokeLinecap="round" />
+                </svg>
+              )}
+              {preparingWorkbook ? "Preparing workbook…" : "Print workbook"}
+            </button>
+          </div>
+          <p className={styles.srOnly} role="status">{preparingWorkbook ? `Preparing the workbook for ${world.title}…` : ""}</p>
+          {workbookError && <p className={styles.workbookError} role="alert">{workbookError}</p>}
         </div>
         <div className={styles.mapProgress}>
           <div className={styles.progressCopy}>

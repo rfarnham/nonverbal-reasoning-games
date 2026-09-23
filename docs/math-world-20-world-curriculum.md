@@ -8,6 +8,17 @@ The adventure visits ten strands, then returns to each for a deeper second pass:
 
 Each world has **four stops of six questions: 24 questions per world, 480 across the adventure**. All 480 are selected from existing source questions and have agent review records. The [reference manifest](../content/math-world/spiral-20.plan.json) records the exact versioned selection; the current snapshot is `spiral-20.v1.f665226c7060bba8`.
 
+Each world map has a **Print workbook** button. Its workbook follows the exact
+stop and question order, with one question per page, space for pencil work, and
+an answer line. Questions and choices favor verified original paper/image crops;
+where no matching original is available, the existing archived question card is
+used. The workbook does not rebuild answer buttons or transcribe questions with
+OCR. Reviewed translations or essential wording repairs accompany images where
+needed; generated provenance and answer-key footers are excluded. Tall cards retain a
+full-width instruction crop and use image columns split only at blank gaps.
+Printing waits for all artwork to load and does not change saved progress.
+The browser print dialog can also save the workbook as a PDF.
+
 | World | Learning focus | Return visit |
 | --- | --- | --- |
 | 1. Counting 1 | Count a given collection, reconstruct missing objects, and distinguish objects from gaps. | 11. Counting 2: count systematically, combine conditions, and avoid double counting. |
