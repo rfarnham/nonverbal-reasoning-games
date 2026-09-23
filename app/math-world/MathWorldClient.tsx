@@ -29,6 +29,7 @@ import {
   downloadQaArchive,
   readQaArchive,
   readWorldProgress,
+  readWorldPlaytestMode,
   rememberFirstQaSelection,
   writeQaRecord,
   writeWorldProgress,
@@ -37,7 +38,6 @@ import {
 import {
   QUESTIONS_BY_STOP,
   REQUIRED_STOPS,
-  WORLD_CONTENT_VERSION,
   type MathStop,
   type WorldQuestion,
 } from "./world-data.ts";
@@ -87,9 +87,10 @@ export default function MathWorldClient() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setProgress(readWorldProgress());
+      const playtestMode = readWorldPlaytestMode() || new URLSearchParams(window.location.search).get("qa") === "1";
+      setQaUnlocked(playtestMode);
+      setProgress(readWorldProgress(playtestMode));
       setSoundEnabled(readSoundPreference());
-      setQaUnlocked(new URLSearchParams(window.location.search).get("qa") === "1");
       setHydrated(true);
       window.scrollTo({ top: 0, behavior: "auto" });
     }, 0);
@@ -97,8 +98,31 @@ export default function MathWorldClient() {
   }, []);
 
   useEffect(() => {
-    if (hydrated) writeWorldProgress(progress);
-  }, [hydrated, progress]);
+    if (hydrated) writeWorldProgress(progress, qaUnlocked);
+  }, [hydrated, progress, qaUnlocked]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const syncProfile = () => {
+      const next = readWorldPlaytestMode() || new URLSearchParams(window.location.search).get("qa") === "1";
+      if (next !== qaUnlocked) {
+        setQaUnlocked(next);
+        setProgress(readWorldProgress(next));
+        setInspectedStopId(null);
+        setQaOpen(false);
+        setZoomed(false);
+      }
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === "spatial-gym:progression") syncProfile();
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("focus", syncProfile);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("focus", syncProfile);
+    };
+  }, [hydrated, qaUnlocked]);
 
   const activeStop = stopById(progress.activeStopId);
   const questions = activeStop
@@ -135,7 +159,10 @@ export default function MathWorldClient() {
   }, [attempt]);
 
   useEffect(() => {
-    if (inspectedStopId) closeInspectRef.current?.focus();
+    if (!inspectedStopId) return;
+    const origin = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeInspectRef.current?.focus();
+    return () => origin?.focus({ preventScroll: true });
   }, [inspectedStopId]);
 
   function ensureAudio(): AudioContext | null {
@@ -160,7 +187,7 @@ export default function MathWorldClient() {
   }
 
   useEffect(() => {
-    if (!activeStop || !question || !attempt || !["answering", "retry"].includes(attempt.phase)) {
+    if (zoomed || qaOpen || inspectedStopId || !activeStop || !question || !attempt || !["answering", "retry"].includes(attempt.phase)) {
       return;
     }
     const onKeyDown = (event: KeyboardEvent) => {
@@ -202,7 +229,7 @@ export default function MathWorldClient() {
 
   function openStop(stopId: string) {
     setInspectedStopId(null);
-    setProgress((current) => startStop(current, stopId));
+    setProgress((current) => startStop(current, stopId, qaUnlocked));
     resetViewport();
   }
 
@@ -278,6 +305,7 @@ export default function MathWorldClient() {
           <strong>Math Kangaroo Worlds</strong>
         </div>
         <div className={styles.topActions}>
+          {qaUnlocked && <span className={styles.headerTestBadge}>Test mode</span>}
           {(activeStop || checkpointStop) && (
             <button type="button" className={styles.mapButton} onClick={goToMap}>
               Map
@@ -287,6 +315,7 @@ export default function MathWorldClient() {
             type="button"
             className={styles.soundButton}
             aria-pressed={soundEnabled}
+            aria-label={`Sound ${soundEnabled ? "on" : "off"}`}
             onClick={toggleSound}
           >
             <span aria-hidden="true">{soundEnabled ? "♪" : "×"}</span>
@@ -518,8 +547,8 @@ export default function MathWorldClient() {
       )}
 
       <footer className={styles.worldFooter}>
-        <span>Static curriculum · No account · Saved on this device</span>
-        <span>{WORLD_CONTENT_VERSION}</span>
+        <span>Untimed adventures · Saved on this device</span>
+        <span>{qaUnlocked ? "Test mode · progress saved separately" : "Made for curious minds"}</span>
       </footer>
     </div>
   );

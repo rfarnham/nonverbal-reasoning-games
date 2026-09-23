@@ -1205,7 +1205,7 @@
     {
       "id": "canada-2015-grades-1-2-q18",
       "stopId": "puzzle-cliffs",
-      "prompt": "The following six shapes were drawn on the six walls of a cube: . Below is what you see if looking at this cube from two positions. Which shape is opposite to the Canadian Math Kangaroo logo ?",
+      "prompt": "The following six shapes were drawn on the six walls of a cube. Below is what you see if looking at this cube from two positions. Which shape is opposite to the Canadian Math Kangaroo logo?",
       "choices": [
         {
           "label": "A",
@@ -1318,7 +1318,7 @@
     {
       "id": "think300-l1-2-4-points-q006",
       "stopId": "puzzle-cliffs",
-      "prompt": "This card is lying on the table. It is flipped over its top edge then flipped over its left edge, as shown in the picture. ? What does the card look like after the two flips?",
+      "prompt": "This card is lying on the table. It is flipped over its top edge then flipped over its left edge, as shown in the picture. What does the card look like after the two flips?",
       "choices": [
         {
           "label": "A",
@@ -1831,7 +1831,7 @@
     {
       "id": "think300-l1-2-5-points-q009",
       "stopId": "lighthouse-crossroads",
-      "prompt": "A blue shirt, a grey skirt and a pair of black pants costs 95 dollars. Tina Woborudgh Pt trwoob bllueem shsirt s( Oanpd ea grraeyt isokirnt.) She spent 71 dollars. George bought a blue shirt for himself, and bought 3 pairs of black pants for his brothers. He spent 85 more dollars than Tina. How much is the price of one pair of black pants?",
+      "prompt": "A blue shirt, a grey skirt and a pair of black pants costs 95 dollars. Tina bought two blue shirts and a grey skirt. She spent 71 dollars. George bought a blue shirt for himself, and bought 3 pairs of black pants for his brothers. He spent 85 more dollars than Tina. How much is the price of one pair of black pants?",
       "choices": [
         {
           "label": "21 dollars",
@@ -2000,7 +2000,7 @@
     {
       "id": "think300-l1-2-4-points-q007",
       "stopId": "lighthouse-crossroads",
-      "prompt": "This card is lying on the table. It is flipped over its right edge then flipped over its top edge, as shown in the picture. ? What does the card look like after the two flips?",
+      "prompt": "This card is lying on the table. It is flipped over its right edge then flipped over its top edge, as shown in the picture. What does the card look like after the two flips?",
       "choices": [
         {
           "label": "A",

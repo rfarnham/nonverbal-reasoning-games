@@ -1,5 +1,10 @@
 # Math Kangaroo Worlds: product and technical plan
 
+> September 2026 update: the [first-world visual playtest](math-world-first-world-playtest.md)
+> replaces the original map art. A [concept-by-concept spiral](math-world-spiral-curriculum-proposal.md)
+> is proposed for review; the older mixed-realm world sequence below remains
+> historical context, not an approved sequence for generating more worlds.
+
 **Status:** fresh product direction and playable first world, 9 August 2026
 
 **Playable route:** `/math-world/`

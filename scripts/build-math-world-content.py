@@ -9,6 +9,7 @@ catalogue payloads never enter the application bundle.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
 import sqlite3
@@ -60,6 +61,41 @@ DOMAIN_SELECTION_COUNTS = {
     "number_arithmetic": 18,
     "geometry_spatial": 10,
     "measurement_time": 10,
+}
+
+# Transcribed from the exact bundled source cards on 2026-09-22. These are
+# display-only OCR repairs: IDs, choices, keys, placement, and content versions
+# stay unchanged. Bind to the image so a later source replacement needs review.
+PROMPT_CORRECTIONS = {
+    "think300-l1-2-5-points-q009": (
+        ("d7f33710a2f23e7855a2b58bdf64b79721624192e141b64d8602997ecbf9e4ed",),
+        "A blue shirt, a grey skirt and a pair of black pants costs 95 dollars. "
+        "Tina bought two blue shirts and a grey skirt. She spent 71 dollars. "
+        "George bought a blue shirt for himself, and bought 3 pairs of black "
+        "pants for his brothers. He spent 85 more dollars than Tina. How much "
+        "is the price of one pair of black pants?",
+    ),
+    "canada-2015-grades-1-2-q18": (
+        (
+            "1feb06aca53042069191d35617aec25f024c27595cfd10f8b887363bb26ee5cf",
+            "4389c34e670e85b87e1ffda346fb7e8296b799ff3e06c34fbb5f5372da758669",
+        ),
+        "The following six shapes were drawn on the six walls of a cube. "
+        "Below is what you see if looking at this cube from two positions. "
+        "Which shape is opposite to the Canadian Math Kangaroo logo?",
+    ),
+    "think300-l1-2-4-points-q006": (
+        ("eda86f9f6ba32e459d1f30bc13fbb454e90cc132ab96b42c030f1584d0739678",),
+        "This card is lying on the table. It is flipped over its top edge then "
+        "flipped over its left edge, as shown in the picture. What does the "
+        "card look like after the two flips?",
+    ),
+    "think300-l1-2-4-points-q007": (
+        ("595a4c131d96d223ed20ab0842c6a26618fe48bfe42152b04ecd60b29d8f5144",),
+        "This card is lying on the table. It is flipped over its right edge "
+        "then flipped over its top edge, as shown in the picture. What does "
+        "the card look like after the two flips?",
+    ),
 }
 
 
@@ -224,13 +260,20 @@ def runtime_question(
         )
 
     confidence = candidate.proposal_payload.get("confidence")
+    prompt = str(
+        candidate.learner_payload.get("stem_markdown")
+        or candidate.source_payload["stem_markdown"]
+    ).strip()
+    correction = PROMPT_CORRECTIONS.get(candidate.item_id)
+    if correction is not None:
+        expected_asset_hashes, corrected_prompt = correction
+        if hashlib.sha256(source_asset.read_bytes()).hexdigest() not in expected_asset_hashes:
+            raise ValueError(f"Prompt correction needs source review: {candidate.item_id}")
+        prompt = corrected_prompt
     return {
         "id": candidate.item_id,
         "stopId": stop_id,
-        "prompt": str(
-            candidate.learner_payload.get("stem_markdown")
-            or candidate.source_payload["stem_markdown"]
-        ).strip(),
+        "prompt": prompt,
         "choices": choices,
         "correctIndex": "ABCDE".index(candidate.answer),
         "presentation": (
