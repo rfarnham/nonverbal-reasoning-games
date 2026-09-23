@@ -20,7 +20,6 @@ import {
   answerQuestion,
   createInitialProgress,
   leaveCheckpoint,
-  nextRequiredStopId,
   startStop,
   stopFirstTryAccuracy,
   type WorldProgress,
@@ -75,6 +74,7 @@ export default function MathWorldClient() {
   const [qaUnlocked, setQaUnlocked] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [inspectedStopId, setInspectedStopId] = useState<string | null>(null);
+  const [lastVisitedStopId, setLastVisitedStopId] = useState<string | null>(null);
   const [zoomed, setZoomed] = useState(false);
   const [qaOpen, setQaOpen] = useState(false);
   const [qaStatus, setQaStatus] = useState<"looks-good" | "needs-change">("looks-good");
@@ -109,6 +109,7 @@ export default function MathWorldClient() {
         setQaUnlocked(next);
         setProgress(readWorldProgress(next));
         setInspectedStopId(null);
+        setLastVisitedStopId(null);
         setQaOpen(false);
         setZoomed(false);
       }
@@ -229,11 +230,13 @@ export default function MathWorldClient() {
 
   function openStop(stopId: string) {
     setInspectedStopId(null);
+    setLastVisitedStopId(stopId);
     setProgress((current) => startStop(current, stopId, qaUnlocked));
     resetViewport();
   }
 
   function goToMap() {
+    if (activeStop) setLastVisitedStopId(activeStop.id);
     setProgress((current) => ({ ...leaveCheckpoint(current), activeStopId: null }));
     resetViewport();
   }
@@ -285,7 +288,6 @@ export default function MathWorldClient() {
     );
   }
 
-  const checkpointStop = stopById(progress.checkpointStopId);
   const inspectedStop = stopById(inspectedStopId);
   const inspectedQuestions = inspectedStop
     ? (QUESTIONS_BY_STOP.get(inspectedStop.id) ?? [])
@@ -306,7 +308,7 @@ export default function MathWorldClient() {
         </div>
         <div className={styles.topActions}>
           {qaUnlocked && <span className={styles.headerTestBadge}>Test mode</span>}
-          {(activeStop || checkpointStop) && (
+          {activeStop && (
             <button type="button" className={styles.mapButton} onClick={goToMap}>
               Map
             </button>
@@ -443,39 +445,10 @@ export default function MathWorldClient() {
 
           <p className={styles.keyboardHint}>Keyboard: press A–E or 1–5 to answer.</p>
         </main>
-      ) : checkpointStop ? (
-        <main className={styles.checkpointShell}>
-          <div className={styles.celebrationRays} aria-hidden="true" />
-          <div className={styles.checkpointIcon} aria-hidden="true">✓</div>
-          <p className={styles.kicker}>Trail restored</p>
-          <h1>{checkpointStop.label} complete</h1>
-          <p>{checkpointStop.description}</p>
-          <div className={styles.resultCards}>
-            <div><strong>{QUESTIONS_BY_STOP.get(checkpointStop.id)?.length ?? 0}</strong><span>questions solved</span></div>
-            <div><strong>{stopFirstTryAccuracy(progress.stopAttempts[checkpointStop.id], QUESTIONS_BY_STOP.get(checkpointStop.id) ?? [])}%</strong><span>first-try accuracy</span></div>
-          </div>
-          <div className={styles.checkpointActions}>
-            {nextRequiredStopId(progress) ? (
-              <button
-                type="button"
-                className={styles.primaryButton}
-                onClick={() => {
-                  const next = nextRequiredStopId(progress);
-                  if (next) openStop(next);
-                }}
-              >
-                Continue adventure <span aria-hidden="true">→</span>
-              </button>
-            ) : (
-              <button type="button" className={styles.primaryButton} onClick={goToMap}>
-                See the restored coast <span aria-hidden="true">→</span>
-              </button>
-            )}
-            <button type="button" className={styles.secondaryButton} onClick={goToMap}>Back to map</button>
-          </div>
-        </main>
       ) : (
         <WorldMap
+          key={qaUnlocked ? "playtest" : "adventure"}
+          avatarStopId={lastVisitedStopId}
           progress={progress}
           qaUnlocked={qaUnlocked}
           onOpenStop={openStop}

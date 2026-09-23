@@ -18,10 +18,14 @@ Open `/math-world/` while the selected local profile is named exactly
 `testUser123`. A visible Test mode label confirms access. `/math-world/?qa=1`
 is also available as a direct preview link.
 
-- Every required trail and optional detour opens immediately.
+- Every required trail and optional detour is available. Selecting one sends the
+  hedgehog along the map, gives it a landing bounce, and opens the stop through
+  a circular transition. Reduced motion opens it directly.
 - Selecting a trail starts a fresh attempt, including completed trails.
 - Map returns from an unfinished attempt; selecting another trail replaces it.
-- Reload resumes the current test attempt.
+- Finish stop returns directly to the map with the completion summary. The
+  hedgehog waits at the finished stop until the child selects the next one.
+- Reload resumes the current test attempt, or the map after a completed stop.
 - Test progress is stored separately from ordinary world progress. No Journey
   progress, clear ledger, or XP is written.
 - Switching or renaming the selected profile away from `testUser123` restores
@@ -49,5 +53,7 @@ Browser checks covered all nine required stops; a wrong answer and retry; full
 finale completion; replay; normal locks; exact-profile auto-unlock; separate
 saves; and live profile renaming from another tab. Desktop and 820, 620, and
 390-pixel layouts have no horizontal overflow; map controls remain at least
-44 pixels. Decorative art is hidden from assistive technology, and the map has
+44 pixels. All five answer buttons have equal width and height at each breakpoint,
+including wrapped choices. Travel locks competing selections and cancels safely
+on scrolling, resizing, Escape, or leaving the map. Decorative art is hidden from assistive technology, and the map has
 an ordered native-control equivalent. Reduced motion removes transitions.

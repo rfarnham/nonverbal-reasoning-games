@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
+import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/progression/avatar";
 import {
   QUESTIONS_BY_STOP,
@@ -14,14 +15,17 @@ import {
 import {
   canOpenRequiredStop,
   nextRequiredStopId,
+  stopFirstTryAccuracy,
   type WorldProgress,
 } from "./engine.ts";
 import styles from "./math-world.module.css";
 import CoastScene from "./CoastScene";
+import { useMapTravel } from "./useMapTravel";
 
 type MapProps = Readonly<{
   progress: WorldProgress;
   qaUnlocked: boolean;
+  avatarStopId: string | null;
   onOpenStop: (stopId: string) => void;
   onInspectStop: (stopId: string) => void;
   onExportQa: () => void;
@@ -49,8 +53,10 @@ function RequiredStopButton({
   qaUnlocked,
   onOpenStop,
   onInspectStop,
+  busy,
 }: Readonly<{
   stop: MathStop;
+  busy: boolean;
   progress: WorldProgress;
   qaUnlocked: boolean;
   onOpenStop: (stopId: string) => void;
@@ -62,11 +68,11 @@ function RequiredStopButton({
   const state = complete ? "complete" : current ? "current" : available ? "available" : "locked";
   const label = `${stop.label}. ${complete ? "Completed" : current ? "Next stop" : available ? "Available in test mode" : "Locked"}. ${stop.description}`;
   return (
-    <li className={styles.mapStop} style={stopStyle(stop)} data-state={state}>
+    <li className={styles.mapStop} style={stopStyle(stop)} data-state={state} data-stop-id={stop.id}>
       <button
         type="button"
         className={styles.stopButton}
-        disabled={!available}
+        disabled={!available || busy}
         aria-label={label}
         aria-current={current ? "step" : undefined}
         onClick={() => (complete && !qaUnlocked ? onInspectStop(stop.id) : onOpenStop(stop.id))}
@@ -85,7 +91,11 @@ function BreakStopLink({
   stop,
   progress,
   qaUnlocked,
+  busy,
+  onTravel,
 }: Readonly<{
+  busy: boolean;
+  onTravel: (stop: BreakStop) => void;
   stop: BreakStop;
   progress: WorldProgress;
   qaUnlocked: boolean;
@@ -104,11 +114,18 @@ function BreakStopLink({
       className={`${styles.mapStop} ${styles.breakStop}`}
       style={stopStyle(stop)}
       data-state={available ? "bonus" : "locked"}
+      data-stop-id={stop.id}
     >
       {available ? (
         <Link
           className={styles.breakLink}
           href={stop.href}
+          aria-disabled={busy || undefined}
+          onClick={(event) => {
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            event.preventDefault();
+            if (!busy) onTravel(stop);
+          }}
           aria-label={`${stop.label}. Optional break. ${stop.description}`}
         >
           {content}
@@ -128,19 +145,38 @@ export function WorldMap({
   onOpenStop,
   onInspectStop,
   onExportQa,
+  avatarStopId,
 }: MapProps) {
   const nextStopId = nextRequiredStopId(progress);
   const nextStop = REQUIRED_STOPS.find(({ id }) => id === nextStopId) ?? REQUIRED_STOPS.at(-1)!;
   const completedCount = progress.completedStopIds.length;
   const complete = completedCount === REQUIRED_STOPS.length;
   const restoration = Math.round((completedCount / REQUIRED_STOPS.length) * 100);
+  const completedStop = REQUIRED_STOPS.find(({ id }) => id === progress.checkpointStopId);
+  const restingStopId = avatarStopId ?? progress.checkpointStopId ?? progress.completedStopIds.at(-1);
+  const restingStop = REQUIRED_STOPS.find(({ id }) => id === restingStopId) ?? REQUIRED_STOPS[0];
+  const { avatarRef, spriteRef, irisRef, mapRef, travel, travelTo } = useMapTravel(restingStop);
+  const router = useRouter();
+  const mapHeadingRef = useRef<HTMLHeadingElement>(null);
+  const completedHeadingRef = useRef<HTMLHeadingElement>(null);
+  const busy = travel !== null;
+
+  useEffect(() => {
+    (completedHeadingRef.current ?? mapHeadingRef.current)?.focus({ preventScroll: true });
+  }, []);
+
+  function openWithTravel(stopId: string) {
+    const stop = REQUIRED_STOPS.find(({ id }) => id === stopId);
+    if (!stop || !canOpenRequiredStop(progress, stopId, qaUnlocked)) return;
+    void travelTo(stop, () => onOpenStop(stopId));
+  }
 
   return (
-    <main className={styles.worldShell}>
+    <main className={styles.worldShell} data-launch-phase={travel?.phase ?? "idle"}>
       <section className={styles.mapIntro} aria-labelledby="world-title">
         <div>
           <p className={styles.kicker}><span className={styles.worldNumber}>01</span> Your island adventure</p>
-          <h1 id="world-title">Counting <span>Coast</span></h1>
+          <h1 ref={mapHeadingRef} tabIndex={-1} id="world-title">Counting <span>Coast</span></h1>
           <p>A little curiosity. A whole island to discover.</p>
         </div>
         <div className={styles.mapProgress}>
@@ -159,8 +195,18 @@ export function WorldMap({
 
       {qaUnlocked && <div className={styles.testNotice} role="status"><strong>Test mode · all paths open</strong><span>Hop to any stop. Replay freely. Your adventure progress stays separate.</span></div>}
 
+      {completedStop && <section className={styles.mapCompletion} aria-labelledby="completed-trail-title">
+        <span className={styles.completionCheck} aria-hidden="true">✓</span>
+        <div>
+          <h2 ref={completedHeadingRef} tabIndex={-1} id="completed-trail-title">{completedStop.label} complete!</h2>
+          <p>{QUESTIONS_BY_STOP.get(completedStop.id)?.length ?? 0} questions solved · {stopFirstTryAccuracy(progress.stopAttempts[completedStop.id], QUESTIONS_BY_STOP.get(completedStop.id) ?? [])}% first-try accuracy</p>
+          <p>{complete ? "You explored every trail. Beautiful work!" : "Choose your next stop on the map."}</p>
+        </div>
+      </section>}
+
+      <p className={styles.srOnly} role="status">{travel ? `Hopping to ${travel.stop.label}…` : ""}</p>
       <section className={styles.mapFrame} aria-label="Counting Coast world map">
-        <div className={styles.mapCanvas} data-restoration={Math.floor(restoration / 25)}>
+        <div ref={mapRef} className={styles.mapCanvas} aria-busy={busy} data-restoration={Math.floor(restoration / 25)}>
           <CoastScene className={styles.mapArt} completedCount={completedCount} />
           <CoastScene className={styles.mobileMapArt} mobile completedCount={completedCount} />
           <div className={styles.mapCompass} aria-hidden="true"><span>✦</span> COUNTING COAST</div>
@@ -174,7 +220,8 @@ export function WorldMap({
                   stop={stop}
                   progress={progress}
                   qaUnlocked={qaUnlocked}
-                  onOpenStop={onOpenStop}
+                  busy={busy}
+                  onOpenStop={openWithTravel}
                   onInspectStop={onInspectStop}
                 />
               ) : (
@@ -183,13 +230,15 @@ export function WorldMap({
                   stop={stop}
                   progress={progress}
                   qaUnlocked={qaUnlocked}
+                  busy={busy}
+                  onTravel={(destination) => void travelTo(destination, () => router.push(destination.href))}
                 />
               ),
             )}
           </ol>
 
-          <span className={styles.mapAvatar} style={stopStyle(nextStop)} aria-hidden="true">
-            <Avatar avatar="hedgehog" size={62} state={complete ? "celebrating" : "walking"} decorative eager />
+          <span ref={avatarRef} className={styles.mapAvatar} style={stopStyle(restingStop)} aria-hidden="true">
+            <span ref={spriteRef} className={styles.avatarSprite}><Avatar avatar="hedgehog" size={62} state="idle" decorative eager /></span>
           </span>
         </div>
       </section>
@@ -201,7 +250,7 @@ export function WorldMap({
           <small>{QUESTIONS_BY_STOP.get(nextStop.id)?.length ?? 0} questions · Untimed</small>
         </div>
         <button type="button" className={styles.primaryButton}
-          onClick={() => nextStopId && onOpenStop(nextStopId)} disabled={!nextStopId}>
+          onClick={() => nextStopId && openWithTravel(nextStopId)} disabled={!nextStopId || busy}>
           {complete ? "Coast complete" : completedCount ? "Continue adventure" : "Let’s explore"}
           {!complete && <span aria-hidden="true">→</span>}
         </button>
@@ -214,17 +263,18 @@ export function WorldMap({
             {REQUIRED_STOPS.map((stop, index) => {
               const completed = progress.completedStopIds.includes(stop.id);
               const available = canOpenRequiredStop(progress, stop.id, qaUnlocked);
-              return <li key={stop.id}><button type="button" disabled={!available}
+              return <li key={stop.id}><button type="button" disabled={!available || busy}
                 aria-current={nextStopId === stop.id ? "step" : undefined}
-                onClick={() => completed && !qaUnlocked ? onInspectStop(stop.id) : onOpenStop(stop.id)}>
+                onClick={() => completed && !qaUnlocked ? onInspectStop(stop.id) : openWithTravel(stop.id)}>
                 <span>{completed ? "✓" : String(index + 1).padStart(2, "0")}</span>
                 <strong>{stop.label}</strong><small>{completed ? qaUnlocked ? "Replay" : "Completed" : available ? "Explore →" : "Locked"}</small>
               </button></li>;
             })}
           </ol>
         </details>
-        <button type="button" className={styles.notesLink} onClick={onExportQa}>↓ Export playtest notes</button>
+        <button type="button" disabled={busy} className={styles.notesLink} onClick={onExportQa}>↓ Export playtest notes</button>
       </section>
+      <div ref={irisRef} className={styles.mapIris} aria-hidden="true" />
     </main>
   );
 }

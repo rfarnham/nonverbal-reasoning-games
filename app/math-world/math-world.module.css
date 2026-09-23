@@ -293,15 +293,17 @@
   max-width: 980px;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
   gap: 12px;
   margin: 30px auto 0;
 }
 
 .answerButton {
   position: relative;
+  min-width: 0;
   min-height: 92px;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   padding: 15px 13px;
@@ -714,7 +716,6 @@
   .mapIntro h1 { font-size: 3.2rem; }
   .courseTopline { grid-template-columns: 1fr; gap: 26px; }
   .answerGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .answerButton:last-child { grid-column: 1 / -1; }
   .nextTrail > small { display: none; }
   .mapStop, .stopButton { width: 48px; min-width: 48px; height: 48px; }
   .stopLabel { font-size: .6rem; padding: 4px 6px; margin-top: 7px; }
@@ -779,3 +780,14 @@
   outline: 3px solid var(--world-blue);
   outline-offset: 4px;
 }
+
+/* Stop arrival is a brief, input-triggered transition, never ambient motion. */
+.avatarSprite { display: block; transform-origin: 50% 90%; }
+.mapIris { position: fixed; inset: 0; z-index: 100; opacity: 0; pointer-events: none; background: var(--world-paper, #fbf8f0); clip-path: circle(0); }
+.mapCompletion { display: flex; align-items: center; gap: 16px; margin: 0 0 20px; padding: 18px 22px; border: 1px solid #aed7bf; border-radius: 20px; background: #f0faed; }
+.completionCheck { display: grid; place-items: center; flex: 0 0 44px; height: 44px; border-radius: 50%; color: white; background: #16836b; font-size: 1.5rem; font-weight: 900; }
+.mapCompletion h2 { margin: 0 0 5px; color: #175241; font-size: 1.15rem; letter-spacing: -.025em; }
+.mapCompletion p { margin: 3px 0 0; color: #365c4a; font-size: .86rem; line-height: 1.45; }
+.mapIntro h1:focus, .mapCompletion h2:focus { outline: none; }
+.worldShell[data-launch-phase="travel"] .mapAvatar, .worldShell[data-launch-phase="bounce"] .mapAvatar { will-change: top, left; }
+.worldShell[data-launch-phase="iris"] .mapIris { will-change: clip-path; }

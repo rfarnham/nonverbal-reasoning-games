@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { desktopBonusRoad, desktopRoad, mobileBonusRoad, mobileRoad } from "./map-travel";
 
 type CoastSceneProps = {
   mobile?: boolean;
@@ -7,28 +8,6 @@ type CoastSceneProps = {
 };
 
 type Point = readonly [number, number];
-
-const desktopRoad = [
-  "M120 540.2 C169 529 204 418 276 414.4",
-  "M276 414.4 C339 406 318 550 420 562.4",
-  "M420 562.4 C494 571 477 415 540 377.4",
-  "M540 377.4 C615 345 635 477 708 481",
-  "M708 481 C790 491 766 346 816 325.6",
-  "M816 325.6 C885 295 883 426 960 399.6",
-  "M960 399.6 C1025 377 923 228 936 177.6",
-  "M936 177.6 C950 132 1030 152 1080 155.4",
-];
-
-const mobileRoad = [
-  "M108 854.4 C148 817 237 809 280 768",
-  "M280 768 C328 709 155 725 116 672",
-  "M116 672 C72 614 254 624 272 576",
-  "M272 576 C302 521 128 526 108 480",
-  "M108 480 C78 432 248 429 276 384",
-  "M276 384 C308 329 141 338 112 288",
-  "M112 288 C79 235 246 246 272 192",
-  "M272 192 C292 151 220 136 176 96",
-];
 
 function Tree({ x, y, scale = 1, warm = false }: { x: number; y: number; scale?: number; warm?: boolean }) {
   return <g transform={`translate(${x} ${y}) scale(${scale})`}>
@@ -180,7 +159,7 @@ function DesktopScene({ grass, reef, completedCount }: { grass: string; reef: st
     <g fill="#60b95a" opacity=".32">
       <ellipse cx="155" cy="462" rx="60" ry="27" /><ellipse cx="279" cy="577" rx="40" ry="19" /><ellipse cx="589" cy="326" rx="53" ry="23" /><ellipse cx="862" cy="421" rx="47" ry="26" /><ellipse cx="1033" cy="213" rx="31" ry="13" />
     </g>
-    <g fill="none" strokeLinecap="round"><path d="M276 414.4C248 373 246 273 264 199.8M540 377.4C554 297 574 230 612 170.2" stroke="#ceaa60" strokeWidth="14" /><path d="M276 414.4C248 373 246 273 264 199.8M540 377.4C554 297 574 230 612 170.2" stroke="#ffe3a3" strokeWidth="9" strokeDasharray="1 14" /></g>
+    <g fill="none" strokeLinecap="round"><path d={desktopBonusRoad.map(({ path }) => path).join("")} stroke="#ceaa60" strokeWidth="14" /><path d={desktopBonusRoad.map(({ path }) => path).join("")} stroke="#ffe3a3" strokeWidth="9" strokeDasharray="1 14" /></g>
     <Road segments={desktopRoad} completedCount={completedCount} mobile={false} />
 
     <Hill x={190} y={478} scale={.88} color="#30b967" /><Hill x={136} y={479} scale={.66} color="#56c964" />
@@ -221,7 +200,7 @@ function MobileScene({ grass, reef, completedCount }: { grass: string; reef: str
     <Island d="M70 373C96 346 136 366 166 372C203 347 261 347 298 360C333 371 342 400 320 422C330 441 320 451 311 458C346 471 338 504 307 509C272 519 257 487 224 481C189 479 172 496 145 509C111 527 68 513 62 488C36 469 40 442 67 427C47 410 44 392 70 373Z" grass={grass} sand="#ffe2a0" cliff="#c79651" scale={.65} />
     <Island d="M153 53C185 34 223 49 227 82C239 118 270 125 297 151C330 168 342 205 315 229C294 252 248 236 221 254C186 268 166 297 133 313C102 331 63 316 59 292C35 275 41 247 67 232C46 214 51 188 71 177C93 151 139 170 156 146C175 126 122 88 153 53Z" grass={grass} sand="#ffe2a0" cliff="#c79651" scale={.65} />
     <Road segments={mobileRoad} completedCount={completedCount} mobile />
-    <g fill="none" strokeLinecap="round"><path d="M116 672C71 695 82 736 92 768M108 480C176 458 252 482 292 480" stroke="#c9a35c" strokeWidth="12" /><path d="M116 672C71 695 82 736 92 768M108 480C176 458 252 482 292 480" stroke="#ffe5a8" strokeWidth="7" strokeDasharray="1 12" /></g>
+    <g fill="none" strokeLinecap="round"><path d={mobileBonusRoad.map(({ path }) => path).join("")} stroke="#c9a35c" strokeWidth="12" /><path d={mobileBonusRoad.map(({ path }) => path).join("")} stroke="#ffe5a8" strokeWidth="7" strokeDasharray="1 12" /></g>
     <Hill x={196} y={796} scale={.44} color="#32ba68" /><Hill x={167} y={800} scale={.34} color="#65c95d" />
     <Tree x={261} y={832} scale={.42} /><Flowers x={68} y={846} scale={.45} color="#fff3d7" />
     <Flowers x={158} y={886} scale={.45} color="#ff9385" />
