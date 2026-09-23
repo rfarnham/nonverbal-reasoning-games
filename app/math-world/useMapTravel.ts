@@ -75,6 +75,9 @@ export function useMapTravel(origin: WorldStop) {
       await animation.finished;
     }
 
+    // Cancellation must work while the initial layout frames are still pending.
+    window.addEventListener("keydown", onKey);
+    motion.addEventListener("change", finish);
     setTravel({ stop, phase: "travel" });
     // Directory and bottom-of-map launchers should reveal the chosen stop first.
     map.querySelector<HTMLElement>(`[data-stop-id="${stop.id}"]`)?.scrollIntoView({ block: "nearest", behavior: "instant" });
@@ -82,8 +85,6 @@ export function useMapTravel(origin: WorldStop) {
     if (tripRef.current !== trip) return;
     window.addEventListener("resize", cancel);
     window.addEventListener("scroll", cancel, true);
-    window.addEventListener("keydown", onKey);
-    motion.addEventListener("change", finish);
     watchdog = window.setTimeout(finish, 3200);
 
     try {
