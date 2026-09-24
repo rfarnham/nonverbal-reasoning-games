@@ -53,6 +53,8 @@ export function canOpenWorld(progress: WorldProgress, worldId: string, qaUnlocke
   const index = WORLD_DEFINITIONS.findIndex(world => world.id === worldId);
   if (index < 0) return false;
   if (qaUnlocked) return true;
+  // An inserted curriculum world never removes access to previously earned work.
+  if (WORLD_DEFINITIONS[index].stopIds.some(id => progress.completedStopIds.includes(id) || Object.hasOwn(progress.stopAttempts, id))) return true;
   const next = worldForStop(nextRequiredStopId(progress));
   return !next || index <= WORLD_DEFINITIONS.findIndex(world => world.id === next.id);
 }
@@ -71,6 +73,7 @@ export function canOpenRequiredStop(
     QUESTIONS_BY_STOP.has(stopId) &&
     (qaUnlocked ||
       progress.completedStopIds.includes(stopId) ||
+      Object.hasOwn(progress.stopAttempts, stopId) ||
       nextRequiredStopId(progress) === stopId)
   );
 }

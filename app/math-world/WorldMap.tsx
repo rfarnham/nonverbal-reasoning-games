@@ -173,7 +173,7 @@ export function WorldMap({
   onChooseWorld,
   onChooseBoss,
 }: MapProps) {
-  const mapLayout = WORLD_MODE === "spiral-preview" ? getWorldMapLayout(world.number) : null;
+  const mapLayout = WORLD_MODE === "spiral-preview" ? getWorldMapLayout(world.number, world.stopIds.length) : null;
   const requiredStops = stopsForWorld(world.id);
   const breakStops = breaksForWorld(world.id);
   const questionCount = requiredStops.reduce((count, stop) => count + (QUESTIONS_BY_STOP.get(stop.id)?.length ?? 0), 0);

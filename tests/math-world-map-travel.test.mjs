@@ -11,10 +11,11 @@ const worldPaths = WORLD_DEFINITIONS.map(world => ({
 }));
 const branchKinds = ["turbo", "minigame"];
 
-test("spiral worlds contain only their four required stops and no optional routes", { skip: WORLD_MODE !== "spiral-preview" }, () => {
-  assert.equal(BREAK_STOPS.length, 0, "spiral worlds must not add optional stops beyond the four required stops");
+test("spiral worlds contain only their authored required stops and no optional routes", { skip: WORLD_MODE !== "spiral-preview" }, () => {
+  assert.equal(BREAK_STOPS.length, 0, "spiral worlds must not add optional quiz stops");
   for (const world of worldPaths) {
-    assert.equal(world.stops.length, 4, `${world.id} has exactly four required stops`);
+    assert.deepEqual(world.stops.map(stop => stop.id), WORLD_DEFINITIONS.find(candidate => candidate.id === world.id).stopIds);
+    assert.ok(world.stops.length >= 2 && world.stops.length <= 4, `${world.id} has two to four required stops`);
     for (const mobile of [false, true]) {
       for (const kind of branchKinds) {
         assert.deepEqual(getMapTravelPoints(world.stops[0].id, `${world.id}-${kind}`, mobile), []);

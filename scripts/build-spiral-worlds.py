@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble reviewed, source-bound selections into an opt-in LOCAL 20-world preview.
+"""Expand the approved bank into two passes through sixteen reviewed concepts.
 
 New question selections remain under ignored work/ until separately approved.
 Published builds use the committed approved runtime. This authoring plan contains references,
@@ -16,7 +16,7 @@ import shutil
 import sqlite3
 
 ROOT = Path(__file__).resolve().parents[1]
-WORK = ROOT / 'work/math-world-curriculum-20'
+WORK = ROOT / 'work/math-world-curriculum-32'
 RUN_ID = 'catalogue-8b9cfc0f0f01b9ef7138902e'
 STRANDS = [
     ('counting', 'Counting', 'Counting Coast', 'Count carefully and organize what you see.', 'number_arithmetic'),
@@ -25,9 +25,15 @@ STRANDS = [
     ('patterns', 'Patterns & Cycles', 'Pattern Grove', 'Find repeating units, growing rules, and recurring steps.', 'number_arithmetic'),
     ('shapes', 'Shape Building', 'Shape Shoals', 'Match, compose, and rebuild flat shapes.', 'geometry_spatial'),
     ('logic', 'Logic', 'Logic Lagoon', 'Use every clue to rule out what cannot work.', 'logic_constraints'),
+    ('groups-sharing', 'Groups & Sharing', 'Sharing Gardens', 'Build equal groups and share fairly.', 'number_arithmetic'),
     ('digits', 'Digits & Codes', 'Digit Dunes', 'Explore place value and number properties.', 'number_arithmetic'),
     ('routes', 'Routes & Grids', 'Trail Treetops', 'Trace paths, follow directions, and organize routes.', 'geometry_spatial'),
+    ('fractions', 'Fractions', 'Fraction Falls', 'Connect equal parts with the whole.', 'number_arithmetic'),
     ('solids', 'Solids & Views', 'Cube Cliffs', 'Connect flat views, hidden cubes, and solid shapes.', 'geometry_spatial'),
+    ('measurement', 'Length & Measure', 'Measuring Mills', 'Compare quantities and reason with measured units.', 'measurement_time'),
+    ('money', 'Money & Value', 'Market Harbor', 'Combine prices, make change, and compare value.', 'measurement_time'),
+    ('time', 'Time', 'Clockwork Gardens', 'Read clocks, follow calendars, and connect intervals.', 'measurement_time'),
+    ('area', 'Area & Boundary', 'Patchwork Terraces', 'Compare covered space and trace the boundary.', 'geometry_spatial'),
     ('missing-values', 'Missing Values', 'Balance Bay', 'Find unknown quantities while keeping relationships true.', 'number_arithmetic'),
 ]
 ANCHORS = [(10,73,27,89),(23,56,70,80),(35,76,29,70),(45,51,68,60),(59,65,27,50),(68,44,69,40),(80,54,28,30),(78,24,68,20),(90,21,44,10)]
@@ -52,7 +58,7 @@ def assert_not_boss_holdout(item_id: str, source: dict) -> None:
         annual_source = (usa_contest and str(source.get('year')) == str(challenge['year'])
                          and source.get('gradeBand', source.get('grade_band')) == challenge['gradeBand'])
         if exact or annual_source:
-            raise ValueError(f"Math Worlds boss holdout: {item_id} is reserved for the {challenge['year']} Grades {challenge['gradeBand']} challenge after world {challenge['afterWorldNumber']}. Remove it from the 20 teaching worlds; keep the complete test separate (content/math-world/boss-holdouts.json).")
+            raise ValueError(f"Math Worlds boss holdout: {item_id} is reserved for the {challenge['year']} Grades {challenge['gradeBand']} challenge after world {challenge['afterWorldNumber']}. Remove it from the teaching worlds; keep the complete test separate (content/math-world/boss-holdouts.json).")
 
 def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -70,10 +76,16 @@ def build(catalogue: Path, reviews: list[Path], output: Path, plan: Path) -> dic
     rows = {row['item_id']: dict(row) for row in connection.execute('SELECT * FROM catalogue_items WHERE run_id=?', (RUN_ID,))}
     connection.close()
     groups = defaultdict(list)
-    seen_ids, seen_assets = set(), {}
+    preserved = json.loads((ROOT/'content/math-world/spiral-20.runtime.json').read_text())
+    preserved_plan = json.loads((ROOT/'content/math-world/spiral-20.plan.json').read_text())
+    existing_worlds = {world['id']: world for world in preserved['worlds']}
+    existing_plans = {world['id']: world for world in preserved_plan['worlds']}
+    seen_ids = {question['id'] for question in preserved['questions']}
+    seen_assets = {question['asset']['sha256']: question['id'] for question in preserved['questions']}
     warnings = []
-    asset_copies = {}
-    textual_signatures = {}
+    asset_copies = {Path(question['asset']['src']).name: ROOT/'public'/question['asset']['src'].lstrip('/') for question in preserved['questions']}
+    textual_signatures = {normalize(question['prompt']): question['id'] for question in preserved['questions']
+                          if len(normalize(question['prompt'])) > 100}
     for review_file in reviews:
         envelope = json.loads(review_file.read_text())
         if envelope['catalogueRunId'] != RUN_ID:
@@ -139,9 +151,11 @@ def build(catalogue: Path, reviews: list[Path], output: Path, plan: Path) -> dic
             correct = source.get('official_answer')
             if correct not in list('ABCDE'):
                 raise ValueError(f'No canonical single answer: {item_id}')
+            if review.get('computedAnswer') != correct or review.get('officialAnswer') != correct:
+                raise ValueError(f'Reviewed solution and official key must agree: {item_id}')
             raw_choices = record.get('choicesOverride') or learner.get('choices') or source.get('choices')
-            if not isinstance(raw_choices,list) or len(raw_choices) not in (4,5):
-                raise ValueError(f'Expected four or five complete source choices: {item_id}')
+            if not isinstance(raw_choices,list) or len(raw_choices) not in (2,3,4,5):
+                raise ValueError(f'Expected two to five complete original source choices: {item_id}')
             choices=[]
             for index, choice in enumerate(raw_choices):
                 text=str(choice).strip(); letter='ABCDE'[index]
@@ -188,14 +202,23 @@ def build(catalogue: Path, reviews: list[Path], output: Path, plan: Path) -> dic
     worlds,stops,breaks,questions,world_plans=[],[],[],[],[]
     for spiral in (1,2):
         for concept,label,title,description,realm in STRANDS:
+            number=len(worlds)+1; world_id=f'{concept}-{spiral}'
+            if world_id in existing_worlds:
+                if groups[(concept,spiral)]:
+                    raise ValueError(f'Existing question order must remain unchanged: {world_id}')
+                worlds.append({**existing_worlds[world_id], 'number':number, 'theme':number-1, 'questionCount':existing_plans[world_id]['questionCount']})
+                stops.extend(stop for stop in preserved['stops'] if stop['worldId']==world_id)
+                questions.extend(question for question in preserved['questions'] if question['worldId']==world_id)
+                world_plans.append({**existing_plans[world_id], 'number':number, 'theme':number-1})
+                continue
             entries=groups[(concept,spiral)]
-            if len(entries) != 24:
-                raise ValueError(f'{concept}-{spiral} must have 24 reviewed questions (four stops of six), found {len(entries)}')
+            configurations={10:(2,5),12:(2,6),15:(3,5),18:(3,6),20:(4,5),24:(4,6)}
+            if len(entries) not in configurations:
+                raise ValueError(f'{world_id} needs two to four complete stops of five or six questions, found {len(entries)}')
             # Human-reviewed reasoning demand governs order; grade and points are
             # source metadata, useful only as secondary scaffolding signals.
             entries.sort(key=lambda item:(item[0]['reasoningDemand'],item[1]['source']['gradeBand']=='3-4',item[0]['pointTier'],-item[1]['source']['year'],item[0].get('orderHint',0),item[0]['itemId']))
-            number=len(worlds)+1; world_id=f'{concept}-{spiral}'
-            stop_count=min(4,len(entries)); stop_ids=[]
+            stop_count,_=configurations[len(entries)]; stop_ids=[]
             for index in range(stop_count):
                 slot=round(index*8/(stop_count-1)) if stop_count>1 else 8
                 x,y,mx,my=ANCHORS[slot]
@@ -204,13 +227,13 @@ def build(catalogue: Path, reviews: list[Path], output: Path, plan: Path) -> dic
                 stops.append({'id':stop_id,'worldId':world_id,'mapSlot':slot,'kind':'culmination' if index==stop_count-1 else 'math-kangaroo','label':f'{label} {spiral} · {stage}','shortLabel':stage,'description':stage_description,'realmId':realm,'districtLabel':f'{label} {spiral}','x':x,'y':y,'mobileX':mx,'mobileY':my})
                 for _,question,_ in entries[index*len(entries)//stop_count:(index+1)*len(entries)//stop_count]:
                     question['stopId']=stop_id
-            worlds.append({'id':world_id,'number':number,'title':title if spiral==1 else f'{title} II','concept':label,'conceptId':concept,'spiral':spiral,'theme':number-1,'description':description,'stopIds':stop_ids})
+            worlds.append({'id':world_id,'number':number,'title':title if spiral==1 else f'{title} II','concept':label,'conceptId':concept,'spiral':spiral,'theme':number-1,'description':description,'stopIds':stop_ids,'questionCount':len(entries)})
             questions.extend(question for _,question,_ in entries)
             world_plans.append({**worlds[-1],'questionCount':len(entries),'questions':[reference for _,_,reference in entries]})
     content_hash=hashlib.sha256(json.dumps({'worlds':worlds,'questions':questions},sort_keys=True).encode()).hexdigest()[:16]
-    version=f'spiral-20.v1.{content_hash}'
-    runtime={'schemaVersion':2,'mode':'spiral-preview','contentVersion':version,'ontologyVersion':'elementary_competition_math.1.0.0','worlds':worlds,'stops':stops,'breaks':breaks,'questions':questions}
-    plan_data={'schemaVersion':1,'contentVersion':version,'status':'agent-curated-local-playtest','catalogueRunId':RUN_ID,'taxonomyVersion':'elementary_competition_math.1.0.0','selectionPolicy':{'maximumWorldQuestions':24,'stopsPerWorld':4,'questionsPerStop':6,'recentTestsPreferred':True,'gradePointTiers':{'1-2':[3,4,5],'3-4':[3,4]},'sourcePolicy':'New selections remain local until explicitly approved; published builds use the committed approved selection.','order':'Reviewed reasoning demand first; source grade and points are secondary signals.'},'worlds':world_plans,'statistics':{'worlds':len(worlds),'questions':len(questions),'bySourceKind':dict(Counter(q['source']['sourceKind'] for q in questions)),'byGrade':dict(Counter(q['source']['gradeBand'] for q in questions)),'byYear':dict(sorted(Counter(q['source']['year'] for q in questions).items(),reverse=True)),'byGradeAndPoints':dict(Counter(f"{q['source']['gradeBand']}:{q['source']['pointTier']}" for q in questions))},'warnings':warnings}
+    version=f'spiral-32.v1.{content_hash}'
+    runtime={'schemaVersion':2,'mode':'spiral-preview','contentVersion':version,'compatibleProgressVersions':[preserved['contentVersion']],'ontologyVersion':'elementary_competition_math.1.0.0','worlds':worlds,'stops':stops,'breaks':breaks,'questions':questions}
+    plan_data={'schemaVersion':1,'contentVersion':version,'status':'agent-reviewed-public-playtest','catalogueRunId':RUN_ID,'taxonomyVersion':'elementary_competition_math.1.0.0','selectionPolicy':{'maximumWorldQuestions':24,'stopsPerWorld':[2,3,4],'questionsPerStop':[5,6],'recentTestsPreferred':True,'gradePointTiers':{'1-2':[3,4,5],'3-4':[3,4]},'sourcePolicy':'Owner-requested expansion of the public playtest. Original source questions and verified keys; compact worlds where the reviewed pool is thin; both annual boss tests remain reserved.','order':'Reviewed reasoning demand first; source grade and points are secondary signals.'},'worlds':world_plans,'statistics':{'worlds':len(worlds),'questions':len(questions),'bySourceKind':dict(Counter(q['source']['sourceKind'] for q in questions)),'byGrade':dict(Counter(q['source']['gradeBand'] for q in questions)),'byYear':dict(sorted(Counter(q['source']['year'] for q in questions).items(),reverse=True)),'byGradeAndPoints':dict(Counter(f"{q['source']['gradeBand']}:{q['source']['pointTier']}" for q in questions))},'warnings':warnings}
     output.parent.mkdir(parents=True,exist_ok=True)
     assets_dir=output.parent/'assets';assets_dir.mkdir(exist_ok=True)
     for old_asset in assets_dir.iterdir():
@@ -225,7 +248,7 @@ if __name__=='__main__':
     parser.add_argument('--catalogue',type=Path,default=ROOT/'work/math-kangaroo-adaptive-engine/catalogue/corpus-review.sqlite3')
     parser.add_argument('--reviews',nargs='+',type=Path)
     parser.add_argument('--output',type=Path,default=WORK/'runtime/manifest.json')
-    parser.add_argument('--plan',type=Path,default=ROOT/'content/math-world/spiral-20.plan.json')
+    parser.add_argument('--plan',type=Path,default=ROOT/'content/math-world/spiral-32.plan.json')
     args=parser.parse_args()
     review_files=args.reviews or sorted(WORK.glob('*-reviewed.json'))
     result=build(args.catalogue.resolve(),review_files,args.output,args.plan)

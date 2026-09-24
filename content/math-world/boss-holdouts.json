@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "policyVersion": "annual-boss-holdouts.v1",
+  "policyVersion": "annual-boss-holdouts.v2",
   "scope": "USA Math Kangaroo annual tests, Grades 1–2, reserved outside the 20 teaching worlds.",
   "matchingPolicy": {
     "exactReferences": "Reserve every sourceId and reservedReferences ID, including documented aliases, surface variants, edition variants, and their connected source occurrences. Variant reservation prevents prior exposure; it does not assert that the artwork is identical.",
@@ -25,7 +25,7 @@
       "id": "boss-2025",
       "year": 2025,
       "gradeBand": "1-2",
-      "afterWorldNumber": 10,
+      "afterWorldNumber": 16,
       "questionCount": 24,
       "status": "placeholder",
       "sourceFamily": "USA",
@@ -451,7 +451,7 @@
       "id": "boss-2026",
       "year": 2026,
       "gradeBand": "1-2",
-      "afterWorldNumber": 20,
+      "afterWorldNumber": 32,
       "questionCount": 24,
       "status": "placeholder",
       "sourceFamily": "USA",

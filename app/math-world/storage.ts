@@ -3,11 +3,12 @@ import {
   WORLD_PROGRESS_SCHEMA_VERSION,
   canOpenRequiredStop,
   canOpenWorld,
+  nextRequiredStopId,
   type QuestionPhase,
   type StopAttempt,
   type WorldProgress,
 } from "./engine.ts";
-import { QUESTIONS_BY_STOP, REQUIRED_STOPS, WORLD_CONTENT_VERSION, WORLD_DEFINITIONS, WORLD_MODE, worldForStop } from "./world-data.ts";
+import { QUESTIONS_BY_STOP, REQUIRED_STOPS, WORLD_CONTENT_VERSION, WORLD_COMPATIBLE_CONTENT_VERSIONS, WORLD_DEFINITIONS, WORLD_MODE, worldForStop } from "./world-data.ts";
 import { loadProgressionState } from "../../lib/progression/persistence.ts";
 import { isJourneyTestProfile } from "../../lib/progression/test-mode.ts";
 import type { StorageLike } from "../../lib/progression/types.ts";
@@ -107,7 +108,7 @@ export function readWorldProgress(qaUnlocked = false): WorldProgress {
     const parsed = JSON.parse(raw) as Partial<Omit<WorldProgress, "schemaVersion">> & { schemaVersion?: number };
     if (
       (parsed.schemaVersion !== WORLD_PROGRESS_SCHEMA_VERSION && !(WORLD_MODE === "prototype" && parsed.schemaVersion === 1)) ||
-      parsed.contentVersion !== WORLD_CONTENT_VERSION
+      !WORLD_COMPATIBLE_CONTENT_VERSIONS.has(parsed.contentVersion ?? "")
     ) {
       return createInitialProgress();
     }
@@ -140,7 +141,7 @@ export function readWorldProgress(qaUnlocked = false): WorldProgress {
     };
     const activeStopId = result.activeStopId && canOpenRequiredStop(result, result.activeStopId, qaUnlocked) ? result.activeStopId : null;
     const checkpointStopId = result.checkpointStopId && result.completedStopIds.includes(result.checkpointStopId) ? result.checkpointStopId : null;
-    const selectedWorldId = worldForStop(activeStopId ?? checkpointStopId)?.id ?? (canOpenWorld(result, result.selectedWorldId, qaUnlocked) ? result.selectedWorldId : WORLD_DEFINITIONS[0].id);
+    const selectedWorldId = worldForStop(activeStopId ?? checkpointStopId)?.id ?? (canOpenWorld(result, result.selectedWorldId, qaUnlocked) ? result.selectedWorldId : worldForStop(nextRequiredStopId(result))?.id ?? WORLD_DEFINITIONS[0].id);
     return { ...result, activeStopId, checkpointStopId, selectedWorldId };
   } catch {
     return createInitialProgress();
@@ -168,17 +169,18 @@ function emptyQaArchive(): QaArchive {
 
 export function readQaArchive(): QaArchive {
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(QA_KEY) ?? window.localStorage.getItem(LEGACY_QA_KEY) ?? "null") as Partial<QaArchive> | null;
-    if (
-      !parsed ||
-      parsed.schemaVersion !== 1 ||
-      parsed.contentVersion !== WORLD_CONTENT_VERSION ||
-      !parsed.records ||
-      typeof parsed.records !== "object"
-    ) {
-      return emptyQaArchive();
+    const keys = [QA_KEY, ...[...WORLD_COMPATIBLE_CONTENT_VERSIONS].filter(version => version !== WORLD_CONTENT_VERSION)
+      .map(version => `${LEGACY_QA_KEY}:${WORLD_MODE}:${version}`), LEGACY_QA_KEY];
+    for (const key of keys) {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) continue;
+      let parsed: Partial<QaArchive> | null;
+      try { parsed = JSON.parse(raw) as Partial<QaArchive> | null; } catch { continue; }
+      if (!parsed || parsed.schemaVersion !== 1 || !WORLD_COMPATIBLE_CONTENT_VERSIONS.has(parsed.contentVersion ?? "")
+        || !parsed.records || typeof parsed.records !== "object") continue;
+      return { ...emptyQaArchive(), records: parsed.records as QaArchive["records"] };
     }
-    return { ...emptyQaArchive(), records: parsed.records as QaArchive["records"] };
+    return emptyQaArchive();
   } catch {
     return emptyQaArchive();
   }

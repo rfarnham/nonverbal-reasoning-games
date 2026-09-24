@@ -3,15 +3,15 @@ import test from "node:test";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { workbookQuestions } from "../app/math-world/workbook.ts";
-import { WORLD_DEFINITIONS, WORLD_QUESTIONS } from "../app/math-world/world-data.ts";
+import { WORLD_DEFINITIONS, WORLD_QUESTIONS, QUESTIONS_BY_STOP } from "../app/math-world/world-data.ts";
 
 test("each workbook follows the playable question order and restarts numbering at each stop", () => {
   for (const world of WORLD_DEFINITIONS) {
     const entries = workbookQuestions(world);
     assert.deepEqual(entries.map(({ question }) => question.id), WORLD_QUESTIONS.filter(question => question.worldId === world.id).map(question => question.id));
-    assert.equal(entries.length, 24);
-    assert.deepEqual(entries.map(({ stopIndex }) => stopIndex), Array.from({ length: 24 }, (_, index) => Math.floor(index / 6)));
-    assert.deepEqual(entries.map(({ questionIndex }) => questionIndex), Array.from({ length: 24 }, (_, index) => index % 6));
+    assert.equal(entries.length, world.questionCount);
+    assert.deepEqual(entries.map(({ stopIndex }) => stopIndex), world.stopIds.flatMap((id, stopIndex) => QUESTIONS_BY_STOP.get(id).map(() => stopIndex)));
+    assert.deepEqual(entries.map(({ questionIndex }) => questionIndex), world.stopIds.flatMap(id => QUESTIONS_BY_STOP.get(id).map((_, questionIndex) => questionIndex)));
   }
 });
 

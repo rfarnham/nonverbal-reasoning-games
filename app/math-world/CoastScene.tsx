@@ -1,7 +1,7 @@
 import { useId } from "react";
 import LegacyCoastScene from "./LegacyCoastScene";
 import { getWorldMapLayout, type MapIsland, type MapLandscape, type MapLayout } from "./map-layouts";
-import { WORLD_MODE } from "./world-data";
+import { WORLD_DEFINITIONS, WORLD_MODE } from "./world-data";
 
 type CoastSceneProps = {
   mobile?: boolean;
@@ -59,6 +59,30 @@ const THEMES: Record<MapLandscape, readonly [Theme, Theme]> = {
   balance: [
     { sky: "#d9cef2", deep: "#9488c3", grass: "#dbe3ae", edge: "#f9e9bd", cliff: "#a799ab", light: "#f8f3d3", leaf: "#caacd7", darkLeaf: "#9c82b6", accent: "#e4b078", road: "#f9dfb1" },
     { sky: "#e6d8ed", deep: "#a78bb5", grass: "#e2ddb2", edge: "#f8e8cb", cliff: "#b197ab", light: "#f9f2d8", leaf: "#bea4cc", darkLeaf: "#967ab0", accent: "#e3a993", road: "#f7dfb9" },
+  ],
+  sharing: [
+    { sky: "#b8e6da", deep: "#57ac9c", grass: "#d2eaa0", edge: "#f8dfa8", cliff: "#b49965", light: "#f7f7c9", leaf: "#78bb71", darkLeaf: "#478862", accent: "#ed9173", road: "#ffe2a2" },
+    { sky: "#d7eaca", deep: "#7aa99b", grass: "#eadb98", edge: "#ffe8b5", cliff: "#bd9c73", light: "#fff4c8", leaf: "#91b875", darkLeaf: "#5d9267", accent: "#d98398", road: "#fae4ae" },
+  ],
+  fractions: [
+    { sky: "#abe2ef", deep: "#518fbc", grass: "#cce6cc", edge: "#e9ecc0", cliff: "#84a4ac", light: "#f5fbdc", leaf: "#64bcb5", darkLeaf: "#378d9a", accent: "#efb468", road: "#ffe5b0" },
+    { sky: "#c0ddf2", deep: "#748fc0", grass: "#dbe5cf", edge: "#f5e8c2", cliff: "#9aa8b2", light: "#fbf9e1", leaf: "#8facd1", darkLeaf: "#647dae", accent: "#eba591", road: "#f9dfb4" },
+  ],
+  measurement: [
+    { sky: "#bbdfe8", deep: "#659ead", grass: "#d9e4a4", edge: "#eeddac", cliff: "#aa9779", light: "#f7f1c9", leaf: "#99bf80", darkLeaf: "#698b6e", accent: "#dd9275", road: "#f5e0ae" },
+    { sky: "#c8dfde", deep: "#699b9d", grass: "#e5dca6", edge: "#f4e4b3", cliff: "#b09b7a", light: "#fff2cf", leaf: "#a6b992", darkLeaf: "#718f7a", accent: "#c987a1", road: "#fae4bc" },
+  ],
+  market: [
+    { sky: "#a9e7e4", deep: "#40a9b2", grass: "#dbe5ad", edge: "#f9dcab", cliff: "#bb9b76", light: "#fdf0d4", leaf: "#6cbbaf", darkLeaf: "#338f92", accent: "#eb8c70", road: "#f7da9b" },
+    { sky: "#c3e2e7", deep: "#69a2b7", grass: "#e9d9ae", edge: "#fce6ba", cliff: "#bda27e", light: "#fff3d8", leaf: "#8db6c0", darkLeaf: "#547f9c", accent: "#e3a562", road: "#ffe4b1" },
+  ],
+  clock: [
+    { sky: "#d4d9ed", deep: "#9299c1", grass: "#dfe3b2", edge: "#f8e6be", cliff: "#aaa08c", light: "#fff5d6", leaf: "#b6aed1", darkLeaf: "#857eaa", accent: "#e3ac6a", road: "#f9dfb2" },
+    { sky: "#dbd2e7", deep: "#978bab", grass: "#d6dbbc", edge: "#f1e2c4", cliff: "#a79e91", light: "#f6efd8", leaf: "#b0bfcb", darkLeaf: "#7c91a8", accent: "#e5aa99", road: "#f7e2bd" },
+  ],
+  area: [
+    { sky: "#b4e0cb", deep: "#64a38e", grass: "#c8e29c", edge: "#f2dda2", cliff: "#a39168", light: "#edf4bf", leaf: "#8bbb72", darkLeaf: "#5a8e65", accent: "#dea46c", road: "#f9dfa8" },
+    { sky: "#c9dfc5", deep: "#789e87", grass: "#e3d9a0", edge: "#f6e4b9", cliff: "#ad9974", light: "#faf0cb", leaf: "#a9ba79", darkLeaf: "#7b9665", accent: "#c88a9c", road: "#ffe6b9" },
   ],
 };
 
@@ -289,7 +313,100 @@ function BalanceRocks({ theme, variant, index }: DecorationProps) {
   </>;
 }
 
-const LANDMARKS = { coast: Lighthouse, mirror: MirrorGarden, orchard: Orchard, pattern: PatternGarden, shapes: Shapes, lagoon: LagoonArch, desert: DesertRuin, canopy: CanopyHouse, cliffs: CliffTowers, balance: BalanceRocks };
+function SharingGarden({ theme, variant, index }: DecorationProps) {
+  return <>
+    <path d="M-64-11-25-33 64-10 28 16Z" fill={theme.light} stroke={theme.darkLeaf} strokeWidth="3" />
+    <path d="M-42-20 45 4M-16-29 61-10M-41 2-3-26M-8 11 31-18" stroke={theme.accent} strokeWidth="7" />
+    <path d="M-40-7V-45H40V-7M-40-28H40" fill="none" stroke="#a8885d" strokeWidth="6" />
+    <path d="M-49-43 0-85 49-43Z" fill={theme.leaf} stroke={theme.darkLeaf} strokeWidth="3" strokeLinejoin="round" />
+    <path d="M0-85V-43M-49-43H49" stroke={theme.light} strokeWidth="4" />
+    {[-1, 1].map(side => <g key={side} transform={`translate(${side * 25} -22)`}>
+      <path d="M-13 0H13L9 14H-9Z" fill={theme.edge} stroke="#ae8658" strokeWidth="2" />
+      <circle cx="-5" cy="-2" r="5" fill={theme.accent} /><circle cx="6" cy="-3" r="6" fill={theme.leaf} />
+      {variant === 2 && <circle cy="-9" r="5" fill={index % 2 ? theme.accent : "#e9be56"} />}
+    </g>)}
+  </>;
+}
+
+function FractionGarden({ theme, variant, index }: DecorationProps) {
+  return <>
+    <ellipse cy="3" rx="65" ry="22" fill={theme.darkLeaf} /><ellipse cy="-1" rx="60" ry="19" fill={theme.light} />
+    <path d="M-43-6V-48H43V-6Z" fill={theme.edge} stroke={theme.darkLeaf} strokeWidth="3" />
+    <path d="M-54-48A54 54 0 0 1 54-48Z" fill={theme.leaf} stroke={theme.darkLeaf} strokeWidth="3" />
+    <path d="M0-48V-102A54 54 0 0 1 54-48Z" fill={theme.accent} stroke={theme.darkLeaf} strokeWidth="3" />
+    {variant === 2 && <path d="M0-48-38-86M0-48 38-86" stroke={theme.light} strokeWidth="4" />}
+    <path d="M-26-10V-34M26-10V-34" stroke={theme.leaf} strokeWidth="11" strokeLinecap="round" />
+    <path d="M-9-6V-25Q0-39 9-25V-6Z" fill={theme.darkLeaf} />
+    <g transform={`translate(${index % 2 ? -55 : 55} 2)`}>
+      <circle cy="-9" r="12" fill={theme.light} stroke={theme.darkLeaf} strokeWidth="2" />
+      <path d="M0-9V-21A12 12 0 0 1 12-9Z" fill={theme.accent} />
+    </g>
+  </>;
+}
+
+function MeasuringMill({ theme, variant, index }: DecorationProps) {
+  return <>
+    <path d="M-31 6-24-65H24L33 6Z" fill={theme.edge} stroke={theme.darkLeaf} strokeWidth="3" />
+    <path d="M-32-64 0-103 33-64Z" fill={theme.accent} stroke={theme.darkLeaf} strokeWidth="3" />
+    <path d="M-8 6V-20Q0-31 8-20V6Z" fill={theme.darkLeaf} />
+    <g transform={`translate(0 -56) rotate(${index * 15 + (variant === 2 ? 35 : 0)})`}>
+      {[0,90,180,270].map(angle => <g key={angle} transform={`rotate(${angle})`}>
+        <path d="M-3-5V-60H11V-25H3V-5Z" fill={theme.light} stroke={theme.darkLeaf} strokeWidth="2.5" />
+        <path d="M0-34H11M0-44H11M0-54H11" stroke={theme.leaf} strokeWidth="3" />
+      </g>)}
+      <circle r="7" fill={theme.accent} stroke={theme.darkLeaf} strokeWidth="2" />
+    </g>
+    <path d="M47 7V-68H61V7Z" fill={theme.light} stroke={theme.darkLeaf} strokeWidth="2.5" />
+    <path d="M47-55H57M47-42H54M47-29H57M47-16H54M47-3H57" stroke={theme.darkLeaf} strokeWidth="2.5" />
+  </>;
+}
+
+function MarketStall({ theme, variant, index }: DecorationProps) {
+  return <>
+    <path d="M-46 8V-59H46V8Z" fill={theme.edge} stroke={theme.darkLeaf} strokeWidth="3" />
+    <path d="M-53-38-40-73H40L53-38Z" fill={theme.accent} stroke={theme.darkLeaf} strokeWidth="3" strokeLinejoin="round" />
+    <path d="M-28-72-36-39M-8-72-10-39M13-72 16-39M33-72 42-39" stroke={theme.light} strokeWidth="11" />
+    <path d="M-50-38V-29Q-40-19-30-29Q-20-19-10-29Q0-19 10-29Q20-19 30-29Q40-19 50-29V-38" fill={theme.accent} stroke={theme.darkLeaf} strokeWidth="2" />
+    <path d="M-42-11H42V7H-42Z" fill={theme.leaf} stroke={theme.darkLeaf} strokeWidth="3" />
+    {[-1,0,1].map(column => <g key={column} transform={`translate(${column * 24} -16)`}>
+      <circle r="8" fill={(index + column) % 2 ? "#edc66a" : theme.accent} stroke={theme.darkLeaf} strokeWidth="2" />
+      {variant === 2 && <path d="M-4-1H4M0-5V3" stroke={theme.light} strokeWidth="2" />}
+    </g>)}
+    <path d="M-33 8V17M32 8V17" stroke={theme.darkLeaf} strokeWidth="5" />
+  </>;
+}
+
+function ClockGarden({ theme, variant, index }: DecorationProps) {
+  return <>
+    <path d="M-28 9V-55H28V9Z" fill={theme.edge} stroke={theme.darkLeaf} strokeWidth="3" />
+    <path d="M-35-65 0-112 35-65Z" fill={theme.accent} stroke={theme.darkLeaf} strokeWidth="3" strokeLinejoin="round" />
+    <circle cy="-56" r="30" fill={theme.light} stroke={theme.darkLeaf} strokeWidth="5" />
+    <path d="M0-78V-74M22-56H18M0-34V-38M-22-56H-18" stroke={theme.darkLeaf} strokeWidth="3" strokeLinecap="round" />
+    <path d={index % 2 ? "M-11-65 0-56V-73" : "M0-74V-56L13-50"} fill="none" stroke={theme.darkLeaf} strokeWidth="4" strokeLinecap="round" />
+    <path d="M-8 8V-14Q0-28 8-14V8Z" fill={theme.leaf} />
+    {variant === 2 ? <>
+      <path d="M-26 13H26M-37 20H37" stroke={theme.darkLeaf} strokeWidth="6" strokeLinecap="round" />
+      <path d="M43 5V-26M37-26H49M37 5H49M38-23 48 2M48-23 38 2" stroke={theme.accent} strokeWidth="3" />
+    </> : <path d="M-60 6Q-51-31-38 6M37 6Q49-34 61 6Z" fill={theme.leaf} stroke={theme.darkLeaf} strokeWidth="3" />}
+  </>;
+}
+
+function PatchworkGarden({ theme, variant, index }: DecorationProps) {
+  return <>
+    <path d="M-67-19 0-49 68-19 0 15Z" fill={theme.edge} stroke={theme.darkLeaf} strokeWidth="3" />
+    {[-1,0,1].flatMap(row => [-1,0,1].map(column => <path key={`${row}-${column}`} d="M-16 0 0-8 16 0 0 8Z" transform={`translate(${(column - row) * 20} ${(column + row) * 10 - 18})`} fill={(row + column + index) % 2 ? theme.leaf : theme.accent} />))}
+    <path d="M-59-39V-17M-38-49V-26M-17-58V-36M17-58V-36M38-49V-26M59-39V-17M-61-32 0-60 62-32" fill="none" stroke={theme.darkLeaf} strokeWidth="3.5" strokeLinecap="round" />
+    {variant === 2 ? <>
+      <path d="M-26-45V-78L0-96 27-78V-45L0-32Z" fill={theme.light} stroke={theme.darkLeaf} strokeWidth="3" />
+      <path d="M-26-78 0-62 27-78M0-96V-32M-13-86V-40M13-87V-39M-26-61 0-46 27-61" fill="none" stroke={theme.leaf} strokeWidth="3" />
+    </> : <>
+      <path d="M-8-50V-85M-8-75Q-35-90-31-61Q-17-56-8-75M-8-66Q12-87 20-62Q9-51-8-66" fill={theme.leaf} stroke={theme.darkLeaf} strokeWidth="3" />
+      <circle cx="-8" cy="-91" r="9" fill={theme.accent} />
+    </>}
+  </>;
+}
+
+const LANDMARKS = { coast: Lighthouse, mirror: MirrorGarden, orchard: Orchard, pattern: PatternGarden, shapes: Shapes, lagoon: LagoonArch, desert: DesertRuin, canopy: CanopyHouse, cliffs: CliffTowers, balance: BalanceRocks, sharing: SharingGarden, fractions: FractionGarden, measurement: MeasuringMill, market: MarketStall, clock: ClockGarden, area: PatchworkGarden };
 
 function SurfaceDetails({ island, landscape, theme, variant, mobile }: { island: MapIsland; landscape: MapLandscape; theme: Theme; variant: 1 | 2; mobile: boolean }) {
   const main = island.stopIndex !== undefined;
@@ -342,6 +459,12 @@ function Background({ layout, landscape, theme, variant }: { layout: MapLayout; 
       if (landscape === "shapes") return <g key={index} transform={`translate(${x} ${y})`} fill="none" stroke={theme.light} strokeWidth="2" opacity=".3">{index % 2 ? <path d="M-9 8 0-8 9 8Z" /> : <rect x="-7" y="-7" width="14" height="14" rx="2" />}</g>;
       if (landscape === "mirror" || landscape === "balance") return <g key={index} transform={`translate(${x} ${y})`} stroke={theme.light} strokeWidth="2" strokeLinecap="round" opacity=".4"><path d="M-6 0H6M0-6V6" /><circle r="11" fill="none" opacity=".4" /></g>;
       if (landscape === "cliffs") return <path key={index} d={`M${x - 19} ${y}q18-8 38 0q13 5 22 0`} fill="none" stroke={theme.light} strokeWidth="3" strokeLinecap="round" opacity=".35" />;
+      if (landscape === "sharing") return <g key={index} transform={`translate(${x} ${y})`} fill={theme.light} opacity=".3"><circle cx="-10" r="5" /><circle cx="10" r="5" /></g>;
+      if (landscape === "fractions") return <g key={index} transform={`translate(${x} ${y})`} stroke={theme.light} strokeWidth="2" opacity=".3"><circle r="10" fill="none" /><path d="M0-10V0H10" fill="none" /></g>;
+      if (landscape === "measurement") return <path key={index} d={`M${x - 15} ${y}h30m-25 0v-6m10 6v-10m10 10v-6`} fill="none" stroke={theme.light} strokeWidth="2" opacity=".3" />;
+      if (landscape === "market") return <g key={index} transform={`translate(${x} ${y})`} stroke={theme.light} strokeWidth="2" opacity=".3"><ellipse rx="8" ry="11" fill="none" /><path d="M0-5V5" /></g>;
+      if (landscape === "clock") return <g key={index} transform={`translate(${x} ${y})`} fill="none" stroke={theme.light} strokeWidth="2" opacity=".3"><circle r="11" /><path d="M0-7V0L5 3" /></g>;
+      if (landscape === "area") return <path key={index} d={`M${x - 10} ${y - 10}h20v20h-20Zm10 0v20m-10-10h20`} fill="none" stroke={theme.light} strokeWidth="2" opacity=".25" />;
       return <path key={index} d={`M${x} ${y}q9 6 18 0m9 0q9 6 18 0`} fill="none" stroke={theme.light} strokeWidth="3" strokeLinecap="round" opacity=".45" />;
     })}
     {landscape === "coast" && !mobile && <g transform={`translate(${variant === 1 ? 1075 : 86} 628) scale(.7)`}>
@@ -379,7 +502,8 @@ export default function CoastScene(props: CoastSceneProps) {
 }
 
 function WorldScene({ mobile = false, completedCount = 0, completedRoadSlot = completedCount - 1, worldNumber = 1, className }: CoastSceneProps) {
-  const world = getWorldMapLayout(worldNumber);
+  const stopCount = WORLD_DEFINITIONS.find(candidate => candidate.number === worldNumber)?.stopIds.length ?? 4;
+  const world = getWorldMapLayout(worldNumber, stopCount);
   const layout = mobile ? world.mobile : world.desktop;
   const theme = THEMES[world.landscape][world.variant - 1];
   const id = useId().replace(/:/g, "");

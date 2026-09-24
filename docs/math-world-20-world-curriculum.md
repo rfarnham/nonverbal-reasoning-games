@@ -1,5 +1,7 @@
 # Math Kangaroo Worlds: 20-world spiral
 
+**Historical release:** superseded by the [32-world curriculum](math-world-32-world-curriculum.md). Its 480 questions remain unchanged in the expanded adventure; world numbers and boss milestones below describe the earlier release.
+
 **Approved implementation scope · password-gated public playtest · 22 September 2026.**
 
 The adventure visits ten strands, then returns to each for a deeper second pass:

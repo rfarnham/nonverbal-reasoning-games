@@ -8,7 +8,7 @@ import { assertNotBossHoldout, findBossHoldout } from '../scripts/generate-math-
 
 const root = path.resolve(import.meta.dirname, '..');
 const policy = JSON.parse(await readFile(path.join(root, 'content/math-world/boss-holdouts.json'), 'utf8'));
-const bank = JSON.parse(await readFile(path.join(root, 'content/math-world/spiral-20.runtime.json'), 'utf8'));
+const bank = JSON.parse(await readFile(path.join(root, 'content/math-world/spiral-32.runtime.json'), 'utf8'));
 const references = policy.challenges.flatMap(challenge => challenge.questions.flatMap(question =>
   [question.sourceId, ...question.reservedReferences.map(reference => reference.id)]));
 
@@ -28,7 +28,7 @@ const renamedAnnual = [2025, 2026].map(year => ({ id: `renamed-annual-${year}`, 
 test('the two boss milestones reserve 24 ordered annual questions each', () => {
   assert.equal(policy.schemaVersion, 1);
   assert.equal(policy.challenges.length, 2);
-  assert.deepEqual(policy.challenges.map(({ year, afterWorldNumber }) => [year, afterWorldNumber]), [[2025, 10], [2026, 20]]);
+  assert.deepEqual(policy.challenges.map(({ year, afterWorldNumber }) => [year, afterWorldNumber]), [[2025, 16], [2026, 32]]);
   for (const challenge of policy.challenges) {
     assert.equal(challenge.status, 'placeholder');
     assert.equal(challenge.gradeBand, '1-2');
@@ -50,8 +50,8 @@ test('the two boss milestones reserve 24 ordered annual questions each', () => {
 });
 
 test('all annual occurrences, canonical aliases, and related variants are excluded from teaching', () => {
-  for (const id of references) assert.throws(() => assertNotBossHoldout({ id }), /boss holdout: .*reserved for.*challenge after world (10|20)/);
-  for (const question of renamedAnnual) assert.throws(() => assertNotBossHoldout(question), /Remove it from the 20 teaching worlds/);
+  for (const id of references) assert.throws(() => assertNotBossHoldout({ id }), /boss holdout: .*reserved for.*challenge after world (16|32)/);
+  for (const question of renamedAnnual) assert.throws(() => assertNotBossHoldout(question), /Remove it from the teaching worlds/);
   assert.throws(() => assertNotBossHoldout({ id: 'renamed-copy', source: { canonicalId: references[1] } }), /boss holdout/);
 });
 
@@ -59,10 +59,11 @@ test('publication years, mocks, team tests, and other grades are not blanket hol
   for (const question of allowed) assert.equal(findBossHoldout(question), undefined, question.id);
 });
 
-test('the approved 480 teaching questions contain no boss exposure and keep their content version', () => {
-  assert.equal(bank.contentVersion, 'spiral-20.v1.f665226c7060bba8');
-  assert.equal(bank.worlds.length, 20);
-  assert.equal(bank.questions.length, 480);
+test('the expanded teaching questions contain no boss exposure and preserve the previous curriculum', () => {
+  assert.match(bank.contentVersion, /^spiral-32\.v1\./);
+  assert.deepEqual(bank.compatibleProgressVersions, ['spiral-20.v1.f665226c7060bba8']);
+  assert.equal(bank.worlds.length, 32);
+  assert.equal(bank.questions.length, 680);
   for (const question of bank.questions) assertNotBossHoldout(question);
 });
 

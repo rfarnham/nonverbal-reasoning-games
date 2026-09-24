@@ -1,8 +1,8 @@
 # Boss challenge print sources
 
 The two Grades 1–2 assessment workbooks retain the full USA tests in original
-question order, separately from the 480 teaching questions. The 2025 challenge
-follows World 10; the 2026 challenge follows World 20. This manifest publishes
+question order, separately from the 680 teaching questions. The 2025 challenge
+follows World 16; the 2026 challenge follows World 32. This manifest publishes
 only these selected tests, not the private source corpus, solutions or answer
 keys.
 

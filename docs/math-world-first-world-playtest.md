@@ -1,6 +1,6 @@
 # Counting Coast visual playtest
 
-The [20-world curriculum](math-world-20-world-curriculum.md) supersedes this prototype. The public playtest now requires `hedgehog`, remembered by a browser cookie.
+The [32-world curriculum](math-world-32-world-curriculum.md) supersedes this prototype. The public playtest now requires `hedgehog`, remembered by a browser cookie.
 
 The first world now uses an original, vibrant platform-adventure map: raised
 islands, a continuous golden road, shallow optional branches, and a lighthouse

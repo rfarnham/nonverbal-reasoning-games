@@ -5,13 +5,13 @@ import holdouts from "../../content/math-world/boss-holdouts.json" with { type: 
 export type BossChallenge = Readonly<{
   id: "boss-2025" | "boss-2026";
   year: 2025 | 2026;
-  afterWorld: 10 | 20;
+  afterWorld: number;
   title: string;
   questionCount: 24;
   gradeBand: "1-2";
 }>;
 
-type ReservedTest = Omit<BossChallenge, "afterWorld" | "title"> & Readonly<{ afterWorldNumber: 10 | 20 }>;
+type ReservedTest = Omit<BossChallenge, "afterWorld" | "title"> & Readonly<{ afterWorldNumber: number }>;
 
 /** Assessment placeholders use the same milestones as the teaching-pool exclusions. */
 export const BOSS_CHALLENGES: readonly BossChallenge[] = WORLD_MODE === "spiral-preview"

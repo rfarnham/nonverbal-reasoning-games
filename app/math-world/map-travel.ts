@@ -77,11 +77,11 @@ function sampleRoadSegment(path: string): MapTravelPoint[] {
 
 const desktopSamples = desktopRoad.map(sampleRoadSegment);
 const authoredSamples = new Map<string, MapTravelPoint[][]>();
-function worldSamples(worldNumber: number, mobile: boolean): MapTravelPoint[][] {
-  const key = `${worldNumber}:${mobile}`;
+function worldSamples(worldNumber: number, mobile: boolean, stopCount: number): MapTravelPoint[][] {
+  const key = `${worldNumber}:${mobile}:${stopCount}`;
   let samples = authoredSamples.get(key);
   if (!samples) {
-    const layout = getWorldMapLayout(worldNumber)[mobile ? "mobile" : "desktop"];
+    const layout = getWorldMapLayout(worldNumber, stopCount)[mobile ? "mobile" : "desktop"];
     samples = layout.roads.map(sampleRoadSegment);
     authoredSamples.set(key, samples);
   }
@@ -93,7 +93,7 @@ const mobileBonusSamples = mobileBonusRoad.map(({ path }) => sampleRoadSegment(p
 
 /**
  * Percentage coordinates along the selected world's painted roads. The spiral
- * has four authored anchors per world; prototype routes retain their original
+ * has two to four authored anchors per world; prototype routes retain their original
  * unnumbered junctions. Story islands do not change quiz travel or progression.
  */
 export function getMapTravelPoints(fromStopId: string, toStopId: string, mobile = false): MapTravelPoint[] {
@@ -107,7 +107,7 @@ export function getMapTravelPoints(fromStopId: string, toStopId: string, mobile 
   const world = WORLD_DEFINITIONS.find(candidate => candidate.id === origin.worldId);
   if (!world) return [];
   const samples = WORLD_MODE === "spiral-preview"
-    ? worldSamples(world.number, mobile)
+    ? worldSamples(world.number, mobile, world.stopIds.length)
     : mobile ? mobileSamples : desktopSamples;
   const toPercentage = ({ x, y }: MapTravelPoint): MapTravelPoint => ({ x: x / width * 100, y: y / height * 100 });
   const slotPoint = (slot: number): MapTravelPoint => {

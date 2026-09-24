@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getWorldMapLayout, WORLD_MAP_LAYOUTS } from "../app/math-world/map-layouts.ts";
+import { COMPACT_WORLD_MAP_LAYOUTS, getWorldMapLayout, WORLD_MAP_LAYOUTS } from "../app/math-world/map-layouts.ts";
 import { getMapTravelPoints } from "../app/math-world/map-travel.ts";
 import { REQUIRED_STOPS, WORLD_DEFINITIONS, WORLD_MODE } from "../app/math-world/world-data.ts";
 import runtimeManifest from "../app/math-world/data/runtime.generated.json" with { type: "json" };
@@ -15,41 +15,56 @@ function curve(path, t) {
   const u = 1 - t;
   return { x: u ** 3*x0 + 3*u*u*t*x1 + 3*u*t*t*x2 + t**3*x3, y: u**3*y0 + 3*u*u*t*y1 + 3*u*t*t*y2 + t**3*y3 };
 }
+const ALL_LAYOUTS = [...WORLD_MAP_LAYOUTS, ...COMPACT_WORLD_MAP_LAYOUTS];
+
 function pixels(point, layout) { return { x: point.x / 100 * layout.width, y: point.y / 100 * layout.height }; }
 function near(actual, expected, label) {
   assert.ok(Math.hypot(actual.x - expected.x, actual.y - expected.y) < 1e-7, label);
 }
 
-test("twenty authored worlds have distinct geometry in both orientations", () => {
-  assert.deepEqual(WORLD_MAP_LAYOUTS.map(world => world.worldNumber), Array.from({ length: 20 }, (_, index) => index + 1));
+test("thirty-two authored worlds have distinct geometry in both orientations", () => {
+  assert.deepEqual(WORLD_MAP_LAYOUTS.map(world => world.worldNumber), Array.from({ length: 32 }, (_, index) => index + 1));
   for (const orientation of ["desktop", "mobile"]) {
     const geometries = WORLD_MAP_LAYOUTS.map(world => JSON.stringify(world[orientation]));
     const routeGeometries = WORLD_MAP_LAYOUTS.map(world => JSON.stringify(world[orientation].roads));
-    assert.equal(new Set(geometries).size, 20);
-    assert.equal(new Set(routeGeometries).size, 20, "each world has its own journey, including the second spiral");
+    assert.equal(new Set(geometries).size, 32);
+    assert.equal(new Set(routeGeometries).size, 32, "each world has its own journey, including the second spiral");
   }
-  for (let index = 0; index < 10; index += 1) {
-    assert.equal(WORLD_MAP_LAYOUTS[index].landscape, WORLD_MAP_LAYOUTS[index + 10].landscape);
+  assert.equal(new Set(WORLD_MAP_LAYOUTS.map(world => world.landscape)).size, 16);
+  for (let index = 0; index < 16; index += 1) {
+    assert.equal(WORLD_MAP_LAYOUTS[index].landscape, WORLD_MAP_LAYOUTS[index + 16].landscape);
     assert.equal(WORLD_MAP_LAYOUTS[index].variant, 1);
-    assert.equal(WORLD_MAP_LAYOUTS[index + 10].variant, 2);
+    assert.equal(WORLD_MAP_LAYOUTS[index + 16].variant, 2);
   }
   assert.throws(() => getWorldMapLayout(0));
-  assert.throws(() => getWorldMapLayout(21));
+  assert.throws(() => getWorldMapLayout(33));
+});
+
+test("shorter banks use complete compact maps with no abandoned quiz islands", () => {
+  assert.deepEqual(COMPACT_WORLD_MAP_LAYOUTS.map(world => [world.worldNumber, world.desktop.stopPoints.length]), [[10,2],[12,3],[13,3],[14,3],[15,2],[26,2],[28,3],[29,3],[30,3],[31,2]]);
+  for (const world of COMPACT_WORLD_MAP_LAYOUTS) {
+    assert.strictEqual(getWorldMapLayout(world.worldNumber, world.desktop.stopPoints.length), world);
+    assert.equal(world.desktop.stopPoints.length, world.mobile.stopPoints.length);
+    assert.equal(world.landscape, getWorldMapLayout(world.worldNumber).landscape);
+    assert.equal(world.variant, getWorldMapLayout(world.worldNumber).variant);
+  }
+  assert.throws(() => getWorldMapLayout(1, 5));
 });
 
 for (const orientation of ["desktop", "mobile"]) {
   const mobile = orientation === "mobile";
-  test(`${orientation}: exactly two story islands have books and four quiz islands have stops`, () => {
-    for (const world of WORLD_MAP_LAYOUTS) {
+  test(`${orientation}: exactly two story islands have books and every quiz island has a real stop`, () => {
+    for (const world of ALL_LAYOUTS) {
       const layout = world[orientation];
       assert.equal(layout.width, mobile ? 400 : 1200);
       assert.equal(layout.height, mobile ? 960 : 740);
-      assert.equal(layout.stopPoints.length, 4);
-      assert.equal(layout.roads.length, 3);
-      assert.equal(layout.islands.length, 6);
+      const stopCount = layout.stopPoints.length;
+      assert.ok([2,3,4].includes(stopCount));
+      assert.equal(layout.roads.length, stopCount - 1);
+      assert.equal(layout.islands.length, stopCount + 2);
       assert.equal(layout.books.length, 2);
       assert.equal(layout.storyPaths.length, 2);
-      assert.deepEqual(layout.islands.filter(island => island.stopIndex !== undefined).map(island => island.stopIndex), [0,1,2,3]);
+      assert.deepEqual(layout.islands.filter(island => island.stopIndex !== undefined).map(island => island.stopIndex), Array.from({ length: stopCount }, (_, index) => index));
       assert.equal(new Set(layout.islands.map(island => island.id)).size, layout.islands.length);
       assert.equal(new Set(layout.books.map(book => book.islandId)).size, 2);
       assert.deepEqual(world.desktop.books.map(book => book.id), world.mobile.books.map(book => book.id));
@@ -78,7 +93,7 @@ for (const orientation of ["desktop", "mobile"]) {
   });
 
   test(`${orientation}: roads join their stops and avoid unrelated islands`, () => {
-    for (const world of WORLD_MAP_LAYOUTS) {
+    for (const world of ALL_LAYOUTS) {
       const layout = world[orientation];
       for (const [index, path] of layout.roads.entries()) {
         near(curve(path, 0), pixels(layout.stopPoints[index], layout), "road starts at its quiz marker");
@@ -111,13 +126,13 @@ for (const orientation of ["desktop", "mobile"]) {
 
   test(`${orientation}: every world's avatar follows its exact painted curves forward and backward`, { skip: WORLD_MODE !== "spiral-preview" }, () => {
     for (const world of WORLD_DEFINITIONS) {
-      const layout = getWorldMapLayout(world.number)[orientation];
+      const layout = getWorldMapLayout(world.number, world.stopIds.length)[orientation];
       const stops = REQUIRED_STOPS.filter(stop => stop.worldId === world.id);
-      assert.deepEqual(stops.map(stop => stop.mapSlot), [0,1,2,3]);
+      assert.deepEqual(stops.map(stop => stop.mapSlot), Array.from({ length: stops.length }, (_, index) => index));
       const routes = [];
-      for (let index = 0; index < 3; index += 1) {
+      for (let index = 0; index < stops.length - 1; index += 1) {
         const route = getMapTravelPoints(stops[index].id, stops[index + 1].id, mobile);
-        const reference = Array.from({ length: 2001 }, (_, sample) => curve(layout.roads[index], sample / 2000));
+        const reference = Array.from({ length: 3201 }, (_, sample) => curve(layout.roads[index], sample / 2000));
         assert.ok(route.length > 2);
         for (const point of route) {
           const pixel = pixels(point, layout);
@@ -126,7 +141,7 @@ for (const orientation of ["desktop", "mobile"]) {
         }
         routes.push(route);
       }
-      for (let from = 0; from < 4; from += 1) for (let to = 0; to < 4; to += 1) {
+      for (let from = 0; from < stops.length; from += 1) for (let to = 0; to < stops.length; to += 1) {
         const route = getMapTravelPoints(stops[from].id, stops[to].id, mobile);
         assert.deepEqual(route[0], layout.stopPoints[from]);
         assert.deepEqual(route.at(-1), layout.stopPoints[to]);
@@ -143,12 +158,12 @@ for (const orientation of ["desktop", "mobile"]) {
           }
         }
       }
-      const route = getMapTravelPoints(stops[0].id, stops[3].id, mobile);
+      const route = getMapTravelPoints(stops[0].id, stops.at(-1).id, mobile);
       const original = structuredClone(route);
       route[0].x = -1;
       route[2].y = -1;
       route.pop();
-      assert.deepEqual(getMapTravelPoints(stops[0].id, stops[3].id, mobile), original, "callers cannot mutate later travel");
+      assert.deepEqual(getMapTravelPoints(stops[0].id, stops.at(-1).id, mobile), original, "callers cannot mutate later travel");
     }
   });
 }

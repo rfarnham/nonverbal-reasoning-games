@@ -20,7 +20,7 @@ export function BossWorld({ challenge, progress, qaUnlocked, onChooseWorld, onCh
   const printingRef = useRef(false);
   const [printing, setPrinting] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
-  const onward = WORLD_DEFINITIONS.find(world => world.number === (challenge.afterWorld === 10 ? 11 : 20));
+  const onward = WORLD_DEFINITIONS.find(world => world.number === Math.min(challenge.afterWorld + 1, WORLD_DEFINITIONS.length));
 
   useEffect(() => {
     mountedRef.current = true;
@@ -67,7 +67,7 @@ export function BossWorld({ challenge, progress, qaUnlocked, onChooseWorld, onCh
       <div className={styles.bossComingSoon}><strong>Boss world coming soon</strong><p>The boss design and answer-entry adventure are still to come. For now, you can print the test and continue exploring.</p></div>
       {onward && <button type="button" className={styles.primaryButton}
         disabled={printing || !canOpenWorld(progress, onward.id, qaUnlocked)} onClick={() => onChooseWorld(onward.id)}>
-        {challenge.afterWorld === 10 ? "Continue to World 11" : "Back to World 20"} <span aria-hidden="true">→</span>
+        {challenge.afterWorld < WORLD_DEFINITIONS.length ? `Continue to World ${onward.number}` : `Back to World ${onward.number}`} <span aria-hidden="true">→</span>
       </button>}
     </section>
   </main>;

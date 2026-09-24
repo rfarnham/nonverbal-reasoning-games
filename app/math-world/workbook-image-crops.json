@@ -2868,6 +2868,1206 @@
       "sourceRight": 990,
       "sourceBottom": 440,
       "basis": "Visually verified crop retaining the complete witch-transformation question, both transformation diagrams, and all five original visual choices; removes empty lower canvas."
+    },
+    "usa-2011-grades-1-2-q06": {
+      "assetSha256": "2119c1e507d3f9437f35853552c2e19ae7ca44c6c2ad9b02d1cec35c7e062ee0",
+      "sourceTop": 0,
+      "sourceBottom": 150,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2010-grades-1-2-q03": {
+      "assetSha256": "74fb2f34639a845b04c42d5665a69537e0d3f7c3c74906413a323e8be3fd31fd",
+      "sourceTop": 0,
+      "sourceBottom": 64,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2006-grades-1-2-q02": {
+      "assetSha256": "cf260c4422cdc80d91519797301719138f6255ba6e8808689bdc0a5df1d97ac7",
+      "sourceTop": 0,
+      "sourceBottom": 99,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2006-grades-1-2-q05": {
+      "assetSha256": "620a0669e040e09a2d34028a355cf0b90a8cb8d3fea9c9876872838a2c611840",
+      "sourceTop": 0,
+      "sourceBottom": 100,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2005-grades-1-2-q01": {
+      "assetSha256": "846ce534da07f5949f82b4fb8375ce8351113f80515d44b95fe409e430824ac8",
+      "sourceTop": 0,
+      "sourceBottom": 163,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2005-grades-1-2-q02": {
+      "assetSha256": "1bd3de363676d20280053927464370fc443189537e73113e0b5ff8ca11484f3d",
+      "sourceTop": 0,
+      "sourceBottom": 90,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2011-grades-1-2-q09": {
+      "assetSha256": "be75eba5e05cc5bd16804bce116d5bde42a771e28457e92fb4754770f396df67",
+      "sourceTop": 0,
+      "sourceBottom": 100,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2026-grades-3-4-part-single-q02": {
+      "assetSha256": "7255e5f014a8f52d94a16b906cbfa5e192c30bd83f48e3979feac08b45d6f528",
+      "sourceTop": 0,
+      "sourceBottom": 217,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2010-grades-1-2-q05": {
+      "assetSha256": "e99b20459895d04e85482a63826fd7db12f367feb12903e8a339363617975a67",
+      "sourceTop": 0,
+      "sourceBottom": 165,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2008-grades-1-2-q06": {
+      "assetSha256": "acda931c02e4f685a7ac7de571c567d99ebc7fb4450b75711f703547d17cab59",
+      "sourceTop": 0,
+      "sourceBottom": 124,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2011-grades-1-2-q13": {
+      "assetSha256": "f0be70861eafaaa7f7b153dc1ee084dd96612b1d8cd837a2fa5b79daa1134eaa",
+      "sourceTop": 0,
+      "sourceBottom": 105,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2010-grades-1-2-q15": {
+      "assetSha256": "e195af41de790c8e08e3027fadacaebb706956cd6aeb67acd85f63333390743e",
+      "sourceTop": 0,
+      "sourceBottom": 88,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2009-grades-1-2-q14": {
+      "assetSha256": "d0370613faa45187af69f5f23d29bd5dfacf1f48c95372da1ed8ee364917206c",
+      "sourceTop": 0,
+      "sourceBottom": 292,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2024-grades-1-2-part-single-q24": {
+      "assetSha256": "e4de301ea021b5efe9abb600343366eb721503f2e7ae847d75065d314c31476a",
+      "sourceTop": 0,
+      "sourceBottom": 236,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2015-grades-1-2-part-single-q21": {
+      "assetSha256": "9b0169c141ea965a3f1d23f5ae65de1fcd8934156dc6f0c86aaf180ab2e2736c",
+      "sourceTop": 0,
+      "sourceBottom": 196,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2012-grades-1-2-part-single-q23": {
+      "assetSha256": "add25e8cac9ea57b53aabbc8d1880f462b0363383147ac4d5562c587e16ac5b8",
+      "sourceTop": 0,
+      "sourceBottom": 166,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2009-grades-1-2-q17": {
+      "assetSha256": "0355d1e89366fa090955bf6550ca7649b982bce28fe12a99f6ce46fe062bce98",
+      "sourceTop": 0,
+      "sourceBottom": 177,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2020-grades-3-4-part-b-q07": {
+      "assetSha256": "16a870cf4cc73793c760f5ec6db5be6dcb94097d467f3df37ceba64dbebd9086",
+      "sourceTop": 0,
+      "sourceBottom": 187,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2025-grades-3-4-part-single-q10": {
+      "assetSha256": "4b867c49fef57c3c1549dcc5e83de2e7bc9462cac2f22ae50f6c97f69dd2d392",
+      "sourceTop": 0,
+      "sourceBottom": 399,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "lebanon-2025-grades-3-4-q09": {
+      "assetSha256": "64ed0c9931bbe6b632bffc0444afc508eb1ea6d0de45efd62cf31b7770d45386",
+      "sourceTop": 0,
+      "sourceBottom": 214,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q088": {
+      "assetSha256": "38c02bae2e961d5f9d533cdd43756cd9b833d1d14b21422eae2cd8332c4cbfff",
+      "sourceTop": 0,
+      "sourceBottom": 222,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "oasis-online-2011-grades-3-4-q10": {
+      "assetSha256": "23facedab29427d5bb090f2fee707348347dd024d733495d390dde19e68d9504",
+      "sourceTop": 0,
+      "sourceBottom": 337,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "mk-canada-2003-34-single-q07": {
+      "assetSha256": "11dc6397ba207f589d82e20b204ced71c394b52ef6ac49e8566ddb1d31c50025",
+      "sourceTop": 0,
+      "sourceBottom": 98,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "mk-canada-2003-34-single-q08": {
+      "assetSha256": "560142375ce2927362c1c0021701eb2dd8cafeaa9d2f7fa0980ce9027620fd91",
+      "sourceTop": 0,
+      "sourceBottom": 122,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2020-grades-1-2-part-b-q07": {
+      "assetSha256": "ad360579d85fc3983fafb27a00571cfcc78cc317e89ff7431587816ba13e5278",
+      "sourceTop": 0,
+      "sourceBottom": 349,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2015-grades-1-2-q07": {
+      "assetSha256": "0a4ca20889e7b182b435b02da296bd93babd0b58f7dc57c0b949cf6b5174fb41",
+      "sourceTop": 0,
+      "sourceBottom": 189,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2023-grades-1-2-part-single-q10": {
+      "assetSha256": "2db9fe8f68cef09689836ed6b9175602c612b3d09b4ce4279df6dad46edc780c",
+      "sourceTop": 0,
+      "sourceBottom": 161,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2017-grades-3-4-part-single-q02": {
+      "assetSha256": "ffbf807777eed8dd6f207c90761151ff2abedbfb25ab4eed2e3ad65b567135af",
+      "sourceTop": 0,
+      "sourceBottom": 337,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2009-grades-3-4-q05": {
+      "assetSha256": "2c552e4c75f6f3c0325853a6328174f3bb6707d572f4854667eb6214e283a0ce",
+      "sourceTop": 0,
+      "sourceBottom": 94,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q014": {
+      "assetSha256": "3bdd78946c12744076291ec0dbb86c571a3160aafb5220bafc493d8e61f3c48f",
+      "sourceTop": 0,
+      "sourceBottom": 142,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2020-grades-3-4-part-a-q04": {
+      "assetSha256": "77d42452cbe14ccaf9206149c517466c69e7b3ed7422ecc4103ac9814bcee2d8",
+      "sourceTop": 0,
+      "sourceBottom": 173,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2016-grades-3-4-part-single-q06": {
+      "assetSha256": "306dec8db28c5eed513aedccd49b0be767c3a96529d7e67ba9a2cb2d8f365e39",
+      "sourceTop": 0,
+      "sourceBottom": 159,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "oasis-online-2010-grades-3-4-q02": {
+      "assetSha256": "f57a90237599b28b4ce85c36ed3d59eb1027068448de5655eac8b30f1667f29d",
+      "sourceTop": 0,
+      "sourceBottom": 337,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2009-grades-3-4-q03": {
+      "assetSha256": "0dd9b0dbc70c91693c7586e46673eb2c67117521d6f364b024094c1b374b3fec",
+      "sourceTop": 0,
+      "sourceBottom": 65,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "mk-canada-2003-34-single-q04": {
+      "assetSha256": "75336516c90e112f768a243909c4164d5f9ff04ffafa450395a0dbd128874499",
+      "sourceTop": 0,
+      "sourceBottom": 223,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2011-grades-3-4-q16": {
+      "assetSha256": "7314b2b281164e88612103c7a8adfc940657ee1148b65a87ab09c583154647a1",
+      "sourceTop": 0,
+      "sourceBottom": 157,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2015-grades-1-2-part-single-q05": {
+      "assetSha256": "046b6029df4922df3984e3ab68202460a269b428aef090ab1a5a3c25f394f3c9",
+      "sourceTop": 0,
+      "sourceBottom": 796,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2026-grades-3-4-part-single-q05": {
+      "assetSha256": "2fb12a89ddb2ed465ab10ffdc4b5026d5fecdd17a33ace740f5320d099afa6f1",
+      "sourceTop": 0,
+      "sourceBottom": 275,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2018-grades-3-4-part-single-q04": {
+      "assetSha256": "84f8a6bda716afeb4c4b344f36c46f1554008919fffd476329401bdb28bc2108",
+      "sourceTop": 0,
+      "sourceBottom": 458,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "canada-2015-grades-3-4-q05": {
+      "assetSha256": "05ceae75ce8da4b474ed3a5f0a9dccd8407b1db39c2d1c4b275bb18b14dea913",
+      "sourceTop": 0,
+      "sourceBottom": 574,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2010-grades-3-4-q15": {
+      "assetSha256": "d13db303b39f70b355c47d83f05ad5ff648cab07efb68218891adccbdac7063a",
+      "sourceTop": 0,
+      "sourceBottom": 104,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2007-grades-3-4-q05": {
+      "assetSha256": "2926ad5552f7197ca7a5b3ef289a71e3ed3cab34854350a63c478d10a82d1ede",
+      "sourceTop": 0,
+      "sourceBottom": 128,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2005-grades-3-4-q14": {
+      "assetSha256": "13ba84d8f791b53f9f57083cd5a880d90e3993887790fe8d57b976387f9b7632",
+      "sourceTop": 0,
+      "sourceBottom": 175,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2008-grades-1-2-q07": {
+      "assetSha256": "0f9bf3a8e048dafef3dd5d2f3a9393a88c9698f8801cb645519e61a0afd0860e",
+      "sourceTop": 0,
+      "sourceBottom": 100,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-4-points-q068": {
+      "assetSha256": "c7d56c47fd311cc7126fd6c27898bdfca6a8158c090ced0f3d553ad5ad94325c",
+      "sourceTop": 0,
+      "sourceBottom": 208,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-4-points-q069": {
+      "assetSha256": "47e6f12cff6c3a7319d318ee304267330ca3bd405bd1fff0fddae1107dae535b",
+      "sourceTop": 0,
+      "sourceBottom": 208,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q053": {
+      "assetSha256": "21e76c234c6710a08b69eb45658f48ee7a33b81e94a00bc1857d568f2dca79cd",
+      "sourceTop": 0,
+      "sourceBottom": 316,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q054": {
+      "assetSha256": "ff1144991f4b9274eac32411aa50702f3439e9bd5db050cfbef0bd7f02585c36",
+      "sourceTop": 0,
+      "sourceBottom": 235,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q055": {
+      "assetSha256": "7a3be0561109fbd252cb44b0e1346a737712a2b35cb10ce00c0e590c5211b879",
+      "sourceTop": 0,
+      "sourceBottom": 604,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2015-grades-1-2-part-single-q17": {
+      "assetSha256": "f35ae94a1f49dc364e68b7fddae0f25d7f8cc37475b3f8ad2d620c85b61c7dca",
+      "sourceTop": 0,
+      "sourceBottom": 244,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-3-points-q024": {
+      "assetSha256": "12f1bafcdde6b2a4abff4a87a2e550e36db52ed71775e1bf23eed45e586225c6",
+      "sourceTop": 0,
+      "sourceBottom": 785,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2005-grades-3-4-q10": {
+      "assetSha256": "b9b6b5b9c4ee719afa31654e99cb259a5d0a01a01dc36d2e628ee90a3d45e3ee",
+      "sourceTop": 0,
+      "sourceBottom": 127,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "mk-canada-2003-34-single-q05": {
+      "assetSha256": "2c896332e552e03a2147c33935774e0c98f669af7a7cd65fdba8cbd93058487d",
+      "sourceTop": 0,
+      "sourceBottom": 100,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2013-grades-3-4-part-single-q10": {
+      "assetSha256": "d5455db95dd144a49bf7e0714ad9c2d9ed893b063683154838cb251576b8b764",
+      "sourceTop": 0,
+      "sourceBottom": 233,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2020-grades-1-2-part-b-q03": {
+      "assetSha256": "938547fc8c21e94252332b2f061002eae907dabaa67ed65eb6a7b0e7e7c2a86c",
+      "sourceTop": 0,
+      "sourceBottom": 161,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2019-grades-1-2-q08": {
+      "assetSha256": "0e58c0d55d3c804612e3678b1dc638256f7b126b9cd9866607b53dac6f1c2840",
+      "sourceTop": 0,
+      "sourceBottom": 565,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-4-points-q037": {
+      "assetSha256": "3784bbb8b32540ab472afb02a4ad147ec9c9af2c6708611ede286d8d27942934",
+      "sourceTop": 0,
+      "sourceBottom": 377,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "canada-2015-grades-3-4-q04": {
+      "assetSha256": "58d111f6a7df6a4a1fc0d97dfb09f4928a746636cb2ff69562f6052f756f5753",
+      "sourceTop": 0,
+      "sourceBottom": 98,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "oasis-online-2010-grades-3-4-q06": {
+      "assetSha256": "3c3a586a82536824ad6c4ed4f65e58bb86669d81931c28d8a9deed0c638c5efc",
+      "sourceTop": 0,
+      "sourceBottom": 370,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2008-grades-3-4-q02": {
+      "assetSha256": "2819b95c72c3b0bdebd1d17664884e25494724503320f1b8091115477c115ba4",
+      "sourceTop": 0,
+      "sourceBottom": 140,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2005-grades-3-4-q03": {
+      "assetSha256": "b780c5d8c596da881f741eba0ab66d99a5a4014c857b84d64ef65d63c8d2fd87",
+      "sourceTop": 0,
+      "sourceBottom": 103,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2008-grades-1-2-q13": {
+      "assetSha256": "7c42fc706fa02d912a541072fd4f9ee2bc3d37bd5475bde0da131ade436ee4d6",
+      "sourceTop": 0,
+      "sourceBottom": 100,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2007-grades-1-2-q16": {
+      "assetSha256": "05b3de6ebae462009a7eeeb44d80a9c430e28a5ff185a2531c84d417d7d0c2b6",
+      "sourceTop": 0,
+      "sourceBottom": 93,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q012": {
+      "assetSha256": "5ea20c3652364581ae7090c2d0269a61a6bc581ea64d65f5c1bf309e48340b50",
+      "sourceTop": 0,
+      "sourceBottom": 176,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q024": {
+      "assetSha256": "00013ab7b474a86ace5cc5be98ae52bc097f1139445082531ccdd7bc41744444",
+      "sourceTop": 0,
+      "sourceBottom": 340,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2024-grades-3-4-part-single-q06": {
+      "assetSha256": "f1df8a814fdb75e4cd2ee734f4204772438fd328738b8f02f0aaa07df377a68d",
+      "sourceTop": 0,
+      "sourceBottom": 149,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2015-grades-3-4-part-single-q05": {
+      "assetSha256": "a76502a29486e6b1b2dd98c760236c3735e2e8deca2be76c3522cd2bf7a12823",
+      "sourceTop": 0,
+      "sourceBottom": 527,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "oasis-online-2011-grades-3-4-q06": {
+      "assetSha256": "30a6b6ba33c619e3ae447d96a385650e910b0c7739cc7ea887fd5ad4de3fc45e",
+      "sourceTop": 0,
+      "sourceBottom": 368,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2011-grades-3-4-q06": {
+      "assetSha256": "0f8a070a815510cd412da64397e7ab4c1fa4a95e8a42f02a7d5b449ecbac9adb",
+      "sourceTop": 0,
+      "sourceBottom": 154,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2007-grades-3-4-q12": {
+      "assetSha256": "16f54a6add8b1e7f7b7bea2143da6a4fd387df7d015e535ec6d3eaa7382ca835",
+      "sourceTop": 0,
+      "sourceBottom": 103,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q014": {
+      "assetSha256": "5783f3f2c3e1a0ab10fac8d6a732f4fcee1cbb93739b12650e59e13fe424a2fb",
+      "sourceTop": 0,
+      "sourceBottom": 419,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2012-grades-3-4-part-single-q10": {
+      "assetSha256": "823540ce7e573e2f76de63bc8f2aec5f7423b5db6f0f392dd84bc2dc2a3ce8dd",
+      "sourceTop": 0,
+      "sourceBottom": 121,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2019-grades-1-2-part-single-q05": {
+      "assetSha256": "03b178fee3709f9c1a1d1d0612c38d8dbf5c57b2ec0dcb260153b07d1b78c34c",
+      "sourceTop": 0,
+      "sourceBottom": 147,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2011-grades-1-2-q05": {
+      "assetSha256": "0bc247c82a65134b9bc45e1695c8a17c976a00f367da7e06ae77a667f720fb69",
+      "sourceTop": 0,
+      "sourceBottom": 86,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2009-grades-1-2-q16": {
+      "assetSha256": "3adef2b36e76e54090330127ec65a9ccfac0ecf552dd200fd0515bc84f8e9f89",
+      "sourceTop": 0,
+      "sourceBottom": 185,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2019-grades-3-4-part-single-q03": {
+      "assetSha256": "8802872f03b80e8668d9c60a2955418663fb0f19318274f33201bad5c6f20e5e",
+      "sourceTop": 0,
+      "sourceBottom": 147,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2006-grades-3-4-q04": {
+      "assetSha256": "6f85738df82a09eb23b6cc1a45c56025de087da02e2e9f127250bace5e69bb3f",
+      "sourceTop": 0,
+      "sourceBottom": 57,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2008-grades-1-2-q04": {
+      "assetSha256": "84d620f1bcc37ee262d6d1b374da3bc2305f006c31b5c33f09e43e6af957a801",
+      "sourceTop": 0,
+      "sourceBottom": 100,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-4-points-q062": {
+      "assetSha256": "ccb917450d896f5125c167769300f5c8fc2401fcae872ffb3f57e7f7a7e6d64c",
+      "sourceTop": 0,
+      "sourceBottom": 228,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-4-points-q067": {
+      "assetSha256": "3e732ce76bfaf345cdac6529385db0285fb7b75434fb25bd9c4182fe0502acdf",
+      "sourceTop": 0,
+      "sourceBottom": 208,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2012-grades-1-2-part-single-q12": {
+      "assetSha256": "779637acee7553986b6e79a5ee4f38ce1452cd0d7f22281466ebc1703905b109",
+      "sourceTop": 0,
+      "sourceBottom": 321,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2011-grades-1-2-q11": {
+      "assetSha256": "042b2014d934d5ea02778c68fbe0d8fe1c7cd7baad3543497901ed8548693ce9",
+      "sourceTop": 0,
+      "sourceBottom": 176,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2010-grades-1-2-q16": {
+      "assetSha256": "ece28ccb01656e8dbec4abd7f8af153a2362b0141838193f489e38d99b1e2484",
+      "sourceTop": 0,
+      "sourceBottom": 115,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2006-grades-1-2-q09": {
+      "assetSha256": "6e27d04f1464346b6fc12c3e2395438198df2bd11aa1eb40052029da07a6f15b",
+      "sourceTop": 0,
+      "sourceBottom": 123,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2007-grades-1-2-q18": {
+      "assetSha256": "9370d0f72ecee6e18e76e8a54ec8226ebe4d1ce2cd1ad15f67930ea5f6950344",
+      "sourceTop": 0,
+      "sourceBottom": 103,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-electronic-2015-grades-3-4-q08": {
+      "assetSha256": "809926ba6ff2ba8b082c6ef4ea67ed0684bc7b504a53b2354e1877eb80fa7e3c",
+      "sourceTop": 0,
+      "sourceBottom": 70,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2014-grades-3-4-part-single-q04": {
+      "assetSha256": "417cc519038c7fb2c8c43b7aedfdd240c741b3c8c69e2357c608f17cb7b3ab88",
+      "sourceTop": 0,
+      "sourceBottom": 173,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2011-grades-3-4-q01": {
+      "assetSha256": "78994358c15a8a8f964775e2f1d5ed4f16085ded0e09f683cb5a1df22f4fff78",
+      "sourceTop": 0,
+      "sourceBottom": 138,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2011-grades-3-4-q04": {
+      "assetSha256": "b1355cfbbbc47e70ac49d7f7c2f68f8a4511af33bf5b3d464be434e74c423f6d",
+      "sourceTop": 0,
+      "sourceBottom": 134,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2007-grades-3-4-q13": {
+      "assetSha256": "9a6a18e4fdb12dc78e1a9a4203aa29346bd8521d369ba895767d94736fde2de3",
+      "sourceTop": 0,
+      "sourceBottom": 123,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2013-grades-1-2-part-single-q06": {
+      "assetSha256": "e3565eecbdd8fc91d066a77dbd82a25d593b309e44bb311a403e1d33084d7740",
+      "sourceTop": 0,
+      "sourceBottom": 524,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2012-grades-3-4-part-single-q02": {
+      "assetSha256": "499991b0a2a445669bdc2f4e9665d68535d8031fa20f38dc1f9440acd8f12761",
+      "sourceTop": 0,
+      "sourceBottom": 224,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2009-grades-3-4-q12": {
+      "assetSha256": "cb9f8dfb7b5e461bda15d0dd7525a0fc2fe3185ffb8e46cf802a278fd50d82cd",
+      "sourceTop": 0,
+      "sourceBottom": 106,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2008-grades-3-4-q18": {
+      "assetSha256": "ccc239d9060b10a84ef7bbdea538a28afaaf15c9e77f44b8da514d091ded2645",
+      "sourceTop": 0,
+      "sourceBottom": 184,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "mk-canada-2002-34-single-q06": {
+      "assetSha256": "082f6bd257d45fb7d1efaeec4bef4bfabc5f1c2ff4a992a42313589ef241fb4c",
+      "sourceTop": 0,
+      "sourceBottom": 308,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q051": {
+      "assetSha256": "2a0053101a4a29a9a24beadd3340d80d336ef68c7d20dbf7c1b573a4ead39684",
+      "sourceTop": 0,
+      "sourceBottom": 217,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q054": {
+      "assetSha256": "a238ddbf72a6f809b974848996d401f0b61f681c6232c5aca787908f07efba67",
+      "sourceTop": 0,
+      "sourceBottom": 250,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q057": {
+      "assetSha256": "e1e6f6280ddf719c6dd01359d97a0c2e1739e96e0956d9980e0164e2d34dfcc4",
+      "sourceTop": 0,
+      "sourceBottom": 244,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q071": {
+      "assetSha256": "f57ea5eebde6a3d9d292298a6393a346f46020b60c316740c687dca50c418049",
+      "sourceTop": 0,
+      "sourceBottom": 249,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "canada-2015-grades-3-4-q16": {
+      "assetSha256": "a72908ec3056fd8708d689b19e837bd5294e28edbd0a1e521fbd6dd72ecf789d",
+      "sourceTop": 0,
+      "sourceBottom": 109,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-4-points-q091": {
+      "assetSha256": "3d781ef8b68d71f99393a1678d19a9b99802ca9f67b5ba84ca9628c18f1156e2",
+      "sourceTop": 0,
+      "sourceBottom": 700,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-4-points-q092": {
+      "assetSha256": "abe412a8a6da438106cd60716cf13b8eb54b6ba950c3460fe31fa1330a6fc0c0",
+      "sourceTop": 0,
+      "sourceBottom": 700,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2017-grades-1-2-part-single-q13": {
+      "assetSha256": "70526b71f28543185e400b1bc3768037a060447656ca4eec1e07eca4b84ce785",
+      "sourceTop": 0,
+      "sourceBottom": 372,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2010-grades-1-2-q13": {
+      "assetSha256": "45c26e405cbddc9c908998e037a11a66f2f1010e918cfaf8a66756be09dc46bd",
+      "sourceTop": 0,
+      "sourceBottom": 112,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2008-grades-1-2-q09": {
+      "assetSha256": "aa4023444dbc91884606c8d67f3c13f13ca27eae63b9b169da4bdef1113c547a",
+      "sourceTop": 0,
+      "sourceBottom": 164,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2011-grades-1-2-q19": {
+      "assetSha256": "5a74c3606fd7cc94758aad638a393e0e87c5911b00c8a0135adeefe5db6e6653",
+      "sourceTop": 0,
+      "sourceBottom": 155,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2010-grades-1-2-q18": {
+      "assetSha256": "ffb2af588287760650960e5d6283ee78571595ac4bf021f6df77b529317ca8cd",
+      "sourceTop": 0,
+      "sourceBottom": 112,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2008-grades-1-2-q17": {
+      "assetSha256": "0a234437eef5c9bfa58942c9278bd30c3222c74578f3b7ade5af8c3f60b23677",
+      "sourceTop": 0,
+      "sourceBottom": 100,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2007-grades-1-2-q23": {
+      "assetSha256": "beb0b25d60dee3295fefec8ee3daa49d7429f148753601d73cc1aa2ad16c4bfc",
+      "sourceTop": 0,
+      "sourceBottom": 114,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "oasis-online-2010-grades-3-4-q07": {
+      "assetSha256": "3133fedcf5bdc234086aededa467e9393dae208110e8cbdea799267410e3874d",
+      "sourceTop": 0,
+      "sourceBottom": 398,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q087": {
+      "assetSha256": "47eca7738baf64708a1713ff62dc11242087bd8e807d988e4633353129d465c4",
+      "sourceTop": 0,
+      "sourceBottom": 249,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q089": {
+      "assetSha256": "7a2e8a8a973fa4470f2ab245ba651803a01c6cdce774a24c74bc4282c6a987d8",
+      "sourceTop": 0,
+      "sourceBottom": 202,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q098": {
+      "assetSha256": "492165fd77ef43ed2765a654c9c4ba9acb12fd206a6aa50ef85f7ec9c21147b9",
+      "sourceTop": 0,
+      "sourceBottom": 245,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2017-grades-3-4-part-single-q11": {
+      "assetSha256": "4681a00f2d380a28a043d7cb244b71e54172047487cea23b22031a2a16b6e8b6",
+      "sourceTop": 0,
+      "sourceBottom": 144,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2016-grades-3-4-part-single-q11": {
+      "assetSha256": "9b4d26ab4171a52dcea870bab199a54234e65fcce2a4266ecf6424519414248d",
+      "sourceTop": 0,
+      "sourceBottom": 428,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-electronic-2015-grades-3-4-q12": {
+      "assetSha256": "ee3a810d9a3ff2a18d226870c12de58e55835574c0aeaddb6c0bf526ba543d0c",
+      "sourceTop": 0,
+      "sourceBottom": 134,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "oasis-online-2014-grades-3-4-q13": {
+      "assetSha256": "058ebf341ac6fafe2635de79fd2de481aeab2c197601fda8f6c20bf7e16e6ac5",
+      "sourceTop": 0,
+      "sourceBottom": 936,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2019-grades-1-2-part-single-q24": {
+      "assetSha256": "95cb8188e544825b93f11a169a05ae5af0fb47cd696521dc60973e8e365cd38a",
+      "sourceTop": 0,
+      "sourceBottom": 553,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2010-grades-1-2-q20": {
+      "assetSha256": "38a765a2227c5a02403f129b125d6f2dcd3e018e96a7c9d929cfcc4607b58b2b",
+      "sourceTop": 0,
+      "sourceBottom": 137,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2008-grades-1-2-q18": {
+      "assetSha256": "b48e477919036625265627d3e88302c7f27ae499f43718fd07ac03c23ef1829d",
+      "sourceTop": 0,
+      "sourceBottom": 123,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2010-grades-3-4-q12": {
+      "assetSha256": "ec351f9e7f1edcfea43d8cd19cbdddfcd20a7b29bccceee79162b2335dc518e0",
+      "sourceTop": 0,
+      "sourceBottom": 125,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2025-grades-3-4-part-single-q13": {
+      "assetSha256": "ec660f6ec99e5cb756bb1cef0cd23a61a74b69139bc88ec4b9e5de9036bc32ee",
+      "sourceTop": 0,
+      "sourceBottom": 292,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q044": {
+      "assetSha256": "9db013e58198cd81d5fd6062614d355c6634bfb18072d283ddaab02cd90d0668",
+      "sourceTop": 0,
+      "sourceBottom": 219,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "mk-canada-2002-34-single-q16": {
+      "assetSha256": "ce897a4f38a2a0be8ce7825f0816508c881853b954309476e803dc3a2a963caa",
+      "sourceTop": 0,
+      "sourceBottom": 125,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q052": {
+      "assetSha256": "19630c1d674992aa0f3aee63a58686b2830c6d119e785d667ba4ebc889e84fc3",
+      "sourceTop": 0,
+      "sourceBottom": 321,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q051": {
+      "assetSha256": "f13f44a32066520790c6365db0d30a7a2bbd417549732b345ee43af5f0628a3e",
+      "sourceTop": 0,
+      "sourceBottom": 378,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2019-grades-1-2-part-single-q21": {
+      "assetSha256": "060f3a4e962b3bb65450caced5ef996000e48fb125e2039bf6628cf59d5448a6",
+      "sourceTop": 0,
+      "sourceBottom": 488,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2010-grades-1-2-q17": {
+      "assetSha256": "e89dab8d45b38f9113ebe6c95a87cfa60a29cd8a27d750dd47c550e6dd677873",
+      "sourceTop": 0,
+      "sourceBottom": 144,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "mk-lithuania-2004-34-minor-q06": {
+      "assetSha256": "c53fc1b870096a7447d22891b2a6f89a6b19aa02d43af9a6e783e0db5d8bacb5",
+      "sourceTop": 0,
+      "sourceBottom": 99,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2025-grades-3-4-part-single-q14": {
+      "assetSha256": "58867f97c90cb3ca6484e62f9d6d63a52a01a0ef7c2d88d7d84e90b939ddc0b4",
+      "sourceTop": 0,
+      "sourceBottom": 220,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2019-grades-3-4-part-single-q15": {
+      "assetSha256": "cd9da2dd49c13b919c66c8f4662808916e2b5f7687f1ab4e9093c9a3824486d2",
+      "sourceTop": 0,
+      "sourceBottom": 287,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2014-grades-3-4-part-single-q10": {
+      "assetSha256": "faf64e0ec12bdd0b5477a195bad90efbcc7cd509036fb35254c1ad19ed6e4684",
+      "sourceTop": 0,
+      "sourceBottom": 219,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "oasis-online-2010-grades-3-4-q11": {
+      "assetSha256": "6f9070edb0943b1b43dd67dbf5ea8783572d10f5d468b9be9b8d707c9813525c",
+      "sourceTop": 0,
+      "sourceBottom": 367,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "mk-lithuania-2004-34-minor-q11": {
+      "assetSha256": "2aa2a5790534a86c0f9b8d5e3732342a51101a407c349a752c67cbb9432eeb93",
+      "sourceTop": 0,
+      "sourceBottom": 104,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2015-grades-1-2-q21": {
+      "assetSha256": "710366608dad17faccde9cbecca5b04342160f7106895d4aa5cbd3ce25a0987f",
+      "sourceTop": 0,
+      "sourceBottom": 271,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2018-grades-3-4-part-single-q15": {
+      "assetSha256": "e9986af17a7f91995ab6e4f2e61d4b8919e18eab2da7230ddfcbf69b0be2afbc",
+      "sourceTop": 0,
+      "sourceBottom": 390,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2024-grades-1-2-part-single-q13": {
+      "assetSha256": "1f8c2edc98d6af444938304ddac76c988438a186f61667f733db756128932386",
+      "sourceTop": 0,
+      "sourceBottom": 268,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q057": {
+      "assetSha256": "7d4c1a54c1003cc0ced7ec6e80c51d1612dcef713abcf0ca86e2f951b7f40e9d",
+      "sourceTop": 0,
+      "sourceBottom": 300,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q058": {
+      "assetSha256": "0319390fbfb34be2dbaab695487c6ae6b4058424d12877d33f9793c47bbe5113",
+      "sourceTop": 0,
+      "sourceBottom": 301,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q059": {
+      "assetSha256": "d2d1afbf04b95bce815ac8f681f9b150d248bf268f044ccaf67a479a81c1edff",
+      "sourceTop": 0,
+      "sourceBottom": 300,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q060": {
+      "assetSha256": "0f9b4b41c8ba0883ddc314750cc6f139dee8bf71632d0c72d1f1dbb1ec0bccc2",
+      "sourceTop": 0,
+      "sourceBottom": 301,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q072": {
+      "assetSha256": "d27537c39b9a3f2c59f2721f4dc9d2ee713e410ba7d2d9a7d3938e06604ac86a",
+      "sourceTop": 0,
+      "sourceBottom": 235,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q073": {
+      "assetSha256": "eb31bd0a1a0e32489702391d5d623c464a082401dab055c5cb5b5ccdf55625bb",
+      "sourceTop": 0,
+      "sourceBottom": 301,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q074": {
+      "assetSha256": "0a68b9213c0e42baa4c5f2eb59c76df5ee38a1796423de7c2e00f6f0370051eb",
+      "sourceTop": 0,
+      "sourceBottom": 300,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2018-grades-1-2-part-single-q22": {
+      "assetSha256": "56083fa3a87fe93e98f41f34ca49ba6dfe60230d6943886c89bf9b653d37fd1b",
+      "sourceTop": 0,
+      "sourceBottom": 410,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2010-grades-1-2-q21": {
+      "assetSha256": "dadf8ee5b789cf9fdb72b6832217835e803a9c99a02db08b8491b7a1a556dcb5",
+      "sourceTop": 0,
+      "sourceBottom": 136,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-3-points-q034": {
+      "assetSha256": "3407b1c829d80a2a455624bde558c7653caac1048231a4cf073e1ece34761795",
+      "sourceTop": 0,
+      "sourceBottom": 417,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2024-grades-3-4-part-single-q16": {
+      "assetSha256": "3c87eb7ef5ba7419067bfdc01b4cbb7de059e79806f82b33802cf78834458b06",
+      "sourceTop": 0,
+      "sourceBottom": 300,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2020-grades-3-4-part-b-q08": {
+      "assetSha256": "85d0109e97e3d28014d6b4635e0f010deb360db70f4b4436a8827fbe938b1db7",
+      "sourceTop": 0,
+      "sourceBottom": 549,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "mk-canada-2003-34-single-q10": {
+      "assetSha256": "01a611bbbc77a42b1ce6422762ea412b09fffecf78d93b133342f818ad03b53f",
+      "sourceTop": 0,
+      "sourceBottom": 197,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q008": {
+      "assetSha256": "420bb907e28be55e3869a27e36aeb3575fcb27d473023fe2609843850ce1ad58",
+      "sourceTop": 0,
+      "sourceBottom": 435,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q023": {
+      "assetSha256": "241aa81165f8e76df9ae18cfa5a28d3f31af9043ac16cf4f80fd69a962b9ddb6",
+      "sourceTop": 0,
+      "sourceBottom": 345,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2023-grades-3-4-part-single-q11": {
+      "assetSha256": "be647f33339aa54c951e29fd38fd5db34d3827560a07858f646e6abd1c34f1f5",
+      "sourceTop": 0,
+      "sourceBottom": 261,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2020-grades-3-4-part-a-q11": {
+      "assetSha256": "21280a9c292d64824148492f8d63353d762a6a103b434978fe41db8ee44772fd",
+      "sourceTop": 0,
+      "sourceBottom": 384,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2006-grades-3-4-q09": {
+      "assetSha256": "6f71ae320a985b6317485ca055c1675e5fbd087e09e19e61d23734169b54908e",
+      "sourceTop": 0,
+      "sourceBottom": 79,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2025-grades-3-4-part-single-q09": {
+      "assetSha256": "b8d1d9967c4424a764883bf3250a02224ac0f96179124f7f8bbc57b2731b084d",
+      "sourceTop": 0,
+      "sourceBottom": 186,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q081": {
+      "assetSha256": "32fedde220e337c14f71e18670e3c7a0f93897507aa31ba7f52998cc805dcbd2",
+      "sourceTop": 0,
+      "sourceBottom": 357,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q082": {
+      "assetSha256": "09c8093b8961c34ed74de193f2f491623621381ab2b18b54a6e061335923eb49",
+      "sourceTop": 0,
+      "sourceBottom": 352,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q083": {
+      "assetSha256": "ccb3aa2cb58dc2e9dab382332ccc3eb2f95ae3bc2b32b6bfbf1d5e63ccdacdba",
+      "sourceTop": 0,
+      "sourceBottom": 347,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q098": {
+      "assetSha256": "9cc1b87d8b057689944a119a01edd1f0644e1a3fbd154ce59d811c3f27f628d6",
+      "sourceTop": 0,
+      "sourceBottom": 388,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2006-grades-3-4-q12": {
+      "assetSha256": "03178b79104175fd7b9e32546bd93b91c01322c2a9bcbbca9ed3e6fd812f4868",
+      "sourceTop": 0,
+      "sourceBottom": 112,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q041": {
+      "assetSha256": "b3e7c9a9d766ed6e1eef61382fd7aee6c45cdcca681ba9e9e6884aa126203e3d",
+      "sourceTop": 0,
+      "sourceBottom": 255,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q042": {
+      "assetSha256": "618476c7c7835677641bf4aa453f1f31e57ffd48a02ea6146c820e6d17c60906",
+      "sourceTop": 0,
+      "sourceBottom": 274,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q090": {
+      "assetSha256": "439a364dac3cbfad8495d45393a4f148e87660c578f651ec70741115c536e01e",
+      "sourceTop": 0,
+      "sourceBottom": 410,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q100": {
+      "assetSha256": "aff763d6980058d165d9655855e96a842134f4ad8d05d2e4e384687e2bcd9cb7",
+      "sourceTop": 0,
+      "sourceBottom": 406,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2011-grades-3-4-q11": {
+      "assetSha256": "38209071fa3528d755c13549f64f0b485d09285c6607cf3318c982566ccfc503",
+      "sourceTop": 0,
+      "sourceBottom": 119,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2024-grades-1-2-part-single-q22": {
+      "assetSha256": "e7c368ae5b56804ed2d4076f72e8a39e82e8456b82f238ac4a088c057f4e4194",
+      "sourceTop": 0,
+      "sourceBottom": 315,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q007": {
+      "assetSha256": "65a8bbfc729c299e186e25e540dc4937b15a1e1e6e36ff9fe861fc16f9ceda82",
+      "sourceTop": 0,
+      "sourceBottom": 234,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q009": {
+      "assetSha256": "d645fcd571a5e26fdf067ee8501252235005e89d3ac9837285c9cda130c81b27",
+      "sourceTop": 0,
+      "sourceBottom": 234,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q010": {
+      "assetSha256": "25ae0eec22d14b9ea9a705210e3fe4e6ee7a7fabc3ede3ba0db15e1ba69dd439",
+      "sourceTop": 0,
+      "sourceBottom": 176,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l1-2-5-points-q015": {
+      "assetSha256": "ac93a721ac6353702779bd1f45c460f270ae29b8b1f2030e2672815bbd1fe208",
+      "sourceTop": 0,
+      "sourceBottom": 163,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2018-grades-1-2-part-single-q24": {
+      "assetSha256": "0229bb9725be2f41c7b99b0280c4e6f0dd5cf751e4c92bca800fe13507453abf",
+      "sourceTop": 0,
+      "sourceBottom": 747,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2017-grades-1-2-part-single-q15": {
+      "assetSha256": "14591542431a03b0fdfb78481b68a1f7ff3186d39c636a9c6805db1507167866",
+      "sourceTop": 0,
+      "sourceBottom": 355,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2017-grades-1-2-part-single-q20": {
+      "assetSha256": "7e1d6d88190715b32b2c2748055ece2d915ead715346bf0d7017871bda30f348",
+      "sourceTop": 0,
+      "sourceBottom": 368,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2015-grades-1-2-part-single-q23": {
+      "assetSha256": "35bd3b5c7d8aff5397ff2e5a5c1ca293ffe185a7efcc73b512360e789a9b30fd",
+      "sourceTop": 0,
+      "sourceBottom": 432,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2010-grades-1-2-q19": {
+      "assetSha256": "60c55244734b324fe3d521e270ada319d46da6052dbeb7c598d8c79dbda44744",
+      "sourceTop": 0,
+      "sourceBottom": 122,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "usa-2007-grades-1-2-q24": {
+      "assetSha256": "08ff806162cde733684059f57c2e6b0b7fb4856f5c71a8f69c917dfc849be4ca",
+      "sourceTop": 0,
+      "sourceBottom": 116,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2023-grades-3-4-part-single-q05": {
+      "assetSha256": "bf2748580a19b193ddc2c1c89cd4b7ebb1d99da05556e5952a2aa2f3691aef56",
+      "sourceTop": 0,
+      "sourceBottom": 341,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2012-grades-3-4-part-single-q08": {
+      "assetSha256": "181160021ebffca173caf0677a3eb97f7cb124bd2e66f48b6100a9f6c01f2047",
+      "sourceTop": 0,
+      "sourceBottom": 275,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2011-grades-3-4-q07": {
+      "assetSha256": "3809f31f2bc7040b154d0ca74a78a4413add1b529588afaca8c8621c72eb3d61",
+      "sourceTop": 0,
+      "sourceBottom": 158,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2009-grades-3-4-q07": {
+      "assetSha256": "0c58de811504e65688199a6e42dacf56f27260ced920d617c7e2a8821009ca3f",
+      "sourceTop": 0,
+      "sourceBottom": 114,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2008-grades-3-4-q15": {
+      "assetSha256": "15c70fbb351f9e1361097f44448b783005b0b12cf179592042b472ce5d928973",
+      "sourceTop": 0,
+      "sourceBottom": 217,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "mk-canada-2002-34-single-q05": {
+      "assetSha256": "cf3317a3b97757cae404cb2ee3a9f6988f488bcd7bf1068040cf4b9ab3fe4678",
+      "sourceTop": 0,
+      "sourceBottom": 77,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2018-grades-3-4-part-single-q13": {
+      "assetSha256": "ab9c64ee879bc387256b5f77935571b27f3dc7e684b01648920328e0a747b05a",
+      "sourceTop": 0,
+      "sourceBottom": 329,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "mk-lithuania-2004-34-minor-q14": {
+      "assetSha256": "610c22494bc4d6b226f63cf7a636724f742a78ba5e92be16757bf1416ffcfeb9",
+      "sourceTop": 0,
+      "sourceBottom": 68,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2024-grades-1-2-part-single-q23": {
+      "assetSha256": "882ee6707e5ff919eb036d23a420fb5f74aa01ef99280ce650d9a53041f54db1",
+      "sourceTop": 0,
+      "sourceBottom": 412,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2006-grades-3-4-q20": {
+      "assetSha256": "3505b3c387a6ca896ceb9ac44733daaa0a72e2179714db5f82108a693d965148",
+      "sourceTop": 0,
+      "sourceBottom": 76,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q017": {
+      "assetSha256": "d929e03e82269a711dfc569160342ba415ed0c54e5ad389633142f783313f995",
+      "sourceTop": 0,
+      "sourceBottom": 280,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q025": {
+      "assetSha256": "1b751d29a2d2397a6d668c7006a8bedfb207f925dfef0db6e3bea7154058491f",
+      "sourceTop": 0,
+      "sourceBottom": 281,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2017-grades-3-4-part-single-q15": {
+      "assetSha256": "2cc89ddf8f0ec4f137965b1ca6f83131d29e7779b0ea1bda0775980946b5ace4",
+      "sourceTop": 0,
+      "sourceBottom": 233,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2020-grades-3-4-part-b-q01": {
+      "assetSha256": "51e68f7151abd6abfaa68ac612671da6d58c102f413cd903783bdb2aea092efd",
+      "sourceTop": 0,
+      "sourceBottom": 290,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "pakistan-2011-grades-3-4-q08": {
+      "assetSha256": "4f06e6216e38065427631563afe4b8440a1de2b6ab9e2e9a8788e1e9dcd7cb13",
+      "sourceTop": 0,
+      "sourceBottom": 248,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q056": {
+      "assetSha256": "179828bd8bde40762b4f450e31440be8b1f657b02f34e1f4f7419d33d568d9e2",
+      "sourceTop": 0,
+      "sourceBottom": 281,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q058": {
+      "assetSha256": "d1c57c6bdf00714904c900207a3d2041b61b61c15a3f740f319fab3556fc7c88",
+      "sourceTop": 0,
+      "sourceBottom": 270,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q059": {
+      "assetSha256": "e117360278c587262e216e3dcaa0c8e6a3c3b131eaf52e3944f2082540d03c35",
+      "sourceTop": 0,
+      "sourceBottom": 442,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q060": {
+      "assetSha256": "d7e1202b333ea97773dab29c483d02b484f7f07ce3f533124d2bc621dff58392",
+      "sourceTop": 0,
+      "sourceBottom": 249,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q072": {
+      "assetSha256": "515d0a35aaf424f798498ad0882adc562bab7c2ffdce4384216911a938c74726",
+      "sourceTop": 0,
+      "sourceBottom": 331,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "cyprus-2014-grades-3-4-part-single-q11": {
+      "assetSha256": "6a23ce0c8a1bbf7099c3b2d56ceac4a7dcded498caf021ad37f3745a324ae7b6",
+      "sourceTop": 0,
+      "sourceBottom": 494,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "mk-canada-2002-34-single-q14": {
+      "assetSha256": "6486b01ece05118acf2ff7e3d27f3b13f9c01fdc23d902d4d82e05ce8965fc2a",
+      "sourceTop": 0,
+      "sourceBottom": 124,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
+    },
+    "think300-l3-4-4-points-q055": {
+      "assetSha256": "ba7c202c78d6c46e2ebcad6bbd6327311c1cf13c29fa4324ae4606e768d1cdc4",
+      "sourceTop": 0,
+      "sourceBottom": 345,
+      "basis": "Reviewed question-scoped source crop. Original prompt, diagram, and ordered choices retained; neighboring questions and generated provenance or answer footers excluded."
     }
   }
 }

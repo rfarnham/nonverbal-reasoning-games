@@ -4,7 +4,7 @@ import PlaytestGate from "./PlaytestGate";
 
 export const metadata: Metadata = {
   title: "Math Kangaroo Worlds · Playtest",
-  description: "Explore a spiral of mathematical ideas across twenty colorful worlds.",
+  description: "Explore sixteen mathematical ideas across thirty-two colorful worlds, with two full-test challenges.",
   robots: { index: false, follow: false },
 };
 

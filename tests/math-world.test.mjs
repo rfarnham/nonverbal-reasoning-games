@@ -113,7 +113,7 @@ test("the authored worlds have bounded, nonempty question stops", async () => {
     }
     return;
   }
-  assert.equal(WORLD_DEFINITIONS.length, 20);
+  assert.equal(WORLD_DEFINITIONS.length, 32);
   const taxonomy = JSON.parse(await readFile(new URL("../content/math-world/competition-math-taxonomy.v1.0.0.proposed.json", import.meta.url), "utf8"));
   const topics = new Set(taxonomy.domains.flatMap(domain => domain.topics.map(topic => topic.id)));
   const conceptPasses = new Set();
@@ -122,16 +122,17 @@ test("the authored worlds have bounded, nonempty question stops", async () => {
     const stops = stopsForWorld(world.id);
     assert.deepEqual(stops.map(stop => stop.id), world.stopIds);
     const questions = stops.flatMap(stop => QUESTIONS_BY_STOP.get(stop.id));
-    assert.equal(questions.length, 24);
-    assert.equal(stops.length, 4);
-    for (const stop of stops) assert.equal(QUESTIONS_BY_STOP.get(stop.id).length, 6);
+    assert.equal(questions.length, world.questionCount);
+    assert.ok(questions.length >= 10 && questions.length <= 24);
+    assert.ok(stops.length >= 2 && stops.length <= 4);
+    for (const stop of stops) assert.ok([5,6].includes(QUESTIONS_BY_STOP.get(stop.id).length));
     for (const question of questions) {
       assert.equal(question.worldId, world.id);
       assert.ok(topics.has(question.curriculum.primaryTopic));
       assert.ok(question.source.gradeBand === "1-2" ? [3,4,5].includes(question.source.pointTier) : question.source.gradeBand === "3-4" && [3,4].includes(question.source.pointTier));
     }
   }
-  assert.equal(conceptPasses.size, 20);
+  assert.equal(conceptPasses.size, 32);
   assert.equal(WORLD_STOPS.length, REQUIRED_STOPS.length + BREAK_STOPS.length);
 });
 
@@ -140,7 +141,7 @@ test("the frozen world package contains unique, mechanically playable questions"
   for (const question of WORLD_QUESTIONS) {
     assert.equal(ids.has(question.id), false, question.id);
     ids.add(question.id);
-    assert.ok([4, 5].includes(question.choices.length));
+    assert.ok([2, 3, 4, 5].includes(question.choices.length));
     assert.ok(question.correctIndex >= 0 && question.correctIndex < question.choices.length);
     assert.ok(question.prompt.trim());
     assert.equal(question.curriculum.placementStatus, WORLD_MODE === "prototype" ? "provisional-playtest" : "agent-reviewed");
