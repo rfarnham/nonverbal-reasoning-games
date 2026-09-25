@@ -9,6 +9,8 @@ import { GLOBE_DESTINATIONS, getGlobeDestination, getGlobeMap, getGlobeRoadPoint
 import type { GlobeSceneFrame, GlobeProjection, GlobeScene } from "./globe-scene";
 import type { ArchipelagoVoyage, VoyageActivityProps } from "./voyage.ts";
 import CoastScene from "./CoastScene";
+import { getWorldBiome } from "./globe-biome-data";
+import { getSceneryPaused, setSceneryPaused, subscribeSceneryPreference } from "./scenery-preference";
 import styles from "./globe.module.css";
 
 type Phase = "overview" | "focused" | "focusing" | "sailing" | "hopping" | "activity";
@@ -29,6 +31,7 @@ const subscribeNarrow = (notify: () => void) => {
 };
 const readNarrow = () => window.matchMedia(narrowQuery).matches;
 const serverNarrow = () => false;
+const readReducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const ease = (t: number) => t * t * (3 - 2 * t);
 function BookIcon() {
   return <svg viewBox="0 0 48 40" aria-hidden="true" fill="none"><path d="M24 8C17 3 9 3 3 5v28c8-2 14-1 21 3 7-4 13-5 21-3V5c-6-2-14-2-21 3Z" fill="#e3a75c" stroke="#805125" strokeWidth="2"/><path d="M24 8C18 4 11 4 6 6v23c7-1 12 0 18 4 6-4 11-5 18-4V6c-5-2-12-2-18 2Z" fill="#fff8dc"/><path d="M24 8v25M10 12l10 3m-10 3 10 3m8-6 10-3m-10 9 10-3" stroke="#ac8143" strokeWidth="2"/></svg>;
@@ -36,6 +39,8 @@ function BookIcon() {
 const titleFor = (id: string) => WORLD_DEFINITIONS.find(world => world.id === id)?.title ?? BOSS_CHALLENGES.find(boss => boss.id === id)?.title ?? "Your next island";
 
 export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoard(props, ref) {
+  const sceneryPaused = useSyncExternalStore(subscribeSceneryPreference, getSceneryPaused, serverNarrow);
+  const reducedScenery = useSyncExternalStore(subscribeSceneryPreference, readReducedMotion, serverNarrow);
   const narrow = useSyncExternalStore(subscribeNarrow, readNarrow, serverNarrow);
   const destinationId = props.boss?.id ?? props.world.id;
   const selected = getGlobeDestination(destinationId)!;
@@ -239,7 +244,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
     const timer = window.setTimeout(() => { if (alive && !sceneRef.current) setRenderer("fallback"); }, 8000);
     void import("./globe-scene").then(({ createGlobeScene }) => {
       if (!alive || !canvasRef.current) return;
-      const scene = createGlobeScene(canvasRef.current, { assetBasePath: basePath, onProject: positionMarkers, onUnavailable: () => { if (alive) { setRenderer("fallback"); cancelTrip(); animation.current?.cancel(); settlePose(); } } });
+      const scene = createGlobeScene(canvasRef.current, { assetBasePath: basePath, animateScenery: !getSceneryPaused(), onProject: positionMarkers, onUnavailable: () => { if (alive) { setRenderer("fallback"); cancelTrip(); animation.current?.cancel(); settlePose(); } } });
       if (!alive) { scene.dispose(); return; }
       sceneRef.current = scene; setRenderer("webgl"); paint({ avatarPosition: restingPosition() });
     }).catch(() => { if (alive) setRenderer("fallback"); });
@@ -250,6 +255,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
     // The scene is owned by this mount; current props are read through latest.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useEffect(() => { sceneRef.current?.setSceneryMotion(!sceneryPaused); }, [sceneryPaused]);
   const onBusyChange = props.onBusyChange;
   useEffect(() => { onBusyChange(busy); return () => onBusyChange(false); }, [busy, onBusyChange]);
   useEffect(() => {
@@ -270,12 +276,17 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
   const pointer = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   return <section className={styles.boardSection} aria-label={`${titleFor(destinationId)} globe map`}>
     <div className={styles.boardToolbar}>
-      <span className={styles.boardEyebrow}>{phase === "overview" ? "A world of discoveries" : "The Curiosity Isles"}</span>
+      <span className={styles.boardEyebrow}>{phase === "overview" ? "A world of discoveries" : props.boss ? "Challenge islands" : getWorldBiome(props.world.number).label}</span>
+      <div className={styles.sceneryControls}>
+      {renderer === "webgl" && <button type="button" className={styles.sceneryToggle} aria-pressed={sceneryPaused} disabled={reducedScenery}
+        title={reducedScenery ? "Scenery stays still with reduced motion" : undefined}
+        onClick={() => setSceneryPaused(!sceneryPaused)}>{sceneryPaused ? "Scenery paused" : "Pause scenery"}</button>}
       <button type="button" disabled={busy || renderer !== "webgl"} onClick={() => {
         if (phase === "overview") { void focusRegion(); return; }
         const start = frame.current.zoom; setBoardPhase("focusing");
         void animate(650, t => paint({ zoom: start * (1 - ease(t)), avatarPosition: undefined })).then(done => { if (done) { setBoardPhase("overview"); paint(); } });
       }}>{phase === "overview" ? `Explore ${titleFor(destinationId)}` : "Show globe"} <span aria-hidden="true">{phase === "overview" ? "↘" : "◎"}</span></button>
+      </div>
     </div>
     <div ref={boardRef} className={styles.board} data-globe-phase={phase} data-globe-renderer={renderer} data-voyage-from={voyage?.fromDestinationId} data-voyage-to={voyage?.toDestinationId} aria-busy={busy}
       onPointerDown={event => { if (phase !== "overview" || (event.target as HTMLElement).closest("button")) return; pointer.current = { x: event.clientX, y: event.clientY, moved: false }; event.currentTarget.setPointerCapture(event.pointerId); }}

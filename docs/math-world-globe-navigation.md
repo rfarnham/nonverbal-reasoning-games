@@ -14,7 +14,15 @@ Destination selection is committed only on arrival. Canceling, closing the page,
 
 ## Rendering and accessibility
 
-The globe, raised islands, paths, landmarks, and boat are local WebGL geometry. The animal is a camera-facing sprite made from the bundled animal artwork. Stop and book controls are native HTML buttons projected from their actual 3D positions. They remain at least 44 CSS pixels; the ordered stop list provides an equivalent control route. The renderer only draws during a change and releases its GPU, image, resize, and event resources on unmount.
+The globe, raised islands, paths, landmarks, and boat are local WebGL geometry. The animal is a camera-facing map pawn made from the bundled animal artwork, perched above its current stop or road so tall scenery cannot hide it. Stop and book controls are native HTML buttons projected from their actual 3D positions. They remain at least 44 CSS pixels; the ordered stop list provides an equivalent control route. The renderer releases its GPU, image, resize, visibility, and event resources on unmount.
+
+## Geography and atmosphere
+
+Each concept's archipelago has a geographic identity with a distinct return-visit variant. Terrain includes volcanic craters and basalt shores, dense forest canopies, coral lagoons, river valleys and waterfalls, snowy tundra, glacier fjords, alpine lakes, and desert formations. These are modeled landforms rather than recolored versions of one island. The original stop locations, roads, two storybooks, question order, and landing elevations stay consistent.
+
+Soft cloud banks drift around the sphere, volcanoes emit rising smoke, water flows through rivers and falls, and the ocean has gentle moving highlights. Atmospheric haze softens the distant horizon. Clouds fade away from the focused archipelago so its stops remain readable.
+
+**Pause scenery** freezes these environmental effects without interrupting navigation. Its preference is remembered on the device. System reduced motion keeps the scenery still and retains the existing direct navigation behavior. A separate active-time clock caps scenery painting at 30 frames per second, pauses while the page is hidden or the globe is offscreen, and avoids duplicating renders during camera travel. Returning to the map or tab resumes smoothly without jumping through elapsed hidden time. Question panels run none of these effects.
 
 Reduced motion moves directly to the destination or question. If WebGL is unavailable or its context is lost, the authored map and native stop list remain playable. The globe adds no external runtime asset or service dependency.
 
@@ -26,4 +34,4 @@ No arithmetic questions, difficulty rules, timing, rewards, or gate have been in
 
 ## Verification
 
-Pure geometry tests cover fixed destinations, source-map projection, great-circle edge cases, all 561 destination pairs, ocean clearance, and consistent route sampling. Browser checks cover normal earned progression, test mode, cancellation and reload, same-canvas travel, stop completion, original-art workbook printing, boss milestones, context loss, reduced motion, keyboard controls, and the 390/620/820/1440 layouts.
+Pure geometry tests cover fixed destinations, source-map projection, great-circle edge cases, all 561 destination pairs, ocean clearance, and consistent route sampling. Scenery-clock tests cover capped painting, pause/resume time, stalled frames, and disposal. Browser checks cover normal earned progression, test mode, cancellation and reload, same-canvas travel, stop completion, original-art workbook printing, boss milestones, context loss, reduced motion, remembered scenery pause, hidden/offscreen suspension, keyboard controls, and the 390/620/820/1440 layouts.

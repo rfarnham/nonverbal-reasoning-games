@@ -23,7 +23,7 @@
 .boardEyebrow { font-size: .64rem; letter-spacing: .18em; text-transform: uppercase; font-weight: 850; color: #345c62; }
 .boardToolbar button { min-height: 44px; background: #fffdf8; padding: 8px 15px; max-width: 66%; text-align: left; display: flex; align-items: center; gap: 14px; }
 .boardToolbar button span { font-size: 1.2rem; }
-.board { position: relative; width: 100%; height: clamp(460px, 57vw, 700px); overflow: hidden; background: radial-gradient(ellipse at 50% 35%, #edf7e2 0, #b9d9d2 50%, #87b9bd 100%); isolation: isolate; }
+.board { position: relative; width: 100%; height: clamp(460px, 57vw, 700px); overflow: hidden; background: radial-gradient(ellipse at 50% 20%, #eaf8ff 0, #b2dce9 52%, #73afcf 100%); isolation: isolate; }
 .board[data-globe-phase="overview"] { touch-action: pan-y; cursor: grab; }
 .board[data-globe-phase="overview"]:active { cursor: grabbing; }
 .canvas, .markerLayer, .fallbackMap { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -69,3 +69,14 @@
 
 .board[data-globe-renderer="fallback"] .canvas { display: none; }
 @media (max-width: 620px) { .board[data-globe-renderer="fallback"] { aspect-ratio: 400 / 960; } }
+
+.sceneryControls { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.sceneryControls button { max-width: none; }
+.sceneryControls .sceneryToggle { font-size: .73rem; color: #315e65; background: #edf5e9; border-color: #b8d0bd; }
+.sceneryControls .sceneryToggle[aria-pressed="true"] { color: #17213d; background: #fffdf8; }
+@media (max-width: 620px) {
+  .boardToolbar { flex-wrap: wrap; }
+  .boardEyebrow { max-width: none; width: 100%; }
+  .sceneryControls { width: 100%; }
+  .sceneryControls button { flex: 1; justify-content: center; }
+}

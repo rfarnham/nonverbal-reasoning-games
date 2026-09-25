@@ -558,6 +558,13 @@ interactive targets below 44×44 CSS pixels.
 
 Motion explains causality; it is not ambient decoration.
 
+Math Kangaroo Worlds' globe is an owner-approved exception for atmospheric
+scenery: drifting clouds, volcanic smoke, flowing water, and gentle ocean
+shimmer belong on its map. Keep them clear of stop controls and question
+content. Provide a remembered **Pause scenery** control, honor reduced motion,
+and stop the scenery clock when the map is hidden, offscreen, or unmounted.
+Scenery motion must never change navigation, answers, progress, or timing.
+
 - Animate the actual state change, not a generic flourish.
 - Preserve geometry, direction, scale, orientation, and timing truthfully.
 - If a piece contains a directional mark or advanced pattern, transform the
