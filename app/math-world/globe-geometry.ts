@@ -18,8 +18,14 @@ export type GlobeDestination = Readonly<{
 export const GLOBE_RADIUS = 1;
 export const GLOBE_PATCH_HALF_WIDTH = 0.175;
 export const GLOBE_REGION_RADIUS = 0.215;
-export const GLOBE_HARBOR_RADIUS = 0.25;
-const OCEAN_CLEARANCE = GLOBE_REGION_RADIUS + 0.006;
+export const GLOBE_HARBOR_RADIUS = 0.277;
+/** The visible boat hull is .072 units wide; reserve half-width plus a small buffer. */
+export const GLOBE_VOYAGE_CLEARANCE = 0.04;
+const OCEAN_MARGIN = GLOBE_VOYAGE_CLEARANCE;
+const POLAR_CAPS = [
+  { id: "north-polar-ice", center: { x: 0, y: 1, z: 0 }, angularRadius: 0.303 },
+  { id: "south-polar-ice", center: { x: 0, y: -1, z: 0 }, angularRadius: 0.303 },
+] as const;
 const EPSILON = 1e-10;
 const clamp = (value: number, min = -1, max = 1) => Math.max(min, Math.min(max, value));
 
@@ -48,25 +54,22 @@ export function tangentPointToGlobe(region: Pick<GlobeDestination, "center" | "e
   return scaleVec3(addVec3(scaleVec3(region.center, Math.cos(angle)), scaleVec3(tangent, Math.sin(angle))), radius);
 }
 
+/** Six authored continental chains leave broad open oceans between their denser
+ * island groups. Coordinates are latitude/longitude, not a uniform sphere lattice. */
+const CLUSTER_LAYOUTS = [
+  { id: "sunrise", label: "Sunrise Coast", coordinates: [[9.9012, -15.3313], [57.6544, -33.2358], [29.3596, -36.6841], [27.9179, 35.7757], [58.4105, 25.4427], [6.6274, 15.7797]] },
+  { id: "monsoon", label: "Monsoon Isles", coordinates: [[-11.3223, 44.6994], [-27.3005, 92.5843], [-6.3576, 72.0966], [-57.5133, 34.263], [-58.358, 88.81]] },
+  { id: "jade", label: "Jade Highlands", coordinates: [[28.4462, 85.2901], [7.9278, 107.4803], [28.5271, 155.6401], [55.7466, 92.1322], [56.1217, 144.8905], [6.0003, 136.2316]] },
+  { id: "ember", label: "Ember Reach", coordinates: [[-6.3527, -165.6203], [-55.5028, 149.0413], [-27.8718, 148.1199], [-30.0042, -149.0725], [-57.734, -156.1873], [-5.5339, 166.0435]] },
+  { id: "aurora", label: "Aurora Coast", coordinates: [[26.7736, -156.2437], [7.1166, -134.8614], [10.5878, -106.115], [56.1574, -97.4856], [56.4113, -149.1319]] },
+  { id: "wildwood", label: "Wildwood Passage", coordinates: [[-29.7269, -97.5025], [-5.6146, -75.4145], [-30.3291, -26.2769], [-58.9533, -93.1913], [-58.4185, -31.114], [-6.518, -43.9832]] },
+] as const;
+
 function destinationCenters(): Vec3[] {
-  // A fixed Fibonacci distribution gives every archipelago real ocean around it.
-  // A deterministic nearest-neighbor tour keeps most consecutive boat rides local.
-  const count = 34;
-  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
-  const remaining = Array.from({ length: count }, (_, index) => {
-    const y = 1 - 2 * (index + 0.5) / count;
-    const ringRadius = Math.sqrt(1 - y * y);
-    return { x: Math.cos(index * goldenAngle) * ringRadius, y, z: Math.sin(index * goldenAngle) * ringRadius };
-  });
-  const ordered = [remaining.splice(12, 1)[0]];
-  while (remaining.length) {
-    let closest = 0;
-    for (let index = 1; index < remaining.length; index += 1) {
-      if (dotVec3(ordered.at(-1)!, remaining[index]) > dotVec3(ordered.at(-1)!, remaining[closest])) closest = index;
-    }
-    ordered.push(remaining.splice(closest, 1)[0]);
-  }
-  return ordered;
+  return CLUSTER_LAYOUTS.flatMap(cluster => cluster.coordinates.map(([latitude, longitude]) => {
+    const lat = latitude * Math.PI / 180, lon = longitude * Math.PI / 180;
+    return { x: Math.cos(lat) * Math.cos(lon), y: Math.sin(lat), z: Math.cos(lat) * Math.sin(lon) };
+  }));
 }
 
 function makeDestinations(): GlobeDestination[] {
@@ -82,12 +85,42 @@ function makeDestinations(): GlobeDestination[] {
     add(definition?.id ?? `world-${worldNumber}`, "teaching");
     if (worldNumber === 16 || worldNumber === 32) add(worldNumber === 16 ? "boss-2025" : "boss-2026", "boss");
   }
-  return destinations;
+  return destinations.map((destination, index) => {
+    let first = 0;
+    const cluster = CLUSTER_LAYOUTS.find(item => { const contains = index < first + item.coordinates.length; if (!contains) first += item.coordinates.length; return contains; })!;
+    const clusterCenter = normalizeVec3(destinations.slice(first, first + cluster.coordinates.length).reduce((sum, item) => addVec3(sum, item.center), { x: 0, y: 0, z: 0 }));
+    const towardCluster = addVec3(clusterCenter, scaleVec3(destination.center, -dotVec3(clusterCenter, destination.center)));
+    const outward = scaleVec3(normalizeVec3(towardCluster), -1);
+    const outwardAngle = Math.atan2(dotVec3(outward, destination.north), dotVec3(outward, destination.east));
+    const obstacles = [...destinations.filter(item => item !== destination), ...POLAR_CAPS];
+    let harbor: Vec3 | undefined, bestScore = -Infinity;
+    for (const radius of [GLOBE_HARBOR_RADIUS, 0.302, 0.327]) for (let step = -10; step <= 10; step++) {
+      const angle = outwardAngle + step * Math.PI / 24;
+      const candidate = tangentPointToGlobe(destination, Math.cos(angle) * radius, Math.sin(angle) * radius);
+      const clearance = Math.min(...obstacles.map(obstacle => sphericalAngle(candidate, obstacle.center) - obstacle.angularRadius));
+      if (clearance < OCEAN_MARGIN + 0.008) continue;
+      const score = clearance + Math.cos(angle - outwardAngle) * 0.09 - (radius - GLOBE_HARBOR_RADIUS) * 0.5;
+      if (score > bestScore) { bestScore = score; harbor = candidate; }
+    }
+    if (!harbor) throw new Error(`No safe outward harbor for ${destination.id}.`);
+    return { ...destination, harbor };
+  });
 }
 
 export const GLOBE_DESTINATIONS: readonly GlobeDestination[] = makeDestinations();
 export const GLOBE_REGIONS: readonly GlobeDestination[] = GLOBE_DESTINATIONS.filter(region => region.kind === "teaching");
 export const GLOBE_BOSS_REGIONS: readonly GlobeDestination[] = GLOBE_DESTINATIONS.filter(region => region.kind === "boss");
+
+export const GLOBE_GEOGRAPHIC_CLUSTERS = CLUSTER_LAYOUTS.map((cluster, index) => {
+  const first = CLUSTER_LAYOUTS.slice(0, index).reduce((count, item) => count + item.coordinates.length, 0);
+  return { id: cluster.id, label: cluster.label, destinationIds: GLOBE_DESTINATIONS.slice(first, first + cluster.coordinates.length).map(destination => destination.id) };
+});
+/** Conservative envelopes include the irregular frozen coast and coastal icebergs. */
+export const GLOBE_POLAR_CAPS: readonly Readonly<{ id: string; center: Vec3; angularRadius: number }>[] = POLAR_CAPS;
+export const GLOBE_LAND_OBSTACLES: readonly Readonly<{ id: string; center: Vec3; angularRadius: number }>[] = [
+  ...GLOBE_DESTINATIONS.map(({ id, center, angularRadius }) => ({ id, center, angularRadius })), ...GLOBE_POLAR_CAPS,
+];
+
 
 export function getGlobeDestination(id: string | number): GlobeDestination {
   const region = typeof id === "number"
@@ -172,15 +205,22 @@ let oceanGraph: OceanGraph | undefined;
 const voyageCache = new Map<string, readonly Vec3[]>();
 
 function clearOceanArc(from: Vec3, to: Vec3): boolean {
-  return GLOBE_DESTINATIONS.every(region => distanceToSurfaceArc(region.center, from, to) >= OCEAN_CLEARANCE - EPSILON);
+  return GLOBE_LAND_OBSTACLES.every(region => distanceToSurfaceArc(region.center, from, to) >= region.angularRadius + OCEAN_MARGIN - EPSILON);
 }
 
 function getOceanGraph(): OceanGraph {
   if (oceanGraph) return oceanGraph;
   const nodes = GLOBE_DESTINATIONS.flatMap(region => Array.from({ length: coastCount }, (_, index) => {
-    const angle = index / coastCount * Math.PI * 2;
+    if (index === 0) return region.harbor;
+    const portAngle = Math.atan2(dotVec3(region.harbor, region.north), dotVec3(region.harbor, region.east));
+    const angle = portAngle + index / coastCount * Math.PI * 2;
     return tangentPointToGlobe(region, Math.cos(angle) * GLOBE_HARBOR_RADIUS, Math.sin(angle) * GLOBE_HARBOR_RADIUS);
   }));
+  // Polar shore nodes let long voyages go around the ice rather than crossing it.
+  for (const cap of GLOBE_POLAR_CAPS) for (let index = 0; index < 32; index++) {
+    const angle = index * Math.PI / 16;
+    nodes.push(tangentPointToGlobe(frame(cap.center), Math.cos(angle) * (cap.angularRadius + OCEAN_MARGIN + 0.025), Math.sin(angle) * (cap.angularRadius + OCEAN_MARGIN + 0.025)));
+  }
   const edges: OceanGraph["edges"] = nodes.map(() => []);
   for (let from = 0; from < nodes.length; from += 1) for (let to = from + 1; to < nodes.length; to += 1) {
     const length = sphericalAngle(nodes[from], nodes[to]);

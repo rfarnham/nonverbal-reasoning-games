@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  GLOBE_BOSS_REGIONS, GLOBE_DESTINATIONS, GLOBE_REGIONS, GLOBE_REGION_RADIUS,
+  GLOBE_BOSS_REGIONS, GLOBE_DESTINATIONS, GLOBE_REGIONS, GLOBE_REGION_RADIUS, GLOBE_GEOGRAPHIC_CLUSTERS, GLOBE_LAND_OBSTACLES, GLOBE_POLAR_CAPS, GLOBE_VOYAGE_CLEARANCE,
   distanceToSurfaceArc, dotVec3, getGlobeDestination, getGlobeMap, getGlobeRegion,
   getGlobeRoadPoints, getSurfaceRouteTangent, getVoyageRoute, mapPointToGlobe,
   sampleSurfaceRoute, sphericalAngle, sphericalInterpolate,
@@ -31,7 +31,7 @@ test("32 persistent archipelagos and two boss destinations occupy distinct non-o
     assert.equal(getGlobeDestination(region.id), region);
     assert.ok(sphericalAngle(region.center, region.harbor) > region.angularRadius, "harbor is in open water outside its land envelope");
     for (const other of GLOBE_DESTINATIONS.slice(index + 1)) {
-      assert.ok(sphericalAngle(region.center, other.center) > region.angularRadius + other.angularRadius + 0.08, "archipelagos leave a navigable ocean corridor");
+      assert.ok(sphericalAngle(region.center, other.center) > region.angularRadius + other.angularRadius, "actual land envelopes never overlap; the boat planner avoids channels narrower than its hull");
     }
   }
   assert.throws(() => getGlobeRegion(0));
@@ -100,9 +100,9 @@ test("spherical interpolation handles equal, near-equal and antipodal points wit
   assert.throws(() => sphericalInterpolate({ x: 0, y: 0, z: 0 }, pairs[0][1], 0.5));
 });
 
-test("every onward voyage and nonadjacent QA jump stays over ocean, reaches exact docks, and reverses faithfully", () => {
-  const pairs = GLOBE_DESTINATIONS.slice(1).map((region, index) => [GLOBE_DESTINATIONS[index].id, region.id]);
-  pairs.push([1, 17], [1, 32], [5, 26], ["boss-2025", "boss-2026"], [29, 3]);
+test("all 561 voyages clear the full boat width and polar land, reach exact docks, and reverse faithfully", () => {
+  const pairs = GLOBE_DESTINATIONS.flatMap((from, index) => GLOBE_DESTINATIONS.slice(index + 1).map(to => [from.id, to.id]));
+  assert.equal(pairs.length, 561);
   for (const [from, to] of pairs) {
     const route = getVoyageRoute(from, to);
     assert.ok(route.length > 2);
@@ -112,8 +112,8 @@ test("every onward voyage and nonadjacent QA jump stays over ocean, reaches exac
     for (const point of route) near(length(point), 1);
     for (let index = 1; index < route.length; index += 1) {
       assert.ok(sphericalAngle(route[index - 1], route[index]) <= 0.0120001, "there are no teleporting gaps");
-      for (const region of GLOBE_DESTINATIONS) {
-        assert.ok(distanceToSurfaceArc(region.center, route[index - 1], route[index]) >= region.angularRadius + 0.0059, `${from}→${to} avoids ${region.id}, including between samples`);
+      for (const region of GLOBE_LAND_OBSTACLES) {
+        assert.ok(distanceToSurfaceArc(region.center, route[index - 1], route[index]) >= region.angularRadius + GLOBE_VOYAGE_CLEARANCE - 1e-7, `${from}→${to} avoids ${region.id}, including between samples`);
       }
     }
     nearPoint(sampleSurfaceRoute(route, 0), route[0]);
@@ -137,4 +137,26 @@ test("route sampling runs at constant angular speed through unequal segments", (
   near(length(sampleSurfaceRoute(route, 0.2, 1.04)), 1.04);
   assert.throws(() => sampleSurfaceRoute([], 0.5));
   near(length(getSurfaceRouteTangent([point(0)], 1)), 1);
+});
+
+
+test("six irregular geographic chains have genuinely closer neighbors within their own cluster", () => {
+  assert.equal(GLOBE_GEOGRAPHIC_CLUSTERS.length, 6);
+  const membership = new Map(GLOBE_GEOGRAPHIC_CLUSTERS.flatMap(cluster => cluster.destinationIds.map(id => [id, cluster.id])));
+  assert.equal(membership.size, 34);
+  let sameSum = 0, otherSum = 0;
+  for (const region of GLOBE_DESTINATIONS) {
+    const nearest = same => Math.min(...GLOBE_DESTINATIONS.filter(other => other !== region && (membership.get(other.id) === membership.get(region.id)) === same).map(other => sphericalAngle(region.center, other.center)));
+    const same = nearest(true), other = nearest(false);
+    assert.ok(same < other, `${region.id} belongs to a denser chain rather than an arbitrary label on a uniform lattice`);
+    sameSum += same; otherSum += other;
+    assert.ok(Math.abs(region.center.y) < Math.sin(60 * Math.PI / 180), "map frames stay away from the polar orientation switch");
+    for (const obstacle of GLOBE_LAND_OBSTACLES) assert.ok(sphericalAngle(region.harbor, obstacle.center) > obstacle.angularRadius + GLOBE_VOYAGE_CLEARANCE, "the full boat width fits at every dock");
+  }
+  assert.ok(otherSum / sameSum > 1.2, "broader inter-cluster oceans separate denser island chains");
+  assert.equal(GLOBE_POLAR_CAPS.length, 2);
+  assert.equal(GLOBE_LAND_OBSTACLES.length, 36);
+  for (const [index, obstacle] of GLOBE_LAND_OBSTACLES.entries()) for (const other of GLOBE_LAND_OBSTACLES.slice(index + 1)) {
+    assert.ok(sphericalAngle(obstacle.center, other.center) > obstacle.angularRadius + other.angularRadius, "polar and archipelago land envelopes remain disjoint");
+  }
 });

@@ -2,15 +2,16 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { WORLD_DEFINITIONS } from "./world-data.ts";
 import { getWorldMapLayout, type MapIsland } from "./map-layouts.ts";
-import { getGlobeRegion, mapPointToGlobe, type Vec3 } from "./globe-geometry.ts";
+import { GLOBE_POLAR_CAPS, getGlobeRegion, mapPointToGlobe, tangentPointToGlobe, type Vec3 } from "./globe-geometry.ts";
 
-import { getWorldBiome, type GlobeBiome, type GlobeBiomeId } from "./globe-biome-data.ts";
+import { getIslandRelief, getWorldBiome, type GlobeBiome, type GlobeBiomeId } from "./globe-biome-data.ts";
 export { getWorldBiome } from "./globe-biome-data.ts";
 
 export type GlobeSmokeSource = Readonly<{ position: Vec3; strength: number }>;
 export type GlobeBiomes = Readonly<{
   smokeSources: readonly GlobeSmokeSource[];
-  update: (timeSeconds: number, activeDestinationId: string, zoom: number) => void;
+  mistSources: readonly GlobeSmokeSource[];
+  update: (timeSeconds: number, activeDestinationId: string, zoom: number, sunDirection?: THREE.Vector3) => void;
   dispose: () => void;
 }>;
 
@@ -50,6 +51,7 @@ export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
   const batches = new Map<number, THREE.BufferGeometry[]>();
   const movingBatches: THREE.BufferGeometry[][] = [[], []];
   const smokeSources: GlobeSmokeSource[] = [];
+  const mistSources: GlobeSmokeSource[] = [];
   const own = <T extends THREE.BufferGeometry>(geometry: T): T => { ownedGeometries.add(geometry); return geometry; };
   const boxGeometry = own(new THREE.BoxGeometry(1, 1, 1));
   const ballGeometry = own(new THREE.IcosahedronGeometry(1, 1));
@@ -177,14 +179,14 @@ export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
   const clearForControls = (island: MapIsland, x: number, y: number) => island.stopIndex === undefined
     ? Math.hypot(x, y) > 29
     : !(x > -125 && x < 15 && y > -22 && y < 60);
-  const grove = (world: number, island: MapIsland, radius: number, kind: Parameters<typeof tree>[1], count: number, seed: number, small = false) => {
+  const grove = (world: number, island: MapIsland, radius: number, kind: Parameters<typeof tree>[1], count: number, seed: number, small = false, reliefScale = 1) => {
     for (let i = 0; i < count; i++) {
       const a = i * 2.399963 + seed;
       const reach = Math.sqrt((i + 1) / (count + 1));
       const x = Math.cos(a) * island.rx * 0.71 * reach;
       const y = Math.sin(a) * island.ry * 0.68 * reach;
       if (!clearForControls(island, x, y)) continue;
-      tree(basisAt(world, island.x + x, island.y + y, radius), kind, (small ? 0.45 : 0.72) + random(seed + i * 3) * (small ? 0.2 : 0.4), seed + i);
+      tree(basisAt(world, island.x + x, island.y + y, radius), kind, ((small ? 0.45 : 0.72) + random(seed + i * 3) * (small ? 0.2 : 0.4)) * reliefScale, seed + i);
     }
   };
 
@@ -194,8 +196,20 @@ export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
     const top = authored.landscape === "cliffs" ? 1.023 : 1.013;
     for (const [islandIndex, island] of authored.desktop.islands.entries()) {
       const quiz = island.stopIndex !== undefined; const seed = world.number * 17 + islandIndex * 7;
+      const relief = quiz ? getIslandRelief(world.number, island.stopIndex!, world.stopIds.length) : undefined;
       const upper = outline(island, biome, 0.86);
       ring(world.number, outline(island, biome, 0.99), outline(island, biome, 1.12), 1.003, 1.0012, colors.reef);
+      // Interrupted shore foam hugs the actual coast; no planet-wide bands.
+      const foamInner = outline(island, biome, 1.047), foamOuter = outline(island, biome, 1.062);
+      const foamPositions: number[] = [];
+      for (let i = 0; i < foamInner.length; i++) {
+        if ((i + islandIndex * 2) % 7 > 2) continue;
+        const j = (i + 1) % foamInner.length;
+        for (const point of [foamInner[i], foamOuter[j], foamOuter[i], foamInner[i], foamInner[j], foamOuter[j]]) {
+          const at = mapAt(world.number, ...point, 1.0032); foamPositions.push(at.x, at.y, at.z);
+        }
+      }
+      const foam = new THREE.BufferGeometry(); foam.setAttribute("position", new THREE.Float32BufferAttribute(foamPositions, 3)); foam.computeVertexNormals(); batch(foam, C.foam); foam.dispose();
       ring(world.number, outline(island, biome, 0.97), outline(island, biome, 1.04), top - 0.004, 1.003, colors.rock);
       ring(world.number, upper, outline(island, biome, 0.99), top, top - 0.003, colors.beach);
       const poolBiome = ["lagoon", "alpine", "mangrove"].includes(biome.id);
@@ -209,7 +223,7 @@ export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
         liquidPool(world.number, hole, top - 0.0013, biome.id === "alpine" ? C.blueIce : C.water);
       }
       const base = basisAt(world.number, island.x + (quiz ? 60 : 31), island.y - (quiz ? 10 : 12), top + 0.0005);
-      const small = quiz ? 1 : 0.56;
+      const small = relief?.scale ?? 0.56;
 
       // Book islands keep a full central clearing. Their geology lives at the
       // edges, below the book rather than behind its large native hit target.
@@ -252,13 +266,15 @@ export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
           const v = new THREE.Vector3(p[0] * crater * 0.7, h - 0.004 * small, p[1] * crater * 0.7).applyMatrix4(base); positions.push(v.x, v.y, v.z); uv.push(p[0] * 2, p[1] * 2);
         }
         const lavaGeometry = new THREE.BufferGeometry(); lavaGeometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3)); lavaGeometry.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); animateGeometry(lavaGeometry, C.lava, world.number, true);
-        liquidRibbon(world.number, base, [[0.002 * small, h + 0.0005, crater * 0.8], [0.004 * small, h * 0.68, r * 0.49], [0.001 * small, h * 0.32, r * 0.8], [0.006 * small, 0.001, r * 0.99]], 0.0035 * small, C.lava, true);
-        const smoke = new THREE.Vector3(0, h + 0.003, 0).applyMatrix4(base); smokeSources.push({ position: { x: smoke.x, y: smoke.y, z: smoke.z }, strength: quiz ? 1 : 0.45 });
+        // Basalt fans and their lava channel continue from the crater to the coast.
+        polygon(world.number, [[island.x + 56, island.y + 34], [island.x + 39, island.y + 67], [island.x + 76, island.y + 83], [island.x + 95, island.y + 66]], top + 0.001, C.basalt);
+        liquidRibbon(world.number, base, [[0.002 * small, h + 0.0005, crater * 0.8], [0.004 * small, h * 0.68, r * 0.49], [0.001 * small, h * 0.32, r * 0.8], [0.006 * small, 0.0015, r * 0.99], [0.003, 0.0015, 0.026], [0.003, 1.003 - top, 0.032]], 0.0035 * small, C.lava, true);
+        const smoke = new THREE.Vector3(0, h + 0.003, 0).applyMatrix4(base); smokeSources.push({ position: { x: smoke.x, y: smoke.y, z: smoke.z }, strength: relief?.role === "landmark" ? 1 : 0.5 });
         for (let i = 0; i < 5; i++) { const a = i * 1.3; ball(base, i % 2 ? C.basaltLight : C.basalt, Math.cos(a) * r * 1.12, 0.003 * small, Math.sin(a) * r * 0.9, 0.006 * small, 0.8, true); }
         if (biome.variant === 2) for (let i = 0; i < 3; i++) cone(base, C.basalt, 0.024 * small, (0.011 + i * 0.002) * small, (i - 1) * 0.008 * small, 0.004 * small, (0.022 + i * 0.004) * small, true);
       } else if (biome.id === "glacier" || biome.id === "tundra") {
         const ice = biome.id === "glacier";
-        for (let i = 0; i < (quiz ? 5 : 3); i++) {
+        for (let i = 0; i < (relief?.role === "landmark" ? 5 : 3); i++) {
           const x = (i - 2) * 0.012 * small; const z = -0.007 - Math.sin(i * 2) * 0.006;
           const h = (0.028 + random(seed + i) * 0.035) * small;
           cone(base, ice ? C.blueIce : C.slate, x, h / 2, z, 0.018 * small, h, true);
@@ -269,12 +285,13 @@ export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
             box(base, i % 2 ? C.ice : C.blueIce, 0, (0.009 - i * 0.004) * small, (0.011 + i * 0.010) * small, (0.027 - i * 0.004) * small, 0.011 * small, 0.012 * small, [0.16, 0.08 * i, 0]);
             box(base, C.snow, 0, (0.015 - i * 0.004) * small, (0.010 + i * 0.010) * small, (0.025 - i * 0.004) * small, 0.002 * small, 0.008 * small, [0.16, 0.08 * i, 0]);
           }
-          if (quiz) for (let i = 0; i < 3; i++) {
+          liquidRibbon(world.number, base, [[0.003, 0.005 * small, 0.018 * small], [0.001, -0.003 * small, 0.033 * small], [0.001, 1.003 - top, 0.042]], 0.003 * small, C.blueIce);
+          if (quiz) for (let i = 0; i < (relief?.role === "landmark" ? 3 : 1); i++) {
             const at = basisAt(world.number, island.x + 65 + i * 34, island.y + 86 + i % 2 * 10, 1.001);
             cone(at, i % 2 ? C.ice : C.snow, 0, 0.004, 0, 0.009 - i * 0.001, 0.019 - i * 0.002, true);
           }
         } else {
-          grove(world.number, island, top + 0.001, "pine", quiz ? 7 : 4, seed, true);
+          grove(world.number, island, top + 0.001, "pine", quiz ? 7 : 4, seed, true, small);
           ball(base, C.snow, 0.02 * small, 0.003, 0.018, 0.012 * small, 0.4, true);
         }
       } else if (biome.id === "desert") {
@@ -298,11 +315,17 @@ export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
           box(riverBase, i % 2 ? C.lime : C.grass, 0, h + 0.0005, (-0.019 + i * 0.009) * small, (0.049 - i * 0.004) * small, 0.002, 0.016 * small);
         }
         const points: Point3[] = high
-          ? [[-0.005 * small, 0.0245 * small, -0.025 * small], [0.003 * small, 0.0245 * small, -0.0087 * small], [0.003 * small, 0.0175 * small, -0.0084 * small], [-0.003 * small, 0.0175 * small, 0.0003 * small], [-0.003 * small, 0.0105 * small, 0.0006 * small], [0.003 * small, 0.0105 * small, 0.0093 * small], [0.003 * small, 0.002, 0.0096 * small], [-0.003 * small, 0.002, 0.016 * small], [0.002 * small, 0.002, 0.024 * small], [0.002 * small, 1.003 - top, 0.030 * small]]
-          : [[0.005 * small, 0.001, -0.024 * small], [-0.006 * small, 0.001, -0.013 * small], [0.006 * small, 0.001, -0.002 * small], [-0.006 * small, 0.001, 0.010 * small], [0.003 * small, 0.001, 0.022 * small], [0.003 * small, 1.003 - top, 0.031 * small]];
+          ? [[-0.005 * small, 0.0245 * small, -0.025 * small], [0.003 * small, 0.0245 * small, -0.0087 * small], [0.003 * small, 0.0175 * small, -0.0084 * small], [-0.003 * small, 0.0175 * small, 0.0003 * small], [-0.003 * small, 0.0105 * small, 0.0006 * small], [0.003 * small, 0.0105 * small, 0.0093 * small], [0.003 * small, 0.002, 0.0096 * small], [-0.003 * small, 0.002, 0.016 * small], [0.002 * small, 0.002, 0.024], [0.002 * small, 1.003 - top, 0.030]]
+          : [[0.005 * small, 0.001, -0.024 * small], [-0.006 * small, 0.001, -0.013 * small], [0.006 * small, 0.001, -0.002 * small], [-0.006 * small, 0.001, 0.010 * small], [0.003 * small, 0.001, 0.022], [0.003 * small, 1.003 - top, 0.031]];
         liquidRibbon(world.number, riverBase, points, (high ? 0.007 : 0.006) * small, C.water);
         if (biome.variant === 2 && biome.id === "river") liquidRibbon(world.number, riverBase, [[0.019, 0.001, -0.014], [0.012, 0.001, -0.006], [0.006, 0.001, -0.002]], 0.0035 * small, C.waterDeep);
-        for (let i = 0; i < 3; i++) ball(riverBase, C.foam, 0.003 * small, 1.004 - top, (0.029 + i * 0.002) * small, 0.0035 * small, 0.25);
+        for (let i = 0; i < 3; i++) ball(riverBase, C.foam, 0.003 * small, 1.004 - top, 0.029 + i * 0.002, 0.0035 * small, 0.25);
+        const spray = new THREE.Vector3(0.003 * small, 1.005 - top, 0.030).applyMatrix4(riverBase);
+        mistSources.push({ position: { x: spray.x, y: spray.y, z: spray.z }, strength: high ? small * 0.8 : 0.25 });
+        // A fan-shaped sand bar and branching outflow link the river to its sea.
+        polygon(world.number, [[island.x + 55, island.y + 86], [island.x + 33, island.y + 108], [island.x + 70, island.y + 120], [island.x + 82, island.y + 99]], 1.0024, C.sand);
+        liquidRibbon(world.number, riverBase, [[0.003 * small, 1.0035 - top, 0.030], [-0.005, 1.0035 - top, 0.038]], 0.003, C.water);
+        liquidRibbon(world.number, riverBase, [[0.003 * small, 1.0035 - top, 0.030], [0.009, 1.0035 - top, 0.036]], 0.0027, C.water);
         for (const sign of [-1, 1]) {
           const t = basisAt(world.number, island.x + (quiz ? 53 : 25) + sign * (quiz ? 56 : 25), island.y - 31, top + 0.001);
           tree(t, biome.variant === 2 ? "pine" : "broad", 0.7 * small, seed + sign);
@@ -349,11 +372,11 @@ export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
         }
       } else {
         const kind = biome.id === "autumn" ? "autumn" : biome.id === "orchard" ? "orchard" : biome.id === "woodland" && biome.variant === 2 ? "redwood" : "broad";
-        grove(world.number, island, top + 0.001, kind, quiz ? (biome.id === "rainforest" ? 25 : 18) : 9, seed, !quiz);
+        grove(world.number, island, top + 0.001, kind, quiz ? Math.round((biome.id === "rainforest" ? 25 : 18) * (relief?.vegetationDensity ?? 1)) : 9, seed, !quiz, 0.55 + small * 0.45);
         if (biome.id === "rainforest") {
           ball(base, C.moss, 0.010, 0.005, -0.010, 0.022 * small, 0.5, true);
           tree(base, "broad", 1.4 * small, seed);
-          for (let i = 0; i < 3; i++) tree(basisAt(world.number, island.x + 17 + i * 30, island.y - 43, top + 0.002), "palm", 0.8, seed + i);
+          for (let i = 0; i < 3; i++) tree(basisAt(world.number, island.x + 17 + i * 30, island.y - 43, top + 0.002), "palm", 0.8 * small, seed + i);
         } else if (biome.id === "woodland" && biome.variant === 1) {
           for (let i = 0; i < 4; i++) {
             const x = (i - 1) * 0.010; const z = 0.013 + Math.sin(i) * 0.004;
@@ -366,6 +389,57 @@ export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
         }
         for (let i = 0; i < 4; i++) ball(base, i % 2 ? C.rock : C.moss, 0.017 + i * 0.002, 0.003, -0.005 + i * 0.004, 0.004, 0.7, true);
       }
+    }
+  }
+
+  // Irregular polar continents are real geometry and share the voyage planner's
+  // conservative ice envelopes. Their bergs stay inside those same exclusions.
+  for (const [capIndex, cap] of GLOBE_POLAR_CAPS.entries()) {
+    const polarFrame = { center: cap.center, east: { x: 1, y: 0, z: 0 }, north: { x: 0, y: 0, z: capIndex === 0 ? -1 : 1 } };
+    const count = 96;
+    const coastAngles = Array.from({ length: count }, (_, i) => {
+      const a = i * Math.PI * 2 / count;
+      return 0.232 + 0.019 * Math.sin(a * 3 + capIndex) + 0.012 * Math.cos(a * 7) + 0.009 * Math.sin(a * 11 + 1);
+    });
+    const polarPoint = (index: number, scale: number, height: number) => {
+      const theta = index / count * Math.PI * 2;
+      const angle = coastAngles[index % count] * scale;
+      return tangentPointToGlobe(polarFrame, Math.cos(theta) * angle, Math.sin(theta) * angle, height);
+    };
+    const polarBand = (inner: number, outer: number, innerHeight: number, outerHeight: number, color: number) => {
+      const vertices: number[] = [];
+      const push = (p: Vec3) => vertices.push(p.x, p.y, p.z);
+      for (let i = 0; i < count; i++) {
+        const j = (i + 1) % count;
+        const a = polarPoint(i, inner, innerHeight), b = polarPoint(i, outer, outerHeight), c = polarPoint(j, outer, outerHeight), d = polarPoint(j, inner, innerHeight);
+        push(a); push(b); push(c); push(a); push(c); push(d);
+      }
+      const geometry = new THREE.BufferGeometry(); geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3)); geometry.computeVertexNormals(); batch(geometry, color); geometry.dispose();
+    };
+    polarBand(0, 0.48, 1.032, 1.023, C.snow);
+    polarBand(0.48, 0.94, 1.023, 1.014, C.snow);
+    polarBand(0.94, 1.01, 1.014, 1.007, C.ice);
+    polarBand(1.01, 1.055, 1.007, 1.0017, C.blueIce);
+    const polarBasis = (at: Vec3) => {
+      const up = vector(at).normalize();
+      const east = new THREE.Vector3(1, 0, 0).addScaledVector(up, -up.x).normalize();
+      return new THREE.Matrix4().makeBasis(east, up, east.clone().cross(up)).setPosition(vector(at));
+    };
+    for (let i = 0; i < 15; i++) {
+      const theta = i * Math.PI * 2 / 15 + capIndex * 0.25;
+      const angle = 0.277 + random(i + capIndex * 20) * 0.005;
+      const at = tangentPointToGlobe(polarFrame, Math.cos(theta) * angle, Math.sin(theta) * angle, 1.001);
+      const base = polarBasis(at); const size = 0.0045 + random(i + 8) * 0.006;
+      cone(base, i % 2 ? C.ice : C.blueIce, 0, 0.008, 0, size, 0.023, true);
+      cone(base, C.snow, 0, 0.016, 0, size * 0.6, 0.009, true);
+    }
+    for (let i = 0; i < 9; i++) {
+      const theta = i * 2.399963 + capIndex;
+      const angle = 0.08 + Math.sqrt((i + 1) / 9) * 0.10;
+      const at = tangentPointToGlobe(polarFrame, Math.cos(theta) * angle, Math.sin(theta) * angle, 1.02);
+      const base = polarBasis(at);
+      cone(base, i % 2 ? C.ice : C.snow, 0, 0.009, 0, 0.014, 0.025, true);
+      box(base, C.blueIce, 0.014, 0.001, 0, 0.002, 0.0015, 0.029, [0, theta, 0]);
     }
   }
 
@@ -383,9 +457,9 @@ export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
     if (!geometry) return;
     const material = new THREE.ShaderMaterial({
       side: THREE.DoubleSide,
-      uniforms: { time: { value: 0 }, activeWorld: { value: 0 }, motionStrength: { value: 0 }, lava: { value: index } },
-      vertexShader: "attribute vec3 color; attribute float region; varying vec3 vColor; varying vec2 vUv; varying float vRegion; void main(){vColor=color; vUv=uv; vRegion=region; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}",
-      fragmentShader: "uniform float time; uniform float activeWorld; uniform float motionStrength; uniform float lava; varying vec3 vColor; varying vec2 vUv; varying float vRegion; void main(){ float enabled=1.0-step(0.5,abs(vRegion-activeWorld)); float clock=time*enabled*motionStrength; float wave=sin(vUv.y*10.0-clock*2.2+sin(vUv.x*5.0)*0.6); float glint=smoothstep(0.80,0.99,wave); float edges=smoothstep(0.25,0.48,abs(vUv.x-0.5)); vec3 bright=mix(vec3(0.72,1.0,0.94),vec3(1.0,0.62,0.15),lava); vec3 color=mix(vColor,bright,glint*mix(0.27,0.48,lava)+edges*0.035); gl_FragColor=vec4(color,1.0); \n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}",
+      uniforms: { time: { value: 0 }, activeWorld: { value: 0 }, motionStrength: { value: 0 }, lava: { value: index }, sunDirection: { value: new THREE.Vector3(1, 1, 1).normalize() } },
+      vertexShader: "attribute vec3 color; attribute float region; varying vec3 vColor; varying vec2 vUv; varying float vRegion; varying vec3 vSurface; void main(){vColor=color; vUv=uv; vRegion=region; vSurface=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}",
+      fragmentShader: "uniform float time; uniform float activeWorld; uniform float motionStrength; uniform float lava; uniform vec3 sunDirection; varying vec3 vSurface; varying vec3 vColor; varying vec2 vUv; varying float vRegion; void main(){ float enabled=1.0-step(0.5,abs(vRegion-activeWorld)); float clock=time*enabled*motionStrength; float wave=sin(vUv.y*10.0-clock*2.2+sin(vUv.x*5.0)*0.6); float glint=smoothstep(0.80,0.99,wave); float edges=smoothstep(0.25,0.48,abs(vUv.x-0.5)); vec3 bright=mix(vec3(0.72,1.0,0.94),vec3(1.0,0.62,0.15),lava); vec3 color=mix(vColor,bright,glint*mix(0.27,0.48,lava)+edges*0.035); float daylight=mix(0.14,1.0,smoothstep(-0.16,0.7,dot(normalize(vSurface),sunDirection))); color*=mix(daylight,1.0,lava); gl_FragColor=vec4(color,1.0); \n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}",
     });
     ownedMaterials.add(material); flowMaterials.push(material);
     scenery.add(new THREE.Mesh(own(geometry), material));
@@ -393,11 +467,12 @@ export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
   const numbersById = new Map(WORLD_DEFINITIONS.map(world => [world.id, world.number]));
   let disposed = false;
   return {
-    smokeSources,
-    update(timeSeconds, activeDestinationId, zoom) {
+    smokeSources, mistSources,
+    update(timeSeconds, activeDestinationId, zoom, sunDirection) {
       if (disposed) return;
       const activeWorld = numbersById.get(activeDestinationId) ?? 0;
       for (const material of flowMaterials) {
+        if (sunDirection) material.uniforms.sunDirection.value.copy(sunDirection);
         material.uniforms.time.value = Number.isFinite(timeSeconds) ? timeSeconds : 0;
         material.uniforms.activeWorld.value = activeWorld;
         material.uniforms.motionStrength.value = Math.max(0, Math.min(1, zoom * 2));

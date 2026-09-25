@@ -7,6 +7,7 @@ import { QUESTIONS_BY_STOP, WORLD_DEFINITIONS, stopsForWorld, type WorldDefiniti
 import { getWorldMapLayout } from "./map-layouts.ts";
 import { GLOBE_DESTINATIONS, getGlobeDestination, getGlobeMap, getGlobeRoadPoints, getVoyageRoute, sampleSurfaceRoute, getSurfaceRouteTangent, sphericalInterpolate, type Vec3 } from "./globe-geometry.ts";
 import type { GlobeSceneFrame, GlobeProjection, GlobeScene } from "./globe-scene";
+import type { GlobeSkyMode } from "./globe-lighting";
 import type { ArchipelagoVoyage, VoyageActivityProps } from "./voyage.ts";
 import CoastScene from "./CoastScene";
 import { getWorldBiome } from "./globe-biome-data";
@@ -33,12 +34,14 @@ const readNarrow = () => window.matchMedia(narrowQuery).matches;
 const serverNarrow = () => false;
 const readReducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const ease = (t: number) => t * t * (3 - 2 * t);
+let visitSkyMode: GlobeSkyMode = "cycle";
 function BookIcon() {
   return <svg viewBox="0 0 48 40" aria-hidden="true" fill="none"><path d="M24 8C17 3 9 3 3 5v28c8-2 14-1 21 3 7-4 13-5 21-3V5c-6-2-14-2-21 3Z" fill="#e3a75c" stroke="#805125" strokeWidth="2"/><path d="M24 8C18 4 11 4 6 6v23c7-1 12 0 18 4 6-4 11-5 18-4V6c-5-2-12-2-18 2Z" fill="#fff8dc"/><path d="M24 8v25M10 12l10 3m-10 3 10 3m8-6 10-3m-10 9 10-3" stroke="#ac8143" strokeWidth="2"/></svg>;
 }
 const titleFor = (id: string) => WORLD_DEFINITIONS.find(world => world.id === id)?.title ?? BOSS_CHALLENGES.find(boss => boss.id === id)?.title ?? "Your next island";
 
 export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoard(props, ref) {
+  const [skyMode, setSkyMode] = useState<GlobeSkyMode>(() => visitSkyMode);
   const sceneryPaused = useSyncExternalStore(subscribeSceneryPreference, getSceneryPaused, serverNarrow);
   const reducedScenery = useSyncExternalStore(subscribeSceneryPreference, readReducedMotion, serverNarrow);
   const narrow = useSyncExternalStore(subscribeNarrow, readNarrow, serverNarrow);
@@ -246,7 +249,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
       if (!alive || !canvasRef.current) return;
       const scene = createGlobeScene(canvasRef.current, { assetBasePath: basePath, animateScenery: !getSceneryPaused(), onProject: positionMarkers, onUnavailable: () => { if (alive) { setRenderer("fallback"); cancelTrip(); animation.current?.cancel(); settlePose(); } } });
       if (!alive) { scene.dispose(); return; }
-      sceneRef.current = scene; setRenderer("webgl"); paint({ avatarPosition: restingPosition() });
+      sceneRef.current = scene; scene.setSkyMode(visitSkyMode); setRenderer("webgl"); paint({ avatarPosition: restingPosition() });
     }).catch(() => { if (alive) setRenderer("fallback"); });
     return () => {
       alive = false; window.clearTimeout(timer); trip.current?.finishActivity?.(); cancelTrip(); animation.current?.cancel(); sceneRef.current?.dispose(); sceneRef.current = null;
@@ -278,6 +281,11 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
     <div className={styles.boardToolbar}>
       <span className={styles.boardEyebrow}>{phase === "overview" ? "A world of discoveries" : props.boss ? "Challenge islands" : getWorldBiome(props.world.number).label}</span>
       <div className={styles.sceneryControls}>
+      {renderer === "webgl" && <label className={styles.skyControl}>Sky
+        <select aria-label="Time of day" value={skyMode} onChange={event => {
+          const mode = event.target.value as GlobeSkyMode; visitSkyMode = mode; setSkyMode(mode); sceneRef.current?.setSkyMode(mode);
+        }}><option value="cycle">Auto</option><option value="day">Day</option><option value="sunset">Sunset</option><option value="night">Night</option></select>
+      </label>}
       {renderer === "webgl" && <button type="button" className={styles.sceneryToggle} aria-pressed={sceneryPaused} disabled={reducedScenery}
         title={reducedScenery ? "Scenery stays still with reduced motion" : undefined}
         onClick={() => setSceneryPaused(!sceneryPaused)}>{sceneryPaused ? "Scenery paused" : "Pause scenery"}</button>}

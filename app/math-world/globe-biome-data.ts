@@ -19,3 +19,14 @@ export function getWorldBiome(worldNumber: number): GlobeBiome {
   const variant = worldNumber > 16 ? 2 : 1;
   return { id: BIOME_IDS[index], label: BIOME_LABELS[index][variant - 1], variant };
 }
+
+/** One skyline anchor per archipelago, with smaller foothills on the way there. */
+export function getIslandRelief(worldNumber: number, stopIndex: number, stopCount: number): Readonly<{
+  role: "landmark" | "foothill" | "outcrop"; scale: number; vegetationDensity: number;
+}> {
+  getWorldBiome(worldNumber);
+  if (!Number.isInteger(stopCount) || stopCount < 2 || stopCount > 4 || !Number.isInteger(stopIndex) || stopIndex < 0 || stopIndex >= stopCount) throw new Error("Unknown island composition.");
+  if (stopIndex === stopCount - 1) return { role: "landmark", scale: 1.06, vegetationDensity: 1 };
+  const scale = stopCount === 2 ? 0.64 : stopIndex === 0 ? 0.72 : (stopIndex + worldNumber) % 2 ? 0.52 : 0.82;
+  return { role: scale < 0.6 ? "outcrop" : "foothill", scale, vegetationDensity: scale < 0.6 ? 0.45 : 0.7 };
+}

@@ -80,3 +80,8 @@
   .sceneryControls { width: 100%; }
   .sceneryControls button { flex: 1; justify-content: center; }
 }
+
+.skyControl { display: flex; align-items: center; gap: 6px; font-size: .72rem; font-weight: 750; color: #315e65; }
+.skyControl select { min-width: 86px; min-height: 44px; border: 1px solid #b8d0bd; border-radius: 22px; padding: 8px 24px 8px 10px; background: #fffdf8; color: #17213d; font: inherit; cursor: pointer; }
+.skyControl select:focus-visible { outline: 3px solid #1679d2; outline-offset: 3px; }
+@media (max-width: 620px) { .sceneryControls { flex-wrap: wrap; }.skyControl { flex: 0 0 auto; }.sceneryControls .sceneryToggle { flex: 0 0 auto; }.sceneryControls > button:last-child { flex: 1 1 100%; } }

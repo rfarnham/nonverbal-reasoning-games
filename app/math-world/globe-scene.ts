@@ -4,6 +4,9 @@ import { WORLD_DEFINITIONS } from "./world-data";
 import { getWorldMapLayout } from "./map-layouts";
 import { createGlobeBiomes } from "./globe-biomes";
 import { createGlobeWeather } from "./globe-weather";
+import { createGlobeOcean } from "./globe-ocean";
+import { createGlobeLighting, type GlobeSkyMode } from "./globe-lighting";
+import { createGlobeLife } from "./globe-life";
 import { createSceneryClock } from "./scenery-clock";
 import {
   GLOBE_DESTINATIONS, getGlobeDestination, getGlobeRoadPoints, mapPointToGlobe,
@@ -33,10 +36,13 @@ export type GlobeSceneOptions = Readonly<{
 export type GlobeScene = Readonly<{
   render: (frame: GlobeSceneFrame) => void; resize: () => void; dispose: () => void;
   setSceneryMotion: (enabled: boolean) => void;
+  setSkyMode: (mode: GlobeSkyMode) => void;
 }>;
 
 const vector = (value: Vec3) => new THREE.Vector3(value.x, value.y, value.z);
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+// Carry the planet's active time across question panels in this browser visit.
+let carriedSceneryTime = 0;
 
 /** This scene owns GPU resources and a pausable scenery clock. Navigation,
  * question state, and progress remain outside the renderer. */
@@ -53,7 +59,9 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.2;
+  renderer.toneMappingExposure = 1.12;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.setClearColor(0x000000, 0);
   renderer.domElement.setAttribute("aria-hidden", "true");
   renderer.domElement.dataset.globeCanvas = "true";
@@ -63,14 +71,8 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   const globe = new THREE.Group();
   scene.add(globe);
   const camera = new THREE.PerspectiveCamera(37, 1, 0.02, 12);
-  const ambient = new THREE.HemisphereLight(0xe5ffff, 0x205457, 2.05);
-  scene.add(ambient);
-  const sun = new THREE.DirectionalLight(0xfff6dc, 3.15);
-  sun.position.set(-3, 5, 4);
-  scene.add(sun);
-  const fill = new THREE.DirectionalLight(0x91dcea, 0.7);
-  fill.position.set(3, 0, 2);
-  scene.add(fill);
+  const lighting = createGlobeLighting(scene, globe, camera, container, GLOBE_DESTINATIONS[0].center);
+  let skyMode: GlobeSkyMode = "cycle";
 
   const geometries = new Set<THREE.BufferGeometry>();
   const materials = new Set<THREE.Material>();
@@ -96,24 +98,8 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     group.push(copy); batches.set(color, group);
   };
   const sphere = keepGeometry(new THREE.SphereGeometry(1, 96, 64));
-  const seaTime = { value: 0 };
-  const oceanMaterial = keepMaterial(new THREE.MeshStandardMaterial({
-    color: 0x087fa3, roughness: 0.4, metalness: 0.06,
-  }));
-  oceanMaterial.onBeforeCompile = shader => {
-    shader.uniforms.uSeaTime = seaTime;
-    shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vSeaPosition;")
-      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvSeaPosition = position;");
-    shader.fragmentShader = shader.fragmentShader.replace("#include <common>", "#include <common>\nvarying vec3 vSeaPosition; uniform float uSeaTime;")
-      .replace("#include <color_fragment>", `#include <color_fragment>
-        float swell = sin(dot(vSeaPosition,vec3(74.,19.,-31.))+uSeaTime*.48);
-        float ripple = sin(dot(vSeaPosition,vec3(-46.,83.,57.))-uSeaTime*.65);
-        float glint = pow(max(0.,swell*ripple),12.);
-        diffuseColor.rgb *= 1. + .055*swell;
-        diffuseColor.rgb += vec3(.012,.025,.035)*glint;
-      `);
-  };
-  const ocean = new THREE.Mesh(sphere, oceanMaterial);
+  const sea = createGlobeOcean();
+  const ocean = new THREE.Mesh(sphere, sea.material);
   globe.add(ocean);
 
   const unitBox = keepGeometry(new THREE.BoxGeometry(1, 1, 1));
@@ -153,6 +139,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   const markerComplete = material(0xffc64b);
   const biomes = createGlobeBiomes(globe);
   const weather = createGlobeWeather(globe, scene, camera, biomes.smokeSources);
+  const life = createGlobeLife(globe, biomes);
   for (const world of WORLD_DEFINITIONS) {
     const authored = getWorldMapLayout(world.number, world.stopIds.length);
     const layout = authored.desktop;
@@ -210,44 +197,34 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   }
   batches.clear();
 
-  // Tiny wave strokes communicate a curved sea without an animated texture or grid.
-  const wavePositions: number[] = [];
-  const waveMaterial = keepMaterial(new THREE.LineBasicMaterial({ color: 0x92e4e5, transparent: true, opacity: 0.19, depthWrite: false }));
-  for (let i = 0; i < 310; i++) {
-    const y = 1 - 2 * (i + 0.5) / 310;
-    const angle = i * Math.PI * (3 - Math.sqrt(5));
-    const at = new THREE.Vector3(Math.sqrt(1 - y * y) * Math.sin(angle), y, Math.sqrt(1 - y * y) * Math.cos(angle));
-    if (GLOBE_DESTINATIONS.some(region => at.dot(vector(region.center)) > 0.97)) continue;
-    const east = new THREE.Vector3(0, 1, 0).cross(at).normalize();
-    for (const sign of [-1, 1]) {
-      const p = at.clone().addScaledVector(east, sign * 0.009).normalize().multiplyScalar(1.002);
-      wavePositions.push(p.x, p.y, p.z);
-    }
-  }
-  const waveGeometry = keepGeometry(new THREE.BufferGeometry());
-  waveGeometry.setAttribute("position", new THREE.Float32BufferAttribute(wavePositions, 3));
-  globe.add(new THREE.LineSegments(waveGeometry, waveMaterial));
 
   let disposed = false;
   let unavailable = false;
   let frame: GlobeSceneFrame | undefined;
   let width = 1; let height = 1;
-  let sceneryTime = 0;
+  const startingSceneryTime = carriedSceneryTime;
+  let sceneryTime = startingSceneryTime;
   let lastPaintTime = 0;
   let sceneryEnabled = options.animateScenery ?? true;
   let onScreen = false;
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const updateScenery = () => {
     if (!frame) return;
-    seaTime.value = sceneryTime;
-    biomes.update(sceneryTime, frame.activeDestinationId, frame.zoom);
-    weather.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId);
+    lighting.update(sceneryTime, skyMode, frame.focus, frame.zoom);
+    sea.update(sceneryTime, globe, camera);
+    biomes.update(sceneryTime, frame.activeDestinationId, frame.zoom, lighting.sunDirection);
+    weather.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, lighting.sunDirection);
+    life.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, lighting.sunDirection);
+    updateLavaLight();
+    wakeTime.value = sceneryTime;
+    const localDay = THREE.MathUtils.smoothstep(lighting.sunDirection.dot(vector(frame.focus)), -.2, .3);
+    spriteMaterial.color.setRGB(.67+.33*localDay, .78+.22*localDay, 1);
   };
   const sceneryClock = createSceneryClock({
     request: callback => window.requestAnimationFrame(callback),
     cancel: id => window.cancelAnimationFrame(id), now: () => performance.now(),
     onFrame: seconds => {
-      sceneryTime = seconds;
+      sceneryTime = startingSceneryTime + seconds;
       // Camera travel already paints at display cadence. Idle scenery needs only
       // 30fps and never reprojects HTML buttons whose positions have not changed.
       if (frame && performance.now() - lastPaintTime > 25) {
@@ -303,11 +280,67 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   const pennantGeometry = keepGeometry(new THREE.BufferGeometry());
   pennantGeometry.setAttribute("position", new THREE.Float32BufferAttribute([0, 0.051, -0.005, 0, 0.046, -0.005, 0, 0.049, 0.005], 3)); pennantGeometry.computeVertexNormals();
   boat.add(new THREE.Mesh(pennantGeometry, keepMaterial(new THREE.MeshStandardMaterial({ color: 0xf07659, side: THREE.DoubleSide }))));
-  const wakeGeometry = keepGeometry(new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(-0.007, 0.001, -0.022), new THREE.Vector3(-0.014, 0.001, -0.038),
-    new THREE.Vector3(0.007, 0.001, -0.022), new THREE.Vector3(0.014, 0.001, -0.038),
-  ]));
-  boat.add(new THREE.LineSegments(wakeGeometry, keepMaterial(new THREE.LineBasicMaterial({ color: 0xc0f4ed, transparent: true, opacity: 0.85 }))));
+  const wakeVertices: number[] = [], wakeUV: number[] = [];
+  for (const sign of [-1, 1]) for (let step = 0; step < 12; step++) {
+    for (const [segment, edge] of [[step, -1], [step+1, -1], [step+1, 1], [step, -1], [step+1, 1], [step, 1]]) {
+      const t = segment/12, breadth = .0015*(1-t)+.0004;
+      wakeVertices.push(sign*(.006+.025*Math.pow(t,.85))+edge*breadth, .001, -.015-t*.055);
+      wakeUV.push((edge+1)/2, t);
+    }
+  }
+  const wakeGeometry = keepGeometry(new THREE.BufferGeometry());
+  wakeGeometry.setAttribute("position", new THREE.Float32BufferAttribute(wakeVertices, 3));
+  wakeGeometry.setAttribute("uv", new THREE.Float32BufferAttribute(wakeUV, 2));
+  const wakeTime = { value: 0 };
+  const wakeMaterial = keepMaterial(new THREE.MeshBasicMaterial({ color: 0xd9fff4, transparent: true, opacity: .7, depthWrite: false, side: THREE.DoubleSide }));
+  wakeMaterial.onBeforeCompile = shader => {
+    shader.uniforms.wakeTime = wakeTime;
+    shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nvarying vec2 wakeUV;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nwakeUV=uv;");
+    shader.fragmentShader = shader.fragmentShader.replace("#include <common>", "#include <common>\nvarying vec2 wakeUV; uniform float wakeTime;")
+      .replace("#include <alphatest_fragment>", `diffuseColor.a *= sin(wakeUV.x*3.14159)*(1.-wakeUV.y)*(.65+.35*sin(wakeUV.y*48.-wakeTime*3.));\n#include <alphatest_fragment>`);
+  };
+  boat.add(new THREE.Mesh(wakeGeometry, wakeMaterial));
+
+  lighting.installSurfaceLighting();
+  // Two nearby crater lights add warm spill to basalt; a tiny additive halo
+  // supplies a local bloom without a full-screen postprocessing render target.
+  const glowCanvas = document.createElement("canvas"); glowCanvas.width = glowCanvas.height = 64;
+  const glowContext = glowCanvas.getContext("2d");
+  if (glowContext) {
+    const gradient = glowContext.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gradient.addColorStop(0, "rgba(255,212,85,.9)"); gradient.addColorStop(.2, "rgba(255,115,28,.6)"); gradient.addColorStop(1, "rgba(255,70,10,0)");
+    glowContext.fillStyle = gradient; glowContext.fillRect(0, 0, 64, 64);
+  }
+  const glowTexture = new THREE.CanvasTexture(glowCanvas); textures.add(glowTexture);
+  const craterLights = Array.from({ length: 2 }, () => {
+    const lamp = new THREE.PointLight(0xff7528, 0, .13, 2);
+    const halo = new THREE.Sprite(keepMaterial(new THREE.SpriteMaterial({ map: glowTexture, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: .55 })));
+    halo.scale.setScalar(.055); globe.add(lamp, halo);
+    return { lamp, halo };
+  });
+  let litDestination = "";
+  function updateLavaLight() {
+    if (!frame) return;
+    if (litDestination !== frame.activeDestinationId) {
+      litDestination = frame.activeDestinationId;
+      const center = getGlobeDestination(litDestination)?.center;
+      const sources = biomes.smokeSources.filter(source => center && vector(source.position).normalize().dot(vector(center)) > .97).sort((a,b) => b.strength-a.strength);
+      craterLights.forEach(({ lamp, halo }, index) => {
+        const source = sources[index]; lamp.visible = halo.visible = !!source;
+        if (source) { lamp.position.copy(vector(source.position)); halo.position.copy(lamp.position); }
+      });
+    }
+    craterLights.forEach(({ lamp, halo }, index) => {
+      const pulse = .92 + .08*Math.sin(sceneryTime*1.8+index*2);
+      lamp.intensity = .017*pulse;
+      halo.material.opacity = .42*pulse;
+    });
+  }
+
+  const shadowGeometry = keepGeometry(new THREE.CircleGeometry(.018, 24)); shadowGeometry.rotateX(-Math.PI/2);
+  const shadow = new THREE.Mesh(shadowGeometry, keepMaterial(new THREE.MeshBasicMaterial({ color: 0x102b40, transparent: true, opacity: .17, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 })));
+  shadow.matrixAutoUpdate = false; shadow.visible = false; globe.add(shadow);
 
   const worldLandscape = (id: string) => {
     const world = WORLD_DEFINITIONS.find(candidate => candidate.id === id);
@@ -351,7 +384,13 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     camera.lookAt(0, 0, zoom);
     camera.updateMatrixWorld();
     const completed = new Set(next.completedStopIds);
-    for (const [id, marker] of stopMarkers) marker.material = completed.has(id) ? markerComplete : markerPlain;
+    const activeStops = WORLD_DEFINITIONS.find(world => world.id === next.activeDestinationId)?.stopIds ?? [];
+    for (const [id, marker] of stopMarkers) {
+      marker.material = completed.has(id) ? markerComplete : markerPlain;
+      // Only the inspected coast needs tiny physical stop pedestals. Hiding
+      // distant ones also removes their otherwise invisible shadow-map draws.
+      marker.visible = zoom > .55 && activeStops.includes(id);
+    }
     boat.visible = !!next.boatPosition;
     if (next.boatPosition) {
       const normal = vector(next.boatPosition).normalize();
@@ -363,6 +402,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     }
     const animalAt = next.boatPosition ?? next.avatarPosition;
     animal.visible = !!animalAt;
+    shadow.visible = false;
     if (animalAt) {
       const foot = vector(animalAt).normalize();
       const islandRadius = worldLandscape(next.activeDestinationId) === "cliffs" ? 1.027 : 1.018;
@@ -376,6 +416,9 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
       const markerClearance = (window.innerWidth <= 620 ? 22 : 24) + 3;
       animal.center.set(0.5, next.boatPosition ? 0.08 : -markerClearance / (animal.scale.y * avatarProjection.scale));
       animal.visible = (!!next.boatPosition || zoom > 0.72) && avatarProjection.visible;
+      shadow.visible = animal.visible && !next.boatPosition;
+      shadow.matrix.copy(basisAt(foot.clone().multiplyScalar(islandRadius+.0003)));
+      shadow.material.opacity = .18*(1-Math.min(.8,(next.avatarHop ?? 0)*15));
     }
     updateScenery();
     globe.updateMatrixWorld(true);
@@ -409,13 +452,14 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   return {
     render: draw, resize,
     setSceneryMotion(enabled) { sceneryEnabled = enabled; reconcileScenery(); },
+    setSkyMode(mode) { skyMode = mode; renderer.domElement.dataset.skyMode = mode; if (frame) draw(frame); },
     dispose() {
       if (disposed) return;
-      disposed = true; observer.disconnect(); intersectionObserver.disconnect();
+      disposed = true; carriedSceneryTime = sceneryTime; observer.disconnect(); intersectionObserver.disconnect();
       sceneryClock.dispose();
       document.removeEventListener("visibilitychange", visibilityChanged);
       reducedMotion.removeEventListener("change", visibilityChanged);
-      weather.dispose(); biomes.dispose();
+      weather.dispose(); life.dispose(); biomes.dispose(); lighting.dispose(); sea.dispose();
       renderer.domElement.removeEventListener("webglcontextlost", contextLost);
       for (const geometry of geometries) geometry.dispose();
       for (const entry of materials) entry.dispose();
