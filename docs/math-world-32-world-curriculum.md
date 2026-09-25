@@ -54,6 +54,8 @@ The 2025 and 2026 USA Grades 1–2 annual papers and their documented aliases re
 
 ## Maps and paper workbooks
 
+All 32 worlds now sit on one continuous 3D globe as archipelagos, with the two boss destinations at their curriculum milestones. The camera turns and moves closer to the selected archipelago; a boat sails between destinations. See [globe navigation](math-world-globe-navigation.md) for controls and transition behavior.
+
 All 32 worlds have distinct authored routes, including separate returning-visit layouts. Compact worlds have only their real quiz islands and exactly two storybook islands. Avatar motion follows the same road geometry that is drawn on the map. The storybook icons remain placeholders.
 
 Every world has one **Print workbook** button, following its exact question and stop order. Original question artwork is preferred; archived source cards are used where an original crop cannot be recovered. Printed pages retain room for pencil work and do not recreate the answer options as buttons. All print assets are bundled locally, and printing changes no progress. Both boss buttons still print all 24 source questions in exam order.

@@ -41,12 +41,14 @@ import {
   QUESTIONS_BY_STOP,
   REQUIRED_STOPS,
   WORLD_DEFINITIONS,
+  WORLD_MODE,
   worldForStop,
   type MathStop,
   type WorldQuestion,
 } from "./world-data.ts";
 import { WorldMap } from "./WorldMap";
 import { BossWorld } from "./BossWorld";
+import { GlobeAdventure } from "./GlobeAdventure";
 import { bossById, canOpenBoss, type BossChallenge } from "./boss-challenges.ts";
 import styles from "./math-world.module.css";
 
@@ -413,7 +415,12 @@ export default function MathWorldClient() {
         </div>
       </header>
 
-      {selectedBoss ? (
+      {!activeStop && WORLD_MODE === "spiral-preview" ? (
+        <GlobeAdventure key={qaUnlocked ? "playtest-globe" : "adventure-globe"}
+          world={selectedWorld} boss={selectedBoss} progress={progress} qaUnlocked={qaUnlocked}
+          avatarStopId={lastVisitedStopId} onChooseWorld={chooseWorld} onChooseBoss={chooseBoss}
+          onOpenStop={openStop} onInspectStop={setInspectedStopId} onExportQa={downloadQaArchive} />
+      ) : selectedBoss ? (
         <BossWorld key={`${qaUnlocked ? "playtest" : "adventure"}:${selectedBoss.id}`}
           challenge={selectedBoss} progress={progress} qaUnlocked={qaUnlocked}
           onChooseWorld={chooseWorld} onChooseBoss={chooseBoss} />
