@@ -155,8 +155,9 @@ test("six irregular geographic chains have genuinely closer neighbors within the
   }
   assert.ok(otherSum / sameSum > 1.2, "broader inter-cluster oceans separate denser island chains");
   assert.equal(GLOBE_POLAR_CAPS.length, 2);
-  assert.equal(GLOBE_LAND_OBSTACLES.length, 36);
-  for (const [index, obstacle] of GLOBE_LAND_OBSTACLES.entries()) for (const other of GLOBE_LAND_OBSTACLES.slice(index + 1)) {
+  assert.equal(GLOBE_LAND_OBSTACLES.length, 42);
+  const islandAndPolarRegions = [...GLOBE_DESTINATIONS, ...GLOBE_POLAR_CAPS];
+  for (const [index, obstacle] of islandAndPolarRegions.entries()) for (const other of islandAndPolarRegions.slice(index + 1)) {
     assert.ok(sphericalAngle(obstacle.center, other.center) > obstacle.angularRadius + other.angularRadius, "polar and archipelago land envelopes remain disjoint");
   }
 });

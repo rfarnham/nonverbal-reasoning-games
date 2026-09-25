@@ -1,5 +1,6 @@
 import { getWorldMapLayout, type MapLayout } from "./map-layouts.ts";
 import { WORLD_DEFINITIONS } from "./world-data.ts";
+import { GLOBE_CONTINENTS } from "./globe-continent-data.ts";
 
 /** Unit-sphere geometry shared by the painted globe, HTML controls, and travel. */
 export type Vec3 = Readonly<{ x: number; y: number; z: number }>;
@@ -92,7 +93,7 @@ function makeDestinations(): GlobeDestination[] {
     const towardCluster = addVec3(clusterCenter, scaleVec3(destination.center, -dotVec3(clusterCenter, destination.center)));
     const outward = scaleVec3(normalizeVec3(towardCluster), -1);
     const outwardAngle = Math.atan2(dotVec3(outward, destination.north), dotVec3(outward, destination.east));
-    const obstacles = [...destinations.filter(item => item !== destination), ...POLAR_CAPS];
+    const obstacles = [...destinations.filter(item => item !== destination), ...POLAR_CAPS, ...GLOBE_CONTINENTS];
     let harbor: Vec3 | undefined, bestScore = -Infinity;
     for (const radius of [GLOBE_HARBOR_RADIUS, 0.302, 0.327]) for (let step = -10; step <= 10; step++) {
       const angle = outwardAngle + step * Math.PI / 24;
@@ -118,7 +119,7 @@ export const GLOBE_GEOGRAPHIC_CLUSTERS = CLUSTER_LAYOUTS.map((cluster, index) =>
 /** Conservative envelopes include the irregular frozen coast and coastal icebergs. */
 export const GLOBE_POLAR_CAPS: readonly Readonly<{ id: string; center: Vec3; angularRadius: number }>[] = POLAR_CAPS;
 export const GLOBE_LAND_OBSTACLES: readonly Readonly<{ id: string; center: Vec3; angularRadius: number }>[] = [
-  ...GLOBE_DESTINATIONS.map(({ id, center, angularRadius }) => ({ id, center, angularRadius })), ...GLOBE_POLAR_CAPS,
+  ...GLOBE_DESTINATIONS.map(({ id, center, angularRadius }) => ({ id, center, angularRadius })), ...GLOBE_POLAR_CAPS, ...GLOBE_CONTINENTS,
 ];
 
 
@@ -220,6 +221,10 @@ function getOceanGraph(): OceanGraph {
   for (const cap of GLOBE_POLAR_CAPS) for (let index = 0; index < 32; index++) {
     const angle = index * Math.PI / 16;
     nodes.push(tangentPointToGlobe(frame(cap.center), Math.cos(angle) * (cap.angularRadius + OCEAN_MARGIN + 0.025), Math.sin(angle) * (cap.angularRadius + OCEAN_MARGIN + 0.025)));
+  }
+  for (const continent of GLOBE_CONTINENTS) for (let index = 0; index < 48; index++) {
+    const angle = index * Math.PI / 24;
+    nodes.push(tangentPointToGlobe(continent, Math.cos(angle) * (continent.angularRadius + OCEAN_MARGIN + .025), Math.sin(angle) * (continent.angularRadius + OCEAN_MARGIN + .025)));
   }
   const edges: OceanGraph["edges"] = nodes.map(() => []);
   for (let from = 0; from < nodes.length; from += 1) for (let to = from + 1; to < nodes.length; to += 1) {

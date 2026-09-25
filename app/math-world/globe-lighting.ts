@@ -86,7 +86,8 @@ export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, came
         material.needsUpdate = true;
       }
       if (materials.some(material => material instanceof THREE.MeshStandardMaterial && !material.transparent)) {
-        object.castShadow = true; object.receiveShadow = true;
+        object.castShadow = object.userData.castShadow !== false;
+        object.receiveShadow = object.userData.receiveShadow !== false;
       }
     });
   }

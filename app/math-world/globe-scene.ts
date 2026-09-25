@@ -3,17 +3,19 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { WORLD_DEFINITIONS } from "./world-data";
 import { getWorldMapLayout } from "./map-layouts";
 import { createGlobeBiomes } from "./globe-biomes";
+import { createGlobeContinents } from "./globe-continents";
 import { createGlobeWeather } from "./globe-weather";
 import { createGlobeOcean } from "./globe-ocean";
 import { createGlobeLighting, type GlobeSkyMode } from "./globe-lighting";
 import { createGlobeLife } from "./globe-life";
 import { createSceneryClock } from "./scenery-clock";
+import { placeOccupiedStopBadge, placeStopCaption } from "./globe-marker-layout";
 import {
   GLOBE_DESTINATIONS, getGlobeDestination, getGlobeRoadPoints, mapPointToGlobe,
   type Vec3,
 } from "./globe-geometry";
 
-export type GlobeProjectedPoint = Readonly<{ x: number; y: number; visible: boolean; scale: number }>;
+export type GlobeProjectedPoint = Readonly<{ x: number; y: number; visible: boolean; scale: number; badgeOffset?: Readonly<{ x: number; y: number }>; captionSide?: "below" | "right" | "left" | "hidden" }>;
 export type GlobeProjection = Readonly<{
   width: number; height: number;
   worlds: Readonly<Record<string, GlobeProjectedPoint>>;
@@ -137,6 +139,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   const markerGeometry = keepGeometry(new THREE.CylinderGeometry(0.006, 0.008, 0.006, 20));
   const markerPlain = material(white);
   const markerComplete = material(0xffc64b);
+  const continents = createGlobeContinents(globe);
   const biomes = createGlobeBiomes(globe);
   const weather = createGlobeWeather(globe, scene, camera, biomes.smokeSources);
   const life = createGlobeLife(globe, biomes);
@@ -212,6 +215,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     if (!frame) return;
     lighting.update(sceneryTime, skyMode, frame.focus, frame.zoom);
     sea.update(sceneryTime, globe, camera);
+    continents.update(sceneryTime, lighting.sunDirection);
     biomes.update(sceneryTime, frame.activeDestinationId, frame.zoom, lighting.sunDirection);
     weather.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, lighting.sunDirection);
     life.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, lighting.sunDirection);
@@ -241,6 +245,8 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     reconcileScenery();
   });
   intersectionObserver.observe(container);
+  // Keep the illustrated body readable against nearby tree canopies. Its feet
+  // and contact shadow use real ground positions, independent of this sprite layer.
   const spriteMaterial = keepMaterial(new THREE.SpriteMaterial({ transparent: true, alphaTest: 0.08, depthTest: false, depthWrite: false, toneMapped: false }));
   const animal = new THREE.Sprite(spriteMaterial);
   animal.center.set(0.5, 0);
@@ -338,7 +344,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     });
   }
 
-  const shadowGeometry = keepGeometry(new THREE.CircleGeometry(.018, 24)); shadowGeometry.rotateX(-Math.PI/2);
+  const shadowGeometry = keepGeometry(new THREE.CircleGeometry(.013, 24)); shadowGeometry.rotateX(-Math.PI/2); shadowGeometry.scale(1, 1, .6);
   const shadow = new THREE.Mesh(shadowGeometry, keepMaterial(new THREE.MeshBasicMaterial({ color: 0x102b40, transparent: true, opacity: .17, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 })));
   shadow.matrixAutoUpdate = false; shadow.visible = false; globe.add(shadow);
 
@@ -389,7 +395,8 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
       marker.material = completed.has(id) ? markerComplete : markerPlain;
       // Only the inspected coast needs tiny physical stop pedestals. Hiding
       // distant ones also removes their otherwise invisible shadow-map draws.
-      marker.visible = zoom > .55 && activeStops.includes(id);
+      const animalNear = next.avatarPosition && vector(next.avatarPosition).angleTo(vector(stopAnchors.get(id)!)) < .009;
+      marker.visible = zoom > .55 && activeStops.includes(id) && !animalNear;
     }
     boat.visible = !!next.boatPosition;
     if (next.boatPosition) {
@@ -405,20 +412,24 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     shadow.visible = false;
     if (animalAt) {
       const foot = vector(animalAt).normalize();
-      const islandRadius = worldLandscape(next.activeDestinationId) === "cliffs" ? 1.027 : 1.018;
-      // The player is a map pawn perched over the stop/road. This deliberate
-      // billboard layer stays readable beside tall mountains and tree canopies.
+      const landingRadius = worldLandscape(next.activeDestinationId) === "cliffs" ? 1.024 : 1.014;
+      let stopDistance = Infinity;
+      for (const id of activeStops) {
+        const anchor = stopAnchors.get(id);
+        if (anchor) stopDistance = Math.min(stopDistance, foot.angleTo(vector(anchor)));
+      }
+      const islandRadius = THREE.MathUtils.lerp(landingRadius, 1.020, THREE.MathUtils.smoothstep(stopDistance, .004, .022));
+      // The foot follows the exact authored stop/road. Native badges project
+      // below their ground anchors so they do not cover the grounded animal.
       animal.position.copy(foot).multiplyScalar(next.boatPosition ? 1.034 : islandRadius + (next.avatarHop ?? 0));
       animal.scale.setScalar(next.boatPosition ? 0.068 : 0.038);
+      // The bundled sprite's feet are at y=30 in its 32px source image.
+      animal.center.set(0.5, next.boatPosition ? 0.08 : 2 / 32);
       const avatarProjection = project(animal.position);
-      // Keep its feet just above the native 44/48px stop on every screen size,
-      // rather than floating higher as the camera approaches the globe.
-      const markerClearance = (window.innerWidth <= 620 ? 22 : 24) + 3;
-      animal.center.set(0.5, next.boatPosition ? 0.08 : -markerClearance / (animal.scale.y * avatarProjection.scale));
       animal.visible = (!!next.boatPosition || zoom > 0.72) && avatarProjection.visible;
-      shadow.visible = animal.visible && !next.boatPosition;
+      shadow.visible = animal.visible && !next.boatPosition && stopDistance < .03;
       shadow.matrix.copy(basisAt(foot.clone().multiplyScalar(islandRadius+.0003)));
-      shadow.material.opacity = .18*(1-Math.min(.8,(next.avatarHop ?? 0)*15));
+      shadow.material.opacity = .22*(1-Math.min(.8,(next.avatarHop ?? 0)*15));
     }
     updateScenery();
     globe.updateMatrixWorld(true);
@@ -431,8 +442,24 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     const books: Record<string, GlobeProjectedPoint> = {};
     const world = WORLD_DEFINITIONS.find(candidate => candidate.id === next.activeDestinationId);
     if (world) {
-      for (const id of world.stopIds) { const at = stopAnchors.get(id); if (at) stops[id] = project(at); }
+      for (const id of world.stopIds) {
+        const at = stopAnchors.get(id);
+        if (at) stops[id] = project(at);
+      }
       for (const [id, at] of bookAnchors) if (id.startsWith(`${world.id}:`)) books[id] = project(at);
+      if (next.avatarPosition && !next.boatPosition) {
+        const occupied = world.stopIds.find(id => vector(next.avatarPosition!).angleTo(vector(stopAnchors.get(id)!)) < .009);
+        if (occupied && stops[occupied]) {
+          const anchor = stops[occupied];
+          const neighbors = [...Object.entries(stops).filter(([id]) => id !== occupied).map(([, point]) => point), ...Object.values(books)].filter(point => point.visible);
+          const badgeOffset = placeOccupiedStopBadge(anchor, neighbors, width, height, window.innerWidth <= 620);
+          stops[occupied] = { ...anchor, x: anchor.x + badgeOffset.x, y: anchor.y + badgeOffset.y, badgeOffset };
+        }
+      }
+      if (window.innerWidth > 620) for (const [id, anchor] of Object.entries(stops)) {
+        const neighbors = [...Object.entries(stops).filter(([other]) => other !== id).map(([, point]) => point), ...Object.values(books)].filter(point => point.visible);
+        stops[id] = { ...anchor, captionSide: placeStopCaption(anchor, neighbors, width, height) };
+      }
     }
     options.onProject({ width, height, worlds, stops, books, ...(animalAt ? { avatar: project(animal.position) } : {}), ...(next.boatPosition ? { boat: project(next.boatPosition) } : {}) });
   }
@@ -459,7 +486,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
       sceneryClock.dispose();
       document.removeEventListener("visibilitychange", visibilityChanged);
       reducedMotion.removeEventListener("change", visibilityChanged);
-      weather.dispose(); life.dispose(); biomes.dispose(); lighting.dispose(); sea.dispose();
+      weather.dispose(); life.dispose(); biomes.dispose(); continents.dispose(); lighting.dispose(); sea.dispose();
       renderer.domElement.removeEventListener("webglcontextlost", contextLost);
       for (const geometry of geometries) geometry.dispose();
       for (const entry of materials) entry.dispose();

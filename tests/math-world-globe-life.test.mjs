@@ -41,7 +41,7 @@ function harness() {
 
 test("weather and habitat effects have fixed geometry budgets across repeated frame and sun changes", () => {
   const h = harness(), first = resources(h.scene);
-  assert.ok(first.meshes <= 12, "the complete weather and wildlife pass stays within eleven added draw calls");
+  assert.ok(first.meshes <= 14, "the complete weather and wildlife pass stays within thirteen added draw calls");
   assert.ok(first.triangles < 85_000, "all globe weather and habitat details share a bounded mesh budget");
   const sun = new THREE.Vector3(), focus = getGlobeRegion(9).center;
   for (let frame = 0; frame < 180; frame += 1) {

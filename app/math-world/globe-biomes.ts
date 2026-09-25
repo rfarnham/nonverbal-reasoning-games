@@ -40,8 +40,8 @@ const random = (seed: number) => { const n = Math.sin(seed * 127.1 + 311.7) * 43
 type Point2 = readonly [number, number];
 type Point3 = readonly [number, number, number];
 
-/** All scenery is local geometry. The only animated surfaces share two GPU materials;
- * React remains the owner of scheduling, visibility, and reduced-motion policy. */
+/** Local geometry shares batched flow, shore, foliage, and ice materials.
+ * React owns scheduling, visibility, and reduced-motion policy through update(). */
 export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
   const scenery = new THREE.Group();
   scenery.name = "archipelago-biomes";
@@ -49,6 +49,9 @@ export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
   const ownedGeometries = new Set<THREE.BufferGeometry>();
   const ownedMaterials = new Set<THREE.Material>();
   const batches = new Map<number, THREE.BufferGeometry[]>();
+  const habitatBatches = new Map<number, THREE.BufferGeometry[]>();
+  let habitatMotion: { anchor: THREE.Vector3; height: number; phase: number; kind: 1 | 2 } | null = null;
+  const shorePositions: number[] = [], shoreDrifts: number[] = [], shoreUvs: number[] = [], shorePhases: number[] = [];
   const movingBatches: THREE.BufferGeometry[][] = [[], []];
   const smokeSources: GlobeSmokeSource[] = [];
   const mistSources: GlobeSmokeSource[] = [];
@@ -66,8 +69,24 @@ export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
     const copy = geometry.index ? geometry.toNonIndexed() : geometry.clone();
     if (transform) copy.applyMatrix4(transform);
     copy.deleteAttribute("uv");
-    const pieces = batches.get(color) ?? [];
-    pieces.push(copy); batches.set(color, pieces);
+    const target = habitatMotion ? habitatBatches : batches;
+    if (habitatMotion) {
+      const positions = copy.getAttribute("position");
+      const anchors = new Float32Array(positions.count * 3), params = new Float32Array(positions.count * 3);
+      const up = habitatMotion.anchor.clone().normalize();
+      for (let index = 0; index < positions.count; index += 1) {
+        const height = (positions.getX(index) - habitatMotion.anchor.x) * up.x
+          + (positions.getY(index) - habitatMotion.anchor.y) * up.y
+          + (positions.getZ(index) - habitatMotion.anchor.z) * up.z;
+        const weight = habitatMotion.kind === 2 ? 1 : Math.pow(THREE.MathUtils.clamp(height / habitatMotion.height, 0, 1), 2);
+        anchors.set([habitatMotion.anchor.x, habitatMotion.anchor.y, habitatMotion.anchor.z], index * 3);
+        params.set([weight, habitatMotion.phase, habitatMotion.kind], index * 3);
+      }
+      copy.setAttribute("motionAnchor", new THREE.BufferAttribute(anchors, 3));
+      copy.setAttribute("motionParams", new THREE.BufferAttribute(params, 3));
+    }
+    const pieces = target.get(color) ?? [];
+    pieces.push(copy); target.set(color, pieces);
   };
   const mapAt = (world: number, x: number, y: number, radius: number) => mapPointToGlobe(world, x / 12, y / 7.4, false, radius);
   const basisAt = (world: number, x: number, y: number, radius: number) => {
@@ -153,6 +172,8 @@ export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
   const ellipse = (x: number, y: number, rx: number, ry: number, count = 40): Point2[] => Array.from({ length: count }, (_, index) => [x + Math.cos(index * Math.PI * 2 / count) * rx, y + Math.sin(index * Math.PI * 2 / count) * ry]);
 
   const tree = (base: THREE.Matrix4, kind: "palm" | "broad" | "pine" | "autumn" | "orchard" | "mangrove" | "redwood", size: number, seed: number) => {
+    const previousMotion = habitatMotion;
+    habitatMotion = { anchor: new THREE.Vector3().setFromMatrixPosition(base), height: (kind === "redwood" ? 0.073 : 0.041) * size, phase: seed * 1.713, kind: 1 };
     const trunkHeight = (kind === "redwood" ? 0.03 : 0.016) * size;
     cylinder(base, C.brown, 0, trunkHeight / 2, 0, 0.0017 * size, trunkHeight);
     if (kind === "palm") {
@@ -175,6 +196,7 @@ export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
       if (kind === "orchard") for (let i = 0; i < 4; i++) ball(base, C.orange, Math.cos(i * 2) * 0.008 * size, trunkHeight + (0.005 + i * 0.002) * size, Math.sin(i * 2) * 0.008 * size, 0.0021 * size);
       if (kind === "mangrove") for (let i = 0; i < 4; i++) box(base, C.brown, Math.cos(i * Math.PI / 2) * 0.003, 0.003, Math.sin(i * Math.PI / 2) * 0.003, 0.0018, 0.013, 0.0018, [Math.cos(i * Math.PI / 2) * 0.55, 0, Math.sin(i * Math.PI / 2) * 0.55]);
     }
+    habitatMotion = previousMotion;
   };
   const clearForControls = (island: MapIsland, x: number, y: number) => island.stopIndex === undefined
     ? Math.hypot(x, y) > 29
@@ -198,18 +220,23 @@ export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
       const quiz = island.stopIndex !== undefined; const seed = world.number * 17 + islandIndex * 7;
       const relief = quiz ? getIslandRelief(world.number, island.stopIndex!, world.stopIds.length) : undefined;
       const upper = outline(island, biome, 0.86);
-      ring(world.number, outline(island, biome, 0.99), outline(island, biome, 1.12), 1.003, 1.0012, colors.reef);
-      // Interrupted shore foam hugs the actual coast; no planet-wide bands.
-      const foamInner = outline(island, biome, 1.047), foamOuter = outline(island, biome, 1.062);
-      const foamPositions: number[] = [];
-      for (let i = 0; i < foamInner.length; i++) {
-        if ((i + islandIndex * 2) % 7 > 2) continue;
+      ring(world.number, outline(island, biome, 0.99), outline(island, biome, 1.065), 1.003, 1.0018, colors.reef);
+      ring(world.number, outline(island, biome, 1.065), outline(island, biome, 1.12), 1.0018, 1.0012, new THREE.Color(colors.reef).lerp(new THREE.Color(0x137e9d), 0.34).getHex());
+      const foamInner = outline(island, biome, 1.020), foamOuter = outline(island, biome, 1.047);
+      const foamReach = outline(island, biome, 1.117);
+      for (let band = 0; band < 2; band += 1) for (let i = 0; i < foamInner.length; i += 1) {
         const j = (i + 1) % foamInner.length;
-        for (const point of [foamInner[i], foamOuter[j], foamOuter[i], foamInner[i], foamInner[j], foamOuter[j]]) {
-          const at = mapAt(world.number, ...point, 1.0032); foamPositions.push(at.x, at.y, at.z);
+        for (const [index, side] of [[i, 0], [j, 1], [i, 1], [i, 0], [j, 0], [j, 1]]) {
+          const point = side ? foamOuter[index] : foamInner[index];
+          const at = mapAt(world.number, ...point, 1.0026);
+          const coast = mapAt(world.number, ...foamInner[index], 1.0026);
+          const reach = mapAt(world.number, ...foamReach[index], 1.0026);
+          shorePositions.push(at.x, at.y, at.z);
+          shoreDrifts.push(reach.x - coast.x, reach.y - coast.y, reach.z - coast.z);
+          shoreUvs.push((index === 0 && i === foamInner.length - 1 ? foamInner.length : index) / foamInner.length, side);
+          shorePhases.push(random(seed) + band * 0.5);
         }
       }
-      const foam = new THREE.BufferGeometry(); foam.setAttribute("position", new THREE.Float32BufferAttribute(foamPositions, 3)); foam.computeVertexNormals(); batch(foam, C.foam); foam.dispose();
       ring(world.number, outline(island, biome, 0.97), outline(island, biome, 1.04), top - 0.004, 1.003, colors.rock);
       ring(world.number, upper, outline(island, biome, 0.99), top, top - 0.003, colors.beach);
       const poolBiome = ["lagoon", "alpine", "mangrove"].includes(biome.id);
@@ -288,7 +315,9 @@ export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
           liquidRibbon(world.number, base, [[0.003, 0.005 * small, 0.018 * small], [0.001, -0.003 * small, 0.033 * small], [0.001, 1.003 - top, 0.042]], 0.003 * small, C.blueIce);
           if (quiz) for (let i = 0; i < (relief?.role === "landmark" ? 3 : 1); i++) {
             const at = basisAt(world.number, island.x + 65 + i * 34, island.y + 86 + i % 2 * 10, 1.001);
+            habitatMotion = { anchor: new THREE.Vector3().setFromMatrixPosition(at), height: 0.02, phase: seed + i * 1.7, kind: 2 };
             cone(at, i % 2 ? C.ice : C.snow, 0, 0.004, 0, 0.009 - i * 0.001, 0.019 - i * 0.002, true);
+            habitatMotion = null;
           }
         } else {
           grove(world.number, island, top + 0.001, "pine", quiz ? 7 : 4, seed, true, small);
@@ -430,8 +459,10 @@ export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
       const angle = 0.277 + random(i + capIndex * 20) * 0.005;
       const at = tangentPointToGlobe(polarFrame, Math.cos(theta) * angle, Math.sin(theta) * angle, 1.001);
       const base = polarBasis(at); const size = 0.0045 + random(i + 8) * 0.006;
+      habitatMotion = { anchor: new THREE.Vector3().setFromMatrixPosition(base), height: 0.025, phase: i * 1.7 + capIndex, kind: 2 };
       cone(base, i % 2 ? C.ice : C.blueIce, 0, 0.008, 0, size, 0.023, true);
       cone(base, C.snow, 0, 0.016, 0, size * 0.6, 0.009, true);
+      habitatMotion = null;
     }
     for (let i = 0; i < 9; i++) {
       const theta = i * 2.399963 + capIndex;
@@ -451,6 +482,96 @@ export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
     scenery.add(new THREE.Mesh(own(merged), material));
   }
   batches.clear();
+  const motionTime = { value: 0 };
+  const motionDeclaration = /* glsl */ `
+    attribute vec3 motionAnchor;
+    attribute vec3 motionParams;
+    uniform float sceneryMotionTime;
+    vec3 moveHabitat(vec3 point) {
+      vec3 up = normalize(motionAnchor);
+      vec3 east = normalize(cross(abs(up.y) > 0.98 ? vec3(0.,0.,1.) : vec3(0.,1.,0.), up));
+      vec3 north = cross(up, east);
+      float phase = motionParams.y;
+      if (motionParams.z < 1.5) {
+        float gust = sin(sceneryMotionTime * 1.05 + phase) + 0.32 * sin(sceneryMotionTime * 2.07 + phase * 1.6);
+        return point + (east + north * 0.38) * gust * motionParams.x * 0.00155;
+      }
+      return point + east * sin(sceneryMotionTime * 0.10 + phase) * 0.0012
+        + north * cos(sceneryMotionTime * 0.08 + phase) * 0.0008
+        + up * sin(sceneryMotionTime * 0.78 + phase) * 0.00125;
+    }
+  `;
+  const patchMotion = (shader: THREE.WebGLProgramParametersWithUniforms) => {
+    shader.uniforms.sceneryMotionTime = motionTime;
+    shader.vertexShader = shader.vertexShader.replace("#include <common>", `#include <common>\n${motionDeclaration}`)
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\ntransformed = moveHabitat(transformed);");
+  };
+  for (const [color, pieces] of habitatBatches) {
+    const geometry = mergeGeometries(pieces, false); disposePieces(pieces);
+    if (!geometry) continue;
+    const material = new THREE.MeshStandardMaterial({ color, roughness: 0.86, metalness: 0, flatShading: true, side: THREE.DoubleSide });
+    material.onBeforeCompile = patchMotion;
+    material.customProgramCacheKey = () => "habitat-wind-and-ice-v1";
+    const depthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, side: THREE.DoubleSide });
+    depthMaterial.onBeforeCompile = patchMotion;
+    depthMaterial.customProgramCacheKey = () => "habitat-wind-and-ice-depth-v1";
+    ownedMaterials.add(material); ownedMaterials.add(depthMaterial);
+    const mesh = new THREE.Mesh(own(geometry), material);
+    mesh.name = "Anchored swaying trees and floating ice";
+    mesh.customDepthMaterial = depthMaterial;
+    scenery.add(mesh);
+  }
+  habitatBatches.clear();
+
+  const shoreGeometry = new THREE.BufferGeometry();
+  shoreGeometry.setAttribute("position", new THREE.Float32BufferAttribute(shorePositions, 3));
+  shoreGeometry.setAttribute("shoreDrift", new THREE.Float32BufferAttribute(shoreDrifts, 3));
+  shoreGeometry.setAttribute("uv", new THREE.Float32BufferAttribute(shoreUvs, 2));
+  shoreGeometry.setAttribute("shorePhase", new THREE.Float32BufferAttribute(shorePhases, 1));
+  const shoreSun = { value: new THREE.Vector3(1, 1, 1).normalize() };
+  const shoreMaterial = new THREE.ShaderMaterial({
+    uniforms: { sceneryMotionTime: motionTime, sunLocal: shoreSun },
+    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    vertexShader: /* glsl */ `
+      attribute vec3 shoreDrift;
+      attribute float shorePhase;
+      uniform float sceneryMotionTime;
+      uniform vec3 sunLocal;
+      varying vec2 waveUv;
+      varying float waveAlpha;
+      varying float waveDaylight;
+      void main() {
+        float progress = fract(sceneryMotionTime * 0.155 + shorePhase);
+        vec3 point = normalize(position + shoreDrift * (1.0 - progress)) * (1.0026 + sin(progress * 3.14159) * 0.00025);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(point, 1.0);
+        waveUv = uv;
+        waveAlpha = sin(progress * 3.14159) * 0.61;
+        waveDaylight = smoothstep(-0.16, 0.7, dot(normalize(point), sunLocal));
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      varying vec2 waveUv;
+      varying float waveAlpha;
+      varying float waveDaylight;
+      void main() {
+        float edge = smoothstep(0.0, 0.24, waveUv.y) * (1.0 - smoothstep(0.65, 1.0, waveUv.y));
+        float breaks = 0.18 + 0.82 * smoothstep(-0.25, 0.50, sin(waveUv.x * 43.0 + sin(waveUv.x * 17.0) * 1.4));
+        float alpha = waveAlpha * breaks * edge;
+        if (alpha < 0.006) discard;
+        vec3 color = mix(vec3(0.11, 0.24, 0.34), vec3(0.80, 0.98, 0.96), waveDaylight);
+        gl_FragColor = vec4(color, alpha);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }
+    `,
+  });
+  ownedMaterials.add(shoreMaterial);
+  const shore = new THREE.Mesh(own(shoreGeometry), shoreMaterial);
+  shore.name = "Rolling shoreline wave and foam bands";
+  shore.renderOrder = 2;
+  shore.frustumCulled = false;
+  scenery.add(shore);
+
   const flowMaterials: THREE.ShaderMaterial[] = [];
   movingBatches.forEach((pieces, index) => {
     const geometry = mergeGeometries(pieces, false); disposePieces(pieces);
@@ -470,6 +591,8 @@ export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
     smokeSources, mistSources,
     update(timeSeconds, activeDestinationId, zoom, sunDirection) {
       if (disposed) return;
+      motionTime.value = Number.isFinite(timeSeconds) ? timeSeconds : 0;
+      if (sunDirection) shoreSun.value.copy(sunDirection);
       const activeWorld = numbersById.get(activeDestinationId) ?? 0;
       for (const material of flowMaterials) {
         if (sunDirection) material.uniforms.sunDirection.value.copy(sunDirection);

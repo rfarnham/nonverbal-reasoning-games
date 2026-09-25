@@ -85,3 +85,19 @@
 .skyControl select { min-width: 86px; min-height: 44px; border: 1px solid #b8d0bd; border-radius: 22px; padding: 8px 24px 8px 10px; background: #fffdf8; color: #17213d; font: inherit; cursor: pointer; }
 .skyControl select:focus-visible { outline: 3px solid #1679d2; outline-offset: 3px; }
 @media (max-width: 620px) { .sceneryControls { flex-wrap: wrap; }.skyControl { flex: 0 0 auto; }.sceneryControls .sceneryToggle { flex: 0 0 auto; }.sceneryControls > button:last-child { flex: 1 1 100%; } }
+
+/* Native badges sit below their ground anchor, connected by a small stem.
+   Their full hit area leaves the grounded animal and contact shadow visible. */
+.board[data-globe-renderer="webgl"] .stopPin { background: transparent; border: 0; box-shadow: none; }
+.board[data-globe-renderer="webgl"] .stopPin > span { display: grid; place-items: center; width: 36px; height: 36px; border: 3px solid #fffae3; border-radius: 50%; background: #ffd46c; box-shadow: 0 3px 0 #be8831, 0 5px 9px #163c4b30; }
+.board[data-globe-renderer="webgl"] .currentPin > span { background: #dc7550; box-shadow: 0 3px 0 #a34536, 0 5px 9px #163c4b30; }
+.board[data-globe-renderer="webgl"] .completePin > span { background: #16836b; box-shadow: 0 3px 0 #0e6656, 0 5px 9px #163c4b30; }
+.board[data-globe-renderer="webgl"] .stopPin:disabled > span { background: #b8c8b6; box-shadow: 0 3px 0 #8aa28f; }
+@media (max-width: 620px) { .board[data-globe-renderer="webgl"] .stopPin > span { width: 30px; height: 30px; font-size: .95rem; border-width: 2px; } }
+
+.board[data-globe-renderer="webgl"] .stopPin[data-grounded-badge="true"]::before { content: ""; position: absolute; width: 2px; height: var(--stop-stem-length); bottom: 50%; left: calc(50% - 1px); transform-origin: center bottom; transform: rotate(var(--stop-stem-angle)); z-index: -1; background: #fffae3; box-shadow: 0 1px 2px #163c4b60; pointer-events: none; }
+.board[data-globe-renderer="webgl"] .stopPin[data-caption-side="right"] small { top: 50%; left: calc(50% + 67px); transform: translate(-50%, -50%); }
+.board[data-globe-renderer="webgl"] .stopPin[data-caption-side="left"] small { top: 50%; left: calc(50% - 67px); transform: translate(-50%, -50%); }
+.board[data-globe-renderer="webgl"] .stopPin[data-caption-side="hidden"] small { display: none; }
+
+@media (max-width: 620px) { .board[data-globe-renderer="webgl"] .stopPin small { display: none; } }

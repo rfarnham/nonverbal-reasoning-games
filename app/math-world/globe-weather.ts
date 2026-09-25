@@ -23,21 +23,37 @@ function billboardGeometry(count: number): THREE.InstancedBufferGeometry {
 
 /** Smoothly union the billows once. A continuous surface avoids the bright
  * intersection rings produced by overlapping translucent ellipsoids. */
-function cloudSurface(): THREE.BufferGeometry {
-  const lobes = [
+function cloudSurface(formation: number): THREE.BufferGeometry {
+  const formations = [[
     [-0.074, 0, 0.004, 0.044, 0.018, 0.036],
     [-0.039, 0.010, -0.015, 0.053, 0.031, 0.043],
     [0.011, 0.015, 0.001, 0.058, 0.039, 0.049],
     [0.062, 0.004, 0.006, 0.046, 0.026, 0.035],
     [0.024, -0.003, 0.036, 0.061, 0.017, 0.030],
     [-0.035, -0.004, 0.032, 0.043, 0.015, 0.025],
-  ];
+    [-0.015, 0.035, -0.006, 0.036, 0.042, 0.034],
+  ], [
+    [-0.087, 0.001, -0.007, 0.062, 0.013, 0.037],
+    [-0.023, 0.005, 0.001, 0.071, 0.019, 0.036],
+    [0.043, 0.002, 0.009, 0.066, 0.015, 0.031],
+    [0.102, -0.001, 0.014, 0.039, 0.010, 0.024],
+  ], [
+    [-0.104, 0, -0.035, 0.064, 0.009, 0.019],
+    [-0.055, 0.001, -0.017, 0.057, 0.013, 0.025],
+    [0.002, 0.001, 0.012, 0.060, 0.010, 0.023],
+    [0.058, 0.002, 0.038, 0.059, 0.009, 0.018],
+    [0.114, 0, 0.050, 0.045, 0.007, 0.013],
+  ]];
+  const lobes = formations[formation];
+  const blend = formation === 2 ? 0.0035 : 0.006;
+  const low = [0, 1, 2].map(axis => Math.min(...lobes.map(lobe => lobe[axis] - lobe[axis + 3])) - 0.008);
+  const high = [0, 1, 2].map(axis => Math.max(...lobes.map(lobe => lobe[axis] + lobe[axis + 3])) + 0.008);
   const field = (x: number, y: number, z: number) => {
     let result = 1;
     for (const lobe of lobes) {
       const value = (Math.hypot((x - lobe[0]) / lobe[3], (y - lobe[1]) / lobe[4], (z - lobe[2]) / lobe[5]) - 1) * Math.min(lobe[3], lobe[4], lobe[5]);
-      const h = THREE.MathUtils.clamp(0.5 + 0.5 * (value - result) / 0.006, 0, 1);
-      result = value * (1 - h) + result * h - 0.006 * h * (1 - h);
+      const h = THREE.MathUtils.clamp(0.5 + 0.5 * (value - result) / blend, 0, 1);
+      result = value * (1 - h) + result * h - blend * h * (1 - h);
     }
     return result;
   };
@@ -59,11 +75,11 @@ function cloudSurface(): THREE.BufferGeometry {
       positions.push(...a, ...c, ...b); normals.push(...na, ...nc, ...nb);
     } else { positions.push(...a, ...b, ...c); normals.push(...na, ...nb, ...nc); }
   };
-  const nx = 14, ny = 6, nz = 8;
+  const nx = 13, ny = 6, nz = 8;
   const points: Point[] = [], values: number[] = [];
   const at = (x: number, y: number, z: number) => (x * (ny + 1) + y) * (nz + 1) + z;
   for (let x = 0; x <= nx; x += 1) for (let y = 0; y <= ny; y += 1) for (let z = 0; z <= nz; z += 1) {
-    const p: Point = [-0.137 + x / nx * 0.27, -0.037 + y / ny * 0.105, -0.069 + z / nz * 0.146];
+    const p: Point = [low[0] + x / nx * (high[0] - low[0]), low[1] + y / ny * (high[1] - low[1]), low[2] + z / nz * (high[2] - low[2])];
     points.push(p); values.push(field(...p));
   }
   const tetrahedra = [[0, 5, 1, 6], [0, 1, 2, 6], [0, 2, 3, 6], [0, 3, 7, 6], [0, 7, 4, 6], [0, 4, 5, 6]];
@@ -96,6 +112,7 @@ const cloudVertexShader = /* glsl */ `
   attribute vec3 puffOffset;
   attribute vec3 cloudPuffSize;
   attribute float bankSeed;
+  attribute float bankFormation;
   uniform float weatherTime;
   uniform vec3 focusedDirection;
   uniform float focusedAmount;
@@ -104,11 +121,13 @@ const cloudVertexShader = /* glsl */ `
   varying vec3 cloudViewDirection;
   varying float cloudDaylight;
   varying float cloudOpacity;
+  varying float cloudLayer;
   uniform vec3 sunLocal;
   void main() {
     // A smooth continuous billow follows the planet's tangent, so banks curve
     // around the horizon and keep their volume while the globe rotates.
-    float angle = weatherTime * (0.007 + bankSeed * 0.0018);
+    float velocity = bankFormation < 0.5 ? 0.0055 : bankFormation < 1.5 ? -0.0038 : 0.0105;
+    float angle = weatherTime * (velocity + bankSeed * 0.0012);
     float s = sin(angle), c = cos(angle);
     vec3 direction = normalize(vec3(
       bankCenter.x * c - bankCenter.z * s,
@@ -121,12 +140,13 @@ const cloudVertexShader = /* glsl */ `
     vec3 along = east * cos(orientation) + north * sin(orientation);
     vec3 across = -east * sin(orientation) + north * cos(orientation);
     float breath = sin(weatherTime * 0.21 + bankSeed * 17.0 + puffOffset.x * 12.0);
-    vec3 center = direction * (1.083 + puffOffset.y + breath * 0.0015)
+    vec3 center = direction * (1.075 + bankFormation * 0.033 + puffOffset.y + breath * 0.0015)
       + along * (puffOffset.x + sin(weatherTime * 0.15 + bankSeed * 9.0) * 0.004)
       + across * puffOffset.z;
-    vec3 localPoint = center + along * position.x * cloudPuffSize.x * (1.0 + breath * 0.06)
-      + direction * position.y * cloudPuffSize.y * (1.0 + breath * 0.13)
-      + across * position.z * cloudPuffSize.z;
+    float shear = sin(weatherTime * (0.10 + bankFormation * 0.03) + position.x * 21.0 + bankSeed * 11.0);
+    vec3 localPoint = center + along * position.x * cloudPuffSize.x * (1.0 + breath * 0.065)
+      + direction * (position.y * cloudPuffSize.y * (1.0 + breath * 0.15) + shear * 0.0015)
+      + across * (position.z * cloudPuffSize.z + shear * 0.0018 * bankFormation);
     vec4 worldPoint = modelMatrix * vec4(localPoint, 1.0);
     gl_Position = projectionMatrix * viewMatrix * worldPoint;
     vec3 adjustedNormal = along * normal.x / cloudPuffSize.x
@@ -136,7 +156,10 @@ const cloudVertexShader = /* glsl */ `
     cloudViewDirection = cameraPosition - worldPoint.xyz;
     cloudDaylight = smoothstep(-0.16, 0.25, dot(direction, sunLocal));
     float clearFocus = smoothstep(0.82, 0.92, dot(direction, focusedDirection));
-    cloudOpacity = 1.0 - clearFocus * focusedAmount;
+    cloudOpacity = (1.0 - clearFocus * focusedAmount) * (bankFormation < 0.5 ? 1.0 : bankFormation < 1.5 ? 0.90 : 0.68);
+    float horizon = dot(normalize(mat3(modelMatrix) * direction), normalize(cameraPosition - worldPoint.xyz));
+    cloudOpacity *= smoothstep(-0.12, 0.12, horizon);
+    cloudLayer = bankFormation;
   }
 `;
 
@@ -146,6 +169,7 @@ const cloudFragmentShader = /* glsl */ `
   varying vec3 cloudViewDirection;
   varying float cloudDaylight;
   varying float cloudOpacity;
+  varying float cloudLayer;
   uniform vec3 sunLocal;
   void main() {
     if (cloudOpacity < 0.12) discard;
@@ -153,6 +177,7 @@ const cloudFragmentShader = /* glsl */ `
     float sunlight = dot(normal, sunLocal);
     float lighting = smoothstep(-0.55, 0.8, sunlight);
     vec3 dayColor = mix(vec3(0.28, 0.44, 0.55), vec3(1.0, 0.98, 0.90), lighting);
+    dayColor = mix(dayColor, vec3(0.83, 0.91, 0.96), cloudLayer * 0.12);
     vec3 color = mix(vec3(0.035, 0.07, 0.16), dayColor, cloudDaylight);
     float grazing = abs(dot(normalize(cloudViewNormal), normalize(cloudViewDirection)));
     float cottonEdge = smoothstep(0.015, 0.32, grazing);
@@ -258,33 +283,23 @@ export function createGlobeWeather(
   camera: THREE.PerspectiveCamera,
   smokeSources: readonly GlobeSmokeSource[],
 ): GlobeWeather {
-  const cloudCount = CLOUD_BANK_COUNT;
-  const surface = cloudSurface();
-  const cloudGeometry = new THREE.InstancedBufferGeometry();
-  cloudGeometry.setAttribute("position", surface.getAttribute("position").clone());
-  cloudGeometry.setAttribute("normal", surface.getAttribute("normal").clone());
-  cloudGeometry.instanceCount = cloudCount;
-  surface.dispose();
-  const centers = new Float32Array(cloudCount * 3);
-  const offsets = new Float32Array(cloudCount * 3);
-  const puffSizes = new Float32Array(cloudCount * 3);
-  const seeds = new Float32Array(cloudCount);
+  const centers = new Float32Array(CLOUD_BANK_COUNT * 3);
+  const puffSizes = new Float32Array(CLOUD_BANK_COUNT * 3);
+  const seeds = new Float32Array(CLOUD_BANK_COUNT);
+  const formationIds = new Float32Array(CLOUD_BANK_COUNT);
   for (let bank = 0; bank < CLOUD_BANK_COUNT; bank += 1) {
     const y = 1 - 2 * (bank + 0.5) / CLOUD_BANK_COUNT;
     const ring = Math.sqrt(1 - y * y);
     const angle = bank * GOLDEN_ANGLE + 0.73;
     const seed = ((bank * 29 + 17) % 101) / 101;
-    const size = 0.80 + seed * 0.6;
-    const height = seed > 0.72 ? 1.55 : seed < 0.25 ? 0.65 : 1;
-    const stretch = seed < 0.25 ? 1.28 : 1;
+    const size = 0.79 + seed * 0.47;
+    const formation = bank % 3;
+    const height = formation === 0 ? 0.88 + seed * 0.37 : 0.85 + seed * 0.25;
     centers.set([Math.cos(angle) * ring, y, Math.sin(angle) * ring], bank * 3);
-    puffSizes.set([size * stretch, size * height, size], bank * 3);
+    puffSizes.set([size, size * height, size * (0.85 + seed * 0.2)], bank * 3);
     seeds[bank] = seed;
+    formationIds[bank] = formation;
   }
-  cloudGeometry.setAttribute("bankCenter", new THREE.InstancedBufferAttribute(centers, 3));
-  cloudGeometry.setAttribute("puffOffset", new THREE.InstancedBufferAttribute(offsets, 3));
-  cloudGeometry.setAttribute("cloudPuffSize", new THREE.InstancedBufferAttribute(puffSizes, 3));
-  cloudGeometry.setAttribute("bankSeed", new THREE.InstancedBufferAttribute(seeds, 1));
   const time = { value: 0 };
   const sunLocal = { value: new THREE.Vector3(-0.4, 0.65, 0.7).normalize() };
   const sunWorld = { value: new THREE.Vector3(-0.4, 0.65, 0.7).normalize() };
@@ -297,11 +312,33 @@ export function createGlobeWeather(
     // translucent lobes. Premultiplication keeps the canvas edge free of halos.
     transparent: true, depthWrite: false, premultipliedAlpha: true,
   });
-  const clouds = new THREE.Mesh(cloudGeometry, cloudMaterial);
-  clouds.name = "Globe drifting cloud banks";
-  clouds.frustumCulled = false;
-  clouds.renderOrder = 6;
-  globe.add(clouds);
+  const cloudMeshes: THREE.Mesh[] = [];
+  const cloudGeometries: THREE.InstancedBufferGeometry[] = [];
+  for (let formation = 0; formation < 3; formation += 1) {
+    const members = Array.from({ length: CLOUD_BANK_COUNT }, (_, index) => index).filter(index => formationIds[index] === formation);
+    const surface = cloudSurface(formation);
+    const geometry = new THREE.InstancedBufferGeometry();
+    geometry.setAttribute("position", surface.getAttribute("position").clone());
+    geometry.setAttribute("normal", surface.getAttribute("normal").clone());
+    geometry.instanceCount = members.length;
+    surface.dispose();
+    const points = new Float32Array(members.length * 3), sizes = new Float32Array(members.length * 3);
+    const phases = new Float32Array(members.length), types = new Float32Array(members.length);
+    members.forEach((member, index) => {
+      points.set(centers.subarray(member * 3, member * 3 + 3), index * 3);
+      sizes.set(puffSizes.subarray(member * 3, member * 3 + 3), index * 3);
+      phases[index] = seeds[member]; types[index] = formation;
+    });
+    geometry.setAttribute("bankCenter", new THREE.InstancedBufferAttribute(points, 3));
+    geometry.setAttribute("puffOffset", new THREE.InstancedBufferAttribute(new Float32Array(members.length * 3), 3));
+    geometry.setAttribute("cloudPuffSize", new THREE.InstancedBufferAttribute(sizes, 3));
+    geometry.setAttribute("bankSeed", new THREE.InstancedBufferAttribute(phases, 1));
+    geometry.setAttribute("bankFormation", new THREE.InstancedBufferAttribute(types, 1));
+    const mesh = new THREE.Mesh(geometry, cloudMaterial);
+    mesh.name = ["Low billowing cumulus clouds", "Wide layered stratus banks", "High feathered cirrus ribbons"][formation];
+    mesh.frustumCulled = false; mesh.renderOrder = 6;
+    cloudGeometries.push(geometry); cloudMeshes.push(mesh); globe.add(mesh);
+  }
 
   const smokeGeometry = billboardGeometry(smokeSources.length * SMOKE_PUFFS_PER_SOURCE);
   const sourcePositions = new Float32Array(smokeGeometry.instanceCount * 3);
@@ -408,12 +445,14 @@ export function createGlobeWeather(
   }
   shadowGeometry.setAttribute("bankCenter", new THREE.InstancedBufferAttribute(shadowCenters, 3));
   shadowGeometry.setAttribute("bankSeed", new THREE.InstancedBufferAttribute(shadowSeeds, 1));
+  shadowGeometry.setAttribute("bankFormation", new THREE.InstancedBufferAttribute(formationIds, 1));
   const shadowMaterial = new THREE.ShaderMaterial({
     uniforms: { weatherTime: time, sunLocal, focusedDirection, focusedAmount },
     transparent: true, depthWrite: false,
     vertexShader: /* glsl */ `
       attribute vec3 bankCenter;
       attribute float bankSeed;
+      attribute float bankFormation;
       uniform float weatherTime;
       uniform vec3 sunLocal;
       uniform vec3 focusedDirection;
@@ -421,7 +460,8 @@ export function createGlobeWeather(
       varying vec2 shadowPoint;
       varying float shadowOpacity;
       void main() {
-        float angle = weatherTime * (0.007 + bankSeed * 0.0018);
+        float velocity = bankFormation < 0.5 ? 0.0055 : bankFormation < 1.5 ? -0.0038 : 0.0105;
+        float angle = weatherTime * (velocity + bankSeed * 0.0012);
         float s = sin(angle), c = cos(angle);
         vec3 direction = normalize(vec3(bankCenter.x * c - bankCenter.z * s,
           bankCenter.y + sin(weatherTime * 0.035 + bankSeed * 19.0) * 0.005,
@@ -543,9 +583,9 @@ export function createGlobeWeather(
     dispose() {
       if (disposed) return;
       disposed = true;
-      globe.remove(clouds, smoke, surfaceHaze, shadows, aurora);
+      globe.remove(...cloudMeshes, smoke, surfaceHaze, shadows, aurora);
       scene.remove(atmosphere);
-      cloudGeometry.dispose();
+      for (const geometry of cloudGeometries) geometry.dispose();
       cloudMaterial.dispose();
       smokeGeometry.dispose();
       smokeMaterial.dispose();

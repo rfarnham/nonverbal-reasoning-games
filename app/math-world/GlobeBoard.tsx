@@ -101,7 +101,16 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
       node.style.visibility = visible ? "visible" : "hidden";
       node.style.pointerEvents = visible ? "auto" : "none";
       node.setAttribute("aria-hidden", String(!visible));
-      if (point) { node.style.left = `${point.x}px`; node.style.top = `${point.y}px`; }
+      if (point) {
+        node.style.left = `${point.x}px`; node.style.top = `${point.y}px`;
+        const offset = point.badgeOffset;
+        node.dataset.captionSide = point.captionSide ?? "below";
+        node.dataset.groundedBadge = String(!!offset && Math.hypot(offset.x, offset.y) > 0);
+        if (offset) {
+          node.style.setProperty("--stop-stem-length", `${Math.hypot(offset.x, offset.y)}px`);
+          node.style.setProperty("--stop-stem-angle", `${-Math.atan2(offset.x, offset.y)}rad`);
+        }
+      }
     }
   }
   function paint(next: Partial<GlobeSceneFrame> = {}) {
