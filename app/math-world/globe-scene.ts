@@ -8,6 +8,8 @@ import { createGlobeWeather } from "./globe-weather";
 import { createGlobeOcean } from "./globe-ocean";
 import { createGlobeLighting, type GlobeSkyMode } from "./globe-lighting";
 import { createGlobeLife } from "./globe-life";
+import { createGlobeMarine } from "./globe-marine";
+import { createGlobeHarbors } from "./globe-harbors";
 import { createSceneryClock } from "./scenery-clock";
 import { placeOccupiedStopBadge, placeStopCaption } from "./globe-marker-layout";
 import {
@@ -143,6 +145,8 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   const biomes = createGlobeBiomes(globe);
   const weather = createGlobeWeather(globe, scene, camera, biomes.smokeSources);
   const life = createGlobeLife(globe, biomes);
+  const marine = createGlobeMarine(globe);
+  const harbors = createGlobeHarbors(globe);
   for (const world of WORLD_DEFINITIONS) {
     const authored = getWorldMapLayout(world.number, world.stopIds.length);
     const layout = authored.desktop;
@@ -170,12 +174,6 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
         const at = mapAt(world.number, x, y, 1.01 + pathIndex * 0.0001);
         cylinder(basisAt(at), 0xffe6ad, 0, 0, 0, 0.0015, 0.001);
       }
-    }
-    const destination = getGlobeDestination(world.id);
-    if (destination) {
-      const base = basisAt(vector(destination.harbor).multiplyScalar(1.003));
-      for (let i = 0; i < 5; i++) box(base, i % 2 ? 0xbc8a55 : 0xd0a168, 0, 0.001, (i - 2) * 0.005, 0.024, 0.003, 0.0045);
-      for (const x of [-0.012, 0.012]) for (const z of [-0.012, 0.012]) cylinder(base, wood, x, 0.003, z, 0.0017, 0.012);
     }
   }
 
@@ -218,7 +216,9 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     continents.update(sceneryTime, lighting.sunDirection);
     biomes.update(sceneryTime, frame.activeDestinationId, frame.zoom, lighting.sunDirection);
     weather.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, lighting.sunDirection);
-    life.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, lighting.sunDirection);
+    life.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, lighting.sunDirection, sceneryEnabled && !reducedMotion.matches);
+    marine.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, lighting.sunDirection);
+    harbors.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, lighting.sunDirection);
     updateLavaLight();
     wakeTime.value = sceneryTime;
     const localDay = THREE.MathUtils.smoothstep(lighting.sunDirection.dot(vector(frame.focus)), -.2, .3);
@@ -237,7 +237,12 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     },
   });
   const reconcileScenery = () => sceneryClock.setRunning(!disposed && !unavailable && !!frame && sceneryEnabled && !reducedMotion.matches && !document.hidden && onScreen);
-  const visibilityChanged = () => reconcileScenery();
+  const visibilityChanged = () => {
+    // Clear an in-flight lightning pulse when reduced motion becomes active.
+    // Hidden/offscreen views still do no painting until they are visible again.
+    if (frame && !document.hidden && onScreen) draw(frame);
+    reconcileScenery();
+  };
   document.addEventListener("visibilitychange", visibilityChanged);
   reducedMotion.addEventListener("change", visibilityChanged);
   const intersectionObserver = new IntersectionObserver(entries => {
@@ -478,7 +483,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   resize();
   return {
     render: draw, resize,
-    setSceneryMotion(enabled) { sceneryEnabled = enabled; reconcileScenery(); },
+    setSceneryMotion(enabled) { sceneryEnabled = enabled; if (frame && onScreen && !document.hidden) draw(frame); reconcileScenery(); },
     setSkyMode(mode) { skyMode = mode; renderer.domElement.dataset.skyMode = mode; if (frame) draw(frame); },
     dispose() {
       if (disposed) return;
@@ -486,7 +491,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
       sceneryClock.dispose();
       document.removeEventListener("visibilitychange", visibilityChanged);
       reducedMotion.removeEventListener("change", visibilityChanged);
-      weather.dispose(); life.dispose(); biomes.dispose(); continents.dispose(); lighting.dispose(); sea.dispose();
+      weather.dispose(); life.dispose(); marine.dispose(); harbors.dispose(); biomes.dispose(); continents.dispose(); lighting.dispose(); sea.dispose();
       renderer.domElement.removeEventListener("webglcontextlost", contextLost);
       for (const geometry of geometries) geometry.dispose();
       for (const entry of materials) entry.dispose();

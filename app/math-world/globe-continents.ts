@@ -2,12 +2,13 @@ import * as THREE from "three";
 import { mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
 import { GLOBE_CONTINENTS, continentPointToGlobe, distanceToCoast2D, pointInsideCoast, type ContinentPoint } from "./globe-continent-data.ts";
 import { GLOBE_DESTINATIONS } from "./globe-geometry.ts";
+import { TREE_SWAY_GLSL } from "./globe-foliage.ts";
 
 type Point = ContinentPoint;
 const clamp = (n: number) => Math.max(0, Math.min(1, n));
 const mix = (a: Point,b: Point,t=.5): Point => [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
 const distance = (a: Point,b: Point) => Math.hypot(a[0]-b[0],a[1]-b[1]);
-type CachedGeometry = { position: Float32Array; normal: Float32Array; color?: Float32Array; uv?: Float32Array; index: Uint16Array | Uint32Array };
+type CachedGeometry = { position: Float32Array; normal: Float32Array; color?: Float32Array; uv?: Float32Array; foliageAnchor?: Float32Array; foliageBend?: Float32Array; index: Uint16Array | Uint32Array };
 // CPU arrays are immutable after construction. Each map mount still owns fresh
 // geometry, attributes and GPU resources, so disposal never invalidates a peer.
 const geometryCache=new Map<string,CachedGeometry>();
@@ -22,7 +23,8 @@ export function createGlobeContinents(globe: THREE.Group) {
   const foamPositions:number[]=[],foamUV:number[]=[];
   const riverPositions:number[]=[],riverUV:number[]=[];
   const landmarkPositions:number[]=[],landmarkColors:number[]=[];
-  const geometry = (key:string,positions:number[],colors?:number[],uv?:number[]) => {
+  const landmarkAnchors:number[]=[],landmarkBends:number[]=[];
+  const geometry = (key:string,positions:number[],colors?:number[],uv?:number[],anchors?:number[],bends?:number[]) => {
     const cached=geometryCache.get(key);
     if(cached){
       const result=new THREE.BufferGeometry();
@@ -30,11 +32,15 @@ export function createGlobeContinents(globe: THREE.Group) {
       result.setAttribute("normal",new THREE.BufferAttribute(cached.normal,3));
       if(cached.color)result.setAttribute("color",new THREE.BufferAttribute(cached.color,3));
       if(cached.uv)result.setAttribute("uv",new THREE.BufferAttribute(cached.uv,2));
+      if(cached.foliageAnchor)result.setAttribute("foliageAnchor",new THREE.BufferAttribute(cached.foliageAnchor,3));
+      if(cached.foliageBend)result.setAttribute("foliageBend",new THREE.BufferAttribute(cached.foliageBend,2));
       result.setIndex(new THREE.BufferAttribute(cached.index,1));geometries.push(result);return result;
     }
     const result=new THREE.BufferGeometry();result.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));
     if(colors)result.setAttribute("color",new THREE.Float32BufferAttribute(colors,3));
     if(uv)result.setAttribute("uv",new THREE.Float32BufferAttribute(uv,2));
+    if(anchors)result.setAttribute("foliageAnchor",new THREE.Float32BufferAttribute(anchors,3));
+    if(bends)result.setAttribute("foliageBend",new THREE.Float32BufferAttribute(bends,2));
     const merged=mergeVertices(result,1e-7);result.dispose();
     const indices=merged.getIndex()!,points=merged.getAttribute("position");
     const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3(),ab=new THREE.Vector3(),ac=new THREE.Vector3();
@@ -45,7 +51,7 @@ export function createGlobeContinents(globe: THREE.Group) {
       if(ab.cross(ac).dot(a)<0){indices.setX(i+1,ic);indices.setX(i+2,ib);}
     }
     merged.computeVertexNormals();
-    geometryCache.set(key,{position:merged.getAttribute("position").array as Float32Array,normal:merged.getAttribute("normal").array as Float32Array,color:merged.getAttribute("color")?.array as Float32Array|undefined,uv:merged.getAttribute("uv")?.array as Float32Array|undefined,index:merged.getIndex()!.array as Uint16Array|Uint32Array});
+    geometryCache.set(key,{position:merged.getAttribute("position").array as Float32Array,normal:merged.getAttribute("normal").array as Float32Array,color:merged.getAttribute("color")?.array as Float32Array|undefined,uv:merged.getAttribute("uv")?.array as Float32Array|undefined,foliageAnchor:merged.getAttribute("foliageAnchor")?.array as Float32Array|undefined,foliageBend:merged.getAttribute("foliageBend")?.array as Float32Array|undefined,index:merged.getIndex()!.array as Uint16Array|Uint32Array});
     geometries.push(merged);return merged;
   };
   const protectedCenters=GLOBE_DESTINATIONS.map(item=>item.center);
@@ -133,9 +139,14 @@ export function createGlobeContinents(globe: THREE.Group) {
     const canopy=new THREE.IcosahedronGeometry(1,0);
     const trunk=new THREE.CylinderGeometry(.15,.22,1,5).toNonIndexed();
     const transform=new THREE.Matrix4(),rotation=new THREE.Quaternion(),scale=new THREE.Vector3(),origin=new THREE.Vector3(),up=new THREE.Vector3(0,1,0),direction=new THREE.Vector3(),vertex=new THREE.Vector3();
+    const treeRoot=new THREE.Vector3(),treeUp=new THREE.Vector3();let treePhase=0;
     const putLandmark=(source:THREE.BufferGeometry,at:Point,height:number,size:readonly[number,number,number],tint:THREE.Color)=>{
       const sphere=continentPointToGlobe(continent,at,height);origin.set(sphere.x,sphere.y,sphere.z);direction.copy(origin).normalize();rotation.setFromUnitVectors(up,direction);scale.set(...size);transform.compose(origin,rotation,scale);
-      const points=source.getAttribute("position");for(let i=0;i<points.count;i++){vertex.fromBufferAttribute(points,i).applyMatrix4(transform);landmarkPositions.push(vertex.x,vertex.y,vertex.z);landmarkColors.push(tint.r,tint.g,tint.b);}
+      const points=source.getAttribute("position");for(let i=0;i<points.count;i++){
+        vertex.fromBufferAttribute(points,i).applyMatrix4(transform);landmarkPositions.push(vertex.x,vertex.y,vertex.z);landmarkColors.push(tint.r,tint.g,tint.b);
+        const height=(vertex.x-treeRoot.x)*treeUp.x+(vertex.y-treeRoot.y)*treeUp.y+(vertex.z-treeRoot.z)*treeUp.z;
+        landmarkAnchors.push(treeRoot.x,treeRoot.y,treeRoot.z);landmarkBends.push(Math.pow(clamp(height/.025),2),treePhase);
+      }
     };
     let trees=0;
     for(let seed=0;seed<160&&trees<24;seed++){
@@ -144,6 +155,7 @@ export function createGlobeContinents(globe: THREE.Group) {
       const at=continentPointToGlobe(continent,p);
       if(protectedCenters.some(c=>c.x*at.x+c.y*at.y+c.z*at.z>Math.cos(.26)))continue;
       const h=heightAt(p),size=.009+(seed%4)*.0018;
+      const root=continentPointToGlobe(continent,p,h);treeRoot.set(root.x,root.y,root.z);treeUp.copy(treeRoot).normalize();treePhase=seed*1.713+index;
       putLandmark(trunk,p,h+.004,[size*.65,.010,size*.65],cliff);
       putLandmark(canopy,p,h+.012,[size,size*1.15,size],forestColor);
       putLandmark(canopy,[p[0]+size*.45,p[1]-.002],h+.008,[size*.76,size*.86,size*.76],forestColor.clone().lerp(highlandColor,.22));
@@ -196,9 +208,17 @@ export function createGlobeContinents(globe: THREE.Group) {
   const terrain=new THREE.Mesh(geometry("terrain",terrainPositions,terrainColors),terrainMaterial);terrain.name="Connected mainland terrain with bays and inland seas";terrain.userData.receiveShadow=false;group.add(terrain);
   const shoreMaterial=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.69,side:THREE.DoubleSide});materials.push(shoreMaterial);
   const shore=new THREE.Mesh(geometry("shore",shorePositions,shoreColors),shoreMaterial);shore.name="Continuous mainland beaches and coastal shelves";shore.userData.receiveShadow=false;group.add(shore);
-  const landmarkMaterial=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.88,flatShading:true});materials.push(landmarkMaterial);
-  const landmarks=new THREE.Mesh(geometry("landmarks",landmarkPositions,landmarkColors),landmarkMaterial);landmarks.name="Mainland forest groves";group.add(landmarks);
   const clock={value:0},sun={value:new THREE.Vector3(1,1,1).normalize()};
+  const patchFoliage=(shader:THREE.WebGLProgramParametersWithUniforms)=>{
+    shader.uniforms.foliageTime=clock;
+    shader.vertexShader=shader.vertexShader.replace("#include <common>",`#include <common>\nattribute vec3 foliageAnchor; attribute vec2 foliageBend; uniform float foliageTime;\n${TREE_SWAY_GLSL}`)
+      .replace("#include <begin_vertex>","#include <begin_vertex>\ntransformed=swayTree(transformed,foliageAnchor,foliageBend.x,foliageBend.y,foliageTime);");
+  };
+  const landmarkMaterial=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.88,flatShading:true});materials.push(landmarkMaterial);
+  landmarkMaterial.onBeforeCompile=patchFoliage;landmarkMaterial.customProgramCacheKey=()=>"mainland-foliage-v1";
+  const landmarkDepth=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking});materials.push(landmarkDepth);
+  landmarkDepth.onBeforeCompile=patchFoliage;landmarkDepth.customProgramCacheKey=()=>"mainland-foliage-depth-v1";
+  const landmarks=new THREE.Mesh(geometry("landmarks",landmarkPositions,landmarkColors,undefined,landmarkAnchors,landmarkBends),landmarkMaterial);landmarks.name="Mainland forest groves";landmarks.customDepthMaterial=landmarkDepth;group.add(landmarks);
   const makeWaterMaterial=(foam:boolean)=>{
     const material=new THREE.ShaderMaterial({transparent:foam,depthWrite:!foam,side:THREE.DoubleSide,uniforms:{seconds:clock,sunDirection:sun,foam:{value:foam?1:0}},
       vertexShader:"varying vec2 vUv; varying vec3 vNormal; void main(){vUv=uv;vNormal=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}",

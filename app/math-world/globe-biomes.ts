@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { WORLD_DEFINITIONS } from "./world-data.ts";
+import { TREE_SWAY_GLSL } from "./globe-foliage.ts";
 import { getWorldMapLayout, type MapIsland } from "./map-layouts.ts";
 import { GLOBE_POLAR_CAPS, getGlobeRegion, mapPointToGlobe, tangentPointToGlobe, type Vec3 } from "./globe-geometry.ts";
 
@@ -487,14 +488,14 @@ export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
     attribute vec3 motionAnchor;
     attribute vec3 motionParams;
     uniform float sceneryMotionTime;
+    ${TREE_SWAY_GLSL}
     vec3 moveHabitat(vec3 point) {
       vec3 up = normalize(motionAnchor);
       vec3 east = normalize(cross(abs(up.y) > 0.98 ? vec3(0.,0.,1.) : vec3(0.,1.,0.), up));
       vec3 north = cross(up, east);
       float phase = motionParams.y;
       if (motionParams.z < 1.5) {
-        float gust = sin(sceneryMotionTime * 1.05 + phase) + 0.32 * sin(sceneryMotionTime * 2.07 + phase * 1.6);
-        return point + (east + north * 0.38) * gust * motionParams.x * 0.00155;
+        return swayTree(point, motionAnchor, motionParams.x, phase, sceneryMotionTime);
       }
       return point + east * sin(sceneryMotionTime * 0.10 + phase) * 0.0012
         + north * cos(sceneryMotionTime * 0.08 + phase) * 0.0008
@@ -511,10 +512,10 @@ export function createGlobeBiomes(globe: THREE.Group): GlobeBiomes {
     if (!geometry) continue;
     const material = new THREE.MeshStandardMaterial({ color, roughness: 0.86, metalness: 0, flatShading: true, side: THREE.DoubleSide });
     material.onBeforeCompile = patchMotion;
-    material.customProgramCacheKey = () => "habitat-wind-and-ice-v1";
+    material.customProgramCacheKey = () => "habitat-wind-and-ice-v2";
     const depthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, side: THREE.DoubleSide });
     depthMaterial.onBeforeCompile = patchMotion;
-    depthMaterial.customProgramCacheKey = () => "habitat-wind-and-ice-depth-v1";
+    depthMaterial.customProgramCacheKey = () => "habitat-wind-and-ice-depth-v2";
     ownedMaterials.add(material); ownedMaterials.add(depthMaterial);
     const mesh = new THREE.Mesh(own(geometry), material);
     mesh.name = "Anchored swaying trees and floating ice";

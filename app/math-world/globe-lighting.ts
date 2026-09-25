@@ -66,7 +66,13 @@ export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, came
           shader.uniforms.planetSun = sunWorld;
           shader.uniforms.planetTime = time;
           shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 planetPoint;")
-            .replace("#include <project_vertex>", "#include <project_vertex>\nplanetPoint = (modelMatrix * vec4(transformed,1.)).xyz;");
+            .replace("#include <project_vertex>", `#include <project_vertex>
+              vec4 planetLocal = vec4(transformed,1.);
+              #ifdef USE_INSTANCING
+                planetLocal = instanceMatrix * planetLocal;
+              #endif
+              planetPoint = (modelMatrix * planetLocal).xyz;
+            `);
           shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>
             varying vec3 planetPoint; uniform vec3 planetSun; uniform float planetTime;
           `).replace("#include <lights_fragment_end>", `#include <lights_fragment_end>
@@ -82,7 +88,7 @@ export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, came
             reflectedLight.directDiffuse *= 1.-smoothstep(.30,.85,cloudShade)*.13;
           `);
         };
-        material.customProgramCacheKey = () => `${previousKey}-living-planet-v1`;
+        material.customProgramCacheKey = () => `${previousKey}-living-planet-v2`;
         material.needsUpdate = true;
       }
       if (materials.some(material => material instanceof THREE.MeshStandardMaterial && !material.transparent)) {

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import * as THREE from "three";
 import { createGlobeBiomes } from "../app/math-world/globe-biomes.ts";
+import { createGlobeContinents } from "../app/math-world/globe-continents.ts";
 import { getGlobeRegion } from "../app/math-world/globe-geometry.ts";
 
 function snapshot(group) {
@@ -54,4 +55,28 @@ test("biome disposal includes animated depth materials and cannot resurrect scen
   biomes.update(50, getGlobeRegion(1).id, 1);
   assert.ok([...counts.values()].every(count => count === 1));
   assert.deepEqual(globe.children, [neighbor]);
+});
+
+test("mainland groves have fixed roots, moving crowns and independently disposed shadow resources", () => {
+  const globe = new THREE.Group(), continents = createGlobeContinents(globe);
+  const grove = globe.getObjectByName("Mainland forest groves");
+  const anchor = grove.geometry.getAttribute("foliageAnchor"), bend = grove.geometry.getAttribute("foliageBend");
+  assert.ok(grove.customDepthMaterial, "canopy shadows follow the same bend as the tree");
+  assert.equal(anchor.count, grove.geometry.getAttribute("position").count);
+  assert.equal(bend.count, anchor.count);
+  let roots = 0, crowns = 0;
+  for (let i = 0; i < bend.count; i++) {
+    assert.ok(Number.isFinite(anchor.getX(i) + anchor.getY(i) + anchor.getZ(i) + bend.getY(i)));
+    assert.ok(bend.getX(i) >= 0 && bend.getX(i) <= 1);
+    if (bend.getX(i) < .00001) roots++;
+    if (bend.getX(i) > .5) crowns++;
+  }
+  assert.ok(roots > 50 && crowns > 100, "trunk bases stay rooted while upper foliage responds to wind");
+  const original = anchor.array.slice();
+  for (let t = 0; t < 120; t++) continents.update(t);
+  assert.deepEqual(anchor.array, original, "animation must not mutate the cached CPU mesh shared across map mounts");
+  let depthDisposals = 0;
+  grove.customDepthMaterial.addEventListener("dispose", () => depthDisposals++);
+  continents.dispose(); continents.dispose();
+  assert.equal(depthDisposals, 1);
 });

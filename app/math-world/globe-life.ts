@@ -3,9 +3,10 @@ import { WORLD_DEFINITIONS } from "./world-data.ts";
 import { getGlobeMap, getGlobeRegion, tangentPointToGlobe, type Vec3 } from "./globe-geometry.ts";
 import { getWorldBiome } from "./globe-biome-data.ts";
 import type { GlobeSmokeSource } from "./globe-weather.ts";
+import { createGlobeLocalWeather } from "./globe-local-weather.ts";
 
 export type GlobeLife = Readonly<{
-  update: (timeSeconds: number, focus: Vec3, zoom: number, activeDestinationId: string, sunDirection?: THREE.Vector3) => void;
+  update: (timeSeconds: number, focus: Vec3, zoom: number, activeDestinationId: string, sunDirection?: THREE.Vector3, motionEnabled?: boolean) => void;
   dispose: () => void;
 }>;
 export type GlobeLifeSources = Readonly<{
@@ -68,7 +69,7 @@ export function createGlobeLife(globe: THREE.Group, sources: GlobeLifeSources): 
       rainOrigins.push(origin);
       // A small low cloud belongs to the shower; it does not depend on a global
       // drifting bank coincidentally passing over this corner of the forest.
-      for (let puff = 0; puff < 5; puff += 1) particles.push({ point: origin, kind: 4, seed: puff / 5, strength: 1 });
+      for (let puff = 0; puff < 5; puff += 1) particles.push({ point: origin, kind: 4, seed: puff / 5, strength: rainOrigins.length - 1 });
     }
   }
   for (const [sourceIndex, source] of sources.smokeSources.entries()) {
@@ -78,6 +79,7 @@ export function createGlobeLife(globe: THREE.Group, sources: GlobeLifeSources): 
     for (let puff = 0; puff < 7; puff += 1) particles.push({ point: source.position, kind: 1, seed: (puff / 7 + sourceIndex * 0.093) % 1, strength: source.strength });
   }
 
+  const localWeather = createGlobeLocalWeather(group, rainOrigins);
   const particleGeometry = keepGeometry(instancePlane());
   particleGeometry.instanceCount = particles.length;
   const particlePositions = new Float32Array(particles.length * 3);
@@ -89,7 +91,7 @@ export function createGlobeLife(globe: THREE.Group, sources: GlobeLifeSources): 
   particleGeometry.setAttribute("sourcePosition", new THREE.InstancedBufferAttribute(particlePositions, 3));
   particleGeometry.setAttribute("particleData", new THREE.InstancedBufferAttribute(particleData, 3));
   const particleMaterial = keepMaterial(new THREE.ShaderMaterial({
-    uniforms: { lifeTime: time, sunLocal, closeAmount },
+    uniforms: { lifeTime: time, sunLocal, closeAmount, stormIntensity: localWeather.stormIntensity },
     transparent: true, depthWrite: false, side: THREE.DoubleSide,
     vertexShader: /* glsl */ `
       attribute vec3 sourcePosition;
@@ -97,6 +99,7 @@ export function createGlobeLife(globe: THREE.Group, sources: GlobeLifeSources): 
       uniform float lifeTime;
       uniform vec3 sunLocal;
       uniform float closeAmount;
+      uniform vec2 stormIntensity;
       varying vec2 particlePoint;
       varying vec3 particleColor;
       varying float particleAlpha;
@@ -143,8 +146,10 @@ export function createGlobeLife(globe: THREE.Group, sources: GlobeLifeSources): 
         } else {
           center = normal * 1.118 + east * (seed - 0.5) * 0.058 + north * sin(seed * 13.0) * 0.009;
           size = 0.022 + sin(seed * 8.0 + lifeTime * 0.12) * 0.003;
-          particleAlpha = 0.26;
-          particleColor = mix(vec3(0.10, 0.15, 0.23), vec3(0.49, 0.63, 0.68), daylight);
+          particleAlpha = 0.62;
+          particleColor = mix(vec3(0.10, 0.15, 0.23), vec3(0.22, 0.31, 0.38), daylight);
+          float stormGlow = mix(stormIntensity.x, stormIntensity.y, step(0.5, strength));
+          particleColor = mix(particleColor, vec3(0.82, 0.89, 1.0), stormGlow * 0.65);
         }
         // Sparse accents remain legible when close; they do not become a layer
         // of giant dots when the entire planet is visible.
@@ -163,7 +168,7 @@ export function createGlobeLife(globe: THREE.Group, sources: GlobeLifeSources): 
       varying float particleKind;
       void main() {
         float r = length(particlePoint);
-        float soft = particleKind > 0.5 && particleKind < 1.5 || particleKind > 3.5 ? 0.08 : 0.22;
+        float soft = particleKind > 3.5 ? 0.45 : particleKind > 0.5 && particleKind < 1.5 ? 0.08 : 0.22;
         float alpha = (1.0 - smoothstep(soft, 1.0, r)) * particleAlpha;
         if (alpha < 0.004) discard;
         gl_FragColor = vec4(particleColor, alpha);
@@ -303,77 +308,20 @@ export function createGlobeLife(globe: THREE.Group, sources: GlobeLifeSources): 
   rain.renderOrder = 6;
   group.add(rain);
 
-  const rainbowGeometry = keepGeometry(new THREE.BufferGeometry());
-  const rainbowVertices: number[] = [];
-  const rainbowCenters: number[] = [];
-  const rainbowIndices: number[] = [];
-  for (const origin of rainOrigins) {
-    const offset = rainbowVertices.length / 3;
-    for (let segment = 0; segment <= 56; segment += 1) {
-      const angle = segment / 56 * Math.PI;
-      for (const band of [0, 1]) {
-        rainbowVertices.push(angle, band, 0);
-        rainbowCenters.push(origin.x, origin.y, origin.z);
-      }
-      if (segment < 56) { const index = offset + segment * 2; rainbowIndices.push(index, index + 1, index + 2, index + 1, index + 3, index + 2); }
-    }
-  }
-  rainbowGeometry.setAttribute("position", new THREE.Float32BufferAttribute(rainbowVertices, 3));
-  rainbowGeometry.setAttribute("bowCenter", new THREE.Float32BufferAttribute(rainbowCenters, 3));
-  rainbowGeometry.setIndex(rainbowIndices);
-  const rainbowMaterial = keepMaterial(new THREE.ShaderMaterial({
-    uniforms: { lifeTime: time, sunLocal },
-    transparent: true, depthWrite: false, side: THREE.DoubleSide,
-    vertexShader: /* glsl */ `
-      attribute vec3 bowCenter;
-      uniform float lifeTime;
-      uniform vec3 sunLocal;
-      varying vec2 bowPoint;
-      varying float bowAlpha;
-      void main() {
-        vec3 normal = normalize(bowCenter);
-        vec3 east = normalize(cross(vec3(0.0, 1.0, 0.0), normal));
-        vec3 north = cross(normal, east);
-        float radius = 0.035 + position.y * 0.0045;
-        vec3 point = normal * 1.020 + east * 0.058 + north * 0.01;
-        point += east * cos(position.x) * radius + normal * sin(position.x) * radius;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(point, 1.0);
-        bowPoint = position.xy;
-        bowAlpha = smoothstep(0.0, 0.45, dot(normal, sunLocal)) * (0.16 + sin(lifeTime * 0.12) * 0.025);
-      }
-    `,
-    fragmentShader: /* glsl */ `
-      varying vec2 bowPoint;
-      varying float bowAlpha;
-      void main() {
-        float band = bowPoint.y;
-        vec3 color = 0.5 + 0.5 * cos(6.28318 * (vec3(0.0, 0.33, 0.67) + band * 0.78));
-        float fade = smoothstep(0.0, 0.2, band) * (1.0 - smoothstep(0.82, 1.0, band));
-        float alpha = fade * sin(bowPoint.x) * bowAlpha;
-        gl_FragColor = vec4(color, alpha);
-        #include <tonemapping_fragment>
-        #include <colorspace_fragment>
-      }
-    `,
-  }));
-  const rainbow = new THREE.Mesh(rainbowGeometry, rainbowMaterial);
-  rainbow.name = "Faint sunlit rainforest rainbows";
-  rainbow.frustumCulled = false;
-  rainbow.renderOrder = 8;
-  group.add(rainbow);
-
   let disposed = false;
   return {
-    update(timeSeconds, focus, zoom, activeDestinationId, sunDirection) {
+    update(timeSeconds, focus, zoom, activeDestinationId, sunDirection, motionEnabled = true) {
       if (disposed) return;
       time.value = Number.isFinite(timeSeconds) ? timeSeconds : 0;
       if (sunDirection && sunDirection.lengthSq() > 0.0001) sunLocal.value.copy(sunDirection).normalize();
+      localWeather.update(time.value, sunLocal.value, motionEnabled);
       focusedDirection.value.set(focus.x, focus.y, focus.z).normalize();
       closeAmount.value = activeDestinationId ? THREE.MathUtils.clamp(zoom, 0, 1) : 0;
     },
     dispose() {
       if (disposed) return;
       disposed = true;
+      localWeather.dispose();
       globe.remove(group);
       for (const geometry of geometries) geometry.dispose();
       for (const material of materials) material.dispose();
