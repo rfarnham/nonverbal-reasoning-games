@@ -11,6 +11,7 @@ import { createGlobeLife } from "./globe-life";
 import { createGlobeMarine } from "./globe-marine";
 import { createGlobeHarbors } from "./globe-harbors";
 import { createGlobeStorms } from "./globe-storms";
+import { northUpGlobeOrientation, type GlobeOrientation } from "./globe-navigation";
 import { sampleStormShipMotion } from "./storm-ship-motion";
 import { createSceneryClock } from "./scenery-clock";
 import { placeOccupiedStopBadge, placeStopCaption } from "./globe-marker-layout";
@@ -28,7 +29,7 @@ export type GlobeProjection = Readonly<{
   avatar?: GlobeProjectedPoint; boat?: GlobeProjectedPoint;
 }>;
 export type GlobeSceneFrame = Readonly<{
-  focus: Vec3; zoom: number; activeDestinationId: string;
+  focus: Vec3; orientation?: GlobeOrientation; zoom: number; activeDestinationId: string;
   completedStopIds: readonly string[];
   stormStages?: Readonly<Record<string, number>>;
   cameraDestinationId?: string; stormCameraBlend?: number;
@@ -197,7 +198,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   const updateScenery = () => {
     if (!frame) return;
     lighting.update(sceneryTime, skyMode, frame.focus, frame.zoom);
-    sea.update(sceneryTime, globe, camera);
+    sea.update(sceneryTime, globe, camera, lighting.sunDirection);
     continents.update(sceneryTime, lighting.sunDirection);
     biomes.update(sceneryTime, frame.activeDestinationId, frame.zoom, lighting.sunDirection);
     weather.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, lighting.sunDirection);
@@ -384,7 +385,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     const world = WORLD_DEFINITIONS.find(candidate => candidate.id === id);
     return world ? getWorldMapLayout(world.number, world.stopIds.length).landscape : "coast";
   };
-  const inverseRotation = new THREE.Quaternion();
+
   const worldPosition = new THREE.Vector3();
   const projected = new THREE.Vector3();
   const eye = new THREE.Vector3();
@@ -402,13 +403,8 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   function draw(next: GlobeSceneFrame) {
     if (disposed || unavailable) return;
     frame = next;
-    const focus = vector(next.focus).normalize();
-    const up = new THREE.Vector3(0, 1, 0).addScaledVector(focus, -focus.y).normalize();
-    if (up.lengthSq() < 0.01) up.set(0, 0, -1);
-    const right = up.clone().cross(focus).normalize();
-    const basis = new THREE.Matrix4().makeBasis(right, up, focus);
-    inverseRotation.setFromRotationMatrix(basis).invert();
-    globe.quaternion.copy(inverseRotation);
+    const orientation = next.orientation ?? northUpGlobeOrientation(next.focus);
+    globe.quaternion.set(orientation.x, orientation.y, orientation.z, orientation.w).normalize();
     const zoom = clamp(next.zoom, 0, 1);
     const tan = Math.tan(camera.fov * Math.PI / 360);
     const aspect = width / height;

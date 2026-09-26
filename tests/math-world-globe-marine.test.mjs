@@ -6,7 +6,7 @@ import {
   distanceToSurfaceArc, sphericalAngle, dotVec3,
 } from "../app/math-world/globe-geometry.ts";
 import {
-  GLOBE_MARINE_LOOPS, MARINE_LAND_CLEARANCE, MARINE_HARBOR_CLEARANCE, MARINE_VOYAGE_CLEARANCE, MARINE_STORM_CLEARANCE,
+  GLOBE_MARINE_LOOPS, MARINE_SCHOOL_SIZE, MARINE_LAND_CLEARANCE, MARINE_HARBOR_CLEARANCE, MARINE_VOYAGE_CLEARANCE, MARINE_STORM_CLEARANCE,
   createGlobeMarine, sampleMarineLoop, sampleWhaleSurfacing,
 } from "../app/math-world/globe-marine.ts";
 
@@ -14,7 +14,8 @@ const close = (actual, expected, message, tolerance = 1e-8) => assert.ok(Math.ab
 
 test("complete marine loops and their visible footprints stay in the ocean and out of every harbor", () => {
   assert.equal(GLOBE_MARINE_LOOPS.filter(loop => loop.kind === "boat").length, 8);
-  assert.equal(GLOBE_MARINE_LOOPS.filter(loop => loop.kind === "fish").length, 12);
+  assert.ok(GLOBE_MARINE_LOOPS.filter(loop => loop.kind === "fish").length >= 24, "schools appear around substantially more coasts");
+  assert.ok(GLOBE_MARINE_LOOPS.filter(loop => loop.kind === "fish").length * MARINE_SCHOOL_SIZE >= 300, "at least300fish occupy the validated schools");
   assert.equal(GLOBE_MARINE_LOOPS.filter(loop => loop.kind === "whale").length, 5);
   for (const loop of GLOBE_MARINE_LOOPS) {
     const name = `${loop.kind} at world ${loop.worldNumber}`;
@@ -120,7 +121,7 @@ test("marine animation holds a fixed resource budget and remains pinned to the g
   const globe = new THREE.Group(), marine = createGlobeMarine(globe);
   const before = inspect(globe), focus = getGlobeRegion(1).center, sun = new THREE.Vector3();
   assert.equal(before.meshes.length, 8);
-  assert.ok(before.triangles < 20_000);
+  assert.ok(before.triangles < 65_000, "hundreds of shaped swimmers remain batched within a bounded triangle budget");
   assert.equal(before.geometry.size, 8);
   assert.equal(before.materials.size, 3);
   for (let frame = 0; frame < 400; frame++) {

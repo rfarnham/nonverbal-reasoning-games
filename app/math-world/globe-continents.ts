@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
 import { GLOBE_CONTINENTS, continentPointToGlobe, distanceToCoast2D, pointInsideCoast, type ContinentPoint } from "./globe-continent-data.ts";
 import { GLOBE_DESTINATIONS } from "./globe-geometry.ts";
+import { MAINLAND_RIVERS, mainlandHeightAt, mainlandWaterSample, mainlandMountainRelief } from "./globe-mainland-geography.ts";
+import { createMainlandLife } from "./globe-mainland-life.ts";
 import { TREE_SWAY_GLSL } from "./globe-foliage.ts";
 
 type Point = ContinentPoint;
@@ -55,36 +57,16 @@ export function createGlobeContinents(globe: THREE.Group) {
     geometries.push(merged);return merged;
   };
   const protectedCenters=GLOBE_DESTINATIONS.map(item=>item.center);
-  const protectedCosine=Math.cos(.235);
-  const rivers: readonly (readonly Point[])[] = [
-    [[-.06,.12],[-.09,.01],[-.02,-.10],[.08,-.17],[.13,-.29],[.07,-.42]],
-    [[-.13,.30],[-.16,.21],[-.11,.14],[-.01,.06],[.08,.04],[.25,.11]],
-    [[.0,.08],[.04,-.03],[-.03,-.13],[-.08,-.22],[-.03,-.34],[.08,-.45]],
-    [[-.02,.04],[-.07,-.06],[-.03,-.14],[.06,-.24],[.03,-.38],[.10,-.47]],
-    [[-.03,.13],[.05,.06],[.12,-.01],[.08,-.10],[.02,-.15],[-.01,-.28]],
-    [[-.03,.12],[.07,.04],[.14,-.07],[.12,-.18],[.05,-.26],[.01,-.46]],
-  ];
-  const segmentDistance=(p:Point,a:Point,b:Point)=>{const dx=b[0]-a[0],dy=b[1]-a[1],t=clamp(((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy));return Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy);};
-  const riverDistance=(p:Point,river:readonly Point[])=>{let minimum=Infinity;for(let i=1;i<river.length;i++)minimum=Math.min(minimum,segmentDistance(p,river[i-1],river[i]));return minimum;};
   if(geometryCache.size<5)for(const [index,continent] of GLOBE_CONTINENTS.entries()) {
     const baseColor=new THREE.Color(continent.color),highlandColor=new THREE.Color(continent.highlandColor);
     const color=new THREE.Color(),sand=new THREE.Color(0xf3deb0),reef=new THREE.Color(0x5ccfc3),deepReef=new THREE.Color(0x269eac),cliff=new THREE.Color(continent.cliffColor);
-    const river=rivers[index];
+    const rivers=MAINLAND_RIVERS[index];
+    const riverDistance=(p:Point)=>mainlandWaterSample(index,p).distance;
     const forestColor=new THREE.Color([0x4f985c,0x408d65,0x4e8268,0x89994d,0x739985,0x39834f][index]);
     const dryColor=new THREE.Color([0xc7c877,0xadbd77,0xb8c1a1,0xd6be75,0xc6cdaf,0xb1bd6c][index]);
     const forestCover=(p:Point)=>clamp(.45+.35*Math.sin(p[0]*12+Math.sin(p[1]*8)*1.4+index*1.3)+.22*Math.cos(p[1]*13-p[0]*4+index));
     const coastDistance=(p:Point)=>{let minimum=distanceToCoast2D(p,continent.coastline);for(const hole of continent.inlandWater)minimum=Math.min(minimum,distanceToCoast2D(p,hole));return minimum;};
-    const heightAt=(p:Point)=>{
-      const coastal=clamp(coastDistance(p)/.032);
-      const ridgeAxis=p[0]+Math.sin(p[1]*12+index)*.054;
-      const interior=clamp((.30-Math.hypot(...p))/.11);
-      const ridge=Math.exp(-ridgeAxis*ridgeAxis/.0035)*Math.exp(-p[1]*p[1]/.039)*interior;
-      let h=1.0035+coastal*.005+ridge*.034;
-      const at=continentPointToGlobe(continent,p);
-      if(protectedCenters.some(c=>c.x*at.x+c.y*at.y+c.z*at.z>protectedCosine))h=Math.min(h,1.0105);
-      const channel=clamp((riverDistance(p,river)-.014)/.009);
-      return 1.0014+(h-1.0014)*channel;
-    };
+    const heightAt=(p:Point)=>mainlandHeightAt(index,p);
     const vertexCache=new Map<string,readonly number[]>();
     const snow=new THREE.Color(0xdce6db);
     const put=(p:Point)=>{
@@ -98,7 +80,8 @@ export function createGlobeContinents(globe: THREE.Group) {
       const inland=clamp((h-1.0035)/.005);
       color.lerp(forestColor,forestCover(p)*inland*.50);
       color.lerp(dryColor,clamp(.22+.28*Math.sin(p[0]*9-p[1]*7+index*2))*inland);
-      if(h>1.029 && [2,4].includes(index))color.lerp(snow,clamp((h-1.029)*55));
+      color.lerp(cliff,clamp((h-1.027)*25)*.50);
+      if(h>1.035)color.lerp(snow,clamp((h-1.035)*65)*([2,4].includes(index)?1:.65));
       terrainColors.push(color.r,color.g,color.b);
       vertexCache.set(key,[at.x,at.y,at.z,color.r,color.g,color.b]);
     };
@@ -108,8 +91,9 @@ export function createGlobeContinents(globe: THREE.Group) {
     const leaves:(readonly[Point,Point,Point])[]=[];
     const triangle=(a:Point,b:Point,c:Point,depth=0)=>{
       const edge=Math.max(distance(a,b),distance(b,c),distance(c,a));
-      const nearRiver=Math.min(riverDistance(a,river),riverDistance(b,river),riverDistance(c,river))<edge+.024;
-      if(depth<9&&edge>(nearRiver?.010:.038)){
+      const nearRiver=Math.min(riverDistance(a),riverDistance(b),riverDistance(c))<edge+.024;
+      const highland=Math.max(mainlandMountainRelief(index,a),mainlandMountainRelief(index,b),mainlandMountainRelief(index,c))>.007;
+      if(depth<9&&edge>(nearRiver?.010:highland?.023:.038)){
         const ab=mix(a,b),bc=mix(b,c),ca=mix(c,a);
         midpoints.set(edgeKey(a,b),ab);midpoints.set(edgeKey(b,c),bc);midpoints.set(edgeKey(c,a),ca);
         triangle(a,ab,ca,depth+1);triangle(ab,b,bc,depth+1);triangle(ca,bc,c,depth+1);triangle(ab,bc,ca,depth+1);return;
@@ -151,7 +135,7 @@ export function createGlobeContinents(globe: THREE.Group) {
     let trees=0;
     for(let seed=0;seed<160&&trees<24;seed++){
       const p:Point=[Math.sin(seed*73.19+index*5.3)*.34,Math.sin(seed*31.77+index*2.1)*.33];
-      if(forestCover(p)<.54||!pointInsideCoast(p,continent.coastline)||continent.inlandWater.some(hole=>pointInsideCoast(p,hole))||coastDistance(p)<.036||riverDistance(p,river)<.040)continue;
+      if(forestCover(p)<.54||!pointInsideCoast(p,continent.coastline)||continent.inlandWater.some(hole=>pointInsideCoast(p,hole))||coastDistance(p)<.036||riverDistance(p)<.040)continue;
       const at=continentPointToGlobe(continent,p);
       if(protectedCenters.some(c=>c.x*at.x+c.y*at.y+c.z*at.z>Math.cos(.26)))continue;
       const h=heightAt(p),size=.009+(seed%4)*.0018;
@@ -195,12 +179,16 @@ export function createGlobeContinents(globe: THREE.Group) {
         for(const [point,along,across]of [[foamA[i],i,0],[foamB[j],i+1,1],[foamB[i],i,1],[foamA[i],i,0],[foamA[j],i+1,0],[foamB[j],i+1,1]] as const){const at=continentPointToGlobe(continent,point,1.0024);foamPositions.push(at.x,at.y,at.z);foamUV.push(along*.38,across);}
       }
     }
-    for(let segment=0;segment<river.length-1;segment++){
-      const a=river[segment],b=river[segment+1],dx=b[0]-a[0],dy=b[1]-a[1],length=Math.hypot(dx,dy),nx=dy/length*.0032,ny=-dx/length*.0032;
+    for(const water of rivers)for(let segment=0;segment<water.points.length-1;segment++){
+      const river=water.points;
+      const a=river[segment],b=river[segment+1],dx=b[0]-a[0],dy=b[1]-a[1],length=Math.hypot(dx,dy),nx=dy/length*water.width,ny=-dx/length*water.width;
       const steps=Math.ceil(length/.012);
       for(let step=0;step<steps;step++)for(const [t,side]of [[step/steps,-1],[(step+1)/steps,1],[step/steps,1],[step/steps,-1],[(step+1)/steps,-1],[(step+1)/steps,1]]){
+        const midpoint=mix(a,b,(step+.5)/steps);
+        if(!pointInsideCoast(midpoint,continent.coastline)||continent.inlandWater.some(hole=>pointInsideCoast(midpoint,hole)))continue;
         const center=mix(a,b,t),point:Point=[center[0]+nx*side,center[1]+ny*side];
-        const at=continentPointToGlobe(continent,point,1.0021);riverPositions.push(at.x,at.y,at.z);riverUV.push((side+1)/2,segment+t);
+        const level=water.sourceLevel+(1.0021-water.sourceLevel)*(segment+t)/(river.length-1);
+        const at=continentPointToGlobe(continent,point,level);riverPositions.push(at.x,at.y,at.z);riverUV.push((side+1)/2,segment+t);
       }
     }
   }
@@ -236,9 +224,10 @@ export function createGlobeContinents(globe: THREE.Group) {
   };
   const foam=new THREE.Mesh(geometry("foam",foamPositions,undefined,foamUV),makeWaterMaterial(true));foam.name="Mainland shoreline wave bands";foam.renderOrder=2;group.add(foam);
   const riverMesh=new THREE.Mesh(geometry("rivers",riverPositions,undefined,riverUV),makeWaterMaterial(false));riverMesh.name="Continental rivers from inland water to the coast";group.add(riverMesh);
+  const life=createMainlandLife(group);
   let disposed=false;
   return{
-    update(seconds:number,sunDirection?:THREE.Vector3){if(disposed)return;clock.value=Number.isFinite(seconds)?seconds:0;if(sunDirection)sun.value.copy(sunDirection);},
-    dispose(){if(disposed)return;disposed=true;globe.remove(group);for(const geometry of geometries)geometry.dispose();for(const material of materials)material.dispose();group.clear();},
+    update(seconds:number,sunDirection?:THREE.Vector3){if(disposed)return;clock.value=Number.isFinite(seconds)?seconds:0;life.update(clock.value);if(sunDirection)sun.value.copy(sunDirection);},
+    dispose(){if(disposed)return;disposed=true;life.dispose();globe.remove(group);for(const geometry of geometries)geometry.dispose();for(const material of materials)material.dispose();group.clear();},
   };
 }

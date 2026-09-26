@@ -5,7 +5,8 @@ import { canOpenRequiredStop, canOpenWorld, type WorldProgress } from "./engine.
 import { BOSS_CHALLENGES, canOpenBoss, type BossChallenge } from "./boss-challenges.ts";
 import { QUESTIONS_BY_STOP, WORLD_DEFINITIONS, stopsForWorld, type WorldDefinition } from "./world-data.ts";
 import { getWorldMapLayout } from "./map-layouts.ts";
-import { GLOBE_DESTINATIONS, getGlobeDestination, getGlobeMap, getGlobeRoadPoints, getVoyageRoute, sampleSurfaceRoute, getSurfaceRouteTangent, sphericalInterpolate, type Vec3 } from "./globe-geometry.ts";
+import { GLOBE_DESTINATIONS, getGlobeDestination, getGlobeMap, getGlobeRoadPoints, getVoyageRoute, sampleSurfaceRoute, getSurfaceRouteTangent, getSurfaceRouteLength, sphericalInterpolate, type Vec3 } from "./globe-geometry.ts";
+import { advanceGlobeAnimationTime, globeTransitionDuration, globeOrientationFocus, interpolateGlobeOrientation, northUpGlobeOrientation, transportGlobeOrientation, turnGlobeOrientation, voyageProgress } from "./globe-navigation.ts";
 import type { GlobeSceneFrame, GlobeProjection, GlobeScene } from "./globe-scene";
 import type { GlobeSkyMode } from "./globe-lighting";
 import type { ArchipelagoVoyage, VoyageActivityProps } from "./voyage.ts";
@@ -57,7 +58,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
   useLayoutEffect(() => { latest.current = props; }, [props]);
   const nodes = useRef(new Map<string, HTMLElement>());
   const projectionRef = useRef<GlobeProjection | null>(null);
-  const frame = useRef<GlobeSceneFrame>({ focus: selected.center, zoom: props.initialOverview ? 0 : 1, activeDestinationId: destinationId, completedStopIds: props.progress.completedStopIds, stormStages });
+  const frame = useRef<GlobeSceneFrame>({ focus: selected.center, orientation: northUpGlobeOrientation(selected.center), zoom: props.initialOverview ? 0 : 1, activeDestinationId: destinationId, completedStopIds: props.progress.completedStopIds, stormStages });
   const [renderer, setRenderer] = useState<"loading" | "webgl" | "fallback">("loading");
   const rendererRef = useRef(renderer);
   useLayoutEffect(() => { rendererRef.current = renderer; }, [renderer]);
@@ -119,7 +120,10 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
   }
   function paint(next: Partial<GlobeSceneFrame> = {}) {
     const p = latest.current;
-    frame.current = { ...frame.current, ...next, completedStopIds: p.progress.completedStopIds,
+    const orientation = next.orientation ?? (next.focus
+      ? transportGlobeOrientation(frame.current.orientation ?? northUpGlobeOrientation(frame.current.focus), next.focus)
+      : frame.current.orientation);
+    frame.current = { ...frame.current, ...next, orientation, completedStopIds: p.progress.completedStopIds,
       stormStages: getBossStormStages(p.progress, p.qaUnlocked, next.activeDestinationId ?? frame.current.activeDestinationId) };
     sceneRef.current?.render(frame.current);
   }
@@ -136,8 +140,8 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
     animation.current?.cancel();
     if (motion.current || renderer === "fallback") { update(1); return Promise.resolve(true); }
     return new Promise(resolve => {
-      let raf = 0, deadline = 0, ended = false;
-      const start = performance.now();
+      let raf = 0, deadline = 0, ended = false, elapsed = 0;
+      let previous = performance.now();
       const finish = (complete: boolean) => {
         if (ended) return; ended = true;
         cancelAnimationFrame(raf); window.clearTimeout(deadline);
@@ -145,9 +149,18 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
         animation.current = null; resolve(complete);
       };
       animation.current = { cancel: () => finish(false) };
-      const tick = (now: number) => { const t = Math.min(1, (now - start) / duration); update(t); if (t >= 1) finish(true); else raf = requestAnimationFrame(tick); };
-      deadline = window.setTimeout(() => finish(true), duration + 1200);
-      raf = requestAnimationFrame(tick);
+      const watchdog = () => {
+        window.clearTimeout(deadline);
+        deadline = window.setTimeout(() => finish(true), 1600);
+      };
+      const tick = (now: number) => {
+        elapsed = advanceGlobeAnimationTime(elapsed, now - previous, duration); previous = now;
+        const t = elapsed / duration;
+        update(t);
+        if (t >= 1) finish(true);
+        else { watchdog(); raf = requestAnimationFrame(tick); }
+      };
+      watchdog(); raf = requestAnimationFrame(tick);
     });
   }
   function cancelTrip() { trip.current?.cancel(); }
@@ -155,7 +168,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
   function settlePose() {
     const p = latest.current;
     const center = getGlobeDestination(p.boss?.id ?? p.world.id)!.center;
-    paint({ focus: center, zoom: 1, activeDestinationId: p.boss?.id ?? p.world.id, cameraDestinationId: undefined, stormCameraBlend: undefined, boatPosition: undefined, boatHeading: undefined, avatarPosition: restingPosition(), avatarHop: 0 });
+    paint({ focus: center, orientation: northUpGlobeOrientation(center), zoom: 1, activeDestinationId: p.boss?.id ?? p.world.id, cameraDestinationId: undefined, stormCameraBlend: undefined, boatPosition: undefined, boatHeading: undefined, avatarPosition: restingPosition(), avatarHop: 0 });
     setBoardPhase("focused");
     if (irisRef.current) irisRef.current.style.opacity = "0";
   }
@@ -164,7 +177,12 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
     const previous = { ...frame.current };
     const target = getGlobeDestination(latest.current.boss?.id ?? latest.current.world.id)!.center;
     setBoardPhase("focusing");
-    const completed = await animate(900, t => paint({ focus: sphericalInterpolate(previous.focus, target, ease(t)), zoom: previous.zoom + (1 - previous.zoom) * ease(t), cameraDestinationId: undefined, stormCameraBlend: undefined }));
+    const startOrientation = previous.orientation ?? northUpGlobeOrientation(previous.focus);
+    const targetOrientation = northUpGlobeOrientation(target);
+    const completed = await animate(globeTransitionDuration(startOrientation, targetOrientation, 1 - previous.zoom), t => {
+      const orientation = interpolateGlobeOrientation(startOrientation, targetOrientation, ease(t));
+      paint({ focus: globeOrientationFocus(orientation), orientation, zoom: previous.zoom + (1 - previous.zoom) * ease(t), cameraDestinationId: undefined, stormCameraBlend: undefined });
+    });
     if (completed) {
       setBoardPhase("focused"); paint({ avatarPosition: restingPosition() });
       requestAnimationFrame(() => { const first = latest.current.world.stopIds.find(id => canOpenRequiredStop(latest.current.progress, id, latest.current.qaUnlocked)); nodes.current.get(`stop:${first}`)?.focus({ preventScroll: true }); });
@@ -192,7 +210,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
       animation.current?.cancel(); trip.current?.finishActivity?.(); trip.current = null;
       setVoyage(null); setActivity(null);
       if (arrived && allowed(id)) {
-        paint({ focus: target.center, zoom: 1, activeDestinationId: id, cameraDestinationId: undefined, stormCameraBlend: undefined, boatPosition: undefined, boatHeading: undefined, avatarPosition: undefined });
+        paint({ focus: target.center, orientation: northUpGlobeOrientation(target.center), zoom: 1, activeDestinationId: id, cameraDestinationId: undefined, stormCameraBlend: undefined, boatPosition: undefined, boatHeading: undefined, avatarPosition: undefined });
         setBoardPhase("focused"); latest.current.onNavigate(id);
       } else { settlePose(); restoreFocus(); }
     };
@@ -200,22 +218,30 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
     setVoyage(voyageState); setBoardPhase("sailing");
     if (motion.current || renderer === "fallback") { finish(true); return; }
     const start = { ...frame.current };
-    if (!await animate(600, t => paint({ focus: sphericalInterpolate(start.focus, route[0], ease(t)), zoom: start.zoom + (0.38 - start.zoom) * ease(t), cameraDestinationId: fromId, stormCameraBlend: (p.boss ? 1 : 0) * (1 - ease(t)), avatarPosition: undefined, boatPosition: route[0], boatHeading: getSurfaceRouteTangent(route, 0) }))) return;
-    const sail = async (from: number, to: number) => animate(2600 * (to - from), t => {
-      const distance = from + (to - from) * ease(t);
+    const departureOrientation = start.orientation ?? northUpGlobeOrientation(start.focus);
+    const harborOrientation = transportGlobeOrientation(departureOrientation, route[0]);
+    const departureDuration = globeTransitionDuration(departureOrientation, harborOrientation, .38 - start.zoom, 700);
+    if (!await animate(departureDuration, t => paint({ focus: sphericalInterpolate(start.focus, route[0], ease(t)), zoom: start.zoom + (0.38 - start.zoom) * ease(t), cameraDestinationId: fromId, stormCameraBlend: (p.boss ? 1 : 0) * (1 - ease(t)), avatarPosition: undefined, boatPosition: route[0], boatHeading: getSurfaceRouteTangent(route, 0) }))) return;
+    const sailDuration = Math.max(2400, Math.min(10000, getSurfaceRouteLength(route) * 1900));
+    const sail = async (from: number, to: number) => animate(sailDuration * (to - from), t => {
+      const distance = from + (to - from) * voyageProgress(t);
       const position = sampleSurfaceRoute(route, distance);
       paint({ focus: position, zoom: 0.38, stormCameraBlend: 0, boatPosition: position, boatHeading: getSurfaceRouteTangent(route, distance) });
     });
-    if (!await sail(0, 0.5) || !active) return;
     if (latest.current.voyageActivity) {
+      if (!await sail(0, 0.5) || !active) return;
       setBoardPhase("activity"); setActivity(voyageState);
       await new Promise<void>(resolve => { if (trip.current) trip.current.finishActivity = resolve; else resolve(); });
       if (!active) return;
       setActivity(null); setBoardPhase("sailing");
-    }
-    if (!await sail(0.5, 1) || !active) return;
-    const end = route.at(-1)!;
-    if (!await animate(750, t => paint({ focus: sphericalInterpolate(end, target.center, ease(t)), zoom: 0.38 + 0.62 * ease(t), cameraDestinationId: target.id, stormCameraBlend: target.kind === "boss" ? ease(t) : 0 })) || !active) return;
+      if (!await sail(0.5, 1) || !active) return;
+    } else if (!await sail(0, 1) || !active) return;
+    const arrivalOrientation = frame.current.orientation ?? northUpGlobeOrientation(route.at(-1)!);
+    const targetOrientation = northUpGlobeOrientation(target.center);
+    if (!await animate(globeTransitionDuration(arrivalOrientation, targetOrientation, .62), t => {
+      const orientation = interpolateGlobeOrientation(arrivalOrientation, targetOrientation, ease(t));
+      paint({ focus: globeOrientationFocus(orientation), orientation, zoom: 0.38 + 0.62 * ease(t), cameraDestinationId: target.id, stormCameraBlend: target.kind === "boss" ? ease(t) : 0 });
+    }) || !active) return;
     finish(true);
   }
   async function openStop(id: string) {
@@ -279,16 +305,19 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
   useEffect(() => {
     if (trip.current) cancelTrip();
     animation.current?.cancel();
-    paint({ focus: getGlobeDestination(destinationId)!.center, activeDestinationId: destinationId, cameraDestinationId: undefined, stormCameraBlend: undefined, avatarPosition: restingPosition() });
+    paint({ focus: getGlobeDestination(destinationId)!.center, orientation: northUpGlobeOrientation(getGlobeDestination(destinationId)!.center), activeDestinationId: destinationId, cameraDestinationId: undefined, stormCameraBlend: undefined, avatarPosition: restingPosition() });
   }, [destinationId]);
   useEffect(() => { paint({ avatarPosition: trip.current ? frame.current.avatarPosition : restingPosition() }); }, [props.progress, props.restingStopId, props.qaUnlocked]);
   useEffect(() => { positionMarkers(projectionRef.current); }, [phase, destinationId, renderer, narrow, props.progress, props.qaUnlocked]);
-  function turn(dx: number, dy: number) {
+  function turn(dx: number, dy: number, animated = false) {
     if (busy) return;
-    const focus = frame.current.focus;
-    const longitude = Math.atan2(focus.x, focus.z) + dx;
-    const latitude = Math.max(-1.35, Math.min(1.35, Math.asin(focus.y) + dy));
-    paint({ focus: { x: Math.cos(latitude) * Math.sin(longitude), y: Math.sin(latitude), z: Math.cos(latitude) * Math.cos(longitude) }, zoom: 0 });
+    const start = frame.current.orientation ?? northUpGlobeOrientation(frame.current.focus);
+    const apply = (t: number) => {
+      const orientation = turnGlobeOrientation(start, dx * t, dy * t);
+      paint({ focus: globeOrientationFocus(orientation), orientation, zoom: 0 });
+    };
+    if (animated) void animate(240, t => apply(ease(t)));
+    else { animation.current?.cancel(); apply(1); }
   }
   const VoyageActivity = props.voyageActivity;
   const pointer = useRef<{ x: number; y: number; moved: boolean } | null>(null);
@@ -349,10 +378,10 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
           aria-label={`Storybook on island ${index + 1}: coming soon`} aria-haspopup="dialog" onClick={event => props.onStory(index, event.currentTarget)}><BookIcon /></button>)}
       </div>
       {phase === "overview" && renderer === "webgl" && <div className={styles.orbitControls} aria-label="Turn the globe">
-        <button type="button" aria-label="Turn globe left" onClick={() => turn(-0.45, 0)}>←</button>
-        <button type="button" aria-label="Turn globe up" onClick={() => turn(0, 0.35)}>↑</button>
-        <button type="button" aria-label="Turn globe down" onClick={() => turn(0, -0.35)}>↓</button>
-        <button type="button" aria-label="Turn globe right" onClick={() => turn(0.45, 0)}>→</button>
+        <button type="button" aria-label="Turn globe left" onClick={() => turn(-0.45, 0, true)}>←</button>
+        <button type="button" aria-label="Turn globe up" onClick={() => turn(0, 0.35, true)}>↑</button>
+        <button type="button" aria-label="Turn globe down" onClick={() => turn(0, -0.35, true)}>↓</button>
+        <button type="button" aria-label="Turn globe right" onClick={() => turn(0.45, 0, true)}>→</button>
       </div>}
       {voyage && <div className={styles.voyageCard} role="status"><span className={styles.voyageKicker}>ALL ABOARD</span><strong>Sailing to {titleFor(voyage.toDestinationId)}</strong><div><button type="button" onClick={() => trip.current?.skip?.()}>Skip voyage</button><button type="button" onClick={cancelTrip}>Cancel voyage</button></div></div>}
       {activity && VoyageActivity && <div className={styles.activity}><VoyageActivity voyage={activity} onContinue={() => trip.current?.finishActivity?.()} onCancel={cancelTrip} /></div>}

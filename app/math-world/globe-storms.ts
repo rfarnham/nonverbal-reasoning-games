@@ -8,13 +8,32 @@ export type GlobeStormStages = Readonly<Record<string, number>>;
 const TAU = Math.PI * 2;
 const random = (index: number) => { const value = Math.sin(index * 127.1 + 311.7) * 43758.5453; return value - Math.floor(value); };
 
-/** One soft, local pulse, never a repeating flash train. Pausing extinguishes it
- * immediately rather than leaving a bright strike frozen on the screen. */
+export type GlobeStormStrike = { intensity: number; x: number; z: number; seed: number };
+
+/** A single soft discharge visits all three rotating rain bands. Irregular
+ * spacing keeps nearby storms from flashing in unison; the minimum separation
+ * is 1.61 seconds, and there is never a train of rapid flashes within a strike. */
+export function getGlobeStormStrike(seconds: number, stormIndex: number, stage: number, motionEnabled: boolean,
+  target: GlobeStormStrike = { intensity: 0, x: 0, z: 0, seed: 0 }): GlobeStormStrike {
+  const time = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
+  const period = stormIndex ? 1.99 : 1.85, start = stormIndex ? 1.53 : .81;
+  const event = Math.floor((time - start) / period);
+  const seed = random(event + stormIndex * 193 + 9001);
+  const age = time - start - event * period - seed * .24;
+  const radius = .34 + random(event + stormIndex * 251 + 9101) * .47;
+  const band = ((event % 3) + 3) % 3;
+  const direction = stormIndex ? -1 : 1;
+  const angle = band * TAU / 3 - (radius - .41) / .48 * 2.75
+    - time * direction * (.042 + (1 - radius) * .017);
+  target.x = Math.cos(angle) * radius; target.z = Math.sin(angle) * radius; target.seed = seed;
+  target.intensity = motionEnabled && Number.isFinite(seconds) && event >= 0 && stage >= .65 && age >= 0 && age < .58
+    ? Math.sin(age / .58 * Math.PI) ** 2 * Math.min(1, stage) : 0;
+  return target;
+}
+
+/** Kept as the compact pulse query for callers that do not need its position. */
 export function globeHurricaneLightning(seconds: number, stormIndex: number, stage: number, motionEnabled: boolean): number {
-  if (!motionEnabled || stage < .65 || !Number.isFinite(seconds)) return 0;
-  const period = stormIndex ? 23 : 19, start = stormIndex ? 9 : 3;
-  const phase = ((seconds - start) % period + period) % period;
-  return phase < 1.15 ? Math.sin(phase / 1.15 * Math.PI) ** 2 * Math.min(1, stage) : 0;
+  return getGlobeStormStrike(seconds, stormIndex, stage, motionEnabled).intensity;
 }
 
 const SURFACE_GLSL = /* glsl */ `
@@ -23,6 +42,8 @@ const SURFACE_GLSL = /* glsl */ `
   uniform float stormStage;
   uniform float stormDirection;
   uniform float stormFlash;
+  uniform vec2 stormStrike;
+  uniform float stormStrikeSeed;
   uniform vec3 stormSun;
   uniform float stormFinal;
   vec3 onSea(vec2 p, float height) { return normalize(vec3(p.x, 1.0, p.y)) * (1.0 + height); }
@@ -139,6 +160,7 @@ export function createGlobeStorms(globe: THREE.Group) {
     const uniforms = {
       stormSeconds: { value: 0 }, stormRadius: { value: Math.tan(region.angularRadius) }, stormStage: { value: 0 },
       stormDirection: { value: index ? -1 : 1 }, stormFlash: { value: 0 },
+      stormStrike: { value: new THREE.Vector2() }, stormStrikeSeed: { value: 0 },
       stormSun: { value: new THREE.Vector3(.4, .8, .3).normalize() }, stormFinal: { value: index },
     };
     const add = (name: string, geometry: THREE.BufferGeometry, material: THREE.ShaderMaterial, order = 0) => {
@@ -168,7 +190,7 @@ export function createGlobeStorms(globe: THREE.Group) {
           vec3 deep=mix(vec3(.008,.035,.079),mix(vec3(.018,.145,.20),vec3(.03,.12,.20),stormFinal),daylight);
           vec3 tint=mix(deep,vec3(.61,.83,.87)*(.42+daylight*.58),foam*.87);
           tint+=vec3(.10,.20,.28)*pow(max(0.0,broken-.57),2.0)*4.0;
-          tint+=vec3(.20,.33,.46)*stormFlash*.14*(1.0-radius);
+          tint+=vec3(.20,.33,.46)*stormFlash*.24*exp(-length(seaPoint-stormStrike)*11.0);
           float alpha=(1.0-smoothstep(.67,1.0,radius))*stormStage*.84;
           gl_FragColor=vec4(tint,alpha);
         }`,
@@ -195,6 +217,7 @@ export function createGlobeStorms(globe: THREE.Group) {
           float mask=smoothstep(.235,.29,radius)*(1.0-smoothstep(.79,.99,radius));
           float daylight=smoothstep(-.17,.26,stormSun.y);
           vec3 tint=mix(vec3(.18,.27,.42),vec3(.66,.79,.86),daylight);
+          tint+=vec3(.38,.51,.70)*stormFlash*exp(-length(cloudSheetPoint-stormStrike)*11.0)*.47;
           float alpha=density*mask*stormStage*(.17+arm*.39);
           gl_FragColor=vec4(tint,alpha);
         }`,
@@ -231,9 +254,9 @@ export function createGlobeStorms(globe: THREE.Group) {
           vec3 tint=mix(shadow,bright,clamp(.25+light*.26+top*.39,0.0,1.0));
           tint*=mix(vec3(.23,.35,.53),vec3(1.0),daylight);
           tint+=vec3(.035,.055,.07)*puffSeed;
-          vec2 location=billowPoint.xz/stormRadius;
-          float localFlash=exp(-length(location-vec2(.38,-.30))*4.8)*stormFlash;
-          tint=mix(tint,vec3(.72,.84,1.0),localFlash*.69);
+          vec2 location=billowPoint.xz/(stormRadius*(.45+.55*stormStage));
+          float localFlash=exp(-length(location-stormStrike)*11.0)*stormFlash;
+          tint=mix(tint,vec3(.78,.88,1.0),localFlash*.87);
           float facing=abs(dot(normalize(billowViewNormal),normalize(billowViewDirection)));
           float opacity=smoothstep(.015,.34,facing)*(.28+.67*stormStage);
           if(opacity<.025)discard;
@@ -283,24 +306,49 @@ export function createGlobeStorms(globe: THREE.Group) {
           gl_FragColor=vec4(mix(vec3(.30,.48,.68),vec3(.82,.94,.97),mistDay),alpha);
         }`,
     }), 4);
-    // A forked discharge sits at the visible outer eyewall. Its rare soft pulse
-    // also lights the surrounding cloud, rather than flashing the entire globe.
-    const boltPositions: number[] = [];
-    const paths = [[[.075,.063],[.067,.050],[.073,.037],[.062,.022],[.063,.009]],[[.071,.044],[.085,.032],[.079,.023]]];
+    // One reusable branched ribbon is advected between storm cells. A narrow
+    // pale core and feathered blue edge read at both globe and ship scale.
+    const boltPositions: number[] = [], boltAcross: number[] = [], boltDirections: number[] = [];
+    const paths = [
+      [[-.092,.23,-.018],[-.055,.22,.012],[-.021,.235,-.005],[.018,.219,.017],[.055,.23,.003],[.085,.224,.03]],
+      [[-.021,.235,-.005],[-.037,.218,-.04],[-.02,.218,-.07]],
+      [[.018,.219,.017],[.009,.15,.017],[.034,.118,.017],[.021,.018,.017]],
+    ];
     for (const path of paths) for (let i = 0; i < path.length - 1; i++) {
-      const [ax, ay] = path[i], [bx, by] = path[i + 1], width = .00065;
-      for (const p of [[ax-width,ay],[ax+width,ay],[bx-width,by],[bx-width,by],[ax+width,ay],[bx+width,by]]) boltPositions.push(p[0],p[1],-.06);
+      const a = path[i], b = path[i + 1];
+      for (const p of [a,a,b,b,a,b]) {
+        boltPositions.push(...p); boltDirections.push(b[0]-a[0],b[1]-a[1],b[2]-a[2]);
+      }
+      boltAcross.push(-1,1,-1,-1,1,1);
     }
-    const boltGeometry = new THREE.BufferGeometry(); boltGeometry.setAttribute("position", new THREE.Float32BufferAttribute(boltPositions,3)); geometries.add(boltGeometry);
-    add("occasional local lightning fork", boltGeometry, new THREE.ShaderMaterial({
+    const boltGeometry = new THREE.BufferGeometry(); boltGeometry.setAttribute("position", new THREE.Float32BufferAttribute(boltPositions,3));
+    boltGeometry.setAttribute("boltAcross", new THREE.Float32BufferAttribute(boltAcross,1)); geometries.add(boltGeometry);
+    boltGeometry.setAttribute("boltDirection", new THREE.Float32BufferAttribute(boltDirections,3));
+    add("traveling lightning through spiral rain bands", boltGeometry, new THREE.ShaderMaterial({
       uniforms, transparent: true, depthWrite: false, side: THREE.DoubleSide,
       vertexShader: /* glsl */ `${SURFACE_GLSL}
-        void main(){vec3 point=onSea(position.xz*stormRadius/.19,position.y*stormRadius/.19);gl_Position=projectionMatrix*modelViewMatrix*vec4(point,1.0);}`,
+        attribute float boltAcross; attribute vec3 boltDirection; varying float dischargeAcross;
+        void main(){
+          float growth=.45+.55*stormStage;
+          float heading=atan(stormStrike.y,stormStrike.x)+stormStrikeSeed*2.4;
+          vec2 offset=turn(heading)*position.xz;
+          vec3 point=onSea((stormStrike+offset)*stormRadius*growth,position.y*stormRadius*growth);
+          vec2 flatDirection=turn(heading)*boltDirection.xz;
+          vec2 screenDirection=(modelViewMatrix*vec4(flatDirection.x,boltDirection.y,flatDirection.y,0.0)).xy;
+          vec2 side=vec2(-screenDirection.y,screenDirection.x)/max(.0001,length(screenDirection));
+          vec4 view=modelViewMatrix*vec4(point,1.0);
+          view.xy+=side*boltAcross*stormRadius*.0042*growth;
+          gl_Position=projectionMatrix*view;dischargeAcross=boltAcross;
+        }`,
       fragmentShader: /* glsl */ `${SURFACE_GLSL}
-        void main(){gl_FragColor=vec4(.72,.88,1.0,stormFlash*.86);}`,
+        varying float dischargeAcross;
+        void main(){
+          float core=1.0-smoothstep(.13,.91,abs(dischargeAcross));
+          gl_FragColor=vec4(mix(vec3(.37,.67,1.0),vec3(.94,.98,1.0),core),stormFlash*core*.94);
+        }`,
     }), 5);
     const inverseFrame = group.matrix.clone().invert();
-    return { group, region, uniforms, inverseFrame };
+    return { group, region, uniforms, inverseFrame, strike: { intensity: 0, x: 0, z: 0, seed: 0 } };
   });
   let disposed = false;
   return {
@@ -312,7 +360,10 @@ export function createGlobeStorms(globe: THREE.Group) {
         system.group.visible = stage > 0 && (facing > -.32 || activeDestinationId === system.region.id);
         system.uniforms.stormStage.value = stage;
         system.uniforms.stormSeconds.value = Number.isFinite(seconds) ? seconds : 0;
-        system.uniforms.stormFlash.value = globeHurricaneLightning(seconds, index, stage, motionEnabled);
+        getGlobeStormStrike(seconds, index, stage, motionEnabled, system.strike);
+        system.uniforms.stormFlash.value = system.strike.intensity;
+        system.uniforms.stormStrike.value.set(system.strike.x, system.strike.z);
+        system.uniforms.stormStrikeSeed.value = system.strike.seed;
         if (sunDirection) system.uniforms.stormSun.value.copy(sunDirection).transformDirection(system.inverseFrame);
       }
     },

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
-import { createGlobeStorms, GLOBE_STORM_EYE_RADIUS, globeHurricaneLightning } from '../app/math-world/globe-storms.ts';
+import { createGlobeStorms, GLOBE_STORM_EYE_RADIUS, globeHurricaneLightning, getGlobeStormStrike } from '../app/math-world/globe-storms.ts';
 import { GLOBE_BOSS_REGIONS, GLOBE_LAND_OBSTACLES, sphericalAngle } from '../app/math-world/globe-geometry.ts';
 
 const direction = point => new THREE.Vector3(point.x,point.y,point.z);
@@ -48,16 +48,42 @@ test('storm appearance is progress supplied and uses only the shared frozen cloc
   storms.dispose();
 });
 
-test('lightning is a single smooth local pulse, absent in early gathering and reduced motion', () => {
-  assert.equal(globeHurricaneLightning(3.575,0,1,true),1);
-  assert.equal(globeHurricaneLightning(3.575,0,.35,true),0);
-  assert.equal(globeHurricaneLightning(3.575,0,1,false),0);
-  assert.equal(globeHurricaneLightning(NaN,0,1,true),0);
-  const active=[];for(let tick=0;tick<1900;tick++)if(globeHurricaneLightning(tick/100,0,1,true)>0)active.push(tick);
-  assert.ok(active.length>=113&&active.length<=115);
-  assert.equal(active.at(-1)-active[0]+1,active.length,'one contiguous pulse per19seconds, no strobes');
-  const rising=Array.from({length:58},(_,i)=>globeHurricaneLightning(3+i*.01,0,1,true));
-  assert.ok(rising.every((value,i)=>i===0||value>=rising[i-1]));
+test('lightning visits separated spiral cells frequently with one smooth pulse per discharge', () => {
+  for (const storm of [0,1]) {
+    const starts=[], peaks=[], quadrants=new Set(), radii=[];
+    let previous=0, peak={intensity:0,x:0,z:0}, samples=[];
+    for(let tick=0;tick<6000;tick++) {
+      const strike=getGlobeStormStrike(tick/100,storm,1,true);
+      assert.ok(strike.intensity>=0&&strike.intensity<=1);
+      if(strike.intensity>0 && previous===0){starts.push(tick/100);samples=[];peak=strike;}
+      if(strike.intensity>0){samples.push(strike.intensity);if(strike.intensity>peak.intensity)peak=strike;}
+      if(strike.intensity===0 && previous>0) {
+        peaks.push(peak);const top=samples.indexOf(Math.max(...samples));
+        assert.ok(samples.slice(0,top+1).every((v,i,a)=>i===0||v>=a[i-1]));
+        assert.ok(samples.slice(top).every((v,i,a)=>i===0||v<=a[i-1]),'one smooth pulse, no flash train');
+        quadrants.add(Math.floor((Math.atan2(peak.z,peak.x)+Math.PI)/(Math.PI/2)));
+        radii.push(Math.hypot(peak.x,peak.z));
+      }
+      previous=strike.intensity;
+    }
+    assert.ok(starts.length>=29 && starts.length<=33,'roughly one discharge every two seconds');
+    assert.ok(starts.every((start,i)=>i===0||start-starts[i-1]>=1.60),'never rapid strobes');
+    assert.equal(quadrants.size,4,'discharges visit the whole hurricane');
+    assert.ok(Math.min(...radii)<.45 && Math.max(...radii)>.70,'inner and outer rain bands both light up');
+    for(const peak of peaks) assert.ok(Math.hypot(peak.x,peak.z)>.33 && Math.hypot(peak.x,peak.z)<.82);
+  }
+});
+
+test('lightning is deterministic and absent when gathering, paused, reduced, or given invalid time', () => {
+  const target={intensity:0,x:0,z:0,seed:0};
+  for(let time=0;time<20;time+=.05) {
+    const active=getGlobeStormStrike(time,0,1,true);
+    assert.deepEqual(getGlobeStormStrike(time,0,1,true,target),active);
+    assert.equal(globeHurricaneLightning(time,0,.35,true),0);
+    assert.equal(globeHurricaneLightning(time,0,1,false),0);
+  }
+  for(const time of [NaN,Infinity,-10]) assert.equal(globeHurricaneLightning(time,0,1,true),0);
+  assert.notDeepEqual(getGlobeStormStrike(5,0,1,true),getGlobeStormStrike(5,1,1,true),'storm schedules and cells differ');
 });
 
 test('storm resources remain bounded and are disposed exactly once', () => {

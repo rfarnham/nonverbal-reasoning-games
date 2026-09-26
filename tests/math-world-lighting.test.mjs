@@ -48,3 +48,23 @@ test("night visibility fades monotonically below the horizon and follows the vie
   assert.equal(getNightSkyVisibility(sun, { x: 0, y: 0, z: 0 }), 0);
   assert.equal(getNightSkyVisibility({ x: NaN, y: 0, z: 0 }, sun), 0);
 });
+
+test("manual preset illumination carries the quaternion horizon continuously over both poles", async () => {
+  const { globeOrientationFocus, northUpGlobeOrientation, rotateGlobeDirection, turnGlobeOrientation } = await import('../app/math-world/globe-navigation.ts');
+  const anchor = { x: 0, y: 0, z: 1 };
+  let orientation = northUpGlobeOrientation(anchor);
+  const expected = new Map(['day', 'sunset', 'night'].map(mode => [mode, getGlobeSunDirection(0, mode, anchor, anchor)]));
+  const automatic = getGlobeSunDirection(41, 'cycle', anchor, anchor);
+  for (let step = 0; step <= 720; step++) {
+    const focus = globeOrientationFocus(orientation);
+    const inverse = { x: -orientation.x, y: -orientation.y, z: -orientation.z, w: orientation.w };
+    const screenRight = rotateGlobeDirection({ x: 1, y: 0, z: 0 }, inverse);
+    for (const mode of ['day', 'sunset', 'night']) {
+      const sun = getGlobeSunDirection(0, mode, focus, anchor, new Vector3(), screenRight);
+      const inView = new Vector3().copy(rotateGlobeDirection(sun, orientation));
+      assert.ok(inView.distanceTo(expected.get(mode)) < 1e-9, `${mode} never flips its light across a pole`);
+    }
+    assert.ok(automatic.distanceTo(getGlobeSunDirection(41, 'cycle', focus, anchor, new Vector3(), screenRight)) < 1e-9, 'automatic sun ignores the camera tangent');
+    orientation = turnGlobeOrientation(orientation, .001, Math.PI / 360);
+  }
+});

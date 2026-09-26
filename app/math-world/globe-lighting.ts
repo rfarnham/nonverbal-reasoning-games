@@ -11,9 +11,15 @@ const up = new THREE.Vector3(0, 1, 0);
 
 /** Presets place the sun relative to the inspected coast. The automatic sun is
  * planet-fixed and advances only with active scenery time, never wall time. */
-export function getGlobeSunDirection(seconds: number, mode: GlobeSkyMode, focus: Vec3, anchor: Vec3, target = new THREE.Vector3()) {
+export function getGlobeSunDirection(seconds: number, mode: GlobeSkyMode, focus: Vec3, anchor: Vec3, target = new THREE.Vector3(), presetEast?: Vec3) {
   const center = new THREE.Vector3().copy(mode === "cycle" ? anchor : focus).normalize();
   const east = new THREE.Vector3().crossVectors(up, center);
+  // The retained camera horizon gives manual presets a continuous tangent at
+  // both poles. Automatic daylight remains fixed to the planet's daily cycle.
+  if (mode !== "cycle" && presetEast) {
+    east.copy(presetEast).addScaledVector(center, -center.dot(presetEast));
+    if (east.lengthSq() < 0.001) east.crossVectors(up, center);
+  }
   if (east.lengthSq() < 0.001) east.set(1, 0, 0);
   east.normalize();
   const angle = mode === "cycle" ? 0.62 + getCelestialCycleAngle(seconds)
@@ -46,6 +52,7 @@ export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, came
   const celestialSky = createGlobeCelestialSky(scene, camera, globe, anchor);
   const moon = createGlobeMoon(scene, globe, camera, anchor);
   const sunDirection = new THREE.Vector3();
+  const presetEast = new THREE.Vector3(), viewToPlanet = new THREE.Quaternion();
   const sunWorld = { value: new THREE.Vector3() };
   const time = { value: 0 };
   const patched = new Set<THREE.Material>();
@@ -105,7 +112,8 @@ export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, came
     sunDirection,
     installSurfaceLighting,
     update(seconds: number, mode: GlobeSkyMode, focus: Vec3, zoom: number) {
-      getGlobeSunDirection(seconds, mode, focus, anchor, sunDirection);
+      presetEast.set(1, 0, 0).applyQuaternion(viewToPlanet.copy(globe.quaternion).invert());
+      getGlobeSunDirection(seconds, mode, focus, anchor, sunDirection, presetEast);
       time.value = seconds;
       sunWorld.value.copy(sunDirection).applyQuaternion(globe.quaternion);
       sun.position.copy(sunWorld.value).multiplyScalar(4);

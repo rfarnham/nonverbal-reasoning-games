@@ -70,7 +70,7 @@ test("real mainland geometry stays in navigation exclusions, preserves every sto
     for(let i=0;i<position.count;i++) {
       point.fromBufferAttribute(position,i);
       assert.ok(Number.isFinite(point.x+point.y+point.z));
-      if(mesh!==group.getObjectByName("Mainland forest groves"))assert.ok(point.x*normal.getX(i)+point.y*normal.getY(i)+point.z*normal.getZ(i)>0,"shared surface normals face outward for consistent sunlight");
+      if(mesh!==group.getObjectByName("Mainland forest groves")&&!mesh.userData.mainlandSolidProp)assert.ok(point.x*normal.getX(i)+point.y*normal.getY(i)+point.z*normal.getZ(i)>0,"shared surface normals face outward for consistent sunlight");
       assert.ok(GLOBE_LAND_OBSTACLES.some(obstacle=>sphericalAngle(point,obstacle.center)<=obstacle.angularRadius+1e-6),"every rendered mainland, beach, shelf and river vertex belongs to a routed land envelope");
     }
   }

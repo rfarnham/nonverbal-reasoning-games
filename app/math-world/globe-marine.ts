@@ -30,6 +30,23 @@ const placements: readonly [MarineLoop["kind"], number, number, number][] = [
   ["fish", 18, .3866458, .1881623], ["fish", 21, -.1952995, -.2407449],
   ["fish", 24, .3043559, .0588852], ["fish", 27, .494, -.394],
   ["fish", 30, -.194, .294], ["fish", 32, -.2787446, -.1356519],
+  // Additional schools occupy separately verified offshore pockets.
+  ["fish", 2, -0.1634043, 0.2249067],
+  ["fish", 4, -0.139, 0.2407551],
+  ["fish", 5, -0.2065943, -0.1860183],
+  ["fish", 7, -0.178695, 0.2129604],
+  ["fish", 8, -0.1822358, -0.2332512],
+  ["fish", 11, -0.428779, 0.3115262],
+  ["fish", 13, -0.0727691, -0.3423517],
+  ["fish", 17, -0.2643937, -0.0859067],
+  ["fish", 19, 0.185652, -0.2752405],
+  ["fish", 20, -0.3919995, -0.0977364],
+  ["fish", 22, -0.2539656, 0.1130728],
+  ["fish", 25, 0.2543268, -0.2134055],
+  ["fish", 26, -0.4056524, -0.116319],
+  ["fish", 28, -0.0193923, 0.2773228],
+  ["fish", 29, -0.1727655, 0.3249247],
+  ["fish", 31, 0.2357574, -0.1473176],
 ];
 export const GLOBE_MARINE_LOOPS: readonly MarineLoop[] = placements.map(([kind, worldNumber, e, n], index) => {
   const center = tangentPointToGlobe(getGlobeRegion(worldNumber), e, n);
@@ -40,6 +57,7 @@ export const GLOBE_MARINE_LOOPS: readonly MarineLoop[] = placements.map(([kind, 
     radius, minorRadius: radius * .58, extent: kind === "boat" ? .028 : kind === "whale" ? .032 : .018,
     period: (kind === "boat" ? 132 : kind === "whale" ? 178 : 48) + index * 2, phase: index * 2.3999632297 };
 });
+export const MARINE_SCHOOL_SIZE = 12;
 export const MARINE_LAND_CLEARANCE = .014;
 export const MARINE_HARBOR_CLEARANCE = .085;
 export const MARINE_VOYAGE_CLEARANCE = .044;
@@ -193,8 +211,8 @@ export function createGlobeMarine(globe: THREE.Group): GlobeMarine {
   };
   const fishingBoats = batch("Small fishing boats with cabins and rods", boatGeometry, solid, boats.length);
   const wakes = batch("Short fishing-boat wakes", wakeGeometry, foam, boats.length);
-  const fish = batch("Surface fish schools", fishGeometry, solid, schools.length * 7);
-  const fishTails = batch("Swimming fish tails", fishTailGeometry, solid, schools.length * 7);
+  const fish = batch("Surface fish schools", fishGeometry, solid, schools.length * MARINE_SCHOOL_SIZE);
+  const fishTails = batch("Swimming fish tails", fishTailGeometry, solid, schools.length * MARINE_SCHOOL_SIZE);
   const whaleBodies = batch("Occasionally surfacing whales", whaleGeometry, solid, whales.length);
   const whaleTails = batch("Whale tail flukes", whaleTailGeometry, solid, whales.length);
   const spouts = batch("Small whale breaths", spoutGeometry, spray, whales.length * 5);
@@ -227,13 +245,18 @@ export function createGlobeMarine(globe: THREE.Group): GlobeMarine {
     }
     for (const [schoolIndex, loop] of schools.entries()) {
       pose(loop, t, 1.0015);
-      for (let member = 0; member < 7; member++) {
-        const index = schoolIndex * 7 + member;
-        const x = (member % 3 - 1) * .006 + Math.sin(t * 1.6 + member + schoolIndex) * .0007;
-        const z = (Math.floor(member / 3) - 1) * .006 + (member % 2) * .002;
+      for (let member = 0; member < MARINE_SCHOOL_SIZE; member++) {
+        const index = schoolIndex * MARINE_SCHOOL_SIZE + member;
+        // A loose rounded shoal, with a staggered outline rather than rows.
+        // The largest swimmer and tail remain inside the validated .018 disk.
+        const angle = member * 2.3999632297 + schoolIndex * .37;
+        const spread = .009 * Math.sqrt((member + .5) / MARINE_SCHOOL_SIZE);
+        const x = Math.cos(angle) * spread + Math.sin(t * 1.6 + member + schoolIndex) * .0006;
+        const z = Math.sin(angle) * spread;
+        const size = .82 + (member % 4) * .06;
         const wag = Math.sin(t * 5 + member * 1.3) * .13;
-        instance(fish, index, [x, 0, z], [0, wag, 0]);
-        instance(fishTails, index, [x - Math.sin(wag) * .0028 * fishSize, 0, z - Math.cos(wag) * .0028 * fishSize], [0, wag + Math.sin(t * 5 + member * 1.3) * .36, 0]);
+        instance(fish, index, [x, 0, z], [0, wag, 0], [size, size, size]);
+        instance(fishTails, index, [x - Math.sin(wag) * .0028 * fishSize * size, 0, z - Math.cos(wag) * .0028 * fishSize * size], [0, wag + Math.sin(t * 5 + member * 1.3) * .36, 0], [size, size, size]);
       }
     }
     for (const [index, loop] of whales.entries()) {
@@ -254,7 +277,7 @@ export function createGlobeMarine(globe: THREE.Group): GlobeMarine {
     // Night tint is instance-local and also covers transparent foam. No emissive
     // dots or camera-facing sprites remain visible through the back of the sea.
     if (sunDirection && Number.isFinite(sunDirection.lengthSq()) && sunDirection.lengthSq() > .0001) {
-      for (const [mesh, loops, repeat] of [[fishingBoats, boats, 1], [wakes, boats, 1], [fish, schools, 7], [fishTails, schools, 7],
+      for (const [mesh, loops, repeat] of [[fishingBoats, boats, 1], [wakes, boats, 1], [fish, schools, MARINE_SCHOOL_SIZE], [fishTails, schools, MARINE_SCHOOL_SIZE],
         [whaleBodies, whales, 1], [whaleTails, whales, 1], [spouts, whales, 5], [ripples, whales, 1]] as const) {
         for (const [index, loop] of loops.entries()) {
           const day = THREE.MathUtils.smoothstep(sunDirection.dot(up.copy(loop.center)) / sunDirection.length(), -.2, .3);

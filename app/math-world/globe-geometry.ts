@@ -219,9 +219,42 @@ const coastCount = 16;
 type OceanGraph = { nodes: Vec3[]; edges: { to: number; length: number }[][] };
 let oceanGraph: OceanGraph | undefined;
 const voyageCache = new Map<string, readonly Vec3[]>();
+const routeLengths = new WeakMap<readonly Vec3[], readonly number[]>();
 
 function clearOceanArc(from: Vec3, to: Vec3): boolean {
   return GLOBE_LAND_OBSTACLES.every(region => distanceToSurfaceArc(region.center, from, to) >= region.angularRadius + OCEAN_MARGIN - EPSILON);
+}
+
+/** Round graph corners with tangent-continuous spherical quadratic bends.
+ * Every chord is checked against the same complete hull-clearance envelopes
+ * used by the ocean graph; a tighter harbor receives a smaller bend. */
+function roundedOceanRoute(waypoints: readonly Vec3[]): Vec3[] {
+  const samples: Vec3[] = [waypoints[0]];
+  const connect = (end: Vec3) => {
+    const start = samples.at(-1)!;
+    const count = Math.max(1, Math.ceil(sphericalAngle(start, end) / .008));
+    for (let step = 1; step <= count; step++) samples.push(sphericalInterpolate(start, end, step / count));
+  };
+  for (let index = 1; index < waypoints.length - 1; index++) {
+    const before = waypoints[index - 1], corner = waypoints[index], after = waypoints[index + 1];
+    const incoming = sphericalAngle(before, corner), outgoing = sphericalAngle(corner, after);
+    let trim = Math.min(.09, incoming * .3, outgoing * .3), bend: Vec3[] | undefined;
+    for (let attempt = 0; attempt < 9 && trim > 1e-5; attempt++, trim *= .5) {
+      const entry = sphericalInterpolate(corner, before, trim / incoming);
+      const exit = sphericalInterpolate(corner, after, trim / outgoing);
+      // Dense samples keep the rendered hull's heading continuous as well as
+      // proving that the actual polyline cannot graze a coastline between points.
+      const candidate = Array.from({ length: 65 }, (_, step) => {
+        const t = step / 64;
+        return sphericalInterpolate(sphericalInterpolate(entry, corner, t), sphericalInterpolate(corner, exit, t), t);
+      });
+      if (candidate.slice(1).every((point, step) => clearOceanArc(candidate[step], point))) { bend = candidate; break; }
+    }
+    if (bend) { connect(bend[0]); samples.push(...bend.slice(1)); }
+    else connect(corner);
+  }
+  connect(waypoints.at(-1)!);
+  return samples;
 }
 
 function getOceanGraph(): OceanGraph {
@@ -288,12 +321,7 @@ export function getVoyageRoute(fromId: string | number, toId: string | number): 
     while (next > current + 1 && !clearOceanArc(waypoints[current], waypoints[next])) next -= 1;
     simplified.push(waypoints[next]); current = next;
   }
-  const samples = [simplified[0]];
-  for (let index = 1; index < simplified.length; index += 1) {
-    const start = simplified[index - 1], end = simplified[index];
-    const steps = Math.max(1, Math.ceil(sphericalAngle(start, end) / 0.012));
-    for (let step = 1; step <= steps; step += 1) samples.push(sphericalInterpolate(start, end, step / steps));
-  }
+  const samples = roundedOceanRoute(simplified);
   // Preserve exact shared dock coordinates for boat/HTML/camera alignment.
   samples[0] = from.harbor; samples[samples.length - 1] = to.harbor;
   voyageCache.set(key, samples);
@@ -301,15 +329,29 @@ export function getVoyageRoute(fromId: string | number, toId: string | number): 
   return samples.map(point => ({ ...point }));
 }
 
-export function sampleSurfaceRoute(points: readonly Vec3[], progress: number, radius = GLOBE_RADIUS): Vec3 {
+function surfaceRouteLengths(points: readonly Vec3[]): readonly number[] {
   if (!points.length) throw new Error("A surface route must contain a point.");
-  if (points.length === 1) return scaleVec3(normalizeVec3(points[0]), radius);
+  const cached = routeLengths.get(points);
+  if (cached) return cached;
   const lengths = [0];
   for (let index = 1; index < points.length; index += 1) lengths.push(lengths[index - 1] + sphericalAngle(points[index - 1], points[index]));
+  routeLengths.set(points, lengths);
+  return lengths;
+}
+
+export function getSurfaceRouteLength(points: readonly Vec3[]): number { return surfaceRouteLengths(points).at(-1)!; }
+
+export function sampleSurfaceRoute(points: readonly Vec3[], progress: number, radius = GLOBE_RADIUS): Vec3 {
+  const lengths = surfaceRouteLengths(points);
+  if (points.length === 1) return scaleVec3(normalizeVec3(points[0]), radius);
   const distance = clamp(progress, 0, 1) * lengths.at(-1)!;
   if (distance <= EPSILON) return scaleVec3(normalizeVec3(points[0]), radius);
-  let index = 1;
-  while (index < lengths.length - 1 && lengths[index] < distance) index += 1;
+  let low = 1, high = lengths.length - 1;
+  while (low < high) {
+    const middle = (low + high) >>> 1;
+    if (lengths[middle] < distance) low = middle + 1; else high = middle;
+  }
+  const index = low;
   const segmentLength = lengths[index] - lengths[index - 1];
   return sphericalInterpolate(points[index - 1], points[index], segmentLength < EPSILON ? 1 : (distance - lengths[index - 1]) / segmentLength, radius);
 }

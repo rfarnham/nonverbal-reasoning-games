@@ -5,7 +5,7 @@ import {
   GLOBE_BOSS_REGIONS, GLOBE_DESTINATIONS, GLOBE_REGIONS, GLOBE_REGION_RADIUS, GLOBE_GEOGRAPHIC_CLUSTERS, GLOBE_LAND_OBSTACLES, GLOBE_POLAR_CAPS, GLOBE_STORM_PASSAGES, GLOBE_VOYAGE_CLEARANCE,
   distanceToSurfaceArc, dotVec3, getGlobeDestination, getGlobeMap, getGlobeRegion,
   getGlobeRoadPoints, getSurfaceRouteTangent, getVoyageRoute, mapPointToGlobe,
-  sampleSurfaceRoute, sphericalAngle, sphericalInterpolate,
+  sampleSurfaceRoute, sphericalAngle, sphericalInterpolate, normalizeVec3, addVec3, scaleVec3,
 } from "../app/math-world/globe-geometry.ts";
 import { WORLD_DEFINITIONS } from "../app/math-world/world-data.ts";
 
@@ -149,6 +149,12 @@ test("all 561 voyages clear the full boat width and polar land, reach exact dock
       assert.ok(sphericalAngle(route[index - 1], route[index]) <= 0.0120001, "there are no teleporting gaps");
       for (const region of GLOBE_LAND_OBSTACLES) {
         assert.ok(distanceToSurfaceArc(region.center, route[index - 1], route[index]) >= region.angularRadius + GLOBE_VOYAGE_CLEARANCE - 1e-7, `${from}→${to} avoids ${region.id}, including between samples`);
+      }
+      if (index < route.length - 1) {
+        const point = route[index];
+        const incoming = normalizeVec3(addVec3(scaleVec3(point, dotVec3(point, route[index - 1])), scaleVec3(route[index - 1], -1)));
+        const outgoing = normalizeVec3(addVec3(route[index + 1], scaleVec3(point, -dotVec3(point, route[index + 1]))));
+        assert.ok(sphericalAngle(incoming, outgoing) < .015, `${from}→${to} has no abrupt steering corner at sample ${index}`);
       }
     }
     nearPoint(sampleSurfaceRoute(route, 0), route[0]);
