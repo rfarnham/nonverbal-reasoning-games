@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import * as THREE from "three";
+import { createCelestialFrame } from "../app/math-world/globe-celestial-frame.ts";
 import { CELESTIAL_SKY_RADIUS, CELESTIAL_STAR_COUNT, createCelestialStarCatalogue, createGlobeCelestialSky } from "../app/math-world/globe-celestial-sky.ts";
+
+const anchor = { x: .28, y: .19, z: .94 };
 
 test("the celestial catalogue is repeatable, irregular and fills the entire sphere", () => {
   const first = createCelestialStarCatalogue(), second = createCelestialStarCatalogue();
@@ -30,8 +33,8 @@ test("the celestial catalogue is repeatable, irregular and fills the entire sphe
 });
 
 test("night visibility gates every celestial draw and the sphere remains behind the planet", () => {
-  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(37, 1, .02, 12);
-  const sky = createGlobeCelestialSky(scene, camera), group = scene.children[0];
+  const scene = new THREE.Scene(), globe = new THREE.Group(), camera = new THREE.PerspectiveCamera(37, 1, .02, 12);
+  const sky = createGlobeCelestialSky(scene, camera, globe, anchor), group = scene.children[0];
   assert.equal(group.visible, false);
   for (const visibility of [-2, 0, NaN, Infinity]) {
     sky.update(0, visibility);
@@ -53,11 +56,12 @@ test("night visibility gates every celestial draw and the sphere remains behind 
   sky.dispose();
 });
 
-test("sky translation removes parallax while fixed directions survive time and camera rotation", () => {
-  const scene = new THREE.Scene(), cameraRig = new THREE.Group();
+test("sky translation removes parallax while its rigid catalogue follows the planet-bound reference frame", () => {
+  const scene = new THREE.Scene(), cameraRig = new THREE.Group(), globe = new THREE.Group();
+  const frameSampler = createCelestialFrame(anchor), expected = new THREE.Quaternion();
   const camera = new THREE.PerspectiveCamera();
   cameraRig.add(camera); scene.add(cameraRig);
-  const sky = createGlobeCelestialSky(scene, camera), group = scene.children[1];
+  const sky = createGlobeCelestialSky(scene, camera, globe, anchor), group = scene.children[1];
   const buffers = group.children.map(object => Object.values(object.geometry.attributes).map(attribute => ({ attribute, values: Array.from(attribute.array) })));
   const worldPosition = new THREE.Vector3();
   for (let frame = 0; frame < 80; frame++) {
@@ -65,10 +69,15 @@ test("sky translation removes parallax while fixed directions survive time and c
     cameraRig.position.set(-frame / 41, .3, .8);
     cameraRig.rotation.y = frame / 19;
     camera.lookAt(0, 0, 1);
+    globe.quaternion.setFromAxisAngle(new THREE.Vector3(0,1,0),frame/13);
     sky.update(frame * 100, .75);
     camera.getWorldPosition(worldPosition);
     assert.ok(group.position.distanceTo(worldPosition) < 1e-10);
-    assert.deepEqual(group.quaternion.toArray(), [0, 0, 0, 1], "the sky does not follow the globe or camera's rotation");
+    frameSampler.update(frame*100,globe.quaternion,expected);
+    assert.ok(group.quaternion.angleTo(expected) < 1e-7, "sky uses both navigation and daily rotation");
+    const paused = group.quaternion.clone();
+    sky.update(frame*100,.75);
+    assert.deepEqual(group.quaternion.toArray(),paused.toArray(),"paused time produces an identical sky pose");
   }
   for (const objects of buffers) for (const { attribute, values } of objects) {
     assert.deepEqual(Array.from(attribute.array), values, "stars and nebula positions are immutable, even as time advances");
@@ -77,7 +86,7 @@ test("sky translation removes parallax while fixed directions survive time and c
 });
 
 test("celestial scenery keeps two draws and disposes each owned GPU resource once", () => {
-  const scene = new THREE.Scene(), sky = createGlobeCelestialSky(scene, new THREE.PerspectiveCamera());
+  const scene = new THREE.Scene(), sky = createGlobeCelestialSky(scene, new THREE.PerspectiveCamera(), new THREE.Group(), anchor);
   const group = scene.children[0];
   assert.equal(group.children.length, 2);
   const resources = group.children.flatMap(object => [object.geometry, object.material]);

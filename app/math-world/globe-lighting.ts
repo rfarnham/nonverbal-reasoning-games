@@ -2,9 +2,11 @@ import * as THREE from "three";
 import type { Vec3 } from "./globe-geometry.ts";
 import { createGlobeCelestialSky } from "./globe-celestial-sky.ts";
 import { createGlobeMoon } from "./globe-moon.ts";
+import { getCelestialCycleAngle } from "./globe-celestial-frame.ts";
+
+export { SKY_CYCLE_SECONDS } from "./globe-celestial-frame.ts";
 
 export type GlobeSkyMode = "cycle" | "day" | "sunset" | "night";
-export const SKY_CYCLE_SECONDS = 360;
 const up = new THREE.Vector3(0, 1, 0);
 
 /** Presets place the sun relative to the inspected coast. The automatic sun is
@@ -14,7 +16,7 @@ export function getGlobeSunDirection(seconds: number, mode: GlobeSkyMode, focus:
   const east = new THREE.Vector3().crossVectors(up, center);
   if (east.lengthSq() < 0.001) east.set(1, 0, 0);
   east.normalize();
-  const angle = mode === "cycle" ? 0.62 + Math.max(0, Number.isFinite(seconds) ? seconds : 0) * Math.PI * 2 / SKY_CYCLE_SECONDS
+  const angle = mode === "cycle" ? 0.62 + getCelestialCycleAngle(seconds)
     : mode === "day" ? 0.5 : mode === "sunset" ? 1.55 : 2.65;
   return target.copy(center).multiplyScalar(Math.cos(angle)).addScaledVector(east, Math.sin(angle)).normalize();
 }
@@ -41,7 +43,7 @@ export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, came
   sun.shadow.radius = 2;
   const nightFill = new THREE.DirectionalLight(0x8abaff, 0.24);
   scene.add(ambient, sun, nightFill);
-  const celestialSky = createGlobeCelestialSky(scene, camera);
+  const celestialSky = createGlobeCelestialSky(scene, camera, globe, anchor);
   const moon = createGlobeMoon(scene, globe, camera, anchor);
   const sunDirection = new THREE.Vector3();
   const sunWorld = { value: new THREE.Vector3() };

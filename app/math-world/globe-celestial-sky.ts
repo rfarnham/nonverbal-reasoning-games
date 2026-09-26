@@ -1,4 +1,6 @@
 import * as THREE from "three";
+import type { Vec3 } from "./globe-geometry.ts";
+import { createCelestialFrame } from "./globe-celestial-frame.ts";
 
 export const CELESTIAL_SKY_RADIUS = 9;
 export const CELESTIAL_STAR_COUNT = 11_800;
@@ -68,10 +70,12 @@ const noiseGlsl = /* glsl */`
   }
 `;
 
-/** Static, camera-centred celestial scenery. Two bounded draws, no textures,
- * wall clocks, callbacks or runtime assets. Depth is real so the globe and moon
- * occlude it; the only changing input is the owner's night-visibility fade. */
-export function createGlobeCelestialSky(scene: THREE.Scene, camera: THREE.Camera) {
+/** A rigid inertial sky seen from the planet-bound reference frame. Two bounded
+ * draws, no textures, wall clocks, callbacks or runtime assets. Depth is real so
+ * the globe and moon occlude it. Lighting presets affect visibility, while the
+ * shared scenery clock still advances the apparent daily rotation. */
+export function createGlobeCelestialSky(scene: THREE.Scene, camera: THREE.Camera, globe: THREE.Group, anchor: Vec3) {
+  const frame = createCelestialFrame(anchor);
   const group = new THREE.Group();
   group.name = "Fixed celestial sphere";
   group.visible = false;
@@ -184,12 +188,13 @@ export function createGlobeCelestialSky(scene: THREE.Scene, camera: THREE.Camera
   group.add(stars);
   let disposed = false;
   return {
-    update(_seconds: number, nightVisibility: number) {
+    update(seconds: number, nightVisibility: number) {
       if (disposed) return;
       const amount = Number.isFinite(nightVisibility) ? THREE.MathUtils.clamp(nightVisibility, 0, 1) : 0;
       visibility.value = amount;
       group.visible = amount > 0;
       camera.getWorldPosition(group.position);
+      frame.update(seconds, globe.quaternion, group.quaternion);
     },
     dispose() {
       if (disposed) return;

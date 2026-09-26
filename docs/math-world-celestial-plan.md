@@ -1,96 +1,91 @@
 # Math World celestial scenery — working plan
 
-Updated: 2026-09-25. Status: **implementation and local verification complete; ready to publish**.
+Updated: 2026-09-25. Status: **correction complete and locally verified; ready to publish**.
 
-Read this file after compaction. Previous hurricane release is deployed at
-`7b127db59d9beedb63aebe8a3fcd764d5651ca3d`.
+Read this file after compaction. The first celestial release is deployed at
+`e7252fddc66ba99a4ccf9729f5ebfa8772eaf839`; its completed receipt and visual
+checks are in shared `work/math-world-celestial-2026-09-25/`.
 
-## Product decisions
+## Product contract
 
-- Add a static celestial sphere with varied stars, luminous nebula clouds,
-  dust lanes and dark space. Fixed directions, no drifting star wallpaper.
-- Stars and nebula appear only once the inspected coast is on the night side;
-  fade smoothly during the automatic day/night cycle and disappear in Day/Sunset.
-- Add an oversized physical moon on an inclined orbit around the planet.
-  Actual shared sun direction and camera position determine the visible phase.
-  The moon remains visible by day as well so every physical phase is available.
-- Model crater bowls, raised rims, maria and highlands. Low-angle sun should
-  reveal relief, with restrained earthshine preserving the dark silhouette.
-- Use the existing scenery clock: pause/reduced motion/hidden/offscreen must
-  freeze orbit; explicit navigation and sky selection may still redraw.
-- All resources local/procedural, fixed allocations, safe disposal. No changes
-  to curriculum, workbooks, questions, saved progress or locks.
+- The stars and nebula are fixed relative to each other in inertial space.
+  They must move on screen when the planet-bound viewpoint turns or the
+  planet's daily rotation advances. They are not screen-fixed wallpaper.
+- The previous implementation kept the celestial sphere's scene quaternion
+  at identity. This was wrong because navigation rotates the globe rather
+  than orbiting the camera. Its old screenshot equality check across navigation
+  tested the wrong behavior and has been replaced.
+- Both sky layers use one rigid transform: `Qview * Banchor * Ry(daily angle)`.
+  `Banchor` is the initial east/north/front basis. This preserves the original
+  opening composition. Positive daily rotation matches the automatic sun.
+- Daily angle uses the shared active scenery clock and360-second sun cycle.
+  In Auto, the sun is constant in celestial coordinates. Day/Sunset/Night
+  remain lighting overrides; like the moon's orbit, sky motion continues there.
+- Center the sphere on the camera to remove translation parallax. Do not rotate
+  the star catalogue independently of the nebula or modify vertex buffers.
+- Stars/nebula remain night-only. All sky motion pauses with scenery pause,
+  reduced motion, hidden documents and offscreen suspension. Navigation still
+  updates perspective while paused.
+- Keep the oversized orbiting moon, actual shared-sun phases, displaced crater
+  bowls/rims, maria, ejecta and earthshine. No moon changes in this correction.
+- Preserve planet depth/occlusion, controls, workbooks, curriculum and progress.
+  No additional animation loops, GPU resources or network assets.
 
 ## Workspace and ownership
 
 - Worktree: `/private/tmp/spatial-gym-coast-preview`.
-- Branch: `codex/celestial-night-sky`; baseline `7b127db`.
+- Branch: `codex/celestial-reference-frame`; baseline `e7252fd`.
 - Shared workspace is dirty; never reset or commit unrelated work there.
-- Root: lighting integration, visibility helper/tests, durable plan, final
-  visual review, full checks, release and public verification.
-- `celestial_sky`: `globe-celestial-sky.ts`, procedural sky and focused tests.
-- `lunar_scene`: `globe-moon.ts`, crater relief, orbit/phase helpers and tests.
-- `celestial_qa`: independent math review and actual-app browser/motion/resource QA.
-- QA: `/private/tmp/math-world-celestial-qa`, static preview port 3308.
-- Durable evidence: shared `work/math-world-celestial-2026-09-25/`.
+- Root: frame helper/integration, unit tests, plan, release and public verification.
+- `celestial_frame_review`: independent math/sign/order review, complete.
+- `celestial_motion_qa`: browser motion/navigation/resource/desktop/phone QA.
+- QA: `/private/tmp/math-world-celestial-motion-qa`, preview port3309.
+- Durable evidence: shared `work/math-world-celestial-motion-2026-09-25/`.
 
-## Integration contracts
+## Current API
 
-- `createGlobeCelestialSky(scene, camera)` returns
+- `createGlobeCelestialSky(scene, camera, globe, anchor)` returns
   `update(seconds, nightVisibility)` and `dispose()`.
-- `createGlobeMoon(scene, globe, camera, anchor)` returns
-  `update(seconds, sunDirection, nightVisibility)` and `dispose()`.
-- Sun direction is globe-local. Moon orbit transforms through globe quaternion;
-  moon surface light uses the same transformed sun as the globe.
-- Sky is scene-owned, camera-centered for no parallax, fixed world orientation;
-  it renders behind the planet and moon with depth preserved.
-- Lighting owns both renderers and disposes them. No new animation loops.
+- `createCelestialFrame(anchor).update(seconds, planetToView, targetQuaternion)`
+  samples the apparent sky orientation without per-frame geometry/allocation.
+- `getCelestialCycleAngle(seconds)` is shared with automatic sunlight;
+  `SKY_CYCLE_SECONDS` remains re-exported from lighting for existing consumers.
 
-## Checklist
+## Correction checklist
 
-- [x] Durable plan, branch and ownership established.
-- [x] Static night-only celestial sphere with varied stars and nebula.
-- [x] Orbiting cratered moon with physically consistent phase and sun lighting.
-- [x] Integrate visibility/clock/cleanup and remove legacy flat star field.
-- [x] Inspect desktop and phone: day, sunset, night, overview and focused coast.
-- [x] Validate full/quarter/crescent relief and planet/moon depth occlusion.
-- [x] Pause/reduced-motion/hidden/offscreen, resources and performance verified.
-- [x] Full repository check passes; question/curriculum content unchanged.
-- [ ] Commit intended files, integrate latest main, guarded fast-forward push.
-- [ ] Exact-commit Pages deployment succeeds; public game verified.
-- [ ] Mirror intended files safely and archive evidence/final receipt.
+- [x] Confirm the reference-frame bug and establish independent math review.
+- [x] Apply navigation and daily rotation to the complete celestial sphere.
+- [x] Keep initial composition and share daily angle with automatic sunlight.
+- [x] Test orbit closure/sign, sun invariant, paused navigation and rigid stars.
+- [x] Actual-app desktop/390px sky changes during time and globe turns.
+- [x] Pause/reduced/hidden/offscreen, night gate and resource behavior verified.
+- [x] Full repository check passes; intended source/content scope confirmed.
+- [ ] Commit, integrate latest main and guarded fast-forward push.
+- [ ] Exact-commit Pages deployment and public browser verification pass.
+- [ ] Safe mirror and archive evidence/final receipt.
 
-## Resume notes and evidence
+## Evidence and resume notes
 
-- Camera far plane is 12; sky sphere radius 9. Moon radius .19, orbit radius
-  1.9, period 224 seconds planned. These are stylized proportions.
-- Night preset puts the sun behind the inspected coast, so the physical moon
-  naturally favors crescents. Do not fake a phase overlay or separate sun.
-- Prior check baseline: 827 JavaScript + 174 Python tests, 8 existing skips.
-- Release workflow is `.github/workflows/deploy-pages.yml`; deployment is
-  required by AGENTS.md, and the public Math World route must be smoke-tested.
+- Independent numerical review found `inverse(Qsky) * Qview * sunLocal(t)`
+  constant within1.7e-15. Quarter-cycle sign agrees with existing lighting.
+- Eleven focused sky/frame/lighting tests pass. Tests now require apparent
+  rotation during navigation and identical poses only at frozen time/view.
+- Sky remains two draws with the existing11,800-star catalogue; only its
+  quaternion changes. No shader, geometry, moon or scenery-loop edits.
+- Full previous release check:837JavaScript+174Python tests passed,8existing
+  skips. New correction adds three meaningful reference-frame tests.
+- Release is required by AGENTS.md. Follow exact SHA of deploy-pages.yml;
+  do not report done before production has been checked.
 
-- Initial actual-app QA passed 13 desktop/390px captures with no browser/shader
-  errors. Day ~29.2fps, night ~28.6fps (same30fps cap). Repeated sky changes
-  allocate no extra GPU resources; sky corner pixels stay identical as the globe
-  rotates. Pause/reduced-motion/hidden/offscreen all stop draws and resume safely.
-- Regression passed original 24-question world workbook and both whole-test
-  workbooks; eight question/map cycles leave one live WebGL context and preserve
-  the scenery clock/night mode. Earned stop unlock and voyage cancellation pass.
-  All four curriculum/content hashes remain unchanged (32worlds/680questions).
-- First integrated moon was near-new by default. Final visual refinement moves
-  its fixed starting orbit to upper-left to expose ~14% crescent under the same
-  Night sun. Moon geometry also averages seam/pole normals. Rebuild and review
-  final desktop/phone night before full check/release.
-
-- Final rebuilt app accepted at1440/390. Moon now starts upper-left with a
-  readable illuminated arc and clear frame/planet separation. Final source has
-  no browser/shader errors; private full/quarter/crescent/new renders match
-  expected illumination1/.5/.1/~0. Independent sun/orbit/observer math passes.
-- `npm run check` passed: lint, TypeScript, static Pages build,837JavaScript
-  tests (8existing skips),174Python tests. Total1,011passing tests. Main fetched
-  unchanged at baseline7b127db, so no integration changes or repeated check needed.
-- Evidence reports: `celestial-app-report.json`, `remaining-report.json`,
-  `independent-moon-math.json`, `final-celestial-visuals-report.json`,
-  `check-final.log`. Final release receipt will be recorded in shared docs and
-  `work/math-world-celestial-2026-09-25/` after public verification.
+- Browser review passed on desktop and390px phone: night-sky pixels change
+  with navigation and advancing time; identical pixels during pause/reduced
+  motion. Navigation remains available while paused. Twelve preset switches
+  allocate no GPU resources; hidden/offscreen suspension and night gate pass.
+  No browser/shader errors or failed responses.
+- Full `npm run check` passes: lint, TypeScript, production export,840JavaScript
+  tests (8existing skips),174Python tests. Total1,014passing tests. All four
+  question/curriculum hashes remain unchanged. Latest main remains e7252fd;
+  no integration change requires repeating those checks.
+- Evidence: `celestial-app-report.json`, `mobile-motion-report.json`,
+  `independent-browser-review.md`, `content-verification.json`, `check-final.log`.
+  Final public receipt will be appended to the shared operational plan/archive.
