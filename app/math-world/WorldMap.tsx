@@ -372,7 +372,7 @@ export function WorldMap({
         </div>
         {complete && nextBoss ? (
           <button type="button" className={styles.primaryButton} disabled={busy || !canOpenBoss(progress, nextBoss, qaUnlocked)} onClick={() => onChooseBoss(nextBoss)}>
-            Open {nextBoss.year} Boss Challenge <span aria-hidden="true">→</span>
+            Sail into the {nextBoss.year} storm <span aria-hidden="true">→</span>
           </button>
         ) : complete && nextWorld ? (
           <button type="button" className={styles.primaryButton} disabled={busy || !canOpenWorld(progress, nextWorld.id, qaUnlocked)} onClick={() => onChooseWorld(nextWorld.id)}>

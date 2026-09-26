@@ -36,6 +36,11 @@
 .worldPin > span { display: grid; place-items: center; width: 27px; height: 27px; background: #234e5c; border: 2px solid #fff8d9; border-radius: 50%; box-shadow: 0 2px 8px #1a384b40; }
 .selectedPin > span { background: #b55a36; width: 32px; height: 32px; }
 .worldPin:disabled { opacity: .8 !important; }.worldPin:disabled > span { background: #526d75; border-color: #c0d5cc; }.worldPin small { position: absolute; right: 0; bottom: 0; color: #173c4f; background: #f2f1d9; border-radius: 50%; font-size: .6rem; width: 14px; height: 14px; }
+.stormPin > span { width: 34px; height: 34px; background: #34465f; border-color: #d8e6ef; }
+.stormPin > span svg { width: 25px; height: 25px; }
+.stormPin[data-storm-strength="0.34"] > span { background: #647d8b; }
+.stormPin[data-storm-strength="0.68"] > span { background: #435a75; }
+.stormFallback { position: absolute; inset: 0; width: 100%; height: 100%; }
 .stopPin { background: #ffd46c; border: 3px solid #fffae3; color: #6d470f; box-shadow: 0 3px 0 #be8831, 0 5px 9px #163c4b30; z-index: 3; font-size: 1.07rem; }
 .stopPin small { position: absolute; top: calc(100% + 7px); border-radius: 6px; padding: 3px 7px; font-size: .63rem; font-weight: 800; color: #284c45; background: #fffce9; white-space: nowrap; box-shadow: 0 1px 5px #163c4b14; pointer-events: none; }
 .currentPin { background: #dc7550; color: white; box-shadow: 0 3px 0 #a34536, 0 5px 9px #163c4b30; }
@@ -65,6 +70,7 @@
 @media (max-width: 620px) { .destinationHeader { align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-top: 23px; }.printButton { padding: 8px 15px; min-height: 44px; font-size: .78rem; }.progressRow { gap: 8px; font-size: .67rem; }.progressRow progress { min-width: 26px; }.board { height: 450px; }.boardToolbar { padding: 10px 12px; }.boardEyebrow { max-width: 90px; line-height: 1.55; }.boardToolbar button { font-size: .75rem; gap: 8px; }.boardSection { border-radius: 18px; }.boardCaption { padding: 11px 15px; font-size: .68rem; }.actions { align-items: stretch; flex-direction: column; gap: 14px; padding-top: 19px; }.actions button { width: 100%; }.testNotice { font-size: .68rem; }.stopPin { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }.stopPin small { font-size: .55rem; padding: 3px 5px; }.bookPin { width: 44px; height: 44px; }.voyageCard strong { font-size: .9rem; } }
 @media (prefers-reduced-motion: reduce) { .board *, .boardSection * { scroll-behavior: auto !important; } }
 .board[data-globe-renderer="fallback"] { height: auto; aspect-ratio: 1200 / 740; }
+.board[data-globe-renderer="fallback"][data-globe-boss] { aspect-ratio: 8 / 5; min-height: 280px; }
 .bookPin svg { width: 33px; height: 30px; }
 
 .board[data-globe-renderer="fallback"] .canvas { display: none; }

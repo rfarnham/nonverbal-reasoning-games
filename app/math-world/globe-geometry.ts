@@ -7,11 +7,12 @@ export type Vec3 = Readonly<{ x: number; y: number; z: number }>;
 export type GlobeDestination = Readonly<{
   id: string;
   kind: "teaching" | "boss";
-  /** Boss regions retain the number of their preceding teaching world. */
+  /** Storm destinations retain the number of their preceding teaching world. */
   worldNumber: number;
   center: Vec3;
   east: Vec3;
   north: Vec3;
+  /** Teaching land envelope, or the outer cloud/particle extent of an ocean storm. */
   angularRadius: number;
   harbor: Vec3;
 }>;
@@ -66,15 +67,23 @@ const CLUSTER_LAYOUTS = [
   { id: "wildwood", label: "Wildwood Passage", coordinates: [[-29.7269, -97.5025], [-5.6146, -75.4145], [-30.3291, -26.2769], [-58.9533, -93.1913], [-58.4185, -31.114], [-6.518, -43.9832]] },
 ] as const;
 
-function destinationCenters(): Vec3[] {
-  return CLUSTER_LAYOUTS.flatMap(cluster => cluster.coordinates.map(([latitude, longitude]) => {
-    const lat = latitude * Math.PI / 180, lon = longitude * Math.PI / 180;
-    return { x: Math.cos(lat) * Math.cos(lon), y: Math.sin(lat), z: Math.cos(lat) * Math.sin(lon) };
-  }));
+function latitudeLongitudeToGlobe(latitude: number, longitude: number): Vec3 {
+  const lat = latitude * Math.PI / 180, lon = longitude * Math.PI / 180;
+  return { x: Math.cos(lat) * Math.cos(lon), y: Math.sin(lat), z: Math.cos(lat) * Math.sin(lon) };
 }
 
+/** The final onward destination remains deliberately unspecified. These are sea
+ * encounters on the course out of their preceding archipelago, never new land. */
+export const GLOBE_STORM_PASSAGES = [
+  { id: "boss-2025", afterWorld: 16, nextWorld: 17, latitude: 42, longitude: -179, angularRadius: .19 },
+  { id: "boss-2026", afterWorld: 32, nextWorld: null, latitude: -27, longitude: 4, angularRadius: .23 },
+] as const;
+
 function makeDestinations(): GlobeDestination[] {
-  const centers = destinationCenters();
+  // Keep the original coast reservations while choosing teaching anchorages.
+  // Moving a former boss slot must not rotate a teaching harbor or displace its
+  // shoreline structures, marine life, stop controls, or saved voyage endpoints.
+  const centers = CLUSTER_LAYOUTS.flatMap(cluster => cluster.coordinates.map(([latitude, longitude]) => latitudeLongitudeToGlobe(latitude, longitude)));
   const destinations: GlobeDestination[] = [];
   for (let worldNumber = 1; worldNumber <= 32; worldNumber += 1) {
     const definition = WORLD_DEFINITIONS.find(world => world.number === worldNumber);
@@ -86,7 +95,7 @@ function makeDestinations(): GlobeDestination[] {
     add(definition?.id ?? `world-${worldNumber}`, "teaching");
     if (worldNumber === 16 || worldNumber === 32) add(worldNumber === 16 ? "boss-2025" : "boss-2026", "boss");
   }
-  return destinations.map((destination, index) => {
+  const coastDestinations = destinations.map((destination, index) => {
     let first = 0;
     const cluster = CLUSTER_LAYOUTS.find(item => { const contains = index < first + item.coordinates.length; if (!contains) first += item.coordinates.length; return contains; })!;
     const clusterCenter = normalizeVec3(destinations.slice(first, first + cluster.coordinates.length).reduce((sum, item) => addVec3(sum, item.center), { x: 0, y: 0, z: 0 }));
@@ -106,6 +115,12 @@ function makeDestinations(): GlobeDestination[] {
     if (!harbor) throw new Error(`No safe outward harbor for ${destination.id}.`);
     return { ...destination, harbor };
   });
+  return coastDestinations.map(destination => {
+    const storm = GLOBE_STORM_PASSAGES.find(passage => passage.id === destination.id);
+    if (!storm) return destination;
+    const basis = frame(latitudeLongitudeToGlobe(storm.latitude, storm.longitude));
+    return { ...destination, ...basis, angularRadius: storm.angularRadius, harbor: basis.center };
+  });
 }
 
 export const GLOBE_DESTINATIONS: readonly GlobeDestination[] = makeDestinations();
@@ -114,12 +129,12 @@ export const GLOBE_BOSS_REGIONS: readonly GlobeDestination[] = GLOBE_DESTINATION
 
 export const GLOBE_GEOGRAPHIC_CLUSTERS = CLUSTER_LAYOUTS.map((cluster, index) => {
   const first = CLUSTER_LAYOUTS.slice(0, index).reduce((count, item) => count + item.coordinates.length, 0);
-  return { id: cluster.id, label: cluster.label, destinationIds: GLOBE_DESTINATIONS.slice(first, first + cluster.coordinates.length).map(destination => destination.id) };
+  return { id: cluster.id, label: cluster.label, destinationIds: GLOBE_DESTINATIONS.slice(first, first + cluster.coordinates.length).filter(destination => destination.kind === "teaching").map(destination => destination.id) };
 });
 /** Conservative envelopes include the irregular frozen coast and coastal icebergs. */
 export const GLOBE_POLAR_CAPS: readonly Readonly<{ id: string; center: Vec3; angularRadius: number }>[] = POLAR_CAPS;
 export const GLOBE_LAND_OBSTACLES: readonly Readonly<{ id: string; center: Vec3; angularRadius: number }>[] = [
-  ...GLOBE_DESTINATIONS.map(({ id, center, angularRadius }) => ({ id, center, angularRadius })), ...GLOBE_POLAR_CAPS, ...GLOBE_CONTINENTS,
+  ...GLOBE_REGIONS.map(({ id, center, angularRadius }) => ({ id, center, angularRadius })), ...GLOBE_POLAR_CAPS, ...GLOBE_CONTINENTS,
 ];
 
 

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { GLOBE_DESTINATIONS, distanceToSurfaceArc, getGlobeMap, mapPointToGlobe, sphericalAngle, sphericalInterpolate, type Vec3, type GlobeDestination } from "./globe-geometry.ts";
+import { GLOBE_REGIONS, distanceToSurfaceArc, getGlobeMap, mapPointToGlobe, sphericalAngle, sphericalInterpolate, type Vec3, type GlobeDestination } from "./globe-geometry.ts";
 import { getWorldMapLayout, type MapIsland } from "./map-layouts.ts";
 import { getWorldBiome } from "./globe-biome-data.ts";
 
@@ -34,11 +34,6 @@ function offsetSide(at: Vec3, toward: Vec3, amount: number): Vec3 {
   return plain(up.clone().multiplyScalar(Math.cos(amount)).addScaledVector(up.clone().cross(forward).normalize(), Math.sin(amount)));
 }
 function makeHarborLayout(destination: GlobeDestination): GlobeHarborLayout {
-  if (destination.kind === "boss") {
-    const shore = sphericalInterpolate(destination.center, destination.harbor, .048 / sphericalAngle(destination.center, destination.harbor));
-    const end = sphericalInterpolate(destination.center, destination.harbor, .112 / sphericalAngle(destination.center, destination.harbor));
-    return { destinationId: destination.id, worldNumber: destination.worldNumber, style: "quay", shore, pierEnd: end, harbor: destination.harbor, landingRadius: 1.027 };
-  }
   const map = getGlobeMap(destination.worldNumber), authored = getWorldMapLayout(destination.worldNumber, map.stops.length);
   const controls = [...map.stops, ...map.books].map(point => point.point);
   const roads = [...map.roads, ...map.storyPaths].flat();
@@ -73,7 +68,7 @@ function makeHarborLayout(destination: GlobeDestination): GlobeHarborLayout {
     shore: best.shore, pierEnd: best.end, harbor: destination.harbor, landingRadius: authored.landscape === "cliffs" ? 1.023 : 1.013,
     shoreIslandId: best.island.id, ...(lighthouse ? { lighthouse } : {}) };
 }
-export const GLOBE_HARBOR_LAYOUTS: readonly GlobeHarborLayout[] = GLOBE_DESTINATIONS.map(makeHarborLayout);
+export const GLOBE_HARBOR_LAYOUTS: readonly GlobeHarborLayout[] = GLOBE_REGIONS.map(makeHarborLayout);
 
 /** Coast-attached port scenery. Its solid geometry remains inside the existing
  * land envelopes; offshore navigational anchorages and boat routes are unchanged. */

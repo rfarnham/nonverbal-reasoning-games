@@ -3,13 +3,14 @@ import test from 'node:test';
 import * as THREE from 'three';
 import { createGlobeHarbors, GLOBE_HARBOR_LAYOUTS } from '../app/math-world/globe-harbors.ts';
 import { createGlobeBiomes } from '../app/math-world/globe-biomes.ts';
-import { GLOBE_DESTINATIONS, GLOBE_LAND_OBSTACLES, getGlobeMap, sphericalAngle } from '../app/math-world/globe-geometry.ts';
+import { GLOBE_REGIONS, GLOBE_LAND_OBSTACLES, getGlobeMap, sphericalAngle } from '../app/math-world/globe-geometry.ts';
 
 const vector = p => new THREE.Vector3(p.x,p.y,p.z);
 
 test('every harbor preserves its route anchorage and joins actual authored island ground', () => {
-  assert.equal(GLOBE_HARBOR_LAYOUTS.length,34);
-  assert.deepEqual(GLOBE_HARBOR_LAYOUTS.map(h=>h.destinationId),GLOBE_DESTINATIONS.map(d=>d.id));
+  assert.equal(GLOBE_HARBOR_LAYOUTS.length,32);
+  assert.deepEqual(GLOBE_HARBOR_LAYOUTS.map(h=>h.destinationId),GLOBE_REGIONS.map(d=>d.id));
+  assert.ok(GLOBE_HARBOR_LAYOUTS.every(h=>!h.destinationId.startsWith('boss-')),'ocean storms never acquire an island, quay or dock');
   assert.equal(new Set(GLOBE_HARBOR_LAYOUTS.map(h=>h.style)).size,4);
   assert.deepEqual(GLOBE_HARBOR_LAYOUTS.filter(h=>h.lighthouse).map(h=>h.worldNumber),[1,6,10,13,17,22,26,30]);
   const globe=new THREE.Group(),biomes=createGlobeBiomes(globe),surfaces=[];
@@ -17,7 +18,7 @@ test('every harbor preserves its route anchorage and joins actual authored islan
   globe.traverse(object=>{if(object.isMesh&&object.material.isMeshStandardMaterial)surfaces.push(object);});
   const ray=new THREE.Raycaster();ray.far=.25;
   for(const [index,layout]of GLOBE_HARBOR_LAYOUTS.entries()){
-    assert.equal(layout.harbor,GLOBE_DESTINATIONS[index].harbor,'navigation endpoints retain their original identity');
+    assert.equal(layout.harbor,GLOBE_REGIONS[index].harbor,'navigation endpoints retain their original identity');
     assert.ok(sphericalAngle(layout.shore,layout.pierEnd)>.012,'the dock has a real connection from shore to water');
     if(!layout.shoreIslandId)continue;
     const map=getGlobeMap(layout.worldNumber);
@@ -40,7 +41,7 @@ test('all solid harbor scenery stays inside routed land envelopes and leaves nat
     assert.ok(GLOBE_LAND_OBSTACLES.some(obstacle=>sphericalAngle(point,obstacle.center)<obstacle.angularRadius+1e-6),'piers, quays and lighthouse foundations cannot obstruct the guaranteed ocean routes');
   }
   const ray=new THREE.Raycaster();ray.far=.23;
-  for(const destination of GLOBE_DESTINATIONS.filter(d=>d.kind==='teaching')){
+  for(const destination of GLOBE_REGIONS){
     const map=getGlobeMap(destination.worldNumber);
     for(const point of [...map.stops,...map.books]){
       const direction=vector(point.point);ray.set(direction.clone().multiplyScalar(1.2),direction.clone().negate());

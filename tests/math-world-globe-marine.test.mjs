@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import * as THREE from "three";
 import {
-  GLOBE_DESTINATIONS, GLOBE_LAND_OBSTACLES, getGlobeRegion, getVoyageRoute,
+  GLOBE_BOSS_REGIONS, GLOBE_DESTINATIONS, GLOBE_LAND_OBSTACLES, getGlobeRegion, getVoyageRoute,
   distanceToSurfaceArc, sphericalAngle, dotVec3,
 } from "../app/math-world/globe-geometry.ts";
 import {
-  GLOBE_MARINE_LOOPS, MARINE_LAND_CLEARANCE, MARINE_HARBOR_CLEARANCE, MARINE_VOYAGE_CLEARANCE,
+  GLOBE_MARINE_LOOPS, MARINE_LAND_CLEARANCE, MARINE_HARBOR_CLEARANCE, MARINE_VOYAGE_CLEARANCE, MARINE_STORM_CLEARANCE,
   createGlobeMarine, sampleMarineLoop, sampleWhaleSurfacing,
 } from "../app/math-world/globe-marine.ts";
 
@@ -27,6 +27,10 @@ test("complete marine loops and their visible footprints stay in the ocean and o
     for (const destination of GLOBE_DESTINATIONS) {
       assert.ok(sphericalAngle(loop.center, destination.harbor) - loop.radius - loop.extent >= MARINE_HARBOR_CLEARANCE,
         `${name} leaves ${destination.id}'s dock and player boat unobstructed`);
+    }
+    for (const storm of GLOBE_BOSS_REGIONS) {
+      assert.ok(sphericalAngle(loop.center, storm.center) - loop.radius - loop.extent - storm.angularRadius >= MARINE_STORM_CLEARANCE,
+        `${name} stays outside ${storm.id}'s entire rotating cloud/particle disk`);
     }
     for (let frame = 0; frame <= 256; frame++) {
       const sample = sampleMarineLoop(loop, frame / 256 * loop.period);

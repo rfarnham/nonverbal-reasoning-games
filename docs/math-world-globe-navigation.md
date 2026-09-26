@@ -1,6 +1,6 @@
 # Math World globe navigation
 
-The public spiral adventure uses one persistent Three.js globe for all 32 teaching archipelagos and the two boss placeholders, grouped around six connected continental mainlands. The existing authored island shapes, stop roads, and exactly two storybook islands per teaching world are projected onto fixed spherical regions. Concept-specific landmarks distinguish the destinations. Question content, ordering, scoring, saves, print workbooks, and the password gate retain their existing contracts.
+The public spiral adventure uses one persistent Three.js globe for all 32 teaching archipelagos and the two ocean-storm boss challenges. The teaching archipelagos cluster around six connected continental mainlands. The existing authored island shapes, stop roads, and exactly two storybook islands per teaching world are projected onto fixed spherical regions. Concept-specific landmarks distinguish the destinations. Question content, ordering, scoring, saves, print workbooks, and the password gate retain their existing contracts.
 
 ## Player flow
 
@@ -20,7 +20,7 @@ The globe, connected mainlands, raised islands, paths, landmarks, and boat are l
 
 Each concept's archipelago has a geographic identity with a distinct return-visit variant. Terrain includes volcanic craters and basalt shores, dense forest canopies, coral lagoons, river valleys and waterfalls, snowy tundra, glacier fjords, alpine lakes, and desert formations. These are modeled landforms rather than recolored versions of one island. The original stop locations, roads, two storybooks, question order, and landing elevations stay consistent.
 
-Six substantial, continuous mainland bodies give the destination clusters shared geography. Their different concave coastlines form peninsulas, broad bays, inland lakes, low coastal plains and interior ridges, with open seas between regions. Filled mainland polygons cover about 27% of the globe before adding the stop islands and polar caps. River valleys connect inland water to the coast. Heights near authored worlds stay below their islands, preserving stop and path visibility. Each archipelago retains a dominant landmark and smaller supporting terrain. Broad turquoise coastal shelves, reefs and animated foam connect the land to the sea. Rendering and route finding share the mainland authoring data: six conservative mainland envelopes join the 34 destination envelopes and two polar envelopes. Boat routes clear all 42 with room for the full hull.
+Six substantial, continuous mainland bodies give the destination clusters shared geography. Their different concave coastlines form peninsulas, broad bays, inland lakes, low coastal plains and interior ridges, with open seas between regions. Filled mainland polygons cover about 27% of the globe before adding the stop islands and polar caps. River valleys connect inland water to the coast. Heights near authored worlds stay below their islands, preserving stop and path visibility. Each archipelago retains a dominant landmark and smaller supporting terrain. Broad turquoise coastal shelves, reefs and animated foam connect the land to the sea. Rendering and route finding share the mainland authoring data: six conservative mainland envelopes join the 32 teaching destination envelopes and two polar envelopes. Boat routes clear all 40 with room for the full hull.
 
 The ocean samples seamless three-dimensional noise to form fine wind ripples and moving sun reflections; it has no latitude or longitude wave bands. One globe-local sun lights terrain, water, clouds, and smoke. Soft terrain shadows, cool night fill, a twilight terminator, distant haze, stars, and warm crater light give the globe a consistent sense of depth.
 
@@ -36,6 +36,32 @@ Sunlit rainbows are visible in selected tropical and wet regions. Sparse curling
 
 Reduced motion moves directly to the destination or question. If WebGL is unavailable or its context is lost, the authored map and native stop list remain playable. The globe adds no external runtime asset or service dependency.
 
+## Hurricane boss passages
+
+The 2025 storm is an ocean destination on the passage between Worlds 16 and 17.
+The 2026 storm lies offshore beyond World 32 on the onward course toward an
+as-yet undesigned final destination. Both arrival points are water at the eye
+of the storm; neither has an island, castle or harbor structure. Teaching
+coordinates and their anchorages stay unchanged.
+
+The first storm gathers after 14 contiguous teaching worlds are complete,
+strengthens after 15 and reaches full strength after 16. The second follows the
+same pattern at 30, 31 and 32. Merely selecting a world cannot change these
+stages. Brewing storms remain locked until the existing boss prerequisite is
+met. Test mode shows both at full strength without awarding completion.
+
+Globe-scale cloud bands rotate around a real open eye. The focused view shows
+the player's ship riding swells, with rain, sea spray, curling whitecaps and
+occasional local lightning. All effects share the existing scenery clock and
+its pause, reduced-motion and visibility rules. A still local SVG storm/ship
+illustration replaces the WebGL view when rendering is unavailable. Direct
+boss links open the focused storm view.
+
+Each boss retains its whole 24-question original-test workbook. Answer entry
+and the final destination remain future work, explicitly labeled in the UI.
+The first boss can sail onward to World 17; the final boss can return to
+World 32 without inventing an extra playable world or completion state.
+
 ## Arithmetic voyage extension
 
 `voyage.ts` defines `ArchipelagoVoyage` and `VoyageActivityProps`. `GlobeBoard` accepts an optional `voyageActivity` component. When supplied, a journey pauses halfway and passes the departure, destination, and Continue/Cancel callbacks to that activity. Cancel and Skip safely resolve the pending activity before settling the journey.
@@ -47,3 +73,5 @@ No arithmetic questions, difficulty rules, timing, rewards, or gate have been in
 Pure geometry tests cover fixed destinations, source-map projection, real mainland coverage, coast concavity, inland water, rendered-geometry containment, exposed rivers, preserved stop elevations, great-circle edge cases, all 561 destination pairs, ocean clearance, and consistent route sampling. Motion tests verify fixed tree roots, bounded geometry, shared resource reuse and complete disposal. Sun-direction tests cover all lighting presets, polar focus, and a camera-independent automatic cycle. Scenery-clock tests cover capped painting, pause/resume time, stalled frames, and disposal. Browser checks cover normal earned progression, test mode, cancellation and reload, same-canvas travel, stop completion, original-art workbook printing, boss milestones, context loss, reduced motion, remembered scenery pause, hidden/offscreen suspension, keyboard controls, and the 390/620/820/1440 layouts.
 
 The continental work is documented in [its completion plan](math-world-visual-completion-plan.md). The marine life, coastal landmarks and weather extension is tracked in [the living-seas checklist](math-world-living-seas-plan.md).
+
+The hurricane bosses are tracked in [the storm-boss checklist](math-world-storm-bosses-plan.md).

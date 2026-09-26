@@ -10,6 +10,8 @@ import { createGlobeLighting, type GlobeSkyMode } from "./globe-lighting";
 import { createGlobeLife } from "./globe-life";
 import { createGlobeMarine } from "./globe-marine";
 import { createGlobeHarbors } from "./globe-harbors";
+import { createGlobeStorms } from "./globe-storms";
+import { sampleStormShipMotion } from "./storm-ship-motion";
 import { createSceneryClock } from "./scenery-clock";
 import { placeOccupiedStopBadge, placeStopCaption } from "./globe-marker-layout";
 import {
@@ -28,6 +30,8 @@ export type GlobeProjection = Readonly<{
 export type GlobeSceneFrame = Readonly<{
   focus: Vec3; zoom: number; activeDestinationId: string;
   completedStopIds: readonly string[];
+  stormStages?: Readonly<Record<string, number>>;
+  cameraDestinationId?: string; stormCameraBlend?: number;
   avatarPosition?: Vec3; avatarHop?: number;
   boatPosition?: Vec3; boatHeading?: Vec3;
 }>;
@@ -106,10 +110,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   const ocean = new THREE.Mesh(sphere, sea.material);
   globe.add(ocean);
 
-  const unitBox = keepGeometry(new THREE.BoxGeometry(1, 1, 1));
-  const unitBall = keepGeometry(new THREE.IcosahedronGeometry(1, 1));
   const unitCylinder = keepGeometry(new THREE.CylinderGeometry(1, 1, 1, 8));
-  const unitCone = keepGeometry(new THREE.ConeGeometry(1, 1, 8));
   const white = 0xfff7dd;
   const wood = 0x95623e;
   const basisAt = (at: Vec3) => {
@@ -124,10 +125,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     const local = new THREE.Matrix4().compose(new THREE.Vector3(...position), quaternion, new THREE.Vector3(...scale));
     batch(geometry, color, base.clone().multiply(local));
   };
-  const box = (base: THREE.Matrix4, color: number, x: number, y: number, z: number, sx: number, sy: number, sz: number, rotation?: [number, number, number]) => addPiece(unitBox, color, base, [x, y, z], [sx, sy, sz], rotation);
-  const ball = (base: THREE.Matrix4, color: number, x: number, y: number, z: number, radius: number, scaleY = 1) => addPiece(unitBall, color, base, [x, y, z], [radius, radius * scaleY, radius]);
   const cylinder = (base: THREE.Matrix4, color: number, x: number, y: number, z: number, radius: number, height: number) => addPiece(unitCylinder, color, base, [x, y, z], [radius, height, radius]);
-  const cone = (base: THREE.Matrix4, color: number, x: number, y: number, z: number, radius: number, height: number) => addPiece(unitCone, color, base, [x, y, z], [radius, height, radius]);
   const mapAt = (worldNumber: number, x: number, y: number, radius: number, width = 1200, height = 740) => mapPointToGlobe(worldNumber, x / width * 100, y / height * 100, false, radius);
   const pathTube = (points: readonly Vec3[], color: number, radius = 0.0015) => {
     if (points.length < 2) return;
@@ -147,6 +145,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   const life = createGlobeLife(globe, biomes);
   const marine = createGlobeMarine(globe);
   const harbors = createGlobeHarbors(globe);
+  const storms = createGlobeStorms(globe);
   for (const world of WORLD_DEFINITIONS) {
     const authored = getWorldMapLayout(world.number, world.stopIds.length);
     const layout = authored.desktop;
@@ -177,20 +176,6 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     }
   }
 
-  for (const destination of GLOBE_DESTINATIONS.filter(region => region.kind === "boss")) {
-    const base = basisAt(vector(destination.center).multiplyScalar(1.014));
-    cylinder(base, 0xf6d795, 0, 0, 0, 0.064, 0.023);
-    cylinder(base, 0x8c85b8, 0, 0.018, 0, 0.047, 0.016);
-    box(base, 0xe7e1f6, 0, 0.048, 0, 0.043, 0.058, 0.038);
-    for (const x of [-0.026, 0.026]) {
-      cylinder(base, 0xb9a6db, x, 0.044, 0, 0.014, 0.078);
-      cone(base, 0x8665ad, x, 0.092, 0, 0.019, 0.024);
-      cylinder(base, wood, x, 0.11, 0, 0.001, 0.021);
-      box(base, 0xffc651, x + 0.006, 0.116, 0, 0.012, 0.008, 0.001);
-    }
-    box(base, 0x5c6086, 0, 0.025, 0.021, 0.015, 0.03, 0.002);
-    ball(base, 0xffc651, 0, 0.069, 0.021, 0.006);
-  }
   for (const [color, pieces] of batches) {
     const merged = mergeGeometries(pieces, false);
     for (const piece of pieces) piece.dispose();
@@ -219,6 +204,8 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     life.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, lighting.sunDirection, sceneryEnabled && !reducedMotion.matches);
     marine.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, lighting.sunDirection);
     harbors.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, lighting.sunDirection);
+    storms.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, frame.stormStages ?? {}, sceneryEnabled && !reducedMotion.matches, lighting.sunDirection);
+    updatePlayerShip();
     updateLavaLight();
     wakeTime.value = sceneryTime;
     const localDay = THREE.MathUtils.smoothstep(lighting.sunDirection.dot(vector(frame.focus)), -.2, .3);
@@ -286,7 +273,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   const mast = new THREE.Mesh(keepGeometry(new THREE.CylinderGeometry(0.0009, 0.0011, 0.041, 6)), material(wood));
   mast.position.set(0, 0.027, -0.005); boat.add(mast);
   const sailShape = new THREE.Shape(); sailShape.moveTo(0, 0); sailShape.lineTo(0, 0.033); sailShape.quadraticCurveTo(0.011, 0.02, 0.018, 0); sailShape.closePath();
-  const sail = new THREE.Mesh(keepGeometry(new THREE.ShapeGeometry(sailShape)), keepMaterial(new THREE.MeshStandardMaterial({ color: 0xfff2cc, roughness: 0.9, side: THREE.DoubleSide })));
+  const sail = new THREE.Mesh(keepGeometry(new THREE.ShapeGeometry(sailShape)), keepMaterial(new THREE.MeshStandardMaterial({ color: 0xfff2cc, emissive: 0xc7cfb4, emissiveIntensity: .24, roughness: 0.9, side: THREE.DoubleSide })));
   sail.position.set(0, 0.011, -0.005); sail.rotation.y = Math.PI / 2; boat.add(sail);
   const pennantGeometry = keepGeometry(new THREE.BufferGeometry());
   pennantGeometry.setAttribute("position", new THREE.Float32BufferAttribute([0, 0.051, -0.005, 0, 0.046, -0.005, 0, 0.049, 0.005], 3)); pennantGeometry.computeVertexNormals();
@@ -312,6 +299,46 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
       .replace("#include <alphatest_fragment>", `diffuseColor.a *= sin(wakeUV.x*3.14159)*(1.-wakeUV.y)*(.65+.35*sin(wakeUV.y*48.-wakeTime*3.));\n#include <alphatest_fragment>`);
   };
   boat.add(new THREE.Mesh(wakeGeometry, wakeMaterial));
+
+  const shipBasis = new THREE.Matrix4();
+  const shipTurn = new THREE.Quaternion();
+  const shipEuler = new THREE.Euler();
+  const shipNormal = new THREE.Vector3(), shipForward = new THREE.Vector3(), shipRight = new THREE.Vector3();
+  const stormRegions = GLOBE_DESTINATIONS.filter(region => region.kind === "boss");
+  function updatePlayerShip() {
+    if (!frame) return;
+    const activeStorm = stormRegions.find(region => region.id === frame!.activeDestinationId);
+    const at = frame.boatPosition ?? activeStorm?.center;
+    boat.visible = !!at;
+    if (!at) { renderer.domElement.dataset.stormShip = "false"; return; }
+    shipNormal.copy(at).normalize();
+    let strength = 0;
+    for (const region of stormRegions) {
+      const distance = shipNormal.angleTo(vector(region.center));
+      strength = Math.max(strength, (frame.stormStages?.[region.id] ?? 0)
+        * (1 - THREE.MathUtils.smoothstep(distance, region.angularRadius * .22, region.angularRadius)));
+    }
+    const pose = sampleStormShipMotion(sceneryTime, strength);
+    const scale = activeStorm && !frame.boatPosition ? 1.35 : THREE.MathUtils.lerp(3, 1.35, strength);
+    boat.scale.setScalar(scale);
+    shipForward.copy(frame.boatHeading ?? activeStorm?.east ?? { x: 0, y: 1, z: 0 });
+    shipForward.addScaledVector(shipNormal, -shipForward.dot(shipNormal));
+    if (shipForward.lengthSq() < .0001) shipForward.set(0, 0, 1).cross(shipNormal);
+    shipForward.normalize(); shipRight.crossVectors(shipNormal, shipForward).normalize();
+    shipBasis.makeBasis(shipRight, shipNormal, shipForward);
+    boat.quaternion.setFromRotationMatrix(shipBasis).multiply(shipTurn.setFromEuler(shipEuler.set(pose.pitch, pose.yaw, pose.roll)));
+    boat.position.copy(shipNormal).multiplyScalar(1.005 + pose.heave);
+    sail.rotation.z = pose.sail;
+    wakeMaterial.opacity = THREE.MathUtils.lerp(.7, .95, strength);
+    // Seat the companion on the deck throughout every voyage, scaling smoothly
+    // with the boat as it enters or leaves the storm's influence.
+    boat.updateMatrix();
+    animal.position.set(0, .01, .003).applyMatrix4(boat.matrix);
+    animal.scale.setScalar(.068 * scale / 3);
+    animal.center.set(.5, .08);
+    animal.visible = project(animal.position).visible;
+    renderer.domElement.dataset.stormShip = strength > 0 ? "true" : "false";
+  }
 
   lighting.installSurfaceLighting();
   // Two nearby crater lights add warm spill to basalt; a tiny additive halo
@@ -386,10 +413,15 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     const tan = Math.tan(camera.fov * Math.PI / 360);
     const aspect = width / height;
     const overviewDistance = Math.max(3.7, 1.24 / (tan * aspect));
-    const focusDistance = Math.max(0.205 / (tan * aspect), 0.194 / tan);
+    const stormDestination = GLOBE_DESTINATIONS.find(region => region.kind === "boss" && region.id === next.activeDestinationId);
+    const cameraRegion = getGlobeDestination(next.cameraDestinationId ?? next.activeDestinationId);
+    const stormViewBlend = clamp(next.stormCameraBlend ?? (cameraRegion.kind === "boss" ? 1 : 0), 0, 1);
+    const focusExtent = THREE.MathUtils.lerp(.205, cameraRegion.angularRadius * 1.34, stormViewBlend);
+    const focusHeight = THREE.MathUtils.lerp(.194, cameraRegion.angularRadius * 1.34, stormViewBlend);
+    const focusDistance = Math.max(focusExtent / (tan * aspect), focusHeight / tan);
     // Look across the surface in close view: a visible curved horizon connects
     // the focused islands to the same globe seen in the overview.
-    const tilt = (aspect < 1 ? 35 : 45) * Math.PI / 180;
+    const tilt = THREE.MathUtils.lerp(aspect < 1 ? 35 : 45, 28, stormViewBlend) * Math.PI / 180;
     camera.position.set(0, -focusDistance * Math.sin(tilt) * zoom,
       THREE.MathUtils.lerp(overviewDistance, 1 + focusDistance * Math.cos(tilt), zoom));
     camera.lookAt(0, 0, zoom);
@@ -403,16 +435,8 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
       const animalNear = next.avatarPosition && vector(next.avatarPosition).angleTo(vector(stopAnchors.get(id)!)) < .009;
       marker.visible = zoom > .55 && activeStops.includes(id) && !animalNear;
     }
-    boat.visible = !!next.boatPosition;
-    if (next.boatPosition) {
-      const normal = vector(next.boatPosition).normalize();
-      const forward = next.boatHeading ? vector(next.boatHeading).addScaledVector(normal, -vector(next.boatHeading).dot(normal)).normalize() : new THREE.Vector3(0, 1, 0).cross(normal).normalize();
-      const boatRight = normal.clone().cross(forward).normalize();
-      const boatBasis = new THREE.Matrix4().makeBasis(boatRight, normal, forward);
-      boat.quaternion.setFromRotationMatrix(boatBasis);
-      boat.position.copy(normal).multiplyScalar(1.007);
-    }
-    const animalAt = next.boatPosition ?? next.avatarPosition;
+    const boatAt = next.boatPosition ?? stormDestination?.center;
+    const animalAt = boatAt ?? next.avatarPosition;
     animal.visible = !!animalAt;
     shadow.visible = false;
     if (animalAt) {
@@ -426,13 +450,13 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
       const islandRadius = THREE.MathUtils.lerp(landingRadius, 1.020, THREE.MathUtils.smoothstep(stopDistance, .004, .022));
       // The foot follows the exact authored stop/road. Native badges project
       // below their ground anchors so they do not cover the grounded animal.
-      animal.position.copy(foot).multiplyScalar(next.boatPosition ? 1.034 : islandRadius + (next.avatarHop ?? 0));
-      animal.scale.setScalar(next.boatPosition ? 0.068 : 0.038);
+      animal.position.copy(foot).multiplyScalar(boatAt ? 1.034 : islandRadius + (next.avatarHop ?? 0));
+      animal.scale.setScalar(boatAt ? 0.068 : 0.038);
       // The bundled sprite's feet are at y=30 in its 32px source image.
-      animal.center.set(0.5, next.boatPosition ? 0.08 : 2 / 32);
+      animal.center.set(0.5, boatAt ? 0.08 : 2 / 32);
       const avatarProjection = project(animal.position);
-      animal.visible = (!!next.boatPosition || zoom > 0.72) && avatarProjection.visible;
-      shadow.visible = animal.visible && !next.boatPosition && stopDistance < .03;
+      animal.visible = (!!boatAt || zoom > 0.72) && avatarProjection.visible;
+      shadow.visible = animal.visible && !boatAt && stopDistance < .03;
       shadow.matrix.copy(basisAt(foot.clone().multiplyScalar(islandRadius+.0003)));
       shadow.material.opacity = .22*(1-Math.min(.8,(next.avatarHop ?? 0)*15));
     }
@@ -466,7 +490,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
         stops[id] = { ...anchor, captionSide: placeStopCaption(anchor, neighbors, width, height) };
       }
     }
-    options.onProject({ width, height, worlds, stops, books, ...(animalAt ? { avatar: project(animal.position) } : {}), ...(next.boatPosition ? { boat: project(next.boatPosition) } : {}) });
+    options.onProject({ width, height, worlds, stops, books, ...(animalAt ? { avatar: project(animal.position) } : {}), ...(boatAt ? { boat: project(boatAt) } : {}) });
   }
   function resize() {
     if (disposed || unavailable) return;
@@ -491,7 +515,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
       sceneryClock.dispose();
       document.removeEventListener("visibilitychange", visibilityChanged);
       reducedMotion.removeEventListener("change", visibilityChanged);
-      weather.dispose(); life.dispose(); marine.dispose(); harbors.dispose(); biomes.dispose(); continents.dispose(); lighting.dispose(); sea.dispose();
+      weather.dispose(); life.dispose(); marine.dispose(); harbors.dispose(); storms.dispose(); biomes.dispose(); continents.dispose(); lighting.dispose(); sea.dispose();
       renderer.domElement.removeEventListener("webglcontextlost", contextLost);
       for (const geometry of geometries) geometry.dispose();
       for (const entry of materials) entry.dispose();

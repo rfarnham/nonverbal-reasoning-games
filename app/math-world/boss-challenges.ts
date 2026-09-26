@@ -13,13 +13,13 @@ export type BossChallenge = Readonly<{
 
 type ReservedTest = Omit<BossChallenge, "afterWorld" | "title"> & Readonly<{ afterWorldNumber: number }>;
 
-/** Assessment placeholders use the same milestones as the teaching-pool exclusions. */
+/** Storm assessments use the same milestones as the teaching-pool exclusions. */
 export const BOSS_CHALLENGES: readonly BossChallenge[] = WORLD_MODE === "spiral-preview"
   ? (holdouts.challenges as readonly ReservedTest[]).map(challenge => ({
     id: challenge.id,
     year: challenge.year,
     afterWorld: challenge.afterWorldNumber,
-    title: `${challenge.year} Boss Challenge`,
+    title: `${challenge.year} Storm Challenge`,
     questionCount: challenge.questionCount,
     gradeBand: challenge.gradeBand,
   }))

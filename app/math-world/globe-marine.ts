@@ -13,23 +13,23 @@ export type MarineLoop = Readonly<{
 }>;
 
 /** Authored ocean pockets, selected against the complete land envelopes, harbors,
- * and every ordinary voyage. Tests prove the enclosing disks are clear, including
+ * storm footprints, and every ordinary voyage. Tests prove the enclosing disks are clear, including
  * the hulls, school spread, fins, wakes, and every point between animation frames.
  * Keeping these placements authored avoids building the voyage graph at startup. */
 const placements: readonly [MarineLoop["kind"], number, number, number][] = [
   ["boat", 1, -.23, -.16], ["boat", 5, -.2228073, .2155386],
   ["boat", 7, .2087963, .3759044], ["boat", 10, .2031741, -.2341374],
-  ["boat", 13, -.2509542, -.1819945], ["boat", 19, -.0321348, .3083299],
+  ["boat", 13, -.234, -.354], ["boat", 19, -.0321348, .3083299],
   ["boat", 25, -.2407639, -.3562762], ["boat", 28, .1356519, -.2787446],
   ["whale", 1, .3043559, .0588852], ["whale", 8, -.3899464, -.0064661],
-  ["whale", 14, .0588852, -.3043559], ["whale", 20, -.5022546, .2241435],
-  ["whale", 30, -.387899, -.0404276],
+  ["whale", 14, .262, -.506], ["whale", 20, -.5022546, .2241435],
+  ["whale", 30, .27, .582],
   ["fish", 1, -.0946797, -.3783329], ["fish", 3, .1505275, .2710009],
   ["fish", 6, -.0275445, -.3890261], ["fish", 9, -.3043559, -.0588852],
   ["fish", 12, -.0487619, -.3061409], ["fish", 15, .2658611, .1594299],
   ["fish", 18, .3866458, .1881623], ["fish", 21, -.1952995, -.2407449],
-  ["fish", 24, .3043559, .0588852], ["fish", 27, .2407449, -.1952995],
-  ["fish", 30, -.0051398, .3099574], ["fish", 32, -.2787446, -.1356519],
+  ["fish", 24, .3043559, .0588852], ["fish", 27, .494, -.394],
+  ["fish", 30, -.194, .294], ["fish", 32, -.2787446, -.1356519],
 ];
 export const GLOBE_MARINE_LOOPS: readonly MarineLoop[] = placements.map(([kind, worldNumber, e, n], index) => {
   const center = tangentPointToGlobe(getGlobeRegion(worldNumber), e, n);
@@ -43,6 +43,7 @@ export const GLOBE_MARINE_LOOPS: readonly MarineLoop[] = placements.map(([kind, 
 export const MARINE_LAND_CLEARANCE = .014;
 export const MARINE_HARBOR_CLEARANCE = .085;
 export const MARINE_VOYAGE_CLEARANCE = .044;
+export const MARINE_STORM_CLEARANCE = .012;
 
 /** A periodic exponential-map ellipse and its exact tangent, both globe-local.
  * Its complete path lies in a spherical disk of radius loop.radius. */

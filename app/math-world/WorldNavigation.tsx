@@ -1,6 +1,7 @@
 "use client";
 
 import { bossAfterWorld, canOpenBoss, type BossChallenge } from "./boss-challenges.ts";
+import { getBossStormStages, bossStormStageLabel } from "./boss-storm-state.ts";
 import { canOpenWorld, type WorldProgress } from "./engine.ts";
 import { WORLD_DEFINITIONS, WORLD_MODE, type WorldDefinition } from "./world-data.ts";
 import styles from "./math-world.module.css";
@@ -22,6 +23,7 @@ export function WorldNavigation({ selectedId, progress, qaUnlocked, busy = false
   onChooseWorld: (worldId: string) => void;
   onChooseBoss: (challenge: BossChallenge) => void;
 }>) {
+  const stormStages = getBossStormStages(progress, qaUnlocked, selectedId);
   const index = destinations.findIndex(destination => destinationId(destination) === selectedId);
   const current = destinations[index];
   const previous = destinations[index - 1];
@@ -45,7 +47,7 @@ export function WorldNavigation({ selectedId, progress, qaUnlocked, busy = false
           {destinations.map(destination => {
             const unlocked = available(destination);
             if (destination.kind === "boss") return <option key={destination.challenge.id} value={destination.challenge.id} disabled={!unlocked}>
-              ★ {destination.challenge.title} · After World {destination.challenge.afterWorld}{!unlocked ? " · Locked" : ""}
+              ◉ {destination.challenge.title} · After World {destination.challenge.afterWorld}{!unlocked ? ` · ${stormStages[destination.challenge.id] > 0 ? bossStormStageLabel(stormStages[destination.challenge.id]) + " · " : ""}Locked` : ""}
             </option>;
             const candidate = destination.world;
             const finished = candidate.stopIds.every(id => progress.completedStopIds.includes(id));
@@ -60,6 +62,6 @@ export function WorldNavigation({ selectedId, progress, qaUnlocked, busy = false
     </div>
     <span className={styles.worldSequence}>{current?.kind === "world"
       ? `World ${current.world.number} of ${WORLD_DEFINITIONS.length}`
-      : current ? `Challenge after World ${current.challenge.afterWorld}` : ""}</span>
+      : current ? `Storm after World ${current.challenge.afterWorld}` : ""}</span>
   </nav>;
 }

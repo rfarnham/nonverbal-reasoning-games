@@ -10,6 +10,8 @@ import type { GlobeSceneFrame, GlobeProjection, GlobeScene } from "./globe-scene
 import type { GlobeSkyMode } from "./globe-lighting";
 import type { ArchipelagoVoyage, VoyageActivityProps } from "./voyage.ts";
 import CoastScene from "./CoastScene";
+import { getBossStormStages, bossStormStageLabel } from "./boss-storm-state.ts";
+import { StormArtwork, StormIcon } from "./StormArtwork";
 import { getWorldBiome } from "./globe-biome-data";
 import { getSceneryPaused, setSceneryPaused, subscribeSceneryPreference } from "./scenery-preference";
 import styles from "./globe.module.css";
@@ -47,6 +49,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
   const narrow = useSyncExternalStore(subscribeNarrow, readNarrow, serverNarrow);
   const destinationId = props.boss?.id ?? props.world.id;
   const selected = getGlobeDestination(destinationId)!;
+  const stormStages = getBossStormStages(props.progress, props.qaUnlocked, props.boss?.id);
   const boardRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<GlobeScene | null>(null);
@@ -54,7 +57,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
   useLayoutEffect(() => { latest.current = props; }, [props]);
   const nodes = useRef(new Map<string, HTMLElement>());
   const projectionRef = useRef<GlobeProjection | null>(null);
-  const frame = useRef<GlobeSceneFrame>({ focus: selected.center, zoom: props.initialOverview ? 0 : 1, activeDestinationId: destinationId, completedStopIds: props.progress.completedStopIds });
+  const frame = useRef<GlobeSceneFrame>({ focus: selected.center, zoom: props.initialOverview ? 0 : 1, activeDestinationId: destinationId, completedStopIds: props.progress.completedStopIds, stormStages });
   const [renderer, setRenderer] = useState<"loading" | "webgl" | "fallback">("loading");
   const rendererRef = useRef(renderer);
   useLayoutEffect(() => { rendererRef.current = renderer; }, [renderer]);
@@ -97,7 +100,8 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
       const group = isWorld ? projection.worlds : key.startsWith("book:") ? projection.books : projection.stops;
       const id = key.slice(key.indexOf(":") + 1);
       const point = group[id];
-      const visible = !!point?.visible && (isWorld ? phaseRef.current === "overview" : phaseRef.current === "focused");
+      const stormVisible = !isWorld || !BOSS_CHALLENGES.some(boss => boss.id === id) || (frame.current.stormStages?.[id] ?? 0) > 0;
+      const visible = stormVisible && !!point?.visible && (isWorld ? phaseRef.current === "overview" : phaseRef.current === "focused");
       node.style.visibility = visible ? "visible" : "hidden";
       node.style.pointerEvents = visible ? "auto" : "none";
       node.setAttribute("aria-hidden", String(!visible));
@@ -114,7 +118,9 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
     }
   }
   function paint(next: Partial<GlobeSceneFrame> = {}) {
-    frame.current = { ...frame.current, ...next, completedStopIds: latest.current.progress.completedStopIds };
+    const p = latest.current;
+    frame.current = { ...frame.current, ...next, completedStopIds: p.progress.completedStopIds,
+      stormStages: getBossStormStages(p.progress, p.qaUnlocked, next.activeDestinationId ?? frame.current.activeDestinationId) };
     sceneRef.current?.render(frame.current);
   }
   function restingPosition(): Vec3 | undefined {
@@ -149,7 +155,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
   function settlePose() {
     const p = latest.current;
     const center = getGlobeDestination(p.boss?.id ?? p.world.id)!.center;
-    paint({ focus: center, zoom: 1, activeDestinationId: p.boss?.id ?? p.world.id, boatPosition: undefined, boatHeading: undefined, avatarPosition: restingPosition(), avatarHop: 0 });
+    paint({ focus: center, zoom: 1, activeDestinationId: p.boss?.id ?? p.world.id, cameraDestinationId: undefined, stormCameraBlend: undefined, boatPosition: undefined, boatHeading: undefined, avatarPosition: restingPosition(), avatarHop: 0 });
     setBoardPhase("focused");
     if (irisRef.current) irisRef.current.style.opacity = "0";
   }
@@ -158,7 +164,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
     const previous = { ...frame.current };
     const target = getGlobeDestination(latest.current.boss?.id ?? latest.current.world.id)!.center;
     setBoardPhase("focusing");
-    const completed = await animate(900, t => paint({ focus: sphericalInterpolate(previous.focus, target, ease(t)), zoom: previous.zoom + (1 - previous.zoom) * ease(t) }));
+    const completed = await animate(900, t => paint({ focus: sphericalInterpolate(previous.focus, target, ease(t)), zoom: previous.zoom + (1 - previous.zoom) * ease(t), cameraDestinationId: undefined, stormCameraBlend: undefined }));
     if (completed) {
       setBoardPhase("focused"); paint({ avatarPosition: restingPosition() });
       requestAnimationFrame(() => { const first = latest.current.world.stopIds.find(id => canOpenRequiredStop(latest.current.progress, id, latest.current.qaUnlocked)); nodes.current.get(`stop:${first}`)?.focus({ preventScroll: true }); });
@@ -186,7 +192,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
       animation.current?.cancel(); trip.current?.finishActivity?.(); trip.current = null;
       setVoyage(null); setActivity(null);
       if (arrived && allowed(id)) {
-        paint({ focus: target.center, zoom: 1, activeDestinationId: id, boatPosition: undefined, boatHeading: undefined, avatarPosition: undefined });
+        paint({ focus: target.center, zoom: 1, activeDestinationId: id, cameraDestinationId: undefined, stormCameraBlend: undefined, boatPosition: undefined, boatHeading: undefined, avatarPosition: undefined });
         setBoardPhase("focused"); latest.current.onNavigate(id);
       } else { settlePose(); restoreFocus(); }
     };
@@ -194,11 +200,11 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
     setVoyage(voyageState); setBoardPhase("sailing");
     if (motion.current || renderer === "fallback") { finish(true); return; }
     const start = { ...frame.current };
-    if (!await animate(600, t => paint({ focus: sphericalInterpolate(start.focus, route[0], ease(t)), zoom: start.zoom + (0.38 - start.zoom) * ease(t), avatarPosition: undefined, boatPosition: route[0], boatHeading: getSurfaceRouteTangent(route, 0) }))) return;
+    if (!await animate(600, t => paint({ focus: sphericalInterpolate(start.focus, route[0], ease(t)), zoom: start.zoom + (0.38 - start.zoom) * ease(t), cameraDestinationId: fromId, stormCameraBlend: (p.boss ? 1 : 0) * (1 - ease(t)), avatarPosition: undefined, boatPosition: route[0], boatHeading: getSurfaceRouteTangent(route, 0) }))) return;
     const sail = async (from: number, to: number) => animate(2600 * (to - from), t => {
       const distance = from + (to - from) * ease(t);
       const position = sampleSurfaceRoute(route, distance);
-      paint({ focus: position, zoom: 0.38, boatPosition: position, boatHeading: getSurfaceRouteTangent(route, distance) });
+      paint({ focus: position, zoom: 0.38, stormCameraBlend: 0, boatPosition: position, boatHeading: getSurfaceRouteTangent(route, distance) });
     });
     if (!await sail(0, 0.5) || !active) return;
     if (latest.current.voyageActivity) {
@@ -209,7 +215,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
     }
     if (!await sail(0.5, 1) || !active) return;
     const end = route.at(-1)!;
-    if (!await animate(750, t => paint({ focus: sphericalInterpolate(end, target.center, ease(t)), zoom: 0.38 + 0.62 * ease(t) })) || !active) return;
+    if (!await animate(750, t => paint({ focus: sphericalInterpolate(end, target.center, ease(t)), zoom: 0.38 + 0.62 * ease(t), cameraDestinationId: target.id, stormCameraBlend: target.kind === "boss" ? ease(t) : 0 })) || !active) return;
     finish(true);
   }
   async function openStop(id: string) {
@@ -273,10 +279,10 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
   useEffect(() => {
     if (trip.current) cancelTrip();
     animation.current?.cancel();
-    paint({ focus: getGlobeDestination(destinationId)!.center, activeDestinationId: destinationId, avatarPosition: restingPosition() });
+    paint({ focus: getGlobeDestination(destinationId)!.center, activeDestinationId: destinationId, cameraDestinationId: undefined, stormCameraBlend: undefined, avatarPosition: restingPosition() });
   }, [destinationId]);
-  useEffect(() => { paint({ avatarPosition: trip.current ? frame.current.avatarPosition : restingPosition() }); }, [props.progress, props.restingStopId]);
-  useEffect(() => { positionMarkers(projectionRef.current); }, [phase, destinationId, renderer, narrow]);
+  useEffect(() => { paint({ avatarPosition: trip.current ? frame.current.avatarPosition : restingPosition() }); }, [props.progress, props.restingStopId, props.qaUnlocked]);
+  useEffect(() => { positionMarkers(projectionRef.current); }, [phase, destinationId, renderer, narrow, props.progress, props.qaUnlocked]);
   function turn(dx: number, dy: number) {
     if (busy) return;
     const focus = frame.current.focus;
@@ -288,7 +294,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
   const pointer = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   return <section className={styles.boardSection} aria-label={`${titleFor(destinationId)} globe map`}>
     <div className={styles.boardToolbar}>
-      <span className={styles.boardEyebrow}>{phase === "overview" ? "A world of discoveries" : props.boss ? "Challenge islands" : getWorldBiome(props.world.number).label}</span>
+      <span className={styles.boardEyebrow}>{phase === "overview" ? "A world of discoveries" : props.boss ? "Into the hurricane" : getWorldBiome(props.world.number).label}</span>
       <div className={styles.sceneryControls}>
       {renderer === "webgl" && <label className={styles.skyControl}>Sky
         <select aria-label="Time of day" value={skyMode} onChange={event => {
@@ -305,23 +311,23 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
       }}>{phase === "overview" ? `Explore ${titleFor(destinationId)}` : "Show globe"} <span aria-hidden="true">{phase === "overview" ? "↘" : "◎"}</span></button>
       </div>
     </div>
-    <div ref={boardRef} className={styles.board} data-globe-phase={phase} data-globe-renderer={renderer} data-voyage-from={voyage?.fromDestinationId} data-voyage-to={voyage?.toDestinationId} aria-busy={busy}
+    <div ref={boardRef} className={styles.board} data-globe-phase={phase} data-globe-renderer={renderer} data-globe-boss={props.boss?.id} data-voyage-from={voyage?.fromDestinationId} data-voyage-to={voyage?.toDestinationId} aria-busy={busy}
       onPointerDown={event => { if (phase !== "overview" || (event.target as HTMLElement).closest("button")) return; pointer.current = { x: event.clientX, y: event.clientY, moved: false }; event.currentTarget.setPointerCapture(event.pointerId); }}
       onPointerMove={event => { const p = pointer.current; if (!p) return; const dx = event.clientX - p.x, dy = event.clientY - p.y; if (Math.hypot(dx, dy) > 2) p.moved = true; turn(-dx * 0.006, dy * 0.006); p.x = event.clientX; p.y = event.clientY; }}
       onPointerUp={() => { pointer.current = null; }} onPointerCancel={() => { pointer.current = null; }}>
       <div ref={canvasRef} className={styles.canvas} data-globe-canvas aria-hidden="true" />
       {renderer === "loading" && <div className={styles.loading} role="status"><span>◎</span>Opening your globe…</div>}
       {renderer === "fallback" && !props.boss && <CoastScene mobile={narrow} className={styles.fallbackMap} completedRoadSlot={-1} worldNumber={props.world.number} />}
-      {renderer === "fallback" && props.boss && <div className={styles.loading}>♜</div>}
+      {renderer === "fallback" && props.boss && <StormArtwork className={styles.stormFallback} />}
       <div className={styles.markerLayer}>
         {GLOBE_DESTINATIONS.map(destination => {
           const boss = BOSS_CHALLENGES.find(boss => boss.id === destination.id);
           const available = boss ? canOpenBoss(props.progress, boss, props.qaUnlocked) : canOpenWorld(props.progress, destination.id, props.qaUnlocked);
           const world = WORLD_DEFINITIONS.find(world => world.id === destination.id);
           return <button type="button" key={destination.id} ref={node => { if (node) nodes.current.set(`world:${destination.id}`, node); else nodes.current.delete(`world:${destination.id}`); }}
-            className={`${styles.worldPin} ${destination.id === destinationId ? styles.selectedPin : ""}`} style={{ visibility: "hidden" }}
-            data-globe-destination={destination.id} disabled={!available || busy || renderer !== "webgl"} aria-label={`${titleFor(destination.id)}. ${available ? "Sail here" : "Locked"}.`} onClick={() => { void sailTo(destination.id); }}>
-            <span>{world?.number ?? "★"}</span>{!available && <small aria-hidden="true">⌑</small>}
+            className={`${styles.worldPin} ${boss ? styles.stormPin : ""} ${destination.id === destinationId ? styles.selectedPin : ""}`} style={{ visibility: "hidden" }}
+            data-globe-destination={destination.id} data-storm-strength={boss ? stormStages[boss.id] : undefined} disabled={!available || busy || renderer !== "webgl"} aria-label={`${titleFor(destination.id)}. ${boss ? `${bossStormStageLabel(stormStages[boss.id])}. ` : ""}${available ? "Sail here" : "Locked"}.`} onClick={() => { void sailTo(destination.id); }}>
+            <span>{boss ? <StormIcon /> : world?.number}</span>{!available && <small aria-hidden="true">⌑</small>}
           </button>;
         })}
         {!props.boss && stops.map((stop, index) => {
@@ -352,6 +358,6 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
       {activity && VoyageActivity && <div className={styles.activity}><VoyageActivity voyage={activity} onContinue={() => trip.current?.finishActivity?.()} onCancel={cancelTrip} /></div>}
       <div ref={irisRef} className={styles.iris} aria-hidden="true" />
     </div>
-    <p className={styles.boardCaption}>{renderer === "fallback" ? "Choose an island stop, or use the list below." : phase === "overview" ? "Drag to turn the globe. Choose an archipelago to set sail." : props.boss ? "A new challenge waits on the horizon." : "Choose a stop to explore. The two books hold stories to come."}</p>
+    <p className={styles.boardCaption}>{props.boss && phase !== "overview" ? "The ship faces the storm. Print the whole test to take on this challenge." : renderer === "fallback" ? "Choose an island stop, or use the list below." : phase === "overview" ? "Drag to turn the globe. Choose a destination to set sail." : "Choose a stop to explore. The two books hold stories to come."}</p>
   </section>;
 });

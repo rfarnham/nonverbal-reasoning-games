@@ -6,6 +6,7 @@ import { printBossWorkbook } from "./boss-workbook.ts";
 import { canOpenWorld, type WorldProgress } from "./engine.ts";
 import { WORLD_DEFINITIONS } from "./world-data.ts";
 import { WorldNavigation } from "./WorldNavigation";
+import { StormArtwork } from "./StormArtwork";
 import styles from "./math-world.module.css";
 
 export function BossWorld({ challenge, progress, qaUnlocked, onChooseWorld, onChooseBoss }: Readonly<{
@@ -47,12 +48,10 @@ export function BossWorld({ challenge, progress, qaUnlocked, onChooseWorld, onCh
   return <main className={styles.worldShell} data-boss-id={challenge.id}>
     <WorldNavigation selectedId={challenge.id} progress={progress} qaUnlocked={qaUnlocked} busy={printing}
       onChooseWorld={onChooseWorld} onChooseBoss={onChooseBoss} />
-    {qaUnlocked && <div className={`${styles.testNotice} ${styles.bossTestNotice}`} role="status"><strong>Test mode · all paths open</strong><span>Both boss challenge placeholders are available.</span></div>}
+    {qaUnlocked && <div className={`${styles.testNotice} ${styles.bossTestNotice}`} role="status"><strong>Test mode · all paths open</strong><span>Both storm challenges are available.</span></div>}
     <section className={styles.bossPlaceholder} aria-labelledby="boss-title">
-      <div className={styles.bossEmblem} aria-hidden="true">
-        <svg viewBox="0 0 64 64" fill="none" focusable="false"><path d="M13 52V22h9v-9h8v9h4v-9h8v9h9v30H13Z" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round"/><path d="M27 52V40a5 5 0 0 1 10 0v12M22 29v4m20-4v4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
-      </div>
-      <p className={styles.kicker}>After World {challenge.afterWorld} · Challenge placeholder</p>
+      <StormArtwork className={styles.bossStormArtwork} />
+      <p className={styles.kicker}>After World {challenge.afterWorld} · Storm challenge</p>
       <h1 id="boss-title" ref={headingRef} tabIndex={-1}>{challenge.title}</h1>
       <p className={styles.bossTestDetails}>Math Kangaroo {challenge.year} · Grades 1–2 · {challenge.questionCount} questions</p>
       <p className={styles.bossDescription}>A full test to bring your learning together. Print the workbook and work through it with pencil and paper.</p>
@@ -64,7 +63,7 @@ export function BossWorld({ challenge, progress, qaUnlocked, onChooseWorld, onCh
       </button>
       <p className={styles.srOnly} role="status">{printing ? `Preparing all ${challenge.questionCount} questions from the ${challenge.year} test…` : ""}</p>
       {printError && <p className={styles.bossPrintError} role="alert">{printError}</p>}
-      <div className={styles.bossComingSoon}><strong>Boss world coming soon</strong><p>The boss design and answer-entry adventure are still to come. For now, you can print the test and continue exploring.</p></div>
+      <div className={styles.bossComingSoon}><strong>Take on the storm, one question at a time</strong><p>{challenge.afterWorld === WORLD_DEFINITIONS.length ? "Beyond this storm lies an uncharted horizon. " : "This storm guards the crossing to the next archipelago. "}Answer entry is coming later. For now, print the whole test and work through it on paper.</p></div>
       {onward && <button type="button" className={styles.primaryButton}
         disabled={printing || !canOpenWorld(progress, onward.id, qaUnlocked)} onClick={() => onChooseWorld(onward.id)}>
         {challenge.afterWorld < WORLD_DEFINITIONS.length ? `Continue to World ${onward.number}` : `Back to World ${onward.number}`} <span aria-hidden="true">→</span>

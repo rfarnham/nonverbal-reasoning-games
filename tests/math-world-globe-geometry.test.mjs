@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  GLOBE_BOSS_REGIONS, GLOBE_DESTINATIONS, GLOBE_REGIONS, GLOBE_REGION_RADIUS, GLOBE_GEOGRAPHIC_CLUSTERS, GLOBE_LAND_OBSTACLES, GLOBE_POLAR_CAPS, GLOBE_VOYAGE_CLEARANCE,
+  GLOBE_BOSS_REGIONS, GLOBE_DESTINATIONS, GLOBE_REGIONS, GLOBE_REGION_RADIUS, GLOBE_GEOGRAPHIC_CLUSTERS, GLOBE_LAND_OBSTACLES, GLOBE_POLAR_CAPS, GLOBE_STORM_PASSAGES, GLOBE_VOYAGE_CLEARANCE,
   distanceToSurfaceArc, dotVec3, getGlobeDestination, getGlobeMap, getGlobeRegion,
   getGlobeRoadPoints, getSurfaceRouteTangent, getVoyageRoute, mapPointToGlobe,
   sampleSurfaceRoute, sphericalAngle, sphericalInterpolate,
@@ -13,7 +13,7 @@ const length = point => Math.hypot(point.x, point.y, point.z);
 const near = (actual, expected, tolerance = 1e-8) => assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} ≈ ${expected}`);
 const nearPoint = (a, b) => near(Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z), 0);
 
-test("32 persistent archipelagos and two boss destinations occupy distinct non-overlapping spherical regions", () => {
+test("32 persistent archipelagos and two ocean storms have distinct spherical footprints", () => {
   assert.equal(GLOBE_DESTINATIONS.length, 34);
   assert.equal(GLOBE_REGIONS.length, 32);
   assert.equal(new Set(GLOBE_DESTINATIONS.map(region => region.id)).size, 34);
@@ -29,13 +29,48 @@ test("32 persistent archipelagos and two boss destinations occupy distinct non-o
     near(dotVec3(region.center, region.north), 0);
     near(dotVec3(region.east, region.north), 0);
     assert.equal(getGlobeDestination(region.id), region);
-    assert.ok(sphericalAngle(region.center, region.harbor) > region.angularRadius, "harbor is in open water outside its land envelope");
+    if (region.kind === "boss") nearPoint(region.harbor, region.center);
+    else assert.ok(sphericalAngle(region.center, region.harbor) > region.angularRadius, "teaching harbor is in open water outside its land envelope");
     for (const other of GLOBE_DESTINATIONS.slice(index + 1)) {
-      assert.ok(sphericalAngle(region.center, other.center) > region.angularRadius + other.angularRadius, "actual land envelopes never overlap; the boat planner avoids channels narrower than its hull");
+      assert.ok(sphericalAngle(region.center, other.center) > region.angularRadius + other.angularRadius, "land and storm footprints remain separate");
     }
   }
   assert.throws(() => getGlobeRegion(0));
   assert.throws(() => getGlobeDestination("missing-world"));
+});
+
+test("bosses occupy open sea on the 16→17 passage and the onward course after 32", () => {
+  assert.deepEqual(GLOBE_STORM_PASSAGES.map(({ id, afterWorld, nextWorld }) => [id, afterWorld, nextWorld]), [
+    ["boss-2025", 16, 17], ["boss-2026", 32, null],
+  ]);
+  for (const passage of GLOBE_STORM_PASSAGES) {
+    const storm = getGlobeDestination(passage.id), before = getGlobeRegion(passage.afterWorld);
+    assert.ok(storm.angularRadius >= .18, "storms have a broad globe-readable cloud disk");
+    nearPoint(storm.center, storm.harbor);
+    assert.ok(!GLOBE_LAND_OBSTACLES.some(land => land.id === storm.id), "a storm is navigable ocean, never a land cap");
+    for (const land of GLOBE_LAND_OBSTACLES) {
+      // The triangle inequality covers every cloud/particle in the entire disk,
+      // including points between vertex samples and every vortex rotation.
+      assert.ok(sphericalAngle(storm.center, land.center) - storm.angularRadius - land.angularRadius > .01,
+        `${storm.id}'s full vortex stays off ${land.id}, including teaching controls`);
+      assert.ok(distanceToSurfaceArc(land.center, before.harbor, storm.center) >= land.angularRadius + GLOBE_VOYAGE_CLEARANCE,
+        `the ship can sail straight from world ${passage.afterWorld} into the eye`);
+    }
+    const approach = getVoyageRoute(before.id, storm.id);
+    nearPoint(approach[0], before.harbor);
+    nearPoint(approach.at(-1), storm.center);
+    if (passage.nextWorld !== null) {
+      const after = getGlobeRegion(passage.nextWorld);
+      assert.ok(distanceToSurfaceArc(storm.center, before.harbor, after.harbor) < .03, "the first storm lies across the natural 16→17 sailing corridor");
+      const detour = sphericalAngle(before.harbor, storm.center) + sphericalAngle(storm.center, after.harbor) - sphericalAngle(before.harbor, after.harbor);
+      assert.ok(detour < .002, "reaching the eye does not send the child on an unrelated side voyage");
+      for (const land of GLOBE_LAND_OBSTACLES) assert.ok(distanceToSurfaceArc(land.center, storm.center, after.harbor) >= land.angularRadius + GLOBE_VOYAGE_CLEARANCE);
+    } else {
+      assert.ok(sphericalAngle(before.harbor, storm.center) > .4, "the final storm is visibly beyond the last archipelago");
+      assert.ok(sphericalAngle(before.center, storm.center) > sphericalAngle(before.center, before.harbor) + .25, "the last crossing heads away from its island toward open sea");
+      assert.equal(GLOBE_DESTINATIONS.at(-1), storm, "an undesigned final destination is not invented as a playable world");
+    }
+  }
 });
 
 test("authored islands, stop curves and exactly two books project onto the actual sphere in all 32 regions", () => {
@@ -143,10 +178,10 @@ test("route sampling runs at constant angular speed through unequal segments", (
 test("six irregular geographic chains have genuinely closer neighbors within their own cluster", () => {
   assert.equal(GLOBE_GEOGRAPHIC_CLUSTERS.length, 6);
   const membership = new Map(GLOBE_GEOGRAPHIC_CLUSTERS.flatMap(cluster => cluster.destinationIds.map(id => [id, cluster.id])));
-  assert.equal(membership.size, 34);
+  assert.equal(membership.size, 32);
   let sameSum = 0, otherSum = 0;
-  for (const region of GLOBE_DESTINATIONS) {
-    const nearest = same => Math.min(...GLOBE_DESTINATIONS.filter(other => other !== region && (membership.get(other.id) === membership.get(region.id)) === same).map(other => sphericalAngle(region.center, other.center)));
+  for (const region of GLOBE_REGIONS) {
+    const nearest = same => Math.min(...GLOBE_REGIONS.filter(other => other !== region && (membership.get(other.id) === membership.get(region.id)) === same).map(other => sphericalAngle(region.center, other.center)));
     const same = nearest(true), other = nearest(false);
     assert.ok(same < other, `${region.id} belongs to a denser chain rather than an arbitrary label on a uniform lattice`);
     sameSum += same; otherSum += other;
@@ -155,8 +190,8 @@ test("six irregular geographic chains have genuinely closer neighbors within the
   }
   assert.ok(otherSum / sameSum > 1.2, "broader inter-cluster oceans separate denser island chains");
   assert.equal(GLOBE_POLAR_CAPS.length, 2);
-  assert.equal(GLOBE_LAND_OBSTACLES.length, 42);
-  const islandAndPolarRegions = [...GLOBE_DESTINATIONS, ...GLOBE_POLAR_CAPS];
+  assert.equal(GLOBE_LAND_OBSTACLES.length, 40);
+  const islandAndPolarRegions = [...GLOBE_REGIONS, ...GLOBE_POLAR_CAPS];
   for (const [index, obstacle] of islandAndPolarRegions.entries()) for (const other of islandAndPolarRegions.slice(index + 1)) {
     assert.ok(sphericalAngle(obstacle.center, other.center) > obstacle.angularRadius + other.angularRadius, "polar and archipelago land envelopes remain disjoint");
   }

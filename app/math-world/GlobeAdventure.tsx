@@ -28,7 +28,7 @@ export function GlobeAdventure(props: Props) {
   const [printing, setPrinting] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
   const mounted = useRef(true), printingRef = useRef(false);
-  const [initialOverview] = useState(() => !props.avatarStopId && !progress.checkpointStopId && Object.keys(progress.stopAttempts).length === 0);
+  const [initialOverview] = useState(() => !boss && !props.avatarStopId && !progress.checkpointStopId && Object.keys(progress.stopAttempts).length === 0);
   const destinationId = boss?.id ?? world.id;
   const stops = stopsForWorld(world.id);
   const completedCount = stops.filter(stop => progress.completedStopIds.includes(stop.id)).length;
@@ -58,7 +58,7 @@ export function GlobeAdventure(props: Props) {
     <WorldNavigation selectedId={destinationId} progress={progress} qaUnlocked={qaUnlocked} busy={busy || printing}
       onChooseWorld={id => boardRef.current?.sailTo(id)} onChooseBoss={boss => boardRef.current?.sailTo(boss.id)} />
     <header className={styles.destinationHeader}>
-      <div><p className={styles.kicker}>{boss ? `After World ${boss.afterWorld} · Challenge placeholder` : `World ${world.number} · ${world.concept} ${world.spiral}`}</p>
+      <div><p className={styles.kicker}>{boss ? `After World ${boss.afterWorld} · Storm challenge` : `World ${world.number} · ${world.concept} ${world.spiral}`}</p>
         <h1 ref={headingRef} tabIndex={-1}>{boss?.title ?? world.title}</h1>
         <p className={styles.description}>{boss ? `Math Kangaroo ${boss.year} · Grades 1–2 · 24 questions` : world.description}</p>
       </div>
@@ -67,7 +67,7 @@ export function GlobeAdventure(props: Props) {
         onClick={() => void print()}><span aria-hidden="true">▤</span>{printing ? "Preparing workbook…" : boss ? "Print whole test workbook" : "Print workbook"}</button>
     </header>
     {printError && <p role="alert" className={styles.error}>{printError}</p>}
-    {qaUnlocked && <p className={styles.testNotice}><strong>Test mode</strong><span>Every archipelago is open. Your adventure progress stays separate.</span></p>}
+    {qaUnlocked && <p className={styles.testNotice}><strong>Test mode</strong><span>Every archipelago and storm is open. Your adventure progress stays separate.</span></p>}
     {!boss && <div className={styles.progressRow}><span>{completedCount} / {stops.length} stops explored</span><progress aria-label={`${world.title} completion`} max={stops.length} value={completedCount} /><span>{questions} questions · Untimed</span></div>}
     {checkpoint && !boss && <div className={styles.completion} role="status"><span aria-hidden="true">✓</span><div><strong>{complete ? "Archipelago complete!" : `${checkpoint.shortLabel} complete!`}</strong><p>{QUESTIONS_BY_STOP.get(checkpoint.id)?.length} questions solved · {stopFirstTryAccuracy(progress.stopAttempts[checkpoint.id], QUESTIONS_BY_STOP.get(checkpoint.id) ?? [])}% first-try accuracy</p></div></div>}
     <GlobeBoard ref={boardRef} world={world} boss={boss} progress={progress} qaUnlocked={qaUnlocked}
@@ -77,11 +77,11 @@ export function GlobeAdventure(props: Props) {
     <section className={styles.actions} aria-label="World actions">
       <div><strong>{boss ? "A full test awaits" : complete ? "Every trail explored" : "Your next discovery"}</strong><p>{boss ? "Print the test and work through it with pencil and paper." : complete ? "Your boat is ready for the next adventure." : "Choose a stop on the globe, or explore the list below."}</p></div>
       {boss ? nextWorld && <button className={styles.primary} disabled={busy || printing || !canOpenWorld(progress, nextWorld.id, qaUnlocked)} onClick={() => boardRef.current?.sailTo(nextWorld.id)}>{boss.afterWorld === WORLD_DEFINITIONS.length ? `Back to World ${nextWorld.number}` : `Continue to World ${nextWorld.number}`} →</button>
-        : complete && nextBoss ? <button className={styles.primary} disabled={busy || printing || !canOpenBoss(progress, nextBoss, qaUnlocked)} onClick={() => boardRef.current?.sailTo(nextBoss.id)}>Open {nextBoss.year} Boss Challenge →</button>
+        : complete && nextBoss ? <button className={styles.primary} disabled={busy || printing || !canOpenBoss(progress, nextBoss, qaUnlocked)} onClick={() => boardRef.current?.sailTo(nextBoss.id)}>Sail into the {nextBoss.year} storm →</button>
           : complete && nextWorld ? <button className={styles.primary} disabled={busy || printing || !canOpenWorld(progress, nextWorld.id, qaUnlocked)} onClick={() => boardRef.current?.sailTo(nextWorld.id)}>Sail to {nextWorld.title} →</button>
             : <button className={styles.primary} disabled={busy || printing || !nextStopId} onClick={() => nextStopId && boardRef.current?.openStop(nextStopId)}>{completedCount ? "Continue adventure" : "Let’s explore"} →</button>}
     </section>
-    {boss ? <section className={styles.bossNote}><strong>Boss world coming soon</strong><p>The boss design and answer-entry adventure are still to come. For now, you can print the test and continue exploring.</p></section>
+    {boss ? <section className={styles.bossNote}><strong>Take on the storm, one question at a time</strong><p>{boss.afterWorld === WORLD_DEFINITIONS.length ? "Beyond this storm lies an uncharted horizon. " : "This storm guards the crossing to the next archipelago. "}Work through the whole test on paper. Answer entry is coming later; for now, you can print and continue exploring.</p></section>
       : <details className={styles.directory}><summary>Explore the island stops</summary><ol>{stops.map((stop, index) => {
         const done = progress.completedStopIds.includes(stop.id); const available = canOpenRequiredStop(progress, stop.id, qaUnlocked);
         return <li key={stop.id}><button type="button" disabled={!available || busy} aria-current={nextStopId === stop.id ? "step" : undefined} onClick={() => done && !qaUnlocked ? props.onInspectStop(stop.id) : boardRef.current?.openStop(stop.id)}><span>{done ? "✓" : index + 1}</span><strong>{stop.shortLabel}</strong><small>{QUESTIONS_BY_STOP.get(stop.id)?.length} questions · {done ? qaUnlocked ? "Replay" : "Completed" : available ? "Explore" : "Locked"}</small></button></li>;
