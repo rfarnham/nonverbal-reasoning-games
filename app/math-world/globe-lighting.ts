@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import type { Vec3 } from "./globe-geometry.ts";
+import { createGlobeCelestialSky } from "./globe-celestial-sky.ts";
+import { createGlobeMoon } from "./globe-moon.ts";
 
 export type GlobeSkyMode = "cycle" | "day" | "sunset" | "night";
 export const SKY_CYCLE_SECONDS = 360;
@@ -17,6 +19,16 @@ export function getGlobeSunDirection(seconds: number, mode: GlobeSkyMode, focus:
   return target.copy(center).multiplyScalar(Math.cos(angle)).addScaledVector(east, Math.sin(angle)).normalize();
 }
 
+/** Celestial detail emerges after dusk, not while the sun is on the horizon.
+ * This depends on the inspected coast, so turning toward the day side also
+ * hides the sky naturally without changing the planet-fixed automatic sun. */
+export function getNightSkyVisibility(sunDirection: Vec3, focus: Vec3) {
+  const scale = Math.hypot(sunDirection.x, sunDirection.y, sunDirection.z) * Math.hypot(focus.x, focus.y, focus.z);
+  if (!Number.isFinite(scale) || scale === 0) return 0;
+  const facing = (sunDirection.x*focus.x + sunDirection.y*focus.y + sunDirection.z*focus.z) / scale;
+  return 1 - THREE.MathUtils.smoothstep(facing, -.38, -.08);
+}
+
 export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, camera: THREE.Camera, container: HTMLElement, anchor: Vec3) {
   const ambient = new THREE.HemisphereLight(0xc2e2ff, 0x304450, 0.78);
   const sun = new THREE.DirectionalLight(0xffeed0, 3.4);
@@ -27,8 +39,10 @@ export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, came
   sun.shadow.bias = -0.00015;
   sun.shadow.normalBias = 0.0009;
   sun.shadow.radius = 2;
-  const moon = new THREE.DirectionalLight(0x8abaff, 0.24);
-  scene.add(ambient, sun, moon);
+  const nightFill = new THREE.DirectionalLight(0x8abaff, 0.24);
+  scene.add(ambient, sun, nightFill);
+  const celestialSky = createGlobeCelestialSky(scene, camera);
+  const moon = createGlobeMoon(scene, globe, camera, anchor);
   const sunDirection = new THREE.Vector3();
   const sunWorld = { value: new THREE.Vector3() };
   const time = { value: 0 };
@@ -38,19 +52,6 @@ export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, came
   const daySky = new THREE.Color(0xa4d8e8), nightSky = new THREE.Color(0x07132d), duskSky = new THREE.Color(0xd9988c);
   const sky = new THREE.Color(), horizon = new THREE.Color(), horizonLight = new THREE.Color(0xffdfbd);
   let skyStyle = "";
-  const starPositions: number[] = [];
-  for (let index = 0; index < 650; index++) {
-    const y = 1 - 2 * (index + 0.5) / 650;
-    const a = index * Math.PI * (3 - Math.sqrt(5));
-    const r = Math.sqrt(1 - y*y) * 7;
-    starPositions.push(Math.cos(a)*r, y*7, Math.sin(a)*r);
-  }
-  const starGeometry = new THREE.BufferGeometry();
-  starGeometry.setAttribute("position", new THREE.Float32BufferAttribute(starPositions, 3));
-  const starMaterial = new THREE.PointsMaterial({ color: 0xe1eeff, size: 0.016, sizeAttenuation: true, transparent: true, opacity: 0, depthWrite: false, fog: false });
-  const stars = new THREE.Points(starGeometry, starMaterial);
-  stars.name = "Night sky stars";
-  scene.add(stars);
 
   function installSurfaceLighting() {
     globe.traverse(object => {
@@ -106,7 +107,7 @@ export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, came
       time.value = seconds;
       sunWorld.value.copy(sunDirection).applyQuaternion(globe.quaternion);
       sun.position.copy(sunWorld.value).multiplyScalar(4);
-      moon.position.copy(sun.position).multiplyScalar(-1);
+      nightFill.position.copy(sun.position).multiplyScalar(-1);
       const facing = sunDirection.x*focus.x + sunDirection.y*focus.y + sunDirection.z*focus.z;
       const daylight = THREE.MathUtils.smoothstep(facing, -.23, .3);
       const twilight = Math.exp(-Math.pow(facing/.25, 2));
@@ -119,14 +120,14 @@ export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, came
       fog.far = zoom > .7 ? 2.5 : eyeDistance + 3;
       const nextSky = `radial-gradient(ellipse at 50% 100%, #${horizon.getHexString()}, #${sky.getHexString()} 85%)`;
       if (nextSky !== skyStyle) { container.style.background = nextSky; skyStyle = nextSky; }
-      stars.position.copy(camera.position);
-      starMaterial.opacity = (1-daylight)*.88;
-      stars.visible = starMaterial.opacity > .01;
+      const nightVisibility = getNightSkyVisibility(sunDirection, focus);
+      celestialSky.update(seconds, nightVisibility);
+      moon.update(seconds, sunDirection, nightVisibility);
     },
     dispose() {
-      scene.remove(ambient, sun, moon, stars);
+      scene.remove(ambient, sun, nightFill);
       sun.shadow.dispose();
-      starGeometry.dispose(); starMaterial.dispose();
+      celestialSky.dispose(); moon.dispose();
       scene.fog = null;
       container.style.removeProperty("background");
     },
