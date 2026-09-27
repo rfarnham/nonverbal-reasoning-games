@@ -1,6 +1,7 @@
 # Math World celestial scenery — working plan
 
-Updated: 2026-09-25. Status: **correction complete and locally verified; ready to publish**.
+Historical reference-frame plan from 2026-09-25; that correction has shipped.
+The 2026-09-27 follow-up is tracked in [the infinite-sky plan](math-world-infinite-sky-plan.md).
 
 Read this file after compaction. The first celestial release is deployed at
 `e7252fddc66ba99a4ccf9729f5ebfa8772eaf839`; its completed receipt and visual
@@ -21,8 +22,9 @@ checks are in shared `work/math-world-celestial-2026-09-25/`.
 - Daily angle uses the shared active scenery clock and360-second sun cycle.
   In Auto, the sun is constant in celestial coordinates. Day/Sunset/Night
   remain lighting overrides; like the moon's orbit, sky motion continues there.
-- Center the sphere on the camera to remove translation parallax. Do not rotate
-  the star catalogue independently of the nebula or modify vertex buffers.
+- Keep the sky camera-centered and use the shared direction-only, far-depth
+  projection added by the infinite-sky follow-up. Do not rotate the star
+  catalogue independently of the nebula or modify vertex buffers.
 - Stars/nebula remain night-only. All sky motion pauses with scenery pause,
   reduced motion, hidden documents and offscreen suspension. Navigation still
   updates perspective while paused.

@@ -32,7 +32,7 @@ test("the celestial catalogue is repeatable, irregular and fills the entire sphe
   assert.ok(small > CELESTIAL_STAR_COUNT * .85, "pinpoints dominate the field");
 });
 
-test("night visibility gates every celestial draw and the sphere remains behind the planet", () => {
+test("night visibility gates every celestial draw and sky materials preserve foreground depth", () => {
   const scene = new THREE.Scene(), globe = new THREE.Group(), camera = new THREE.PerspectiveCamera(37, 1, .02, 12);
   const sky = createGlobeCelestialSky(scene, camera, globe, anchor), group = scene.children[0];
   assert.equal(group.visible, false);
@@ -51,12 +51,11 @@ test("night visibility gates every celestial draw and the sphere remains behind 
       assert.equal(object.castShadow, false);
     }
   }
-  assert.ok(CELESTIAL_SKY_RADIUS > 5 && CELESTIAL_SKY_RADIUS < camera.far);
-  assert.equal(group.children[0].material.side, THREE.BackSide, "the viewer is inside a real far-depth celestial sphere");
+  assert.equal(group.children[0].material.side, THREE.BackSide, "nebula directions render from inside their authoring sphere");
   sky.dispose();
 });
 
-test("sky translation removes parallax while its rigid catalogue follows the planet-bound reference frame", () => {
+test("the camera-centered sky's rigid catalogue follows the planet-bound reference frame", () => {
   const scene = new THREE.Scene(), cameraRig = new THREE.Group(), globe = new THREE.Group();
   const frameSampler = createCelestialFrame(anchor), expected = new THREE.Quaternion();
   const camera = new THREE.PerspectiveCamera();

@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { Vec3 } from "./globe-geometry.ts";
 import { createCelestialFrame } from "./globe-celestial-frame.ts";
 
+// Authoring scale only: both sky layers project directions at infinite depth.
 export const CELESTIAL_SKY_RADIUS = 9;
 export const CELESTIAL_STAR_COUNT = 11_800;
 const galacticNormal = new THREE.Vector3(.955, .23, .187).normalize();
@@ -70,9 +71,17 @@ const noiseGlsl = /* glsl */`
   }
 `;
 
+// Discard model/camera translation, then pin depth to the far plane. Sharing
+// this projection keeps every star and the nebula at the same infinity even
+// when the camera moves beyond the authoring sphere on a narrow viewport.
+const infiniteSkyProjection = /* glsl */`
+  vec4 clip = projectionMatrix * vec4(mat3(modelViewMatrix) * position, 1.);
+  gl_Position = clip.xyww;
+`;
+
 /** A rigid inertial sky seen from the planet-bound reference frame. Two bounded
- * draws, no textures, wall clocks, callbacks or runtime assets. Depth is real so
- * the globe and moon occlude it. Lighting presets affect visibility, while the
+ * draws, no textures, wall clocks, callbacks or runtime assets. Far-plane depth
+ * lets the globe and moon occlude it. Lighting presets affect visibility, while the
  * shared scenery clock still advances the apparent daily rotation. */
 export function createGlobeCelestialSky(scene: THREE.Scene, camera: THREE.Camera, globe: THREE.Group, anchor: Vec3) {
   const frame = createCelestialFrame(anchor);
@@ -89,7 +98,7 @@ export function createGlobeCelestialSky(scene: THREE.Scene, camera: THREE.Camera
       varying vec3 skyDirection;
       void main() {
         skyDirection = normalize(position);
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.);
+        ${infiniteSkyProjection}
       }
     `,
     fragmentShader: /* glsl */`
@@ -157,7 +166,7 @@ export function createGlobeCelestialSky(scene: THREE.Scene, camera: THREE.Camera
         color = starColor;
         brightness = starBrightness;
         sparkle = step(6.,starSize);
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.);
+        ${infiniteSkyProjection}
         gl_PointSize = starSize * 1.8;
       }
     `,
@@ -193,6 +202,8 @@ export function createGlobeCelestialSky(scene: THREE.Scene, camera: THREE.Camera
       const amount = Number.isFinite(nightVisibility) ? THREE.MathUtils.clamp(nightVisibility, 0, 1) : 0;
       visibility.value = amount;
       group.visible = amount > 0;
+      // Keep the scene graph camera-centered too; the shaders independently
+      // guarantee no translation parallax and no finite-shell occlusion.
       camera.getWorldPosition(group.position);
       frame.update(seconds, globe.quaternion, group.quaternion);
     },
