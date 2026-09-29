@@ -46,6 +46,15 @@ questions.
 | [Borrow Flash](https://rfarnham.github.io/nonverbal-reasoning-games/lab/subtraction-flash/) | Visual and listening subtraction practice with tap, handwriting, and speech answers | Playable |
 | [Math Kangaroo Shuffle](https://rfarnham.github.io/nonverbal-reasoning-games/lab/math-kangaroo/) | Random spatial questions filtered by grade, point value, and question type | Playable |
 
+## Contributor question search
+
+[Question Search](https://rfarnham.github.io/nonverbal-reasoning-games/question-search/)
+finds related questions by wording, structure, and possible solution method.
+The 5,207-question bank and illustrations are encrypted; contributors unlock
+them locally with a shared password. Search and image OCR run in the browser,
+with an optional encrypted offline download. No API key or application server
+is required. [Build, evaluation, and agent workflow](docs/question-search.md).
+
 ## Project shape
 
 This is one statically exported Next.js project. The home page is a catalog;

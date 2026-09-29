@@ -14,6 +14,7 @@ const eslintConfig = defineConfig([
     "lib/generated/**",
     "tmp/**",
     "work/**",
+    "public/question-search/ocr/**",
     "next-env.d.ts",
   ]),
 ]);

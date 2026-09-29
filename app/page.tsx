@@ -248,6 +248,7 @@ export default function Home() {
             games.
           </p>
         </div>
+        <Link href="/question-search/">Question search · contributors</Link>
         <a href="https://github.com/rfarnham/nonverbal-reasoning-games">
           View the project on GitHub <span aria-hidden="true">↗</span>
         </a>

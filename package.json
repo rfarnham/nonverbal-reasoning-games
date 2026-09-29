@@ -20,18 +20,23 @@
     "arithmetic:generate": "node scripts/arithmetic-curriculum.mjs generate",
     "arithmetic:explain": "node scripts/arithmetic-curriculum.mjs explain",
     "arithmetic:verify-all": "node scripts/arithmetic-curriculum.mjs verify-all",
-    "test": "npm run generate:games && node --test tests/*.test.mjs && npm run test:mk-core",
+    "test": "npm run generate:games && node --test tests/*.test.mjs && npm run test:mk-core && npm run test:search-build",
     "test:mk-core": "python3 -m pytest -q tools/math_kangaroo_trainer/tests/synthetic",
     "audit:mk": "python3 -m math_kangaroo_trainer stage0 build --source work/math-kangaroo-complete-question-bank/data/questions.sqlite3 --output work/math-kangaroo-adaptive-engine/stage0 --sample-size 180 --seed 20260801",
     "lint": "npm run generate:games && eslint .",
     "typecheck": "npm run generate:games && next typegen && tsc --noEmit",
-    "check": "npm run lint && npm run typecheck && npm run build:pages && npm test"
+    "check": "npm run lint && npm run typecheck && npm run build:pages && npm test",
+    "search:ocr": "node scripts/prepare-question-search-ocr.mjs",
+    "search:query": "node scripts/query-question-search.mjs",
+    "search:evaluate": "node scripts/evaluate-question-search.mjs",
+    "test:search-build": "python3 tests/question-search-export.test.py && python3 tests/question-search-lsa.test.py"
   },
   "dependencies": {
     "next": "16.2.6",
     "onnxruntime-web": "1.27.0",
     "react": "19.2.6",
-    "react-dom": "19.2.6"
+    "react-dom": "19.2.6",
+    "tesseract.js": "6.0.1"
   },
   "devDependencies": {
     "@types/node": "22.19.19",

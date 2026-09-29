@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "version": "6cbdd4b330f1094820f74ec939db14888367ded7e39bf999fa5215976c4f7d87",
+  "count": 5207,
+  "index": {
+    "path": "index-6cbdd4b330f1094820f74ec939db14888367ded7e39bf999fa5215976c4f7d87.bin",
+    "sha256": "f87691b976e740723fe2407af4a88fcfcdb4c714830d1061a190ff6744b2b768",
+    "bytes": 19518002
+  },
+  "encryption": {
+    "name": "AES-GCM",
+    "kdf": "PBKDF2",
+    "hash": "SHA-256",
+    "iterations": 600000,
+    "salt": "Gbat+ZJ7I1P58otr7GJsRQ=="
+  }
+}
