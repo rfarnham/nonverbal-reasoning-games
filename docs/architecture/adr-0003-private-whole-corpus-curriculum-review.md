@@ -1,6 +1,6 @@
 # ADR 0003: Keep whole-corpus curriculum review private and evidence-bound
 
-Status: accepted
+Status: accepted; selected Math Worlds public playtest exception added in [ADR 0004](adr-0004-math-world-public-playtest.md).
 
 ## Context
 

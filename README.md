@@ -11,7 +11,11 @@ There is no account, download, backend, or analytics.
 
 **[Play the games](https://rfarnham.github.io/nonverbal-reasoning-games/)**
 
-The prominent **Journey** path connects a stable, snapshotted set of up to
+**[Math Kangaroo Worlds](https://rfarnham.github.io/nonverbal-reasoning-games/math-world/)**
+is a password-gated playtest of 20 spiral worlds, with four six-question stops
+per world. See the [curriculum outline](docs/math-world-20-world-curriculum.md).
+
+The secondary **Journey** path connects a stable, snapshotted set of up to
 eight canonical games across seven boards: Starter, Junior I–II, Expert I–II,
 and Wizard I–II. It includes local player profiles, animal avatars, saved stop
 progress, Turbo Time, redemption, level challenges, collectible XP, and two
@@ -44,6 +48,7 @@ questions.
 | Lab | Practice | Status |
 | --- | --- | --- |
 | [Borrow Flash](https://rfarnham.github.io/nonverbal-reasoning-games/lab/subtraction-flash/) | Visual and listening subtraction practice with tap, handwriting, and speech answers | Playable |
+| [Subtraction Steps](https://rfarnham.github.io/nonverbal-reasoning-games/lab/subtraction-trainer/) | Draw-only vertical subtraction, a writable workspace, five adaptive fluency tiers, and mistake review | Playable |
 | [Math Kangaroo Shuffle](https://rfarnham.github.io/nonverbal-reasoning-games/lab/math-kangaroo/) | Random spatial questions filtered by grade, point value, and question type | Playable |
 
 ## Contributor question search

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MathWorldHomeLink } from "@/components/MathWorldHomeLink";
 import { JourneyHomeCta } from "@/components/progression/JourneyHomeCta";
 import { games, type GameCatalogEntry } from "@/lib/games";
 
@@ -89,9 +90,7 @@ export default function Home() {
             No account. No download.
           </p>
           <div className="hero-actions">
-            <Link className="button button-primary math-world-home-cta" href="/math-world/">
-              Explore Counting Coast <span aria-hidden="true">→</span>
-            </Link>
+            <MathWorldHomeLink />
             <JourneyHomeCta secondary />
             <a className="button button-secondary" href="#games">
               Pick a single game
@@ -168,6 +167,19 @@ export default function Home() {
           </p>
         </div>
         <div className="lab-grid">
+          <article className="lab-card">
+            <div className="lab-card-equation" aria-hidden="true">
+              <span>32</span><i>−</i><span>7</span><i>=</i><strong>?</strong>
+            </div>
+            <div className="lab-card-copy">
+              <span className="status-pill status-lab">Handwriting practice</span>
+              <h3>Subtraction Steps</h3>
+              <p>Write your answers and borrow marks. Build fluency through five adaptive tiers with focused mistake review.</p>
+              <Link className="game-link" href="/lab/subtraction-trainer/">
+                Start practicing <span aria-hidden="true">→</span>
+              </Link>
+            </div>
+          </article>
           <article className="lab-card">
             <div className="lab-card-equation" aria-hidden="true">
               <span>14</span>

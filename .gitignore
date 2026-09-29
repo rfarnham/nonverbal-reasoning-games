@@ -50,3 +50,6 @@ __pycache__/
 # local editor and tooling state
 .idea/
 .vscode/
+
+# Generated runtime; approved source material lives in content/ and public/.
+/app/math-world/data/runtime.generated.json

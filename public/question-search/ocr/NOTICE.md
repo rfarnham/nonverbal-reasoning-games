@@ -1,6 +1,6 @@
 # Local OCR assets
 
-tesseract.js 6.0.1 and tesseract.js-core 6.0.0 are distributed under Apache-2.0
+tesseract.js 6.0.1 and tesseract.js-core 6.1.2 are distributed under Apache-2.0
 (see LICENSE). Their exact npm sources are recorded in package-lock.json.
 The `.wasm.js` files include their WebAssembly payloads.
 
