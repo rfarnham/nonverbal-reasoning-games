@@ -215,6 +215,23 @@ separate from the bank password and the ChatGPT login; it is never printed by
 the companion. Use `--token-file /private/path/token` to choose another location.
 Stop the companion, remove its token file, and restart to rotate access.
 
+An HTTPS page connecting to HTTP localhost is browser-dependent. During QA,
+Codex's embedded browser timed out on that connection from GitHub Pages, while
+the same companion worked from the local website. Successful CORS preflight
+does not override a browser's local-network permissions or embedded-browser
+policy. Use a private HTTPS companion address as described below, or run the
+website locally on the laptop. In a separate terminal from the companion:
+
+```sh
+npm run build
+python3 -m http.server 3000 --bind 127.0.0.1 --directory out
+```
+
+Open `http://localhost:3000/question-search/`, unlock the bank, and choose
+**My companion** with `http://127.0.0.1:4318`. This local preview requires Python 3
+and uses the same encrypted assets and browser search code. Do not disable browser
+security settings to make the public page connect.
+
 Only authenticated `/v1/status` and `/v1/generate` endpoints are exposed. The
 companion accepts one request at a time, bounds request size and duration,
 disables agent tools and inherited user configuration, and deletes temporary
