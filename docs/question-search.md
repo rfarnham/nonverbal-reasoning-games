@@ -2,8 +2,11 @@
 
 The `/question-search/` route is a static research tool. Its browser and local
 agent interface use the same versioned corpus and deterministic retrieval engine.
-No AI API key or application server is required. Question text, descriptions,
-answer data, and source images are encrypted before entering `public/`.
+Local search requires no AI API key or application server. An optional frontier
+search mode can interpret a screenshot, expand the retrieval query, and rerank a
+small candidate set using a user-supplied API key or a personal Codex companion.
+Question text, descriptions, answer data, and source images are encrypted before
+entering `public/`.
 
 ## Access and privacy
 
@@ -12,7 +15,9 @@ the password only to designated contributors through a separate channel. Keep
 the password out of commits, build arguments, URLs, screenshots, and public
 reports. The app derives its decryption key in memory using PBKDF2-SHA256 and
 decrypts authenticated AES-256-GCM files locally. Neither the password nor
-decrypted content needs to be sent to an AI provider to search.
+decrypted content needs to be sent to an AI provider for local search. Explicitly
+running frontier search sends the input question and selected candidate content
+to the chosen provider. It does not send the bank's unlock password.
 
 The public manifest reveals format, corpus version, count, and encrypted file
 sizes. Anyone can download the ciphertext and attempt offline password guesses:
@@ -130,6 +135,134 @@ that disclosure. Keep the unlock password out of the candidate packet. A
 ChatGPT environment that can execute local files can run the CLI directly;
 ordinary browsing of an encrypted page is not an automatic search integration.
 The skill does not introduce an MCP server, a plugin service, or an API credential.
+
+## Optional frontier search
+
+The browser keeps local retrieval as the candidate generator. Frontier search
+adds two bounded model stages around it:
+
+1. Interpret the query text and original uploaded screenshot. Describe the
+   mathematical structure, plausible solution methods, and uncertainties, then
+   produce several concise search queries.
+2. Run those queries through the existing local index and combine candidates.
+   Inferred methods are hypotheses, not mandatory filters that can silently hide
+   relevant questions.
+3. Compare a limited shortlist with the original input, including candidate
+   diagrams, and rank the matches by shared method and useful adaptation.
+
+A run allows one understanding request and up to three reranking requests, with
+at most six candidates in each reranking batch. It is not an unrestricted agent
+loop or an exhaustive model review of all 5,207 questions. Content from questions
+is untrusted evidence, never instructions to execute. Structured model output is
+validated before it can affect searches or result ordering.
+
+The original query and up to four expanded queries each retrieve local candidates.
+Reciprocal rank fusion combines their lists before selecting the first 18 for
+model review. Final ordering groups reviewed candidates by relationship, using
+local retrieval order to break ties. Unreviewed candidates retain their relative
+order and appear before uncertain, surface-only, and unrelated judgments. These
+categories and local scores are not calibrated probabilities. Missing candidate
+images produce a visible warning; the affected comparisons use text and annotations.
+
+Choose one of these execution paths:
+
+| Path | Where the model runs | Cost and availability |
+| --- | --- | --- |
+| Local search | No model service | Works from the cached pack; OCR and coarse visual matching only. |
+| OpenAI or Gemini API | The selected provider | Uses the user's own API key and that provider's API billing and quota. |
+| Codex companion | Official Codex CLI on a personal computer | Uses its existing ChatGPT subscription login and quota; the computer must be running and reachable. |
+
+API keys and companion credentials are kept only in browser memory. Reloading or
+locking the bank clears them; they are not included in offline cache, recipes,
+candidate exports, or GitHub assets. Model results can still contain question
+content, so treat an exported report as private.
+
+API access is distinct from a ChatGPT or Gemini app subscription. Finite request
+counts bound a search's work but do not make a paid API key free or constitute an
+account-wide monetary cap. The application does not purchase credits, change
+billing settings, or fall back from subscription access to a paid API. Quota or
+authentication failures stop frontier work and leave local retrieval available.
+
+The model, prompt, corpus version, candidate budget, and inspected image evidence
+matter when comparing results. The pilot below measures the existing local
+retriever, not frontier understanding or reranking. Do not claim improved recall
+until the new path has been evaluated against held-out judgments and actual
+screenshot inputs.
+
+### Set up the personal companion
+
+On the computer that will run inference, use Node 22.18+ and a current official
+Codex CLI. Sign in with the intended personal ChatGPT account, then start the
+companion from this repository:
+
+```sh
+codex login
+node scripts/question-search-companion.mjs
+```
+
+The default address is `http://127.0.0.1:4318`. The companion checks that Codex is
+signed in through ChatGPT, rejects API-key login, and requires CLI support for
+isolated configuration, images, ephemeral sessions, and structured output. If
+`codex` is not on PATH, supply `--codex-bin /absolute/path/to/codex`. An optional
+`--model MODEL_ID` chooses a model available to that account; otherwise Codex uses
+its default. `--help` lists the remaining options.
+
+On first start, the companion generates a private bearer token in
+`work/question-search-companion/token` with owner-only file permissions. Open that
+file privately and copy the token into **My companion** in the unlocked search
+page. Enter the address above and select **Test connection**. The token is
+separate from the bank password and the ChatGPT login; it is never printed by
+the companion. Use `--token-file /private/path/token` to choose another location.
+Stop the companion, remove its token file, and restart to rotate access.
+
+Only authenticated `/v1/status` and `/v1/generate` endpoints are exposed. The
+companion accepts one request at a time, bounds request size and duration,
+disables agent tools and inherited user configuration, and deletes temporary
+question images after each request. It invokes the official CLI without
+extracting or copying its login tokens. Subscription limits stop inference;
+there is no automatic API fallback or credit purchase. Keep this service and
+token for personal use; contributors can configure their own companions.
+
+This implementation has a Codex adapter only. Gemini is available through the
+explicit BYOK API path. A Google app subscription or connected Google account
+does not make that API path subscription-backed. No Antigravity or Jules adapter
+is implemented.
+
+### Use the companion from a phone or tablet
+
+The static GitHub page can reach a personal computer through a private HTTPS
+reverse proxy. With Tailscale already configured on both devices, use
+[Tailscale Serve](https://tailscale.com/docs/reference/tailscale-cli/serve) to
+proxy only the companion port:
+
+```sh
+tailscale serve --bg http://127.0.0.1:4318
+```
+
+Use the HTTPS origin reported by Serve, replacing the example below with the
+actual hostname, and start or restart the companion with that origin:
+
+```sh
+node scripts/question-search-companion.mjs \
+  --public-url https://your-computer.your-tailnet.ts.net
+```
+
+Enter that HTTPS address and the private companion token on the phone or tablet.
+Keep its Tailscale connection active and allow browser local-network access if
+prompted. Serve restricts access to the tailnet; do not enable public Funnel or
+expose a raw Codex server. The companion remains bound to `127.0.0.1`, with its
+own bearer authentication.
+
+The exact GitHub Pages origin `https://rfarnham.github.io` is allowed by default,
+along with local development origins on port 3000. If the page is hosted
+elsewhere, add `--origin https://your-page-host.example`; origins have no route
+or repository path. `--public-url` names the companion's HTTPS origin, while
+`--origin` names the page allowed to call it. Wildcard CORS is not supported.
+
+The companion host must stay awake, online, and running Codex and this process.
+The page does not install a VPN or configure a remote server automatically. If
+the host is unavailable, use local retrieval or explicitly choose an API key;
+provider switching is never automatic.
 
 ## Evaluation and contributor judgments
 

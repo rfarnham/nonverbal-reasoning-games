@@ -7,11 +7,14 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { clearOffline, inspectImage, loadManifest, recognizeImage, unlockCorpus, type SearchSession } from "@/lib/question-search/browser";
 import { parseSearchQuery } from "@/lib/question-search/engine";
+import { runFrontierSearch, type FrontierConnection } from "@/lib/question-search/frontier";
+import FrontierControls from "./FrontierControls";
 import type { MatchRelationship, SearchHit, SearchJudgment, SearchManifest, SearchQuery, SearchQuestion, SearchResponse } from "@/lib/question-search/types";
 import styles from "./question-search.module.css";
 
 const REVIEW_KEY = "spatial-gym:question-search:judgments:v1";
 const PAGE_SIZE = 12;
+type FrontierResult = Awaited<ReturnType<typeof runFrontierSearch>>;
 const relationships: [MatchRelationship, string][] = [
   ["same_method", "Same structure and method"],
   ["adaptation", "Same method, with adaptation"],
@@ -26,6 +29,7 @@ const relationshipGrades: Record<MatchRelationship, number | null> = {
 
 function message(error: unknown) { return error instanceof Error ? error.message : "Something went wrong. Please try again."; }
 function label(value: string) { return value.replaceAll("_", " ").replaceAll("-", " "); }
+function relationshipLabel(value: MatchRelationship) { return relationships.find(([id]) => id === value)?.[1] ?? value; }
 function sourceLabel(q: SearchQuestion) { return `${q.source.year} · Grade ${q.source.grade} · Q${q.source.question}`; }
 function download(name: string, data: unknown) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
@@ -116,11 +120,11 @@ function QuestionDialog({ hit, session, onClose, onRelated, query, queryQuestion
         {q.options.length > 0 && <ol className={styles.answerOptions} type="A">{q.options.map((option, index) => <li key={index}>{option}</li>)}</ol>}
         {q.originalPrompt && q.originalPrompt !== q.prompt && <details className={styles.originalText}><summary>Original text · {label(q.source.language)}</summary><p className={styles.fullPrompt}>{q.originalPrompt}</p>{q.originalOptions && q.originalOptions.length > 0 && <ol className={styles.answerOptions} type="A">{q.originalOptions.map((option, index) => <li key={index}>{option}</li>)}</ol>}</details>}
         <div className={styles.answerReveal}><button className={styles.secondary} type="button" aria-expanded={showAnswer} onClick={() => setShowAnswer(!showAnswer)}>{showAnswer ? "Hide answer" : "Show answer"}</button>{showAnswer && <p>{q.answer ? `Answer: ${q.answer}` : "No answer recorded."} <span className={styles.muted}>({label(q.answerStatus)})</span></p>}</div>
-        <section className={styles.evidencePanel} aria-labelledby="match-evidence-title"><h3 id="match-evidence-title">Why it surfaced</h3><ul>{hit.reasons.map((reason, index) => <li key={index}>{reason}</li>)}</ul>
+        <section className={styles.evidencePanel} aria-labelledby="match-evidence-title"><h3 id="match-evidence-title">Why it surfaced</h3>{hit.ai && <div className={styles.aiEvidence}><span className={styles.aiBadge}>AI reviewed · {relationshipLabel(hit.ai.relationship)}</span><p>{hit.ai.reason}</p><span className={styles.finePrint}>An AI assessment, not a verified equivalence.</span></div>}<ul>{hit.reasons.map((reason, index) => <li key={index}>{reason}</li>)}</ul>
           {q.structure && <p><strong>Structure</strong> {q.structure}</p>}{q.method && <p><strong>Method</strong> {q.method}</p>}{q.description && <p><strong>Description</strong> {q.description}</p>}
           <div className={styles.tags}>{q.topics.map((tag) => <span key={tag}>{session.corpus.facets.topics[tag] ?? label(tag)}</span>)}{q.strategies.map((tag) => <span key={tag}>{session.corpus.facets.strategies[tag] ?? label(tag)}</span>)}</div>
           <p className={styles.finePrint}>Annotation: {label(q.annotationStatus)}. Search evidence is a lead to inspect, not a verified judgment of shared reasoning.</p>
-          <details><summary>Ranking signals</summary><p className={styles.finePrint}>Combined score: {hit.score.toFixed(2)}. Scores order this search; they are not probabilities or comparable across queries.</p><dl className={styles.signalList}>{Object.entries(hit.signals).map(([name, value]) => <div key={name}><dt>{name === "text" ? "Wording" : name === "visual" ? "Image layout" : label(name)}</dt><dd>{value.toFixed(2)}</dd></div>)}</dl></details>
+          <details><summary>Ranking signals</summary><p className={styles.finePrint}>Local retrieval score: {hit.score.toFixed(2)}. Scores are not probabilities or comparable across queries.{hit.ai ? " AI review determines this candidate’s final position." : ""}</p><dl className={styles.signalList}>{Object.entries(hit.signals).map(([name, value]) => <div key={name}><dt>{name === "text" ? "Wording" : name === "visual" ? "Image layout" : label(name)}</dt><dd>{value.toFixed(2)}</dd></div>)}</dl></details>
           {q.evidence.length > 0 && <details><summary>Annotation sources</summary><ul>{q.evidence.map((item, index) => <li key={index}>{item}</li>)}</ul></details>}
         </section>
         <section className={styles.relatedPanel} aria-label="Use this question as your query"><div><h3>Search from this question</h3><label className={styles.check}><input type="checkbox" checked={excludeFamily} onChange={(event) => setExcludeFamily(event.target.checked)} /> Exclude its duplicate family</label></div><button className={styles.primary} type="button" onClick={() => { onRelated(q, excludeFamily); onClose(); }}>Find related <span aria-hidden="true">↗</span></button></section>
@@ -139,6 +143,11 @@ function QuestionDialog({ hit, session, onClose, onRelated, query, queryQuestion
 
 function SearchWorkspace({ session, onLock }: { session: SearchSession; onLock: () => void }) {
   const [text, setText] = useState("");
+  const [connection, setConnection] = useState<FrontierConnection>({ kind: "local" });
+  const [frontierResult, setFrontierResult] = useState<FrontierResult | null>(null);
+  const [cachedResults, setCachedResults] = useState<SearchResponse | null>(null);
+  const [searchStatus, setSearchStatus] = useState("");
+  const searchController = useRef<AbortController | null>(null);
   const [mode, setMode] = useState<SearchQuery["mode"]>("hybrid");
   const [grade, setGrade] = useState("");
   const [topic, setTopic] = useState("");
@@ -184,30 +193,71 @@ function SearchWorkspace({ session, onLock }: { session: SearchSession; onLock: 
     queryInput.current?.focus();
     // These are request generation counters, not DOM refs: invalidate their latest values.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    return () => { mounted.current = false; searchSerial.current++; imageSerial.current++; if (imageRef.current) URL.revokeObjectURL(imageRef.current); };
+    return () => { mounted.current = false; searchSerial.current++; searchController.current?.abort(); imageSerial.current++; if (imageRef.current) URL.revokeObjectURL(imageRef.current); };
   }, []);
-  async function runSearch(query: SearchQuery, origin?: SearchQuestion | null) {
+  function cancelSearch(showNotice = true) {
+    searchController.current?.abort(); searchController.current = null;
+    searchSerial.current++; setBusy(false); setSearchStatus("");
+    if (showNotice) setNotice("Search cancelled. Any displayed results are from local retrieval.");
+  }
+  async function runSearch(query: SearchQuery, origin?: SearchQuestion | null, locally = false) {
+    searchController.current?.abort();
+    const controller = new AbortController(); searchController.current = controller;
     const serial = ++searchSerial.current;
-    setBusy(true); setError(""); setNotice("");
+    const current = () => mounted.current && serial === searchSerial.current && !controller.signal.aborted;
+    const useFrontier = !locally && connection.kind !== "local";
+    setBusy(true); setError(""); setNotice(""); setFrontierResult(null); setCachedResults(null); setSearchStatus(useFrontier ? "Finding local candidates…" : "Searching this device…");
+    setResult(null); setDetail(null);
+    if (origin !== undefined) setQueryQuestion(origin);
+    let localAvailable = false;
     try {
-      const response = await session.search(query);
-      if (!mounted.current || serial !== searchSerial.current) return;
-      setResult(response);
-      if (origin !== undefined) setQueryQuestion(origin);
-      requestAnimationFrame(() => { if (mounted.current) resultHeading.current?.focus(); });
-    } catch (cause) { if (mounted.current && serial === searchSerial.current) setError(message(cause)); }
-    finally { if (mounted.current && serial === searchSerial.current) setBusy(false); }
+      // Present a useful local answer even when the provider is unreachable or the AI request is cancelled.
+      const localResponse = await session.search({ ...query, limit: PAGE_SIZE, offset: query.offset ?? 0 });
+      if (!current()) return;
+      setResult(localResponse); localAvailable = true;
+      if (useFrontier) {
+        const sourceQuestion = origin === undefined ? queryQuestion : origin;
+        const queryImageUrl = sourceQuestion ? await session.imageUrl(sourceQuestion) : image?.previewUrl;
+        if (!current()) return;
+        const enhanced = await runFrontierSearch({ connection, query, imageUrl: queryImageUrl, session, signal: controller.signal,
+          onProgress: (status) => { if (current()) setSearchStatus(status); },
+          onLocalResults: (response) => {
+            if (current()) {
+              // The first callback is a page from the full bank; only a complete union can be paged from memory.
+              setCachedResults(response.hits.length === response.total ? response : null);
+              setResult({ ...response, hits: response.hits.slice(0, PAGE_SIZE), query: { ...response.query, offset: 0, limit: PAGE_SIZE } });
+            }
+          },
+        });
+        if (!current()) return;
+        setFrontierResult(enhanced); setCachedResults(enhanced.response);
+        setResult({ ...enhanced.response, hits: enhanced.response.hits.slice(0, PAGE_SIZE), query: { ...enhanced.response.query, offset: 0, limit: PAGE_SIZE } });
+        if (enhanced.warning) setNotice(enhanced.warning);
+      }
+      requestAnimationFrame(() => { if (current()) resultHeading.current?.focus(); });
+    } catch (cause) {
+      if (current()) setError(`${message(cause)}${useFrontier && localAvailable ? " Local search results are still available below; they have not been reviewed by AI." : ""}`);
+    } finally { if (current()) { setBusy(false); setSearchStatus(""); searchController.current = null; } }
+  }
+  function changePage(nextOffset: number) {
+    if (!result) return;
+    if (cachedResults) {
+      const response = cachedResults;
+      setResult({ ...response, hits: response.hits.slice(nextOffset, nextOffset + PAGE_SIZE), query: { ...response.query, offset: nextOffset, limit: PAGE_SIZE } });
+      resultHeading.current?.focus();
+    } else void runSearch({ ...result.query, offset: nextOffset, limit: PAGE_SIZE }, undefined, true);
   }
   function currentQuery(): SearchQuery {
     return { ...recipeExtras, text: [text, ocrText].filter(Boolean).join("\n"), mode, grade: grade || undefined, topics: topic ? [topic, ...(recipeExtras.topics ?? [])] : recipeExtras.topics, strategies: strategy ? [strategy, ...(recipeExtras.strategies ?? [])] : recipeExtras.strategies, imageHash: image?.hash ?? recipeExtras.imageHash, dhash: image?.dhash ?? recipeExtras.dhash, ...exclusions, limit: PAGE_SIZE, offset: 0 };
   }
   function submit(event: FormEvent) { event.preventDefault(); void runSearch(currentQuery(), queryQuestion && exclusions.excludeIds?.includes(queryQuestion.id) ? queryQuestion : null); }
   function clearImage() {
+    cancelSearch(false);
     imageSerial.current++; if (imageRef.current) URL.revokeObjectURL(imageRef.current); imageRef.current = null;
     setImage(null); setOcrText(""); setImageBusy(false); setImageStatus(""); if (upload.current) upload.current.value = "";
   }
   async function addImage(file: File) {
-    clearImage();
+    clearImage(); setQueryQuestion(null); setExclusions({}); setRecipeExtras({});
     const serial = ++imageSerial.current;
     setImageBusy(true); setImageStatus("Reading image…"); setError("");
     try {
@@ -240,7 +290,7 @@ function SearchWorkspace({ session, onLock }: { session: SearchSession; onLock: 
       if (parsed.grade && !grades.includes(parsed.grade)) throw new Error(`Unknown grade ${parsed.grade}. Use a grade from the filters or omit it.`);
       clearImage(); setText(parsed.text); setMode(parsed.mode ?? "hybrid"); setGrade(parsed.grade ?? ""); setTopic(parsed.topics?.[0] ?? ""); setStrategy(parsed.strategies?.[0] ?? ""); setExclusions({ excludeIds: parsed.excludeIds, excludeFamily: parsed.excludeFamily });
       setRecipeExtras({ topics: parsed.topics?.slice(1), strategies: parsed.strategies?.slice(1), source: parsed.source, imageHash: parsed.imageHash, dhash: parsed.dhash });
-      void runSearch({ ...parsed, offset: 0, limit: PAGE_SIZE }, null);
+      void runSearch({ ...parsed, offset: 0, limit: PAGE_SIZE }, null, true);
     } catch (cause) { setError(`Could not import recipe: ${message(cause)}`); }
   }
   function saveJudgment(value: SearchJudgment) {
@@ -280,11 +330,12 @@ function SearchWorkspace({ session, onLock }: { session: SearchSession; onLock: 
   const activeQueryId = result ? queryQuestion?.id ?? queryIdentity(result.query) : "";
   const offset = result?.query.offset ?? 0;
   return <>
-    <header className={styles.topbar}><Link href="/" prefetch={false} className={styles.back}>← Spatial Gym</Link><span className={styles.topbarTitle}>Question Search</span><button className={styles.secondary} type="button" onClick={onLock}>Lock bank <span aria-hidden="true">↗</span></button></header>
+    <header className={styles.topbar}><Link href="/" prefetch={false} className={styles.back}>← Spatial Gym</Link><span className={styles.topbarTitle}>Question Search</span><button className={styles.secondary} type="button" onClick={() => { cancelSearch(false); onLock(); }}>Lock bank <span aria-hidden="true">↗</span></button></header>
     <main className={styles.workspace}>
       <div className={styles.intro}><div><span className={styles.kicker}>A question leads to another</span><h1>Find the shared idea.</h1><p>Search the question bank by words, structure, or approach.</p></div><div className={styles.corpusBadge}><strong>{session.corpus.questions.length.toLocaleString()}</strong><span>questions · browser search</span></div></div>
       <div className={styles.searchLayout}><aside className={styles.searchSidebar} aria-label="Search controls">
         <form onSubmit={submit} className={styles.queryPanel}>
+          <FrontierControls connection={connection} disabled={busy} onChange={(next) => { cancelSearch(false); setConnection(next); }} />
           <label className={styles.queryLabel} htmlFor="question-query">Your question</label>
           <textarea ref={queryInput} id="question-query" value={text} onChange={(event) => setText(event.target.value)} rows={6} placeholder="Paste a question, or describe the key idea…" maxLength={20000} />
           <div className={styles.uploadRow}><label className={styles.uploadButton}><span aria-hidden="true">＋</span> Add a picture<input ref={upload} type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; if (file) void addImage(file); }} /></label><span className={styles.finePrint}>or paste an image below</span></div>
@@ -301,13 +352,14 @@ function SearchWorkspace({ session, onLock }: { session: SearchSession; onLock: 
           </div></details>
           {exclusions.excludeIds?.length || exclusions.excludeFamily ? <div className={styles.exclusion}><span>Source question excluded{exclusions.excludeFamily ? ", including its duplicate family" : ""}.</span><button type="button" className={styles.textButton} onClick={() => { setExclusions({}); setRecipeExtras({}); }}>Clear</button></div> : null}
           {!!(recipeExtras.topics?.length || recipeExtras.strategies?.length || recipeExtras.source) && <div className={styles.exclusion}><span>Additional recipe filters: {[...(recipeExtras.topics ?? []).map((id) => session.corpus.facets.topics[id]), ...(recipeExtras.strategies ?? []).map((id) => session.corpus.facets.strategies[id]), recipeExtras.source].filter(Boolean).join(", ")}</span><button className={styles.textButton} type="button" onClick={() => setRecipeExtras({})}>Clear</button></div>}
-          <button type="submit" className={`${styles.primary} ${styles.searchButton}`} disabled={busy || imageBusy}>{busy ? "Searching…" : imageBusy ? "Reading picture…" : "Search questions"}<span aria-hidden="true">↗</span></button>
-          {busy && <button type="button" className={styles.textButton} onClick={() => { searchSerial.current++; setBusy(false); setNotice("Search cancelled."); }}>Cancel search</button>}
-          <p className={styles.localNote}><span aria-hidden="true">○</span> Your query stays in this browser.</p>
+          <button type="submit" className={`${styles.primary} ${styles.searchButton}`} disabled={busy || (imageBusy && (connection.kind === "local" || !image))}>{busy ? "Searching…" : imageBusy && (connection.kind === "local" || !image) ? "Reading picture…" : connection.kind === "local" ? "Search questions" : "Search with AI"}<span aria-hidden="true">↗</span></button>
+          {busy && <button type="button" className={styles.textButton} onClick={() => cancelSearch()}>Cancel search</button>}
+          {searchStatus && <p className={styles.searchProgress} role="status">{searchStatus}</p>}
+          {connection.kind === "local" && <p className={styles.localNote}><span aria-hidden="true">○</span> Your query stays in this browser.</p>}
         </form>
-        <details className={styles.agentPanel}><summary>Search with ChatGPT or Codex</summary><p>Let an assistant interpret your question, then use its search recipe here. Share a candidate packet for closer comparison.</p><button className={styles.secondary} type="button" onClick={() => void copyInstructions()}>Copy search instructions</button>
+        <details className={styles.agentPanel}><summary>Manual handoff to an assistant</summary><p>Let an assistant interpret your question, then use its search recipe here. Share a candidate packet for closer comparison.</p><button className={styles.secondary} type="button" onClick={() => void copyInstructions()}>Copy search instructions</button>
           {copyFallback && <label className={styles.field}>Instructions to copy<textarea readOnly rows={5} value={copyFallback} onFocus={(event) => event.target.select()} /></label>}
-          <label className={styles.field}>Paste a JSON search recipe<textarea value={recipe} onChange={(event) => setRecipe(event.target.value)} rows={4} maxLength={60000} spellCheck={false} placeholder={'{"text": "work backward through a sequence", "mode": "strategy"}'} /></label><button className={styles.secondary} type="button" disabled={!recipe.trim() || busy} onClick={importRecipe}>Run recipe</button>
+          <label className={styles.field}>Paste a JSON search recipe<textarea value={recipe} onChange={(event) => setRecipe(event.target.value)} rows={4} maxLength={60000} spellCheck={false} placeholder={'{"text": "work backward through a sequence", "mode": "strategy"}'} /></label><button className={styles.secondary} type="button" disabled={!recipe.trim() || busy} onClick={importRecipe}>Search recipe locally</button>
           <p className={styles.finePrint}>Recipes are validated as data. No model-generated code is executed.</p>
         </details>
         <details className={styles.agentPanel}><summary>Review collection{judgments.length ? ` · ${judgments.length}` : ""}</summary><p>Open a result and review its relationship to your query. Save examples that work and near-matches that do not.</p><button type="button" className={styles.secondary} disabled={!judgments.length} onClick={() => download("question-search-judgments.json", { schemaVersion: 1, corpusVersion: session.corpus.version, provenance: "browser-review", cases: [...new Map(judgments.filter((item) => !item.queryId.startsWith("external:")).map((item) => [item.queryId, { queryId: item.queryId, queryVersion: item.queryVersion, split: "development" }])).values()], judgments })}>Export {judgments.length} judgments</button>
@@ -321,16 +373,17 @@ function SearchWorkspace({ session, onLock }: { session: SearchSession; onLock: 
       <section className={styles.results} aria-labelledby="search-results-heading" aria-busy={busy}>
         <div className={styles.resultsHeader}><div><span className={styles.kicker}>The question bank</span><h2 id="search-results-heading" ref={resultHeading} tabIndex={-1}>{result ? `${result.total.toLocaleString()} candidates` : "Start with a question."}</h2></div>{result && <span className={styles.resultRange}>{result.total ? `${offset + 1}–${offset + result.hits.length}` : "0"} shown</span>}</div>
         <div className={styles.messages} aria-live="polite" aria-atomic="true">{notice && <p className={styles.notice}>{notice}</p>}{error && <p className={styles.error} role="alert">{error}</p>}</div>
-        {!result && <div className={styles.emptyState}><div className={styles.searchArt} aria-hidden="true"><span>?</span><span>↗</span><span>≈</span></div><h3>Different questions.<br />A familiar way through.</h3><p>Paste text, upload a picture, or describe a solution method. The search brings together clues for you to inspect.</p><div className={styles.exampleQueries}><span>Try an idea</span>{["work backward through a sequence", "count paths through a grid", "fold a cube from a net"].map((example) => <button key={example} type="button" onClick={() => { setText(example); void runSearch({ text: example, mode: "hybrid", limit: PAGE_SIZE, offset: 0 }, null); }}>{example} <span aria-hidden="true">↗</span></button>)}</div></div>}
-        {result && !result.hits.length && <div className={styles.emptyState}><h3>No matches with these settings.</h3><p>Try fewer filters, a broader description, or words explaining how the question is solved.</p><button className={styles.secondary} type="button" onClick={() => { setGrade(""); setTopic(""); setStrategy(""); setExclusions({}); setRecipeExtras({}); void runSearch({ text: [text, ocrText].join("\n"), mode: "hybrid", dhash: image?.dhash, imageHash: image?.hash, limit: PAGE_SIZE }, null); }}>Broaden search</button></div>}
-        {result && result.hits.length > 0 && <><p className={styles.resultNote}>Ranked leads, not confirmed equivalents. Open a question to inspect its method and evidence.</p><div className={styles.resultGrid}>{result.hits.map((hit) => <article className={styles.resultCard} key={hit.question.id}>
+        {frontierResult && <section className={styles.understanding} aria-label="AI question understanding"><div className={styles.understandingHeading}><h3>The shared reasoning</h3><span className={styles.aiBadge}>AI reviewed {frontierResult.reviewed} of {frontierResult.retrieved} candidates</span></div><p>{frontierResult.understanding.summary}</p>{frontierResult.understanding.strategies.length > 0 && <div className={styles.tags}>{frontierResult.understanding.strategies.map((item, index) => <span key={index}>{item}</span>)}</div>}{frontierResult.understanding.uncertainties.length > 0 && <div className={styles.uncertainties}><strong>Still uncertain</strong><ul>{frontierResult.understanding.uncertainties.map((item, index) => <li key={index}>{item}</li>)}</ul></div>}<details><summary>Searches used</summary><ul>{frontierResult.understanding.searches.map((item, index) => <li key={index}>{item}</li>)}</ul></details></section>}
+        {!result && <div className={styles.emptyState}><div className={styles.searchArt} aria-hidden="true"><span>?</span><span>↗</span><span>≈</span></div><h3>Different questions.<br />A familiar way through.</h3><p>Paste text, upload a picture, or describe a solution method. The search brings together clues for you to inspect.</p><div className={styles.exampleQueries}><span>Try an idea</span>{["work backward through a sequence", "count paths through a grid", "fold a cube from a net"].map((example) => <button key={example} type="button" onClick={() => { setText(example); void runSearch({ text: example, mode: "hybrid", limit: PAGE_SIZE, offset: 0 }, null, true); }}>{example} <span aria-hidden="true">↗</span></button>)}</div></div>}
+        {result && !result.hits.length && <div className={styles.emptyState}><h3>No matches with these settings.</h3><p>Try fewer filters, a broader description, or words explaining how the question is solved.</p><button className={styles.secondary} type="button" onClick={() => { setGrade(""); setTopic(""); setStrategy(""); setExclusions({}); setRecipeExtras({}); void runSearch({ text: [text, ocrText].join("\n"), mode: "hybrid", dhash: image?.dhash, imageHash: image?.hash, limit: PAGE_SIZE }, null, true); }}>Broaden search</button></div>}
+        {result && result.hits.length > 0 && <><p className={styles.resultNote}>{frontierResult ? "AI review promotes stronger reasoning matches and moves weaker matches down. Unreviewed candidates retain local ranking. Inspect the explanations; AI judgments can be mistaken." : busy && connection.kind !== "local" ? "Local candidates while AI works. These results have not been reviewed by AI yet." : "Ranked by local retrieval. Open a question to inspect its method and evidence."}</p><div className={styles.resultGrid}>{result.hits.map((hit) => <article className={styles.resultCard} key={hit.question.id}>
           <button type="button" className={styles.cardOpen} onClick={() => setDetail(hit)} aria-label={`Inspect ${sourceLabel(hit.question)}`}><QuestionImage question={hit.question} session={session} /><div className={styles.cardBody}><div className={styles.cardMeta}><span>{sourceLabel(hit.question)}</span><span aria-hidden="true">↗</span></div><h3>{hit.question.prompt || hit.question.description || "Inspect this visual question"}</h3></div></button>
-          <div className={styles.cardFooter}>{hit.reasons.slice(0, 2).map((reason, index) => <span key={index}>{reason}</span>)}{judgments.some((item) => item.queryId === activeQueryId && item.candidateId === hit.question.id) && <span className={styles.reviewed}>✓ Reviewed</span>}</div>
+          <div className={styles.cardFooter}>{hit.ai ? <div className={styles.cardAi}><span className={styles.aiBadge}>AI reviewed · {relationshipLabel(hit.ai.relationship)}</span><p>{hit.ai.reason}</p></div> : frontierResult ? <span className={styles.unreviewed}>Not reviewed by AI</span> : null}{hit.reasons.slice(0, 2).map((reason, index) => <span key={index}>{reason}</span>)}{judgments.some((item) => item.queryId === activeQueryId && item.candidateId === hit.question.id) && <span className={styles.reviewed}>✓ Your review saved</span>}</div>
         </article>)}</div>
-        <nav className={styles.pagination} aria-label="Search result pages"><button className={styles.secondary} type="button" disabled={busy || offset === 0} onClick={() => void runSearch({ ...result.query, offset: Math.max(0, offset - PAGE_SIZE), limit: PAGE_SIZE })}>← Previous</button><span>Page {Math.floor(offset / PAGE_SIZE) + 1} of {Math.ceil(result.total / PAGE_SIZE)}</span><button className={styles.secondary} type="button" disabled={busy || offset + PAGE_SIZE >= result.total} onClick={() => void runSearch({ ...result.query, offset: offset + PAGE_SIZE, limit: PAGE_SIZE })}>Next →</button></nav>
+        <nav className={styles.pagination} aria-label="Search result pages"><button className={styles.secondary} type="button" disabled={busy || offset === 0} onClick={() => changePage(Math.max(0, offset - PAGE_SIZE))}>← Previous</button><span>Page {Math.floor(offset / PAGE_SIZE) + 1} of {Math.ceil(result.total / PAGE_SIZE)}</span><button className={styles.secondary} type="button" disabled={busy || offset + PAGE_SIZE >= result.total} onClick={() => changePage(offset + PAGE_SIZE)}>Next →</button></nav>
         <div className={styles.exportPanel}><div><h3>Take a closer look with an assistant.</h3><p>Export these {result.hits.length} candidates with their evidence and your search recipe.</p><label className={styles.check}><input type="checkbox" checked={includeImages} onChange={(event) => setIncludeImages(event.target.checked)} /> Include question images</label></div><button className={styles.secondary} type="button" disabled={exportBusy} onClick={() => void exportCandidates()}>{exportBusy ? "Preparing packet…" : "Download candidate packet"}</button></div></>}
       </section></div>
-      <footer className={styles.footer}><span title={session.corpus.version}>Question Search · index {session.corpus.version.slice(0, 12)}</span><span>Unlocked questions stay in memory. Saved reviews and downloaded exports remain on your device.</span></footer>
+      <footer className={styles.footer}><span title={session.corpus.version}>Question Search · index {session.corpus.version.slice(0, 12)}</span><span>Unlocked questions and AI credentials stay in memory. Saved reviews and downloaded exports remain on your device.</span></footer>
     </main>
     {detail && result && <QuestionDialog key={detail.question.id} hit={detail} session={session} onClose={() => setDetail(null)} onRelated={related} query={result.query} queryQuestion={queryQuestion} saved={judgments.findLast((item) => item.queryId === activeQueryId && item.candidateId === detail.question.id)} onSave={saveJudgment} />}
   </>;
@@ -375,7 +428,7 @@ export default function SearchClient() {
       <section className={styles.unlockCard} aria-labelledby="unlock-heading"><div className={styles.lockIcon} aria-hidden="true">↳</div><span className={styles.kicker}>Your search workspace</span><h2 id="unlock-heading">Unlock the bank.</h2><p>Use the shared contributor password to open the encrypted questions and search index.</p>
         <form onSubmit={unlock}><label className={styles.field} htmlFor="bank-password">Bank password<input ref={passwordInput} id="bank-password" name="bank-password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required disabled={busy} aria-describedby="password-note" /></label><button className={styles.primary} type="submit" disabled={busy || !password}>{busy ? "Unlocking…" : "Unlock question bank"}<span aria-hidden="true">↗</span></button></form>
         <div aria-live="polite" aria-atomic="true">{status && <p className={styles.notice}>{status}</p>}{error && <p className={styles.error} role="alert">{error}</p>}</div>
-        <p id="password-note" className={styles.finePrint}>Decryption and search happen in your browser. This page does not save the password or send your question to an AI service.</p>
+        <p id="password-note" className={styles.finePrint}>Decryption and local search happen in your browser. This page never saves the password or sends it to AI. Optional AI connections are available after unlocking.</p>
         <div className={styles.unlockFoot}><span aria-hidden="true">○</span><p>After unlocking, add a question, inspect related problems, and collect useful matches.</p></div>
       </section>
     </main><footer className={styles.lockedFooter}>Spatial Gym <span>Explore the reasoning. Find the connection.</span></footer>

@@ -67,6 +67,7 @@ export interface SearchHit {
   score: number;
   reasons: string[];
   signals: { text: number; structure: number; strategy: number; visual: number };
+  ai?: { relationship: MatchRelationship; reason: string };
 }
 
 export interface SearchResponse { hits: SearchHit[]; total: number; query: SearchQuery }

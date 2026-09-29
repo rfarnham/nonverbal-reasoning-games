@@ -30,6 +30,7 @@
     "build:worlds": "MATH_WORLD_PREVIEW=1 npm run build:pages",
     "search:ocr": "node scripts/prepare-question-search-ocr.mjs",
     "search:query": "node scripts/query-question-search.mjs",
+    "search:companion": "node scripts/question-search-companion.mjs",
     "search:evaluate": "node scripts/evaluate-question-search.mjs",
     "test:search-build": "python3 tests/question-search-export.test.py && python3 tests/question-search-lsa.test.py"
   },

@@ -268,3 +268,32 @@
   .primary, .secondary, .uploadButton, .textButton { transition: none; }
   .primary:not(:disabled):hover { transform: none; }
 }
+.frontierControls { display: flex; flex-direction: column; gap: 13px; padding-bottom: 18px; border-bottom: 1px solid var(--search-line); }
+.frontierControls .textButton { align-self: start; }
+.frontierControls > div:empty { display: none; }
+.frontierDisclosure { font-size: .72rem; line-height: 1.7; margin: 0; padding: 12px; background: #f1eee3; border-radius: 9px; color: #4b566b; }
+.connectionActions { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+.connectionActions button { font-size: .72rem; }
+.searchProgress { font-size: .75rem; font-weight: 650; color: #326c64; line-height: 1.65; margin: 0; }
+.understanding { margin-top: 20px; padding: 22px; border: 1px solid #c7d6cb; border-radius: 16px; background: #f2f6ee; overflow-wrap: anywhere; }
+.understandingHeading { display: flex; align-items: start; flex-wrap: wrap; gap: 10px 18px; }
+.understanding h3 { margin: 0; font-size: 1rem; letter-spacing: -.025em; }
+.understanding p { font-size: .85rem; line-height: 1.75; margin: 16px 0 0; }
+.understanding .tags { margin-top: 13px; }
+.understanding summary { min-height: 44px; align-content: center; cursor: pointer; font-size: .75rem; font-weight: 650; }
+.understanding ul { padding-left: 19px; margin: 5px 0 12px; font-size: .77rem; line-height: 1.7; }
+.understanding details { margin-top: 9px; }
+.aiBadge { display: inline-block; color: #315e50; font-size: .67rem; font-weight: 720; line-height: 1.6; }
+.uncertainties { margin-top: 18px; font-size: .75rem; color: #58616c; }
+.cardAi { border-top: 1px solid #e7e3d9; padding-top: 11px; margin-bottom: 4px; }
+.cardAi p { margin: 6px 0 0; color: #4b5965; font-size: .73rem; line-height: 1.7; overflow-wrap: anywhere; }
+.cardFooter > .unreviewed { color: var(--search-muted); font-style: italic; }
+.cardFooter > .unreviewed::before { content: ""; }
+.aiEvidence { border-bottom: 1px solid #d9dfd2; padding-bottom: 16px; margin-bottom: 16px; }
+.aiEvidence .aiBadge { font-size: .8rem; }
+.evidencePanel .aiEvidence p { margin-bottom: 8px; }
+@media (max-width: 620px) {
+  .understanding { padding: 18px; }
+  .cardAi p { font-size: .7rem; }
+  .aiBadge { font-size: .65rem; }
+}
