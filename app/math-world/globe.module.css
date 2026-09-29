@@ -107,3 +107,18 @@
 .board[data-globe-renderer="webgl"] .stopPin[data-caption-side="hidden"] small { display: none; }
 
 @media (max-width: 620px) { .board[data-globe-renderer="webgl"] .stopPin small { display: none; } }
+
+.chapterActions { display:flex; flex-wrap:wrap; justify-content:center; gap:12px; padding:8px 0 24px; }
+.chapterActions button { min-height:44px; padding:10px 18px; border:1px solid #bcad80; border-radius:24px; color:#57422d; background:#fff7de; cursor:pointer; font:inherit; font-size:.85rem; }
+.chapterActions button:disabled { opacity:.5; cursor:default; }
+.chapterActions button:focus-visible, .crystalCaption button:focus-visible { outline:3px solid #1679d2; outline-offset:4px; }
+.crystalCaption { position:absolute; z-index:12; inset:auto 18px 18px; display:flex; align-items:center; justify-content:space-between; gap:18px; padding:15px 20px; border:1px solid #8dcde560; border-radius:20px; background:#081d33ed; color:#f5f8ef; box-shadow:0 8px 30px #03142360; }
+.crystalCaption strong { display:block; margin-top:5px; font-family:Georgia,serif; font-size:1.25rem; }
+.crystalCaption p { margin:6px 0 0; font-size:.85rem; line-height:1.4; color:#d5e6ed; }
+.crystalCaption .voyageKicker { color:#99e9f4; }
+.crystalCaption button { min-height:44px; flex-shrink:0; border:1px solid #a7eef2; border-radius:24px; padding:10px 17px; background:#d5fcfb; color:#102c42; font:inherit; font-size:.85rem; font-weight:700; cursor:pointer; }
+.crystalStill { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.board[data-story-cinematic] .markerLayer, .board[data-story-cinematic] .orbitControls { visibility:hidden; pointer-events:none; }
+.board[data-globe-renderer="fallback"][data-story-cinematic] { height:600px; aspect-ratio:auto; }
+.stopPin[data-summit-shard]::after { content:"◆"; position:absolute; right:-6px; top:-12px; color:#c1ffff; font-size:24px; -webkit-text-stroke:1px #167f9b; filter:drop-shadow(0 0 4px #48dce3); pointer-events:none; }
+@media (max-width:620px) { .crystalCaption { inset:auto 10px 10px; display:block; padding:12px 15px; }.crystalCaption strong { font-size:1rem; }.crystalCaption p { font-size:.75rem; }.crystalCaption button { margin-top:10px; width:100%; }.board[data-globe-renderer="fallback"][data-story-cinematic] { height:450px; } }

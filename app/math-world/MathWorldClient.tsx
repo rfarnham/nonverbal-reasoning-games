@@ -50,6 +50,7 @@ import { WorldMap } from "./WorldMap";
 import { BossWorld } from "./BossWorld";
 import { GlobeAdventure } from "./GlobeAdventure";
 import { bossById, canOpenBoss, type BossChallenge } from "./boss-challenges.ts";
+import { createStoryProgress, pendingFirstWorldEnding, readStoryProgress, writeStoryProgress, type WorldStoryProgress } from "./story-progress.ts";
 import styles from "./math-world.module.css";
 
 const basePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
@@ -80,6 +81,7 @@ function questionNeedsOpenCard(question: WorldQuestion): boolean {
 
 export default function MathWorldClient() {
   const [progress, setProgress] = useState<WorldProgress>(createInitialProgress);
+  const [storyProgress, setStoryProgress] = useState<WorldStoryProgress>(createStoryProgress);
   const [hydrated, setHydrated] = useState(false);
   const [qaUnlocked, setQaUnlocked] = useState(false);
   const [selectedBoss, setSelectedBoss] = useState<BossChallenge | null>(null);
@@ -104,6 +106,7 @@ export default function MathWorldClient() {
       const initialBoss = requestedBoss && canOpenBoss(savedProgress, requestedBoss, playtestMode) ? requestedBoss : null;
       setQaUnlocked(playtestMode);
       setProgress(savedProgress);
+      setStoryProgress(readStoryProgress(playtestMode));
       setSelectedBoss(initialBoss);
       const initialUrl = new URL(window.location.href);
       if (!initialBoss) initialUrl.searchParams.delete("boss");
@@ -127,6 +130,7 @@ export default function MathWorldClient() {
       if (next !== qaUnlocked) {
         setQaUnlocked(next);
         setProgress(nextProgress);
+        setStoryProgress(readStoryProgress(next));
         setInspectedStopId(null);
         setLastVisitedStopId(null);
         setQaOpen(false);
@@ -159,6 +163,16 @@ export default function MathWorldClient() {
       if (nextQa !== qaUnlocked) {
         setQaUnlocked(nextQa);
         setProgress(nextProgress);
+        setStoryProgress(readStoryProgress(nextQa));
+      }
+      // Browser history must not skip the newly completed chapter's ending.
+      // Do not pull established players in later worlds back to World 1.
+      if (nextQa === qaUnlocked && pendingFirstWorldEnding(storyProgress, nextProgress)) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("boss");
+        window.history.replaceState({ ...window.history.state, mathWorldId: nextProgress.selectedWorldId }, "", url);
+        setSelectedBoss(null);
+        return;
       }
       const requestedBossId = params.get("boss");
       const requestedBoss = bossById(requestedBossId);
@@ -181,7 +195,7 @@ export default function MathWorldClient() {
     };
     window.addEventListener("popstate", restoreDestination);
     return () => window.removeEventListener("popstate", restoreDestination);
-  }, [hydrated, progress, qaUnlocked]);
+  }, [hydrated, progress, qaUnlocked, storyProgress]);
 
   const activeStop = selectedBoss ? null : stopById(progress.activeStopId);
   const selectedWorld = (activeStop ? worldForStop(activeStop.id) : undefined)
@@ -298,6 +312,7 @@ export default function MathWorldClient() {
   }
 
   function chooseWorld(worldId: string) {
+    if (pendingFirstWorldEnding(storyProgress, progress)) return;
     if (!canOpenWorld(progress, worldId, qaUnlocked)) return;
     const url = new URL(window.location.href);
     url.searchParams.delete("boss");
@@ -312,6 +327,7 @@ export default function MathWorldClient() {
   }
 
   function chooseBoss(challenge: BossChallenge) {
+    if (pendingFirstWorldEnding(storyProgress, progress)) return;
     if (!canOpenBoss(progress, challenge, qaUnlocked)) return;
     const url = new URL(window.location.href);
     url.searchParams.set("boss", challenge.id);
@@ -328,6 +344,11 @@ export default function MathWorldClient() {
     if (activeStop) setLastVisitedStopId(activeStop.id);
     setProgress((current) => ({ ...leaveCheckpoint(current), activeStopId: null }));
     resetViewport();
+  }
+
+  function saveStoryProgress(next: WorldStoryProgress) {
+    setStoryProgress(next);
+    writeStoryProgress(next, qaUnlocked);
   }
 
   function goToNextQuestion() {
@@ -418,6 +439,7 @@ export default function MathWorldClient() {
       {!activeStop && WORLD_MODE === "spiral-preview" ? (
         <GlobeAdventure key={qaUnlocked ? "playtest-globe" : "adventure-globe"}
           world={selectedWorld} boss={selectedBoss} progress={progress} qaUnlocked={qaUnlocked}
+          storyProgress={storyProgress} onStoryProgress={saveStoryProgress}
           avatarStopId={lastVisitedStopId} onChooseWorld={chooseWorld} onChooseBoss={chooseBoss}
           onOpenStop={openStop} onInspectStop={setInspectedStopId} onExportQa={downloadQaArchive} />
       ) : selectedBoss ? (

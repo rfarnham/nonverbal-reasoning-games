@@ -8,6 +8,9 @@ import { canOpenRequiredStop, canOpenWorld, nextRequiredStopId, stopFirstTryAccu
 import { QUESTIONS_BY_STOP, WORLD_DEFINITIONS, stopsForWorld, type WorldDefinition } from "./world-data.ts";
 import { printWorldWorkbook } from "./workbook.ts";
 import { printBossWorkbook } from "./boss-workbook.ts";
+import { StoryPage } from "./StoryPage";
+import { FIRST_WORLD_STORY } from "./story-content.ts";
+import { advanceStoryPage, automaticStoryPage, markStoryBookRead, type AutomaticStoryPage, type WorldStoryProgress } from "./story-progress.ts";
 import shell from "./math-world.module.css";
 import styles from "./globe.module.css";
 
@@ -15,6 +18,7 @@ type Props = {
   world: WorldDefinition; boss: BossChallenge | null; progress: WorldProgress; qaUnlocked: boolean;
   avatarStopId: string | null; onChooseWorld: (id: string) => void; onChooseBoss: (boss: BossChallenge) => void;
   onOpenStop: (id: string) => void; onInspectStop: (id: string) => void; onExportQa: () => void;
+  storyProgress: WorldStoryProgress; onStoryProgress: (next: WorldStoryProgress) => void;
 };
 
 export function GlobeAdventure(props: Props) {
@@ -24,6 +28,7 @@ export function GlobeAdventure(props: Props) {
   const storyRef = useRef<HTMLDialogElement>(null);
   const storyOpener = useRef<HTMLButtonElement | null>(null);
   const [story, setStory] = useState<number | null>(null);
+  const [preview, setPreview] = useState<AutomaticStoryPage | null>(null);
   const [busy, setBusy] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
@@ -41,8 +46,30 @@ export function GlobeAdventure(props: Props) {
   const onBusyChange = useCallback((value: boolean) => setBusy(value), []);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => { headingRef.current?.focus({ preventScroll: true }); }, [destinationId]);
-  useEffect(() => { if (story !== null && !storyRef.current?.open) storyRef.current?.showModal(); }, [story]);
+  useEffect(() => {
+    const closeReading = () => { storyRef.current?.close(); setPreview(null); setStory(null); };
+    window.addEventListener("popstate", closeReading);
+    return () => window.removeEventListener("popstate", closeReading);
+  }, []);
+  useEffect(() => { if (world.number !== 1 && story !== null && !storyRef.current?.open) storyRef.current?.showModal(); }, [story, world.number]);
+  const automaticPage = automaticStoryPage(props.storyProgress, progress, world.id, !!boss);
+  const chapterStage = preview ?? automaticPage;
+  const chapterPage = chapterStage && chapterStage !== "shattering" ? FIRST_WORLD_STORY[chapterStage] : null;
+  const bookPage = world.number === 1 && story !== null ? (story === 0 ? FIRST_WORLD_STORY.book1 : FIRST_WORLD_STORY.book2) : null;
+  const reading = !!chapterStage || story !== null;
+  function continueChapter() {
+    if (!chapterStage) return;
+    if (preview) setPreview(preview === "fracture" ? "shattering" : preview === "shattering" ? "appeal" : null);
+    else props.onStoryProgress(advanceStoryPage(props.storyProgress, chapterStage));
+  }
+  function closeBook() {
+    if (story !== null) props.onStoryProgress(markStoryBookRead(props.storyProgress, story));
+    setStory(null);
+    requestAnimationFrame(() => { if (storyOpener.current?.isConnected) storyOpener.current.focus({ preventScroll: true }); });
+  }
   function navigate(id: string) {
+    storyRef.current?.close();
+    setPreview(null); setStory(null);
     setPrintError(null);
     const targetBoss = BOSS_CHALLENGES.find(candidate => candidate.id === id);
     if (targetBoss) props.onChooseBoss(targetBoss); else props.onChooseWorld(id);
@@ -55,14 +82,14 @@ export function GlobeAdventure(props: Props) {
     finally { printingRef.current = false; if (mounted.current) setPrinting(false); }
   }
   return <main className={styles.adventure} data-world-id={boss ? undefined : world.id} data-boss-id={boss?.id}>
-    <WorldNavigation selectedId={destinationId} progress={progress} qaUnlocked={qaUnlocked} busy={busy || printing}
+    <WorldNavigation selectedId={destinationId} progress={progress} qaUnlocked={qaUnlocked} busy={busy || printing || reading}
       onChooseWorld={id => boardRef.current?.sailTo(id)} onChooseBoss={boss => boardRef.current?.sailTo(boss.id)} />
     <header className={styles.destinationHeader}>
       <div><p className={styles.kicker}>{boss ? `After World ${boss.afterWorld} · Storm challenge` : `World ${world.number} · ${world.concept} ${world.spiral}`}</p>
         <h1 ref={headingRef} tabIndex={-1}>{boss?.title ?? world.title}</h1>
         <p className={styles.description}>{boss ? `Math Kangaroo ${boss.year} · Grades 1–2 · 24 questions` : world.description}</p>
       </div>
-      <button type="button" className={styles.printButton} disabled={busy || printing} aria-busy={printing}
+      <button type="button" className={styles.printButton} disabled={busy || printing || reading} aria-busy={printing}
         aria-label={printing ? "Preparing workbook" : boss ? `Print whole ${boss.year} test workbook` : `Print workbook for ${world.title}`}
         onClick={() => void print()}><span aria-hidden="true">▤</span>{printing ? "Preparing workbook…" : boss ? "Print whole test workbook" : "Print workbook"}</button>
     </header>
@@ -73,8 +100,11 @@ export function GlobeAdventure(props: Props) {
     <GlobeBoard ref={boardRef} world={world} boss={boss} progress={progress} qaUnlocked={qaUnlocked}
       initialOverview={initialOverview} restingStopId={props.avatarStopId ?? progress.checkpointStopId}
       onNavigate={navigate} onOpenStop={props.onOpenStop} onInspectStop={props.onInspectStop} onBusyChange={onBusyChange}
+      interactionLocked={reading} storyScene={chapterStage === "shattering"} onStorySceneEnd={continueChapter}
+      storyScattered={props.storyProgress.ending === "appeal" || props.storyProgress.ending === "complete"}
+      storyBookLabels={world.number === 1 ? [FIRST_WORLD_STORY.book1.title, FIRST_WORLD_STORY.book2.title] : undefined}
       onStory={(index, opener) => { storyOpener.current = opener; setStory(index); }} />
-    <section className={styles.actions} aria-label="World actions">
+    <section className={styles.actions} aria-label="World actions" inert={reading}>
       <div><strong>{boss ? "A full test awaits" : complete ? "Every trail explored" : "Your next discovery"}</strong><p>{boss ? "Print the test and work through it with pencil and paper." : complete ? "Your boat is ready for the next adventure." : "Choose a stop on the globe, or explore the list below."}</p></div>
       {boss ? nextWorld && <button className={styles.primary} disabled={busy || printing || !canOpenWorld(progress, nextWorld.id, qaUnlocked)} onClick={() => boardRef.current?.sailTo(nextWorld.id)}>{boss.afterWorld === WORLD_DEFINITIONS.length ? `Back to World ${nextWorld.number}` : `Continue to World ${nextWorld.number}`} →</button>
         : complete && nextBoss ? <button className={styles.primary} disabled={busy || printing || !canOpenBoss(progress, nextBoss, qaUnlocked)} onClick={() => boardRef.current?.sailTo(nextBoss.id)}>Sail into the {nextBoss.year} storm →</button>
@@ -82,15 +112,22 @@ export function GlobeAdventure(props: Props) {
             : <button className={styles.primary} disabled={busy || printing || !nextStopId} onClick={() => nextStopId && boardRef.current?.openStop(nextStopId)}>{completedCount ? "Continue adventure" : "Let’s explore"} →</button>}
     </section>
     {boss ? <section className={styles.bossNote}><strong>Take on the storm, one question at a time</strong><p>{boss.afterWorld === WORLD_DEFINITIONS.length ? "Beyond this storm lies an uncharted horizon. " : "This storm guards the crossing to the next archipelago. "}Work through the whole test on paper. Answer entry is coming later; for now, you can print and continue exploring.</p></section>
-      : <details className={styles.directory}><summary>Explore the island stops</summary><ol>{stops.map((stop, index) => {
+      : <details className={styles.directory} inert={reading}><summary>Explore the island stops</summary><ol>{stops.map((stop, index) => {
         const done = progress.completedStopIds.includes(stop.id); const available = canOpenRequiredStop(progress, stop.id, qaUnlocked);
         return <li key={stop.id}><button type="button" disabled={!available || busy} aria-current={nextStopId === stop.id ? "step" : undefined} onClick={() => done && !qaUnlocked ? props.onInspectStop(stop.id) : boardRef.current?.openStop(stop.id)}><span>{done ? "✓" : index + 1}</span><strong>{stop.shortLabel}</strong><small>{QUESTIONS_BY_STOP.get(stop.id)?.length} questions · {done ? qaUnlocked ? "Replay" : "Completed" : available ? "Explore" : "Locked"}</small></button></li>;
       })}</ol></details>}
     {qaUnlocked && <button type="button" className={styles.exportButton} onClick={props.onExportQa}>Export playtest notes</button>}
-    <dialog ref={storyRef} className={shell.storyDialog} aria-labelledby="globe-story-title" onClose={() => { setStory(null); storyOpener.current?.focus({ preventScroll: true }); }}>
+    {!boss && world.number === 1 && <div className={styles.chapterActions}>
+      <button type="button" disabled={busy || reading} onClick={() => setPreview("intro")}>Read the welcome</button>
+      {(qaUnlocked || props.storyProgress.ending === "complete") && <button type="button" disabled={busy || reading} onClick={() => setPreview("fracture")}>{qaUnlocked ? "Preview crystal shattering" : "Revisit the falling stars"}</button>}
+    </div>}
+    {chapterPage && <StoryPage key={chapterPage.id} page={chapterPage} onContinue={continueChapter}
+      actionLabel={chapterStage === "intro" ? "Begin exploring" : chapterStage === "fracture" ? "Watch the sky" : "I’ll help find the shards"} />}
+    {!chapterPage && bookPage && <StoryPage key={bookPage.id} page={bookPage} onContinue={closeBook} actionLabel="Back to the map" />}
+    {world.number !== 1 && <dialog ref={storyRef} className={shell.storyDialog} aria-labelledby="globe-story-title" onClose={() => { setStory(null); storyOpener.current?.focus({ preventScroll: true }); }}>
       <div className={styles.storyIcon} aria-hidden="true">▤</div><p className={styles.kicker}>{world.title} · Island {(story ?? 0) + 1}</p>
       <h2 id="globe-story-title">Story coming soon</h2><p>A little story will connect this island to the rest of the adventure.</p>
       <button type="button" className={styles.primary} onClick={() => storyRef.current?.close()}>Back to the map</button>
-    </dialog>
+    </dialog>}
   </main>;
 }

@@ -85,3 +85,28 @@ The hurricane bosses are tracked in [the storm-boss checklist](math-world-storm-
 The eight-item implementation and release checklist is tracked in
 [the living-world polish plan](math-world-polish-plan.md). Its durable browser
 evidence and release receipt live in shared `work/math-world-polish-2026-09-25/`.
+
+## Oceania's opening chapter
+
+The first archipelago introduces Oceania through an opening manuscript scroll and
+its two existing island books. Each illustrated page has two or three paragraphs.
+After every question in that archipelago is solved, a second scroll reveals the
+Tideheart crystal's destruction. The same globe then pulls back and turns as 32
+glowing fragments follow curved, outward flight paths to the final summit stop
+of each teaching archipelago. A final scroll asks the voyager to recover them.
+No ordinary stop, book or boss receives a fragment.
+
+Story acknowledgements have their own versioned local save, separate from question
+progress and isolated between normal and playtest modes. Reloading a page resumes
+its narrative stage; reloading the short globe scene replays that scene. Reading
+cannot change answers, scores, completion or XP. After the scene, small static
+summit shards remain visible. Collecting and restoring them is a future gameplay
+extension; this chapter does not invent a new reward or progression rule.
+
+The native scroll dialog supports keyboard reading and returns focus to the book
+that opened it. The scene has an explicit Continue story control. Reduced motion
+shows a still ending, while scenery pause, document visibility and offscreen state
+suspend animation. WebGL fallback uses a local illustrated globe. Test mode exposes
+Preview crystal shattering so the complete ending can be inspected without
+solving or modifying a saved attempt. The implementation and release checklist is
+in [the opening-chapter plan](math-world-story-plan.md).

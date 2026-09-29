@@ -11,6 +11,7 @@ import { createGlobeLife } from "./globe-life";
 import { createGlobeMarine } from "./globe-marine";
 import { createGlobeHarbors } from "./globe-harbors";
 import { createGlobeStorms } from "./globe-storms";
+import { createGlobeCrystalStory } from "./globe-crystal-story";
 import { northUpGlobeOrientation, type GlobeOrientation } from "./globe-navigation";
 import { sampleStormShipMotion } from "./storm-ship-motion";
 import { createSceneryClock } from "./scenery-clock";
@@ -35,6 +36,7 @@ export type GlobeSceneFrame = Readonly<{
   cameraDestinationId?: string; stormCameraBlend?: number;
   avatarPosition?: Vec3; avatarHop?: number;
   boatPosition?: Vec3; boatHeading?: Vec3;
+  storyProgress?: number | null; storyPullback?: number; storyScattered?: boolean;
 }>;
 export type GlobeSceneOptions = Readonly<{
   onProject: (projection: GlobeProjection) => void;
@@ -147,6 +149,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   const marine = createGlobeMarine(globe);
   const harbors = createGlobeHarbors(globe);
   const storms = createGlobeStorms(globe);
+  const crystalStory = createGlobeCrystalStory(globe);
   for (const world of WORLD_DEFINITIONS) {
     const authored = getWorldMapLayout(world.number, world.stopIds.length);
     const layout = authored.desktop;
@@ -408,7 +411,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     const zoom = clamp(next.zoom, 0, 1);
     const tan = Math.tan(camera.fov * Math.PI / 360);
     const aspect = width / height;
-    const overviewDistance = Math.max(3.7, 1.24 / (tan * aspect));
+    const overviewDistance = Math.max(3.7, 1.24 / (tan * aspect)) * (1 + .64 * (next.storyPullback ?? 0));
     const stormDestination = GLOBE_DESTINATIONS.find(region => region.kind === "boss" && region.id === next.activeDestinationId);
     const cameraRegion = getGlobeDestination(next.cameraDestinationId ?? next.activeDestinationId);
     const stormViewBlend = clamp(next.stormCameraBlend ?? (cameraRegion.kind === "boss" ? 1 : 0), 0, 1);
@@ -420,7 +423,9 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     const tilt = THREE.MathUtils.lerp(aspect < 1 ? 35 : 45, 28, stormViewBlend) * Math.PI / 180;
     camera.position.set(0, -focusDistance * Math.sin(tilt) * zoom,
       THREE.MathUtils.lerp(overviewDistance, 1 + focusDistance * Math.cos(tilt), zoom));
-    camera.lookAt(0, 0, zoom);
+    // The opening cinematic frames the raised crystal, then eases back to the
+    // planet center as the camera widens. Its top must not clip off-screen.
+    camera.lookAt(0, 0, zoom * (next.storyProgress != null ? 1.125 : 1));
     camera.updateMatrixWorld();
     const completed = new Set(next.completedStopIds);
     const activeStops = WORLD_DEFINITIONS.find(world => world.id === next.activeDestinationId)?.stopIds ?? [];
@@ -457,6 +462,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
       shadow.material.opacity = .22*(1-Math.min(.8,(next.avatarHop ?? 0)*15));
     }
     updateScenery();
+    crystalStory.update(next.storyProgress ?? null, next.storyScattered);
     globe.updateMatrixWorld(true);
     renderer.render(scene, camera);
     lastPaintTime = performance.now();
@@ -511,7 +517,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
       sceneryClock.dispose();
       document.removeEventListener("visibilitychange", visibilityChanged);
       reducedMotion.removeEventListener("change", visibilityChanged);
-      weather.dispose(); life.dispose(); marine.dispose(); harbors.dispose(); storms.dispose(); biomes.dispose(); continents.dispose(); lighting.dispose(); sea.dispose();
+      weather.dispose(); life.dispose(); marine.dispose(); harbors.dispose(); storms.dispose(); crystalStory.dispose(); biomes.dispose(); continents.dispose(); lighting.dispose(); sea.dispose();
       renderer.domElement.removeEventListener("webglcontextlost", contextLost);
       for (const geometry of geometries) geometry.dispose();
       for (const entry of materials) entry.dispose();

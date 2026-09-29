@@ -15,9 +15,11 @@ import { getBossStormStages, bossStormStageLabel } from "./boss-storm-state.ts";
 import { StormArtwork, StormIcon } from "./StormArtwork";
 import { getWorldBiome } from "./globe-biome-data";
 import { getSceneryPaused, setSceneryPaused, subscribeSceneryPreference } from "./scenery-preference";
+import { createSceneryClock } from "./scenery-clock";
+import { CrystalFallStill } from "./CrystalFallStill";
 import styles from "./globe.module.css";
 
-type Phase = "overview" | "focused" | "focusing" | "sailing" | "hopping" | "activity";
+type Phase = "overview" | "focused" | "focusing" | "sailing" | "hopping" | "activity" | "story";
 export type GlobeBoardHandle = { sailTo: (id: string) => void; openStop: (id: string) => void; focus: () => void };
 type Props = {
   world: WorldDefinition; boss: BossChallenge | null; progress: WorldProgress; qaUnlocked: boolean;
@@ -25,6 +27,8 @@ type Props = {
   onNavigate: (id: string) => void; onOpenStop: (id: string) => void; onInspectStop: (id: string) => void;
   onBusyChange: (busy: boolean) => void; onStory: (index: number, opener: HTMLButtonElement) => void;
   voyageActivity?: ComponentType<VoyageActivityProps>;
+  interactionLocked?: boolean; storyScene?: boolean; storyScattered?: boolean;
+  onStorySceneEnd?: () => void; storyBookLabels?: readonly string[];
 };
 const basePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
 const narrowQuery = "(max-width: 620px)";
@@ -62,8 +66,10 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
   const [renderer, setRenderer] = useState<"loading" | "webgl" | "fallback">("loading");
   const rendererRef = useRef(renderer);
   useLayoutEffect(() => { rendererRef.current = renderer; }, [renderer]);
-  const [phase, setPhase] = useState<Phase>(props.initialOverview ? "overview" : "focused");
+  const [navigationPhase, setPhase] = useState<Phase>(props.initialOverview ? "overview" : "focused");
+  const phase = props.storyScene ? "story" : navigationPhase;
   const phaseRef = useRef<Phase>(phase);
+  useLayoutEffect(() => { phaseRef.current = phase; }, [phase]);
   const [voyage, setVoyage] = useState<ArchipelagoVoyage | null>(null);
   const trip = useRef<{ cancel: () => void; skip?: () => void; finishActivity?: () => void } | null>(null);
   const animation = useRef<{ cancel: () => void } | null>(null);
@@ -71,7 +77,9 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
   const openerRef = useRef<HTMLElement | null>(null);
   const irisRef = useRef<HTMLDivElement>(null);
   const [activity, setActivity] = useState<ArchipelagoVoyage | null>(null);
-  const busy = ["focusing", "sailing", "hopping", "activity"].includes(phase);
+  const busy = !!props.interactionLocked || ["focusing", "sailing", "hopping", "activity", "story"].includes(phase);
+  const storyStill = !!props.storyScene && (reducedScenery || sceneryPaused || renderer === "fallback");
+  const storyContinueRef = useRef<HTMLButtonElement>(null);
   const authoredLayout = getWorldMapLayout(props.world.number, props.world.stopIds.length);
   const layout = renderer === "fallback" && narrow ? authoredLayout.mobile : authoredLayout.desktop;
   const stops = stopsForWorld(props.world.id);
@@ -87,7 +95,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
       for (const [key, node] of nodes.current) {
         const stopIndex = p.world.stopIds.indexOf(key.slice(5));
         const book = fallback.books.find(book => key === `book:${p.world.id}:${book.id}`);
-        const point = !p.boss && (key.startsWith("stop:") ? fallback.stopPoints[stopIndex] : book);
+        const point = !p.boss && !p.storyScene && (key.startsWith("stop:") ? fallback.stopPoints[stopIndex] : book);
         node.style.visibility = point ? "visible" : "hidden";
         node.style.pointerEvents = point ? "auto" : "none";
         node.setAttribute("aria-hidden", String(!point));
@@ -123,7 +131,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
     const orientation = next.orientation ?? (next.focus
       ? transportGlobeOrientation(frame.current.orientation ?? northUpGlobeOrientation(frame.current.focus), next.focus)
       : frame.current.orientation);
-    frame.current = { ...frame.current, ...next, orientation, completedStopIds: p.progress.completedStopIds,
+    frame.current = { ...frame.current, ...next, orientation, completedStopIds: p.progress.completedStopIds, storyScattered: p.storyScattered,
       stormStages: getBossStormStages(p.progress, p.qaUnlocked, next.activeDestinationId ?? frame.current.activeDestinationId) };
     sceneRef.current?.render(frame.current);
   }
@@ -173,7 +181,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
     if (irisRef.current) irisRef.current.style.opacity = "0";
   }
   async function focusRegion() {
-    if (trip.current) return false;
+    if (trip.current || latest.current.interactionLocked) return false;
     const previous = { ...frame.current };
     const target = getGlobeDestination(latest.current.boss?.id ?? latest.current.world.id)!.center;
     setBoardPhase("focusing");
@@ -195,7 +203,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
     return boss ? canOpenBoss(p.progress, boss, p.qaUnlocked) : canOpenWorld(p.progress, id, p.qaUnlocked);
   }
   async function sailTo(id: string) {
-    if (trip.current || !allowed(id)) return;
+    if (trip.current || latest.current.interactionLocked || !allowed(id)) return;
     const p = latest.current;
     const fromId = p.boss?.id ?? p.world.id;
     if (id === fromId) { void focusRegion(); return; }
@@ -246,7 +254,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
   }
   async function openStop(id: string) {
     const p = latest.current;
-    if (trip.current || p.boss || !p.world.stopIds.includes(id) || !canOpenRequiredStop(p.progress, id, p.qaUnlocked)) return;
+    if (trip.current || p.interactionLocked || p.boss || !p.world.stopIds.includes(id) || !canOpenRequiredStop(p.progress, id, p.qaUnlocked)) return;
     if (p.progress.completedStopIds.includes(id) && !p.qaUnlocked) { p.onInspectStop(id); return; }
     if (phaseRef.current === "overview" && !await focusRegion()) return;
     if (latest.current.world.id !== p.world.id || latest.current.boss || !canOpenRequiredStop(latest.current.progress, id, latest.current.qaUnlocked)) return;
@@ -278,11 +286,11 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
   useEffect(() => {
     let alive = true;
     const query = window.matchMedia("(prefers-reduced-motion: reduce)"); motion.current = query.matches;
-    const change = () => { motion.current = query.matches; if (query.matches) { if (trip.current?.skip) trip.current.skip(); else { cancelTrip(); animation.current?.cancel(); settlePose(); } } };
+    const change = () => { motion.current = query.matches; if (latest.current.storyScene) return; if (query.matches) { if (trip.current?.skip) trip.current.skip(); else { cancelTrip(); animation.current?.cancel(); settlePose(); } } };
     query.addEventListener("change", change);
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { cancelTrip(); if (phaseRef.current === "focusing") { animation.current?.cancel(); settlePose(); } } };
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { if (latest.current.storyScene) { latest.current.onStorySceneEnd?.(); return; } cancelTrip(); if (phaseRef.current === "focusing") { animation.current?.cancel(); settlePose(); } } };
     const onHide = () => { if (document.hidden) cancelTrip(); };
-    const onHistory = () => { cancelTrip(); animation.current?.cancel(); settlePose(); };
+    const onHistory = () => { if (latest.current.storyScene) return; cancelTrip(); animation.current?.cancel(); settlePose(); };
     const onScroll = () => { if (phaseRef.current === "hopping") cancelTrip(); };
     window.addEventListener("keydown", onKey); window.addEventListener("popstate", onHistory); document.addEventListener("visibilitychange", onHide); window.addEventListener("scroll", onScroll, true);
     const timer = window.setTimeout(() => { if (alive && !sceneRef.current) setRenderer("fallback"); }, 8000);
@@ -299,7 +307,40 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
     // The scene is owned by this mount; current props are read through latest.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  useEffect(() => { sceneRef.current?.setSceneryMotion(!sceneryPaused); }, [sceneryPaused]);
+  useEffect(() => { sceneRef.current?.setSceneryMotion(!sceneryPaused && !props.storyScene && !props.interactionLocked); }, [sceneryPaused, props.storyScene, props.interactionLocked, renderer]);
+  useEffect(() => {
+    if (!props.storyScene || renderer === "loading") return;
+    let alive = true, onScreen = true;
+    const previous = { ...frame.current };
+    const origin = getGlobeDestination(WORLD_DEFINITIONS[0].id)!.center;
+    const start = northUpGlobeOrientation(origin);
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let staticEnding = reduced.matches || renderer === "fallback";
+    animation.current?.cancel();
+    const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+    const show = (t: number) => {
+      const widening = ease(clamp01((t - .12) / .28));
+      const turn = ease(clamp01((t - .15) / .7));
+      const orientation = turnGlobeOrientation(start, turn * 2.2, -.14 * Math.sin(turn * Math.PI));
+      paint({ focus: globeOrientationFocus(orientation), orientation, zoom: 1 - widening,
+        storyProgress: t, storyPullback: widening, avatarPosition: undefined });
+    };
+    const clock = createSceneryClock({ request: callback => requestAnimationFrame(callback), cancel: id => cancelAnimationFrame(id), now: () => performance.now(),
+      onFrame: seconds => { if (!alive) return; const t = Math.min(1, seconds / 11); show(t); if (t === 1) { clock.setRunning(false); latest.current.onStorySceneEnd?.(); } } });
+    const reconcile = () => clock.setRunning(alive && !staticEnding && renderer === "webgl" && !getSceneryPaused() && !reduced.matches && !document.hidden && onScreen);
+    const changeMotion = () => { if (reduced.matches) { staticEnding = true; show(1); } reconcile(); };
+    const observer = new IntersectionObserver(entries => { onScreen = entries.some(entry => entry.isIntersecting); reconcile(); });
+    if (boardRef.current) { boardRef.current.scrollIntoView({ block: "center", behavior: "instant" }); observer.observe(boardRef.current); }
+    show(reduced.matches || getSceneryPaused() || renderer === "fallback" ? 1 : 0);
+    storyContinueRef.current?.focus({ preventScroll: true });
+    document.addEventListener("visibilitychange", reconcile);
+    reduced.addEventListener("change", changeMotion);
+    const unsubscribe = subscribeSceneryPreference(reconcile);
+    reconcile();
+    return () => { alive = false; clock.dispose(); observer.disconnect(); unsubscribe(); document.removeEventListener("visibilitychange", reconcile); reduced.removeEventListener("change", changeMotion);
+      paint({ ...previous, storyProgress: null, storyPullback: 0 }); };
+    // Reading callbacks and progress are consumed from latest, never restarting the scene.
+  }, [props.storyScene, renderer]);
   const onBusyChange = props.onBusyChange;
   useEffect(() => { onBusyChange(busy); return () => onBusyChange(false); }, [busy, onBusyChange]);
   useEffect(() => {
@@ -307,7 +348,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
     animation.current?.cancel();
     paint({ focus: getGlobeDestination(destinationId)!.center, orientation: northUpGlobeOrientation(getGlobeDestination(destinationId)!.center), activeDestinationId: destinationId, cameraDestinationId: undefined, stormCameraBlend: undefined, avatarPosition: restingPosition() });
   }, [destinationId]);
-  useEffect(() => { paint({ avatarPosition: trip.current ? frame.current.avatarPosition : restingPosition() }); }, [props.progress, props.restingStopId, props.qaUnlocked]);
+  useEffect(() => { paint({ avatarPosition: trip.current || props.storyScene ? frame.current.avatarPosition : restingPosition() }); }, [props.progress, props.restingStopId, props.qaUnlocked, props.storyScattered, props.storyScene]);
   useEffect(() => { positionMarkers(projectionRef.current); }, [phase, destinationId, renderer, narrow, props.progress, props.qaUnlocked]);
   function turn(dx: number, dy: number, animated = false) {
     if (busy) return;
@@ -326,7 +367,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
       <span className={styles.boardEyebrow}>{phase === "overview" ? "A world of discoveries" : props.boss ? "Into the hurricane" : getWorldBiome(props.world.number).label}</span>
       <div className={styles.sceneryControls}>
       {renderer === "webgl" && <label className={styles.skyControl}>Sky
-        <select aria-label="Time of day" value={skyMode} onChange={event => {
+        <select aria-label="Time of day" value={skyMode} disabled={!!props.storyScene} onChange={event => {
           const mode = event.target.value as GlobeSkyMode; visitSkyMode = mode; setSkyMode(mode); sceneRef.current?.setSkyMode(mode);
         }}><option value="cycle">Auto</option><option value="day">Day</option><option value="sunset">Sunset</option><option value="night">Night</option></select>
       </label>}
@@ -340,7 +381,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
       }}>{phase === "overview" ? `Explore ${titleFor(destinationId)}` : "Show globe"} <span aria-hidden="true">{phase === "overview" ? "↘" : "◎"}</span></button>
       </div>
     </div>
-    <div ref={boardRef} className={styles.board} data-globe-phase={phase} data-globe-renderer={renderer} data-globe-boss={props.boss?.id} data-voyage-from={voyage?.fromDestinationId} data-voyage-to={voyage?.toDestinationId} aria-busy={busy}
+    <div ref={boardRef} className={styles.board} data-globe-phase={phase} data-globe-renderer={renderer} data-globe-boss={props.boss?.id} data-voyage-from={voyage?.fromDestinationId} data-voyage-to={voyage?.toDestinationId} data-story-cinematic={props.storyScene ? storyStill ? "still" : "active" : undefined} aria-busy={busy}
       onPointerDown={event => { if (phase !== "overview" || (event.target as HTMLElement).closest("button")) return; pointer.current = { x: event.clientX, y: event.clientY, moved: false }; event.currentTarget.setPointerCapture(event.pointerId); }}
       onPointerMove={event => { const p = pointer.current; if (!p) return; const dx = event.clientX - p.x, dy = event.clientY - p.y; if (Math.hypot(dx, dy) > 2) p.moved = true; turn(-dx * 0.006, dy * 0.006); p.x = event.clientX; p.y = event.clientY; }}
       onPointerUp={() => { pointer.current = null; }} onPointerCancel={() => { pointer.current = null; }}>
@@ -348,7 +389,8 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
       {renderer === "loading" && <div className={styles.loading} role="status"><span>◎</span>Opening your globe…</div>}
       {renderer === "fallback" && !props.boss && <CoastScene mobile={narrow} className={styles.fallbackMap} completedRoadSlot={-1} worldNumber={props.world.number} />}
       {renderer === "fallback" && props.boss && <StormArtwork className={styles.stormFallback} />}
-      <div className={styles.markerLayer}>
+      {renderer === "fallback" && props.storyScene && <CrystalFallStill className={styles.crystalStill} />}
+      <div className={styles.markerLayer} inert={!!props.storyScene}>
         {GLOBE_DESTINATIONS.map(destination => {
           const boss = BOSS_CHALLENGES.find(boss => boss.id === destination.id);
           const available = boss ? canOpenBoss(props.progress, boss, props.qaUnlocked) : canOpenWorld(props.progress, destination.id, props.qaUnlocked);
@@ -367,15 +409,15 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
           return <button type="button" key={stop.id} ref={node => { if (node) nodes.current.set(`stop:${stop.id}`, node); else nodes.current.delete(`stop:${stop.id}`); }}
             className={`${styles.stopPin} ${complete ? styles.completePin : currentStop?.id === stop.id ? styles.currentPin : ""}`}
             style={fallback ? { left: `${point.x}%`, top: `${point.y}%`, visibility: "visible" } : { visibility: "hidden" }}
-            data-stop-id={stop.id} disabled={!available || busy} aria-current={currentStop?.id === stop.id ? "step" : undefined}
-            aria-label={`${stop.label}. ${complete ? "Completed" : available ? "Available" : "Locked"}. ${QUESTIONS_BY_STOP.get(stop.id)?.length} questions.`} onClick={() => { void openStop(stop.id); }}>
+            data-stop-id={stop.id} data-summit-shard={!!props.storyScattered && index === stops.length - 1 ? "true" : undefined} disabled={!available || busy} aria-current={currentStop?.id === stop.id ? "step" : undefined}
+            aria-label={`${stop.label}. ${complete ? "Completed" : available ? "Available" : "Locked"}. ${QUESTIONS_BY_STOP.get(stop.id)?.length} questions.${props.storyScattered && index === stops.length - 1 ? " A Tideheart shard rests at this summit." : ""}`} onClick={() => { void openStop(stop.id); }}>
             <span>{complete ? "✓" : !available ? "⌑" : stop.kind === "culmination" ? "★" : index + 1}</span><small>{stop.shortLabel}</small>
           </button>;
         })}
         {!props.boss && layout.books.map((book, index) => <button type="button" key={`${props.world.id}:${book.id}`} ref={node => { const key = `book:${props.world.id}:${book.id}`; if (node) nodes.current.set(key, node); else nodes.current.delete(key); }}
           className={styles.bookPin} disabled={busy} data-story-island-id={book.islandId} data-story-book-id={book.id}
           style={renderer === "fallback" ? { left: `${book.x}%`, top: `${book.y}%`, visibility: "visible" } : { visibility: "hidden" }}
-          aria-label={`Storybook on island ${index + 1}: coming soon`} aria-haspopup="dialog" onClick={event => props.onStory(index, event.currentTarget)}><BookIcon /></button>)}
+          aria-label={`Storybook on island ${index + 1}: ${props.storyBookLabels?.[index] ?? "coming soon"}`} aria-haspopup="dialog" onClick={event => props.onStory(index, event.currentTarget)}><BookIcon /></button>)}
       </div>
       {phase === "overview" && renderer === "webgl" && <div className={styles.orbitControls} aria-label="Turn the globe">
         <button type="button" aria-label="Turn globe left" onClick={() => turn(-0.45, 0, true)}>←</button>
@@ -385,8 +427,12 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
       </div>}
       {voyage && <div className={styles.voyageCard} role="status"><span className={styles.voyageKicker}>ALL ABOARD</span><strong>Sailing to {titleFor(voyage.toDestinationId)}</strong><div><button type="button" onClick={() => trip.current?.skip?.()}>Skip voyage</button><button type="button" onClick={cancelTrip}>Cancel voyage</button></div></div>}
       {activity && VoyageActivity && <div className={styles.activity}><VoyageActivity voyage={activity} onContinue={() => trip.current?.finishActivity?.()} onCancel={cancelTrip} /></div>}
+      {props.storyScene && <div className={styles.crystalCaption}>
+        <div><span className={styles.voyageKicker}>The Tideheart falls</span><strong>Thirty-two lights cross Oceania</strong><p>{storyStill ? "One shard rests at the summit of each archipelago." : "Over the clouds, across the seas… a shard for every summit."}</p></div>
+        <button ref={storyContinueRef} type="button" onClick={() => latest.current.onStorySceneEnd?.()}>Continue story <span aria-hidden="true">→</span></button>
+      </div>}
       <div ref={irisRef} className={styles.iris} aria-hidden="true" />
     </div>
-    <p className={styles.boardCaption}>{props.boss && phase !== "overview" ? "The ship faces the storm. Print the whole test to take on this challenge." : renderer === "fallback" ? "Choose an island stop, or use the list below." : phase === "overview" ? "Drag to turn the globe. Choose a destination to set sail." : "Choose a stop to explore. The two books hold stories to come."}</p>
+    <p className={styles.boardCaption}>{props.storyScene ? "The Tideheart’s light is scattered, but not lost." : props.boss && phase !== "overview" ? "The ship faces the storm. Print the whole test to take on this challenge." : renderer === "fallback" ? "Choose an island stop, or use the list below." : phase === "overview" ? "Drag to turn the globe. Choose a destination to set sail." : props.storyBookLabels ? "Choose a stop to explore. Open the two books to discover Oceania’s story." : "Choose a stop to explore. The two books hold stories to come."}</p>
   </section>;
 });
