@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { workbookQuestions } from "../app/math-world/workbook.ts";
+import { workbookArtwork, workbookQuestions } from "../app/math-world/workbook.ts";
 import { WORLD_DEFINITIONS, WORLD_QUESTIONS, QUESTIONS_BY_STOP } from "../app/math-world/world-data.ts";
 
 test("each workbook follows the playable question order and restarts numbering at each stop", () => {
@@ -13,6 +13,46 @@ test("each workbook follows the playable question order and restarts numbering a
     assert.deepEqual(entries.map(({ stopIndex }) => stopIndex), world.stopIds.flatMap((id, stopIndex) => QUESTIONS_BY_STOP.get(id).map(() => stopIndex)));
     assert.deepEqual(entries.map(({ questionIndex }) => questionIndex), world.stopIds.flatMap(id => QUESTIONS_BY_STOP.get(id).map((_, questionIndex) => questionIndex)));
   }
+});
+
+test("workbooks prefer print originals and retain each complete reviewed rectangle", async () => {
+  const { crops } = JSON.parse(await readFile(new URL("../app/math-world/workbook-image-crops.json", import.meta.url), "utf8"));
+  let originals = 0;
+  for (const question of WORLD_QUESTIONS) {
+    const crop = crops[question.id];
+    const expectedAsset = crop?.printAsset ?? question.asset;
+    const artwork = workbookArtwork(question);
+    assert.deepEqual(artwork.asset, expectedAsset, `Wrong print source: ${question.id}`);
+    // Every point in the source has the same coordinate system, including
+    // tall questions whose prompt and choices were previously split apart.
+    assert.deepEqual(
+      [artwork.left, artwork.top, artwork.right, artwork.bottom],
+      [crop?.sourceLeft ?? 0, crop?.sourceTop ?? 0, crop?.sourceRight ?? expectedAsset.width, crop?.sourceBottom ?? expectedAsset.height],
+      `The complete reviewed question must stay intact: ${question.id}`,
+    );
+    if (crop?.printAsset) {
+      originals++;
+      assert.notEqual(artwork.asset.src, question.asset.src, `Original must replace the game card: ${question.id}`);
+    }
+  }
+  assert.ok(originals >= 335, "Reviewed original print assets must not silently fall back to reconstructed game cards");
+});
+
+test("World 1 question 2 prints the original publisher's complete question", () => {
+  const world = WORLD_DEFINITIONS.find(world => world.number === 1);
+  const { question } = workbookQuestions(world)[1];
+  assert.equal(question.id, "oasis-online-2022-grades-1-2-q01");
+  const { asset, left, top, right, bottom } = workbookArtwork(question);
+  assert.equal(asset.src, "/math-world/workbook-questions/oasis-online-2022-grades-1-2-q01-original.webp");
+  assert.deepEqual([left, top, right, bottom], [0, 0, asset.width, asset.height]);
+  assert.equal(asset.originalSource.questionId, "cyprus-2022-grades-1-2-part-single-q01");
+});
+
+test("printing rejects changed or unreviewed generated source cards", () => {
+  const question = WORLD_QUESTIONS.find(question => question.id === "oasis-online-2022-grades-1-2-q01");
+  assert.ok(question, "The reported World 1 question must remain covered");
+  assert.throws(() => workbookArtwork({ ...question, asset: { ...question.asset, sha256: "changed-source" } }), /artwork has changed/);
+  assert.throws(() => workbookArtwork({ ...question, id: "oasis-online-unreviewed-question" }), /crop needs an update/);
 });
 
 test("workbook image bounds stay bound to the approved crops and exclude captured footers", async () => {
