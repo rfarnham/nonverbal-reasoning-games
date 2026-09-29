@@ -80,6 +80,12 @@ evicted, so confirm download completion before disconnecting. Uploaded images
 can be read by bundled local OCR; extracted text remains editable. OCR transcribes
 words, not the mathematical meaning of an unfamiliar diagram.
 
+Production builds use Webpack, matching `build:pages`, so the search worker is
+self-contained for offline reloads. Turbopack's separate worker dependencies
+are not supported by this offline cache. The vendored OCR assets can be
+reproduced with `npm run search:ocr`; their sources and checksums are recorded
+in `public/question-search/ocr/NOTICE.md`.
+
 ## Local agent interface
 
 ```sh
@@ -174,6 +180,12 @@ Grade 3 means the same core move; 2 is a useful adaptation; 1 is a neighboring
 skill or surface resemblance; 0 is unrelated; null is uncertain. Valid
 relationships are `same_method`, `adaptation`, `related_skill`, `surface_only`,
 `unrelated`, and `uncertain`. Leave uninspected candidates unjudged.
+
+Browser review exports include development cases for searches started with
+**Find related**. External-input judgments are retained for inspection but are
+not source-question leave-one-out cases. Review new labels before adding them
+to an independent benchmark; browser judgments may have been influenced by
+visible search annotations.
 
 The evaluator distinguishes known-question text lookup from leave-one-out
 retrieval. Leave-one-out uses only the source prompt, excludes the query itself,

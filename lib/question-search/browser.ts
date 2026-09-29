@@ -110,7 +110,7 @@ export class SearchSession {
     const cache = await caches.open("question-search-offline-v1");
     const paths = [...new Set(this.corpus.questions.map(q => q.image.path))];
     const urls = [
-      `${basePath}/question-search/`, `${DATA_ROOT}manifest.json`,
+      `${basePath}/question-search/`, `${basePath}/favicon.svg`, `${DATA_ROOT}manifest.json`,
       `${DATA_ROOT}${this.manifest.index.path}?pack=${this.manifest.index.sha256}`,
       ...paths.map(path => `${DATA_ROOT}${path}?pack=${this.manifest.index.sha256}`),
       ...["worker.min.js", "eng.traineddata.gz", "tesseract-core-lstm.wasm.js", "tesseract-core-simd-lstm.wasm.js", "tesseract-core.wasm.js", "tesseract-core-simd.wasm.js"].map(path => `${OCR_ROOT}${path}`),
