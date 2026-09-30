@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useId, useRef } from "react";
 import type { StoryIllustration, StoryPageContent } from "./story-content";
 import styles from "./story.module.css";
@@ -101,7 +102,7 @@ function StoryIllustration({ kind }: { kind: StoryIllustration }) {
 }
 
 export type StoryPageProps = {
-  page: StoryPageContent;
+  page: Omit<StoryPageContent, "illustration"> & { illustration: StoryPageContent["illustration"] | { src: string; width: number; height: number; alt: string } };
   onContinue: () => void;
   onClose?: () => void;
   actionLabel?: string;
@@ -134,7 +135,7 @@ export function StoryPage({ page, onContinue, onClose, actionLabel = "Continue" 
       <div className={styles.scrollRoll} aria-hidden="true" />
       <div className={styles.sheet}>
         <div className={styles.folio} aria-hidden="true"><span>Oceania</span><span>✦</span><span>The island chronicles</span></div>
-        <StoryIllustration kind={page.illustration} />
+        {typeof page.illustration === "string" ? <StoryIllustration kind={page.illustration} /> : <Image className={styles.illustration} src={`${(process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "")}${page.illustration.src}`} width={page.illustration.width} height={page.illustration.height} alt={page.illustration.alt} unoptimized priority style={{ height: "auto", maxHeight: "38vh", objectFit: "contain", borderRadius: "20px" }} />}
         <header className={styles.header}>
           <p className={styles.kicker}>{page.kicker}</p>
           <h2 ref={headingRef} tabIndex={-1} id={titleId} className={styles.title}>{page.title}</h2>

@@ -4,6 +4,15 @@ import imageCrops from "./workbook-image-crops.json" with { type: "json" };
 type PrintAsset = { src: string; width: number; height: number; sha256: string };
 type Crop = { printAsset?: PrintAsset; assetSha256: string; sourceTop: number; sourceBottom: number; sourceLeft?: number; sourceRight?: number; clarification?: string; answerLabelNote?: string };
 type Artwork = { src: string; width: number; height: number; left: number; right: number; top: number; bottom: number };
+type WorkbookEntry = {
+  question: WorldQuestion;
+  stopId: string;
+  stopLabel: string;
+  questionNumber: number;
+  questionCount: number;
+  answerInstruction: string;
+};
+type WorkbookPacket = { title: string; subtitle: string; entries: readonly WorkbookEntry[] };
 const crops = imageCrops.crops as Record<string, Crop>;
 const basePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
 const escapeHtml = (value: string | number) => String(value).replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!);
@@ -13,6 +22,19 @@ export function workbookQuestions(world: WorldDefinition) {
   return stopsForWorld(world.id).flatMap((stop, stopIndex) =>
     (QUESTIONS_BY_STOP.get(stop.id) ?? []).map((question, questionIndex) => ({ stop, stopIndex, question, questionIndex })),
   );
+}
+
+/** Preserve the snapshotted review sequence, with one stop numbered from 1. */
+export function dangerWorkbookQuestions(dangerId: string, questions: readonly WorldQuestion[]): WorkbookEntry[] {
+  if (questions.length === 0 || questions.length > 24) throw new Error("A danger workbook must contain between 1 and 24 questions.");
+  return questions.map((question, index) => ({
+    question,
+    stopId: dangerId,
+    stopLabel: "Stop 1 · Sea review",
+    questionNumber: index + 1,
+    questionCount: questions.length,
+    answerInstruction: `Enter your answer in the danger’s review stop, Question ${index + 1}.`,
+  }));
 }
 
 const stylesheet = `
@@ -74,22 +96,22 @@ function renderArtwork(art: Artwork, scale = 1): string {
   return `<div class="fragment" data-intact-layout="true" data-source-left="${art.left}" data-source-right="${art.right}" data-source-top="${art.top}" data-source-bottom="${art.bottom}" style="width:${width}mm;height:${(art.bottom - art.top) * factor}mm"><img src="${escapeHtml(art.src)}" alt="Question artwork and answer choices" width="${art.width}" height="${art.height}" style="width:${art.width * factor}mm;height:${art.height * factor}mm;left:${-art.left * factor}mm;top:${-art.top * factor}mm"></div>`;
 }
 
-function sheet(world: WorldDefinition, entry: ReturnType<typeof workbookQuestions>[number], artwork: Artwork, index: number, count: number): string {
-  const { question, stop, stopIndex, questionIndex } = entry;
+function sheet(packet: WorkbookPacket, entry: WorkbookEntry, artwork: Artwork, index: number, count: number): string {
+  const { question, stopId, stopLabel, questionNumber, questionCount, answerInstruction } = entry;
   // Only reviewed repairs/translations supplement the source image. Printing
   // never reconstructs its text or lays out answer controls.
   const crop = crops[question.id];
   const clarifications = [...new Set([question.showPrompt ? question.prompt : undefined, crop?.clarification].filter((text): text is string => Boolean(text)))];
   const clarification = clarifications.map(text => `<p class="clarification">${escapeHtml(text)}</p>`).join("");
   const answerLabelNote = crop?.answerLabelNote ? `<p class="answer-label-note">${escapeHtml(crop.answerLabelNote)}</p>` : "";
-  return `<article class="sheet" data-question-id="${escapeHtml(question.id)}" data-stop-id="${escapeHtml(stop.id)}" data-question-number="${questionIndex + 1}">
-<header class="page-head"><div><h1>${escapeHtml(world.title)}</h1><p>World ${world.number} · ${escapeHtml(world.concept)} ${world.spiral}</p></div><div class="name">Name: __________________</div></header>
-<h2 class="question-heading">Stop ${stopIndex + 1} · ${escapeHtml(stop.shortLabel)}<span>Question ${questionIndex + 1} of ${QUESTIONS_BY_STOP.get(stop.id)?.length ?? 0}</span></h2>
+  return `<article class="sheet" data-question-id="${escapeHtml(question.id)}" data-stop-id="${escapeHtml(stopId)}" data-question-number="${questionNumber}">
+<header class="page-head"><div><h1>${escapeHtml(packet.title)}</h1><p>${escapeHtml(packet.subtitle)}</p></div><div class="name">Name: __________________</div></header>
+<h2 class="question-heading">${escapeHtml(stopLabel)}<span>Question ${questionNumber} of ${questionCount}</span></h2>
 ${clarification}
 <div class="artwork">${renderArtwork(artwork)}</div>
 ${answerLabelNote}
 <section class="workspace" aria-label="Pencil and paper working space"><p class="workspace-label">My working</p><div class="work-lines"></div><p class="answer">My answer: __________</p></section>
-<footer class="page-foot"><span>Enter your answer in World ${world.number}, Stop ${stopIndex + 1}, Question ${questionIndex + 1}.</span><span>Page ${index + 1} of ${count}</span></footer></article>`;
+<footer class="page-foot"><span>${escapeHtml(answerInstruction)}</span><span>Page ${index + 1} of ${count}</span></footer></article>`;
 }
 
 async function waitForDocumentImages(popup: Window): Promise<void> {
@@ -111,12 +133,32 @@ async function waitForDocumentImages(popup: Window): Promise<void> {
 
 /** The popup opens during the original click, before any asynchronous work. */
 export async function printWorldWorkbook(world: WorldDefinition): Promise<void> {
+  return printWorkbook({
+    title: world.title,
+    subtitle: `World ${world.number} · ${world.concept} ${world.spiral}`,
+    entries: workbookQuestions(world).map(({ question, stop, stopIndex, questionIndex }) => ({
+      question,
+      stopId: stop.id,
+      stopLabel: `Stop ${stopIndex + 1} · ${stop.shortLabel}`,
+      questionNumber: questionIndex + 1,
+      questionCount: QUESTIONS_BY_STOP.get(stop.id)?.length ?? 0,
+      answerInstruction: `Enter your answer in World ${world.number}, Stop ${stopIndex + 1}, Question ${questionIndex + 1}.`,
+    })),
+  });
+}
+
+/** Print the same immutable packet used by the danger's single review stop. */
+export async function printDangerWorkbook(title: string, dangerId: string, questions: readonly WorldQuestion[]): Promise<void> {
+  return printWorkbook({ title, subtitle: "Oceania · Danger review", entries: dangerWorkbookQuestions(dangerId, questions) });
+}
+
+async function printWorkbook(packet: WorkbookPacket): Promise<void> {
   const popup = window.open("", "_blank");
   if (!popup) throw new Error("Allow popups to print this workbook, then try again.");
   popup.opener = null;
-  const entries = workbookQuestions(world);
+  const { entries } = packet;
   popup.document.open();
-  popup.document.write(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(world.title)} - Workbook</title><style>${stylesheet}</style></head><body data-print-ready="false"><div class="toolbar"><p id="print-status" role="status">Preparing all ${entries.length} questions…</p><button id="print-workbook" type="button" disabled>Print workbook</button></div><main id="pages"></main></body></html>`);
+  popup.document.write(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(packet.title)} - Workbook</title><style>${stylesheet}</style></head><body data-print-ready="false"><div class="toolbar"><p id="print-status" role="status">Preparing all ${entries.length} questions…</p><button id="print-workbook" type="button" disabled>Print workbook</button></div><main id="pages"></main></body></html>`);
   popup.document.close();
   const status = popup.document.getElementById("print-status")!;
   const button = popup.document.getElementById("print-workbook") as HTMLButtonElement;
@@ -128,7 +170,7 @@ export async function printWorldWorkbook(world: WorldDefinition): Promise<void> 
       return artworkFor(question, image, src);
     }));
     if (popup.closed) return;
-    popup.document.getElementById("pages")!.innerHTML = entries.map((entry, index) => sheet(world, entry, art[index], index, entries.length)).join("");
+    popup.document.getElementById("pages")!.innerHTML = entries.map((entry, index) => sheet(packet, entry, art[index], index, entries.length)).join("");
     await waitForDocumentImages(popup);
     if (popup.closed) return;
     // Fit each source image while reserving at least 38mm for pencil work.
@@ -152,7 +194,7 @@ export async function printWorldWorkbook(world: WorldDefinition): Promise<void> 
     await waitForDocumentImages(popup);
     if (popup.closed) return;
     popup.document.body.dataset.printReady = "true";
-    status.textContent = `${world.title} · ${entries.length} questions · Print or choose Save as PDF.`;
+    status.textContent = `${packet.title} · ${entries.length} questions · Print or choose Save as PDF.`;
     button.disabled = false;
     const print = () => { if (!popup.closed) { popup.focus(); popup.print(); } };
     button.addEventListener("click", print);

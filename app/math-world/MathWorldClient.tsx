@@ -4,6 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   useEffect,
+  useCallback,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -20,7 +22,6 @@ import {
   allowRetry,
   answerQuestion,
   createInitialProgress,
-  canOpenWorld,
   selectWorld,
   leaveCheckpoint,
   startStop,
@@ -49,8 +50,11 @@ import {
 import { WorldMap } from "./WorldMap";
 import { BossWorld } from "./BossWorld";
 import { GlobeAdventure } from "./GlobeAdventure";
-import { bossById, canOpenBoss, type BossChallenge } from "./boss-challenges.ts";
+import { bossById, type BossChallenge } from "./boss-challenges.ts";
 import { createStoryProgress, pendingFirstWorldEnding, readStoryProgress, writeStoryProgress, type WorldStoryProgress } from "./story-progress.ts";
+import { dangerById, nextDueDanger, canNavigateDestination, type DangerDefinition } from "./danger-definitions.ts";
+import { createDangerState, recordDangerMiss, ensureDangerPacket, acknowledgeDangerBriefing, startDangerPacket, answerDangerQuestion, allowDangerRetry, advanceDangerQuestion, dangerPacketQuestions, type DangerState } from "./danger-engine.ts";
+import { readDangerIdentity, readDangerState, writeDangerState, claimLegacyDangerMisses } from "./danger-storage.ts";
 import styles from "./math-world.module.css";
 
 const basePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
@@ -85,6 +89,24 @@ export default function MathWorldClient() {
   const [hydrated, setHydrated] = useState(false);
   const [qaUnlocked, setQaUnlocked] = useState(false);
   const [selectedBoss, setSelectedBoss] = useState<BossChallenge | null>(null);
+  const [selectedDanger, setSelectedDanger] = useState<DangerDefinition | null>(null);
+  const [dangerSaveFailed, setDangerSaveFailed] = useState(false);
+  const [dangerPlaying, setDangerPlaying] = useState(false);
+  const [dangerState, setDangerState] = useState<DangerState>(() => createDangerState("device-guest"));
+  const dangerRef = useRef(dangerState);
+  const submissionLocked = useRef(false);
+  const saveDanger = useCallback((next: DangerState) => {
+    dangerRef.current = next;
+    setDangerState(next);
+    setDangerSaveFailed(!writeDangerState(next));
+  }, []);
+  const loadDangers = useCallback((saved: WorldProgress, qa: boolean) => {
+    const identity = readDangerIdentity();
+    const next = claimLegacyDangerMisses(readDangerState(identity.profileId, qa), saved);
+    saveDanger(next);
+    return next;
+  }, [saveDanger]);
+  const canNavigate = (id: string) => canNavigateDestination(progress, dangerState, id, qaUnlocked);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [inspectedStopId, setInspectedStopId] = useState<string | null>(null);
   const [lastVisitedStopId, setLastVisitedStopId] = useState<string | null>(null);
@@ -102,13 +124,18 @@ export default function MathWorldClient() {
     const timer = window.setTimeout(() => {
       const playtestMode = readWorldPlaytestMode() || new URLSearchParams(window.location.search).get("qa") === "1";
       const savedProgress = readWorldProgress(playtestMode);
+      const savedDangers = loadDangers(savedProgress, playtestMode);
+      const requestedDanger = dangerById(new URLSearchParams(window.location.search).get("danger"));
+      const initialDanger = requestedDanger && canNavigateDestination(savedProgress, savedDangers, requestedDanger.id, playtestMode) ? requestedDanger : !playtestMode && !canNavigateDestination(savedProgress, savedDangers, savedProgress.selectedWorldId) ? nextDueDanger(savedProgress, savedDangers) ?? null : null;
+      setSelectedDanger(initialDanger ?? null);
       const requestedBoss = bossById(new URLSearchParams(window.location.search).get("boss"));
-      const initialBoss = requestedBoss && canOpenBoss(savedProgress, requestedBoss, playtestMode) ? requestedBoss : null;
+      const initialBoss = !initialDanger && requestedBoss && canNavigateDestination(savedProgress, savedDangers, requestedBoss.id, playtestMode) ? requestedBoss : null;
       setQaUnlocked(playtestMode);
       setProgress(savedProgress);
       setStoryProgress(readStoryProgress(playtestMode));
       setSelectedBoss(initialBoss);
       const initialUrl = new URL(window.location.href);
+      if (!initialDanger) initialUrl.searchParams.delete("danger"); else initialUrl.searchParams.set("danger", initialDanger.id);
       if (!initialBoss) initialUrl.searchParams.delete("boss");
       window.history.replaceState({ ...window.history.state, mathWorldId: savedProgress.selectedWorldId }, "", initialUrl);
       setSoundEnabled(readSoundPreference());
@@ -116,7 +143,7 @@ export default function MathWorldClient() {
       window.scrollTo({ top: 0, behavior: "auto" });
     }, 0);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [loadDangers]);
 
   useEffect(() => {
     if (hydrated) writeWorldProgress(progress, qaUnlocked);
@@ -127,7 +154,13 @@ export default function MathWorldClient() {
     const syncProfile = () => {
       const next = readWorldPlaytestMode() || new URLSearchParams(window.location.search).get("qa") === "1";
       const nextProgress = next !== qaUnlocked ? readWorldProgress(next) : progress;
-      if (next !== qaUnlocked) {
+      const identity = readDangerIdentity();
+      if (next !== qaUnlocked || identity.profileId !== dangerRef.current.profileId) {
+        const loaded = loadDangers(nextProgress, next);
+        const due = !next && !canNavigateDestination(nextProgress, loaded, nextProgress.selectedWorldId) ? nextDueDanger(nextProgress, loaded) : undefined;
+        setSelectedDanger(due ?? null); setDangerPlaying(false);
+        const dangerUrl = new URL(window.location.href); if (due) dangerUrl.searchParams.set("danger", due.id); else dangerUrl.searchParams.delete("danger");
+        window.history.replaceState(window.history.state, "", dangerUrl);
         setQaUnlocked(next);
         setProgress(nextProgress);
         setStoryProgress(readStoryProgress(next));
@@ -136,7 +169,7 @@ export default function MathWorldClient() {
         setQaOpen(false);
         setZoomed(false);
       }
-      if (selectedBoss && !canOpenBoss(nextProgress, selectedBoss, next)) {
+      if (selectedBoss && !canNavigateDestination(nextProgress, dangerRef.current, selectedBoss.id, next)) {
         setSelectedBoss(null);
         const url = new URL(window.location.href);
         url.searchParams.delete("boss");
@@ -152,7 +185,7 @@ export default function MathWorldClient() {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("focus", syncProfile);
     };
-  }, [hydrated, qaUnlocked, progress, selectedBoss]);
+  }, [hydrated, qaUnlocked, progress, selectedBoss, loadDangers]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -160,6 +193,8 @@ export default function MathWorldClient() {
       const params = new URLSearchParams(window.location.search);
       const nextQa = readWorldPlaytestMode() || params.get("qa") === "1";
       const nextProgress = nextQa !== qaUnlocked ? readWorldProgress(nextQa) : progress;
+      const nextDangers = nextQa !== qaUnlocked ? loadDangers(nextProgress, nextQa) : dangerRef.current;
+      setDangerPlaying(false);
       if (nextQa !== qaUnlocked) {
         setQaUnlocked(nextQa);
         setProgress(nextProgress);
@@ -171,22 +206,28 @@ export default function MathWorldClient() {
         const url = new URL(window.location.href);
         url.searchParams.delete("boss");
         window.history.replaceState({ ...window.history.state, mathWorldId: nextProgress.selectedWorldId }, "", url);
-        setSelectedBoss(null);
+        setSelectedBoss(null); setSelectedDanger(null);
+        url.searchParams.delete("danger");
+        window.history.replaceState(window.history.state, "", url);
         return;
       }
+      const requestedDanger = dangerById(params.get("danger"));
+      const allowedDanger = requestedDanger && canNavigateDestination(nextProgress, nextDangers, requestedDanger.id, nextQa) ? requestedDanger : null;
+      setSelectedDanger(allowedDanger ?? null);
       const requestedBossId = params.get("boss");
       const requestedBoss = bossById(requestedBossId);
-      const allowedBoss = requestedBoss && canOpenBoss(nextProgress, requestedBoss, nextQa) ? requestedBoss : null;
+      const allowedBoss = !allowedDanger && requestedBoss && canNavigateDestination(nextProgress, nextDangers, requestedBoss.id, nextQa) ? requestedBoss : null;
       setSelectedBoss(allowedBoss);
       setInspectedStopId(null);
       setLastVisitedStopId(null);
       setQaOpen(false);
       setZoomed(false);
-      if (!allowedBoss) {
+      if (!allowedDanger) { const url = new URL(window.location.href); url.searchParams.delete("danger"); window.history.replaceState(window.history.state, "", url); }
+      if (!allowedBoss && !allowedDanger) {
         const url = new URL(window.location.href);
         url.searchParams.delete("boss");
         const worldId = event.state?.mathWorldId;
-        if (!requestedBossId && typeof worldId === "string" && canOpenWorld(nextProgress, worldId, nextQa)) {
+        if (!requestedBossId && typeof worldId === "string" && canNavigateDestination(nextProgress, nextDangers, worldId, nextQa)) {
           setProgress(current => current.selectedWorldId === worldId ? current : selectWorld(current, worldId, nextQa));
         }
         window.history.replaceState(window.history.state, "", url);
@@ -195,16 +236,19 @@ export default function MathWorldClient() {
     };
     window.addEventListener("popstate", restoreDestination);
     return () => window.removeEventListener("popstate", restoreDestination);
-  }, [hydrated, progress, qaUnlocked, storyProgress]);
+  }, [hydrated, progress, qaUnlocked, storyProgress, loadDangers]);
 
-  const activeStop = selectedBoss ? null : stopById(progress.activeStopId);
+  const dangerPacket = selectedDanger ? dangerState.packets[selectedDanger.id] : undefined;
+  const activeDanger = selectedDanger && dangerPlaying && dangerPacket?.startedAt && !dangerPacket.completedAt ? selectedDanger : null;
+  const activeStop = useMemo(() => activeDanger ? { ...REQUIRED_STOPS[0], id: `${activeDanger.id}:review`, label: "Danger crossing", shortLabel: "Danger crossing" }
+    : selectedBoss || selectedDanger ? null : stopById(progress.activeStopId), [activeDanger, selectedBoss, selectedDanger, progress.activeStopId]);
   const selectedWorld = (activeStop ? worldForStop(activeStop.id) : undefined)
     ?? WORLD_DEFINITIONS.find(({ id }) => id === progress.selectedWorldId)
     ?? WORLD_DEFINITIONS[0];
-  const questions = activeStop
+  const questions = activeDanger && dangerPacket ? dangerPacketQuestions(dangerPacket) : activeStop
     ? (QUESTIONS_BY_STOP.get(activeStop.id) ?? [])
     : [];
-  const attempt = activeStop ? progress.stopAttempts[activeStop.id] : undefined;
+  const attempt = activeDanger ? dangerPacket?.attempt : activeStop ? progress.stopAttempts[activeStop.id] : undefined;
   const question = attempt
     ? questions[Math.min(attempt.questionIndex, Math.max(questions.length - 1, 0))]
     : undefined;
@@ -213,14 +257,15 @@ export default function MathWorldClient() {
     if (!activeStop || !attempt || attempt.phase !== "wrong-review") return;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const timeout = window.setTimeout(
-      () => setProgress((current) => allowRetry(current, activeStop.id)),
+      () => { if (activeDanger) saveDanger(allowDangerRetry(dangerRef.current, activeDanger.id)); else setProgress((current) => allowRetry(current, activeStop.id)); },
       reducedMotion ? 1300 : 2200,
     );
     return () => window.clearTimeout(timeout);
-  }, [activeStop, attempt]);
+  }, [activeStop, activeDanger, attempt, saveDanger]);
 
   useEffect(() => {
     if (!attempt) return;
+    submissionLocked.current = !["answering", "retry"].includes(attempt.phase);
     if (attempt.phase === "correct") {
       nextRef.current?.focus({ preventScroll: true });
       return;
@@ -254,11 +299,20 @@ export default function MathWorldClient() {
     if (!activeStop || !question || !attempt || !["answering", "retry"].includes(attempt.phase)) {
       return;
     }
+    if (submissionLocked.current) return;
+    submissionLocked.current = true;
     const correct = selectedIndex === question.correctIndex;
-    rememberFirstQaSelection(question.id, activeStop.id, selectedIndex);
+    const observation = { eventId: crypto.randomUUID(), at: new Date().toISOString() };
+    if (activeDanger) saveDanger(answerDangerQuestion(dangerRef.current, activeDanger.id, selectedIndex, observation));
+    else if (!correct) saveDanger(recordDangerMiss(dangerRef.current, {
+      ...observation, questionId: question.id, source: "archipelago", sourceId: activeStop.id,
+      worldNumber: selectedWorld.number, selectedIndex,
+      attemptOrdinal: dangerRef.current.misses.filter(miss => miss.sourceId === activeStop.id && miss.questionId === question.id).length + 1,
+    }));
+    if (!activeDanger) rememberFirstQaSelection(question.id, activeStop.id, selectedIndex);
     const context = ensureAudio();
     if (context) playFeedbackEarcon(context, correct);
-    setProgress((current) =>
+    if (!activeDanger) setProgress((current) =>
       answerQuestion(current, activeStop.id, question, selectedIndex),
     );
   }
@@ -305,6 +359,8 @@ export default function MathWorldClient() {
   }
 
   function openStop(stopId: string) {
+    const world = worldForStop(stopId);
+    if (!world || !canNavigate(world.id)) return;
     setInspectedStopId(null);
     setLastVisitedStopId(stopId);
     setProgress((current) => startStop(current, stopId, qaUnlocked));
@@ -313,9 +369,10 @@ export default function MathWorldClient() {
 
   function chooseWorld(worldId: string) {
     if (pendingFirstWorldEnding(storyProgress, progress)) return;
-    if (!canOpenWorld(progress, worldId, qaUnlocked)) return;
+    if (!canNavigate(worldId)) return;
     const url = new URL(window.location.href);
-    url.searchParams.delete("boss");
+    url.searchParams.delete("boss"); url.searchParams.delete("danger");
+    setSelectedDanger(null); setDangerPlaying(false);
     window.history.pushState({ ...window.history.state, mathWorldId: worldId }, "", url);
     setSelectedBoss(null);
     setInspectedStopId(null);
@@ -328,9 +385,10 @@ export default function MathWorldClient() {
 
   function chooseBoss(challenge: BossChallenge) {
     if (pendingFirstWorldEnding(storyProgress, progress)) return;
-    if (!canOpenBoss(progress, challenge, qaUnlocked)) return;
+    if (!canNavigate(challenge.id)) return;
     const url = new URL(window.location.href);
-    url.searchParams.set("boss", challenge.id);
+    url.searchParams.set("boss", challenge.id); url.searchParams.delete("danger");
+    setSelectedDanger(null); setDangerPlaying(false);
     window.history.pushState({ ...window.history.state, mathWorldId: progress.selectedWorldId }, "", url);
     setSelectedBoss(challenge);
     setInspectedStopId(null);
@@ -340,7 +398,29 @@ export default function MathWorldClient() {
     resetViewport();
   }
 
+  function chooseDanger(danger: DangerDefinition) {
+    if (pendingFirstWorldEnding(storyProgress, progress) || !canNavigate(danger.id)) return;
+    const url = new URL(window.location.href); url.searchParams.delete("boss"); url.searchParams.set("danger", danger.id);
+    window.history.pushState({ ...window.history.state, mathWorldId: progress.selectedWorldId }, "", url);
+    setSelectedDanger(danger); setDangerPlaying(false); setSelectedBoss(null);
+    setInspectedStopId(null); setQaOpen(false); setZoomed(false);
+    setProgress(current => ({ ...leaveCheckpoint(current), activeStopId: null }));
+    resetViewport();
+  }
+  function prepareDanger() {
+    if (!selectedDanger || !canNavigate(selectedDanger.id)) return;
+    const next = acknowledgeDangerBriefing(ensureDangerPacket(dangerRef.current, { dangerId: selectedDanger.id, afterWorldNumber: selectedDanger.afterWorld }), selectedDanger.id);
+    saveDanger(next);
+    return next.packets[selectedDanger.id];
+  }
+  function openDanger() {
+    if (!selectedDanger || !canNavigate(selectedDanger.id)) return;
+    const next = startDangerPacket(dangerRef.current, selectedDanger.id);
+    if (!next.packets[selectedDanger.id]?.startedAt) return;
+    saveDanger(next); setDangerPlaying(!next.packets[selectedDanger.id]?.completedAt); resetViewport();
+  }
   function goToMap() {
+    if (activeDanger) { setDangerPlaying(false); resetViewport(); return; }
     if (activeStop) setLastVisitedStopId(activeStop.id);
     setProgress((current) => ({ ...leaveCheckpoint(current), activeStopId: null }));
     resetViewport();
@@ -352,6 +432,12 @@ export default function MathWorldClient() {
   }
 
   function goToNextQuestion() {
+    if (activeDanger) {
+      const next = advanceDangerQuestion(dangerRef.current, activeDanger.id);
+      saveDanger(next);
+      if (next.packets[activeDanger.id]?.completedAt) setDangerPlaying(false);
+      resetViewport(); return;
+    }
     if (!activeStop) return;
     setProgress((current) => advanceQuestion(current, activeStop.id, questions.length));
     resetViewport();
@@ -436,8 +522,10 @@ export default function MathWorldClient() {
         </div>
       </header>
 
+      {dangerSaveFailed && <p role="alert" className={styles.testNotice}>This browser could not save your review progress. Keep this tab open to retain the current packet.</p>}
       {!activeStop && WORLD_MODE === "spiral-preview" ? (
         <GlobeAdventure key={qaUnlocked ? "playtest-globe" : "adventure-globe"}
+          danger={selectedDanger} dangerState={dangerState} onChooseDanger={chooseDanger} canNavigate={canNavigate} onPrepareDanger={prepareDanger} onOpenDanger={openDanger}
           world={selectedWorld} boss={selectedBoss} progress={progress} qaUnlocked={qaUnlocked}
           storyProgress={storyProgress} onStoryProgress={saveStoryProgress}
           avatarStopId={lastVisitedStopId} onChooseWorld={chooseWorld} onChooseBoss={chooseBoss}
@@ -450,7 +538,7 @@ export default function MathWorldClient() {
         <main className={styles.courseShell}>
           <section className={styles.courseTopline} aria-label="Stop progress">
             <div>
-              <p className={styles.kicker}>World {selectedWorld.number} · {selectedWorld.concept} {selectedWorld.spiral}</p>
+              <p className={styles.kicker}>{activeDanger ? `${activeDanger.title} · After World ${activeDanger.afterWorld}` : `World ${selectedWorld.number} · ${selectedWorld.concept} ${selectedWorld.spiral}`}</p>
               <h1>{activeStop.label}</h1>
             </div>
             <div className={styles.questionProgress}>
@@ -474,9 +562,9 @@ export default function MathWorldClient() {
                 <span className={styles.sourcePill}>{question.source.sourceKind === "practice" ? "Practice" : question.source.sourceKind === "mock" ? "Mock test" : "Math Kangaroo"} · {question.source.year}</span>
                 <h2 id="question-heading">Choose the best answer.</h2>
               </div>
-              <button type="button" className={styles.flagButton} onClick={openQa}>
+              {!activeDanger && <button type="button" className={styles.flagButton} onClick={openQa}>
                 Flag question
-              </button>
+              </button>}
             </div>
 
             <p className={question.presentation === "semantic" || question.showPrompt ? styles.questionPrompt : styles.srOnly}>

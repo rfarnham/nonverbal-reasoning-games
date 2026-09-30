@@ -4,18 +4,21 @@ import { bossAfterWorld, canOpenBoss, type BossChallenge } from "./boss-challeng
 import { getBossStormStages, bossStormStageLabel } from "./boss-storm-state.ts";
 import { canOpenWorld, type WorldProgress } from "./engine.ts";
 import { WORLD_DEFINITIONS, WORLD_MODE, type WorldDefinition } from "./world-data.ts";
+import { dangerAfterWorld, type DangerDefinition } from "./danger-definitions.ts";
 import styles from "./math-world.module.css";
 
-type Destination = Readonly<{ kind: "world"; world: WorldDefinition }> | Readonly<{ kind: "boss"; challenge: BossChallenge }>;
+type Destination = Readonly<{ kind: "danger"; danger: DangerDefinition }> | Readonly<{ kind: "world"; world: WorldDefinition }> | Readonly<{ kind: "boss"; challenge: BossChallenge }>;
 
 const destinations: readonly Destination[] = WORLD_DEFINITIONS.flatMap((world): Destination[] => {
   const challenge = WORLD_MODE === "spiral-preview" ? bossAfterWorld(world.number) : undefined;
-  return [{ kind: "world", world }, ...(challenge ? [{ kind: "boss" as const, challenge }] : [])];
+  return [{ kind: "world", world }, ...(WORLD_MODE === "spiral-preview" && dangerAfterWorld(world.number) ? [{ kind: "danger" as const, danger: dangerAfterWorld(world.number)! }] : []), ...(challenge ? [{ kind: "boss" as const, challenge }] : [])];
 });
 
-const destinationId = (destination: Destination) => destination.kind === "world" ? destination.world.id : destination.challenge.id;
+const destinationId = (destination: Destination) => destination.kind === "world" ? destination.world.id : destination.kind === "danger" ? destination.danger.id : destination.challenge.id;
 
-export function WorldNavigation({ selectedId, progress, qaUnlocked, busy = false, onChooseWorld, onChooseBoss }: Readonly<{
+export function WorldNavigation({ selectedId, progress, qaUnlocked, busy = false, onChooseWorld, onChooseBoss, onChooseDanger, canNavigate }: Readonly<{
+  onChooseDanger?: (danger: DangerDefinition) => void;
+  canNavigate?: (id: string) => boolean;
   selectedId: string;
   progress: WorldProgress;
   qaUnlocked: boolean;
@@ -28,12 +31,13 @@ export function WorldNavigation({ selectedId, progress, qaUnlocked, busy = false
   const current = destinations[index];
   const previous = destinations[index - 1];
   const next = destinations[index + 1];
-  const available = (destination: Destination | undefined) => !!destination && (destination.kind === "world"
+  const available = (destination: Destination | undefined) => !!destination && (canNavigate ? canNavigate(destinationId(destination)) : destination.kind === "danger" ? false : destination.kind === "world"
     ? canOpenWorld(progress, destination.world.id, qaUnlocked)
     : canOpenBoss(progress, destination.challenge, qaUnlocked));
   function choose(destination: Destination | undefined) {
     if (!destination || busy || !available(destination)) return;
     if (destination.kind === "world") onChooseWorld(destination.world.id);
+    else if (destination.kind === "danger") onChooseDanger?.(destination.danger);
     else onChooseBoss(destination.challenge);
   }
   return <nav className={styles.worldNavigation} aria-label="World navigation">
@@ -46,6 +50,7 @@ export function WorldNavigation({ selectedId, progress, qaUnlocked, busy = false
           onChange={event => choose(destinations.find(destination => destinationId(destination) === event.target.value))}>
           {destinations.map(destination => {
             const unlocked = available(destination);
+            if (destination.kind === "danger") return <option key={destination.danger.id} value={destination.danger.id} disabled={!unlocked}>◇ {destination.danger.title} · After World {destination.danger.afterWorld}{!unlocked ? " · Locked" : ""}</option>;
             if (destination.kind === "boss") return <option key={destination.challenge.id} value={destination.challenge.id} disabled={!unlocked}>
               ◉ {destination.challenge.title} · After World {destination.challenge.afterWorld}{!unlocked ? ` · ${stormStages[destination.challenge.id] > 0 ? bossStormStageLabel(stormStages[destination.challenge.id]) + " · " : ""}Locked` : ""}
             </option>;
@@ -62,6 +67,6 @@ export function WorldNavigation({ selectedId, progress, qaUnlocked, busy = false
     </div>
     <span className={styles.worldSequence}>{current?.kind === "world"
       ? `World ${current.world.number} of ${WORLD_DEFINITIONS.length}`
-      : current ? `Storm after World ${current.challenge.afterWorld}` : ""}</span>
+      : current?.kind === "danger" ? `Danger after World ${current.danger.afterWorld}` : current ? `Storm after World ${current.challenge.afterWorld}` : ""}</span>
   </nav>;
 }
