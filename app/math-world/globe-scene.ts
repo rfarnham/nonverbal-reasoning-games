@@ -16,6 +16,7 @@ import { createGlobeCrystalStory } from "./globe-crystal-story";
 import { northUpGlobeOrientation, type GlobeOrientation } from "./globe-navigation";
 import { sampleStormShipMotion } from "./storm-ship-motion";
 import { createSceneryClock } from "./scenery-clock";
+import { SKY_CYCLE_SECONDS } from "./globe-celestial-frame";
 import { placeOccupiedStopBadge, placeStopCaption } from "./globe-marker-layout";
 import {
   GLOBE_DESTINATIONS, GLOBE_DANGER_REGIONS, getGlobeDestination, getGlobeRoadPoints, mapPointToGlobe,
@@ -39,12 +40,14 @@ export type GlobeSceneFrame = Readonly<{
   avatarPosition?: Vec3; avatarHop?: number;
   boatPosition?: Vec3; boatHeading?: Vec3;
   storyProgress?: number | null; storyPullback?: number; storyScattered?: boolean;
+  overviewSpinning?: boolean;
 }>;
 export type GlobeSceneOptions = Readonly<{
   onProject: (projection: GlobeProjection) => void;
   onUnavailable: () => void;
   assetBasePath?: string;
   animateScenery?: boolean;
+  onOverviewTurn?: (radians: number) => boolean;
 }>;
 export type GlobeScene = Readonly<{
   render: (frame: GlobeSceneFrame) => void; resize: () => void; dispose: () => void;
@@ -197,6 +200,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   let width = 1; let height = 1;
   const startingSceneryTime = carriedSceneryTime;
   let sceneryTime = startingSceneryTime;
+  let overviewElapsed = 0;
   let lastPaintTime = 0;
   let sceneryEnabled = options.animateScenery ?? true;
   let onScreen = false;
@@ -223,11 +227,15 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     request: callback => window.requestAnimationFrame(callback),
     cancel: id => window.cancelAnimationFrame(id), now: () => performance.now(),
     onFrame: seconds => {
+      const elapsed = Math.max(0, Math.min(.1, startingSceneryTime + seconds - sceneryTime));
       sceneryTime = startingSceneryTime + seconds;
-      // Camera travel already paints at display cadence. Idle scenery needs only
-      // 30fps and never reprojects HTML buttons whose positions have not changed.
+      overviewElapsed = frame?.overviewSpinning ? Math.min(.1, overviewElapsed + elapsed) : 0;
+      // The board owns the actual orientation, so navigation and HTML markers
+      // follow every idle planet turn. The same clock pauses all scenery.
       if (frame && performance.now() - lastPaintTime > 25) {
-        updateScenery(); renderer.render(scene, camera); lastPaintTime = performance.now();
+        const repainted = frame.overviewSpinning && options.onOverviewTurn?.(overviewElapsed * Math.PI * 2 / SKY_CYCLE_SECONDS);
+        overviewElapsed = 0;
+        if (!repainted) { updateScenery(); renderer.render(scene, camera); lastPaintTime = performance.now(); }
       }
     },
   });
@@ -412,6 +420,9 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   }
   function draw(next: GlobeSceneFrame) {
     if (disposed || unavailable) return;
+    // An explicit navigation/interaction paint consumes any pending idle turn;
+    // returning to an overview never catches up on time spent handling input.
+    overviewElapsed = 0;
     frame = next;
     const orientation = next.orientation ?? northUpGlobeOrientation(next.focus);
     globe.quaternion.set(orientation.x, orientation.y, orientation.z, orientation.w).normalize();

@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { Vec3 } from "./globe-geometry.ts";
 import { createGlobeCelestialSky } from "./globe-celestial-sky.ts";
 import { createGlobeMoon } from "./globe-moon.ts";
+import { createGlobeSun } from "./globe-sun.ts";
 import { getCelestialCycleAngle } from "./globe-celestial-frame.ts";
 
 export { SKY_CYCLE_SECONDS } from "./globe-celestial-frame.ts";
@@ -27,14 +28,22 @@ export function getGlobeSunDirection(seconds: number, mode: GlobeSkyMode, focus:
   return target.copy(center).multiplyScalar(Math.cos(angle)).addScaledVector(east, Math.sin(angle)).normalize();
 }
 
-/** Celestial detail emerges after dusk, not while the sun is on the horizon.
- * This depends on the inspected coast, so turning toward the day side also
- * hides the sky naturally without changing the planet-fixed automatic sun. */
+/** Near the surface, the atmosphere hides celestial detail until after dusk. */
 export function getNightSkyVisibility(sunDirection: Vec3, focus: Vec3) {
   const scale = Math.hypot(sunDirection.x, sunDirection.y, sunDirection.z) * Math.hypot(focus.x, focus.y, focus.z);
   if (!Number.isFinite(scale) || scale === 0) return 0;
   const facing = (sunDirection.x*focus.x + sunDirection.y*focus.y + sunDirection.z*focus.z) / scale;
   return 1 - THREE.MathUtils.smoothstep(facing, -.38, -.08);
+}
+
+/** Art-directed atmospheric entry, shared by sky, fog and the distant sun.
+ * Sailing and the wide globe remain in clear space on every viewport. */
+export function getGlobeAtmosphereBlend(zoom: number) {
+  return THREE.MathUtils.smoothstep(Number.isFinite(zoom) ? zoom : 0, .62, 1);
+}
+
+export function getGlobeSkyVisibility(sunDirection: Vec3, focus: Vec3, zoom: number) {
+  return THREE.MathUtils.lerp(1, getNightSkyVisibility(sunDirection, focus), getGlobeAtmosphereBlend(zoom));
 }
 
 export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, camera: THREE.Camera, container: HTMLElement, anchor: Vec3) {
@@ -49,16 +58,20 @@ export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, came
   sun.shadow.radius = 2;
   const nightFill = new THREE.DirectionalLight(0x8abaff, 0.24);
   scene.add(ambient, sun, nightFill);
-  const celestialSky = createGlobeCelestialSky(scene, camera, globe, anchor);
+  const celestialSky = createGlobeCelestialSky(scene, camera);
+  const distantSun = createGlobeSun(scene, camera);
   const moon = createGlobeMoon(scene, globe, camera, anchor);
   const sunDirection = new THREE.Vector3();
   const presetEast = new THREE.Vector3(), viewToPlanet = new THREE.Quaternion();
   const sunWorld = { value: new THREE.Vector3() };
+  const spaceSun = new THREE.Vector3(), viewFront = new THREE.Vector3(0, 0, 1);
+  const sunTurn = new THREE.Quaternion(), sunBlend = new THREE.Quaternion();
   const time = { value: 0 };
   const patched = new Set<THREE.Material>();
   const fog = new THREE.Fog(0x9acbdc, 1.1, 3.7);
   scene.fog = fog;
   const daySky = new THREE.Color(0xa4d8e8), nightSky = new THREE.Color(0x07132d), duskSky = new THREE.Color(0xd9988c);
+  const spaceSky = new THREE.Color(0x030713);
   const sky = new THREE.Color(), horizon = new THREE.Color(), horizonLight = new THREE.Color(0xffdfbd);
   let skyStyle = "";
 
@@ -112,10 +125,18 @@ export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, came
     sunDirection,
     installSurfaceLighting,
     update(seconds: number, mode: GlobeSkyMode, focus: Vec3, zoom: number) {
+      const atmosphere = getGlobeAtmosphereBlend(zoom);
       presetEast.set(1, 0, 0).applyQuaternion(viewToPlanet.copy(globe.quaternion).invert());
       getGlobeSunDirection(seconds, mode, focus, anchor, sunDirection, presetEast);
       time.value = seconds;
       sunWorld.value.copy(sunDirection).applyQuaternion(globe.quaternion);
+      // A stationary light in the wide view lets the rotating surface cross
+      // the terminator. Close views retain the existing local day/night cycle.
+      getGlobeSunDirection(0, mode, viewFront, viewFront, spaceSun);
+      sunTurn.setFromUnitVectors(spaceSun, sunWorld.value);
+      sunBlend.identity().slerp(sunTurn, atmosphere);
+      sunWorld.value.copy(spaceSun).applyQuaternion(sunBlend);
+      sunDirection.copy(sunWorld.value).applyQuaternion(viewToPlanet);
       sun.position.copy(sunWorld.value).multiplyScalar(4);
       nightFill.position.copy(sun.position).multiplyScalar(-1);
       const facing = sunDirection.x*focus.x + sunDirection.y*focus.y + sunDirection.z*focus.z;
@@ -123,21 +144,24 @@ export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, came
       const twilight = Math.exp(-Math.pow(facing/.25, 2));
       sky.copy(nightSky).lerp(daySky, daylight).lerp(duskSky, twilight*.4);
       horizon.copy(sky).lerp(horizonLight, daylight*.22 + twilight*.18);
+      sky.lerp(spaceSky, 1 - atmosphere);
+      horizon.lerp(spaceSky, 1 - atmosphere);
       fog.color.copy(sky);
       // Only distant coastlines soften; overview geography retains its contrast.
       const eyeDistance = camera.position.length();
-      fog.near = zoom > .7 ? .8 : eyeDistance + .4;
-      fog.far = zoom > .7 ? 2.5 : eyeDistance + 3;
+      fog.near = THREE.MathUtils.lerp(eyeDistance + .4, .8, atmosphere);
+      fog.far = THREE.MathUtils.lerp(eyeDistance + 3, 2.5, atmosphere);
       const nextSky = `radial-gradient(ellipse at 50% 100%, #${horizon.getHexString()}, #${sky.getHexString()} 85%)`;
       if (nextSky !== skyStyle) { container.style.background = nextSky; skyStyle = nextSky; }
       const nightVisibility = getNightSkyVisibility(sunDirection, focus);
-      celestialSky.update(seconds, nightVisibility);
+      celestialSky.update(getGlobeSkyVisibility(sunDirection, focus, zoom));
+      distantSun.update(atmosphere);
       moon.update(seconds, sunDirection, nightVisibility);
     },
     dispose() {
       scene.remove(ambient, sun, nightFill);
       sun.shadow.dispose();
-      celestialSky.dispose(); moon.dispose();
+      celestialSky.dispose(); distantSun.dispose(); moon.dispose();
       scene.fog = null;
       container.style.removeProperty("background");
     },

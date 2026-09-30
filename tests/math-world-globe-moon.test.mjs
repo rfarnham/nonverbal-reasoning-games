@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
+import { northUpGlobeOrientation } from '../app/math-world/globe-navigation.ts';
 import { createGlobeMoon, createGlobeMoonGeometry, sampleGlobeMoonOrbit, getMoonIlluminatedFraction, GLOBE_MOON_RADIUS, GLOBE_MOON_ORBIT_RADIUS, GLOBE_MOON_ORBIT_SECONDS } from '../app/math-world/globe-moon.ts';
 
 const anchor={x:.28,y:.19,z:.94};
@@ -46,7 +47,7 @@ test('moon relief has actual lowered bowls, raised rims, varied maria and finite
   geometry.dispose();
 });
 
-test('moon transforms orbit and sunlight together, stays visible by day, and disposes fixed resources exactly once',()=>{
+test('moon orbit is independent of globe turns, shares surface sunlight, and disposes fixed resources exactly once',()=>{
   const scene=new THREE.Scene(),globe=new THREE.Group(),keep=new THREE.Group(),camera=new THREE.PerspectiveCamera();scene.add(keep,globe);camera.position.set(0,0,4);
   const moon=createGlobeMoon(scene,globe,camera,anchor),mesh=scene.getObjectByName('Orbiting cratered moon');assert.ok(mesh);
   const geometry=mesh.geometry,material=mesh.material,positionArray=geometry.attributes.position.array,normalArray=geometry.attributes.normal.array;
@@ -55,7 +56,12 @@ test('moon transforms orbit and sunlight together, stays visible by day, and dis
   globe.quaternion.setFromAxisAngle(new THREE.Vector3(0,1,0),.72);
   const sun=new THREE.Vector3(.2,-.4,.9).normalize();moon.update(34,sun,0);
   assert.equal(mesh.parent,scene,'the moon is a true scene object, not a camera overlay or a rotating planet child');
-  assert.ok(mesh.position.distanceTo(sampleGlobeMoonOrbit(34,anchor).applyQuaternion(globe.quaternion))<1e-10);
+  const initial=northUpGlobeOrientation(anchor), spaceFrame=new THREE.Quaternion(initial.x,initial.y,initial.z,initial.w);
+  assert.ok(mesh.position.distanceTo(sampleGlobeMoonOrbit(34,anchor).applyQuaternion(spaceFrame))<1e-10);
+  const orbitPosition=mesh.position.clone();
+  globe.quaternion.setFromAxisAngle(new THREE.Vector3(1,0,0),2.4);
+  moon.update(34,sun,0);
+  assert.ok(mesh.position.distanceTo(orbitPosition)<1e-10,'turning the globe never rotates the orbit');
   assert.ok(material.uniforms.lunarSun.value.distanceTo(sun.clone().applyQuaternion(globe.quaternion))<1e-10);
   close(material.uniforms.lunarLocalSun.value.length(),1);
   close(mesh.userData.illuminatedFraction,getMoonIlluminatedFraction(mesh.position,material.uniforms.lunarSun.value,camera.position));

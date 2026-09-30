@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import * as THREE from "three";
-import { createCelestialFrame } from "../app/math-world/globe-celestial-frame.ts";
 import { CELESTIAL_SKY_RADIUS, CELESTIAL_STAR_COUNT, createCelestialStarCatalogue, createGlobeCelestialSky } from "../app/math-world/globe-celestial-sky.ts";
-
-const anchor = { x: .28, y: .19, z: .94 };
 
 test("the celestial catalogue is repeatable, irregular and fills the entire sphere", () => {
   const first = createCelestialStarCatalogue(), second = createCelestialStarCatalogue();
@@ -32,16 +29,16 @@ test("the celestial catalogue is repeatable, irregular and fills the entire sphe
   assert.ok(small > CELESTIAL_STAR_COUNT * .85, "pinpoints dominate the field");
 });
 
-test("night visibility gates every celestial draw and sky materials preserve foreground depth", () => {
-  const scene = new THREE.Scene(), globe = new THREE.Group(), camera = new THREE.PerspectiveCamera(37, 1, .02, 12);
-  const sky = createGlobeCelestialSky(scene, camera, globe, anchor), group = scene.children[0];
+test("atmospheric visibility gates every celestial draw and sky materials preserve foreground depth", () => {
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(37, 1, .02, 12);
+  const sky = createGlobeCelestialSky(scene, camera), group = scene.children[0];
   assert.equal(group.visible, false);
   for (const visibility of [-2, 0, NaN, Infinity]) {
-    sky.update(0, visibility);
-    assert.equal(group.visible, false, "no daytime or invalid-state sky draws");
+    sky.update(visibility);
+    assert.equal(group.visible, false, "no fully obscured or invalid-state sky draws");
   }
   for (const visibility of [.01, .5, 1, 2]) {
-    sky.update(0, visibility);
+    sky.update(visibility);
     assert.equal(group.visible, true);
     for (const object of group.children) {
       assert.equal(object.material.uniforms.nightVisibility.value, Math.min(visibility, 1));
@@ -55,12 +52,11 @@ test("night visibility gates every celestial draw and sky materials preserve for
   sky.dispose();
 });
 
-test("the camera-centered sky's rigid catalogue follows the planet-bound reference frame", () => {
+test("the space backdrop stays fixed through globe turns and scenery time", () => {
   const scene = new THREE.Scene(), cameraRig = new THREE.Group(), globe = new THREE.Group();
-  const frameSampler = createCelestialFrame(anchor), expected = new THREE.Quaternion();
   const camera = new THREE.PerspectiveCamera();
   cameraRig.add(camera); scene.add(cameraRig);
-  const sky = createGlobeCelestialSky(scene, camera, globe, anchor), group = scene.children[1];
+  const sky = createGlobeCelestialSky(scene, camera), group = scene.children[1];
   const buffers = group.children.map(object => Object.values(object.geometry.attributes).map(attribute => ({ attribute, values: Array.from(attribute.array) })));
   const worldPosition = new THREE.Vector3();
   for (let frame = 0; frame < 80; frame++) {
@@ -69,13 +65,12 @@ test("the camera-centered sky's rigid catalogue follows the planet-bound referen
     cameraRig.rotation.y = frame / 19;
     camera.lookAt(0, 0, 1);
     globe.quaternion.setFromAxisAngle(new THREE.Vector3(0,1,0),frame/13);
-    sky.update(frame * 100, .75);
+    sky.update(.75);
     camera.getWorldPosition(worldPosition);
     assert.ok(group.position.distanceTo(worldPosition) < 1e-10);
-    frameSampler.update(frame*100,globe.quaternion,expected);
-    assert.ok(group.quaternion.angleTo(expected) < 1e-7, "sky uses both navigation and daily rotation");
+    assert.ok(group.quaternion.angleTo(new THREE.Quaternion()) < 1e-7, "planet turns never rotate the star field");
     const paused = group.quaternion.clone();
-    sky.update(frame*100,.75);
+    sky.update(.75);
     assert.deepEqual(group.quaternion.toArray(),paused.toArray(),"paused time produces an identical sky pose");
   }
   for (const objects of buffers) for (const { attribute, values } of objects) {
@@ -85,7 +80,7 @@ test("the camera-centered sky's rigid catalogue follows the planet-bound referen
 });
 
 test("celestial scenery keeps two draws and disposes each owned GPU resource once", () => {
-  const scene = new THREE.Scene(), sky = createGlobeCelestialSky(scene, new THREE.PerspectiveCamera(), new THREE.Group(), anchor);
+  const scene = new THREE.Scene(), sky = createGlobeCelestialSky(scene, new THREE.PerspectiveCamera());
   const group = scene.children[0];
   assert.equal(group.children.length, 2);
   const resources = group.children.flatMap(object => [object.geometry, object.material]);
@@ -95,9 +90,9 @@ test("celestial scenery keeps two draws and disposes each owned GPU resource onc
   assert.ok(nebula.geometry.index.count / 3 < 1600);
   assert.equal(stars.geometry.getAttribute("position").count, CELESTIAL_STAR_COUNT);
   assert.ok(resources.filter(resource => resource.isMaterial).every(material => Object.values(material.uniforms).every(uniform => !uniform.value?.isTexture)), "all sky content is local procedural geometry/shading");
-  for (let frame = 0; frame < 600; frame++) sky.update(frame / 60, frame % 2);
+  for (let frame = 0; frame < 600; frame++) sky.update(frame % 2);
   assert.deepEqual(group.children.flatMap(object => [object.geometry, object.material]), resources);
-  sky.dispose(); sky.dispose(); sky.update(100, 1);
+  sky.dispose(); sky.dispose(); sky.update(1);
   assert.equal(scene.children.length, 0);
   assert.ok([...disposed.values()].every(count => count === 1));
 });

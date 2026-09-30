@@ -1,5 +1,10 @@
 # Infinite celestial sky — working plan
 
+> The 30 September 2026 overview design supersedes this historical plan’s
+> planet-bound sky motion and night-only visibility. The current contract is in
+> [globe navigation](math-world-globe-navigation.md): fixed stars, rotating
+> overview planet, independent moon, and atmosphere on close approach only.
+
 Updated: 2026-09-27. Status: implementation and local validation complete; ready to publish.
 
 ## Request and finding

@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import type { Vec3 } from "./globe-geometry.ts";
+import { northUpGlobeOrientation } from "./globe-navigation.ts";
 
-/** Deliberately storybook scale: a real sphere following a planet-local orbit. */
+/** Deliberately storybook scale: a real sphere following an independent inclined orbit. */
 export const GLOBE_MOON_RADIUS = .19;
 export const GLOBE_MOON_ORBIT_RADIUS = 1.9;
 export const GLOBE_MOON_ORBIT_SECONDS = 224;
@@ -224,6 +225,8 @@ export function createGlobeMoon(scene: THREE.Scene, globe: THREE.Group, camera: 
   scene.add(mesh);
   const { start, tangent } = orbitBasis(anchor);
   const orbitNormal = start.clone().cross(tangent).normalize();
+  const initial = northUpGlobeOrientation(anchor);
+  const spaceFrame = new THREE.Quaternion(initial.x, initial.y, initial.z, initial.w);
   const localPosition = new THREE.Vector3(), worldSun = new THREE.Vector3(), worldOrbitNormal = new THREE.Vector3();
   const facing = new THREE.Vector3(), east = new THREE.Vector3(), north = new THREE.Vector3();
   const basis = new THREE.Matrix4(), inverseMoon = new THREE.Quaternion();
@@ -233,10 +236,13 @@ export function createGlobeMoon(scene: THREE.Scene, globe: THREE.Group, camera: 
       if (disposed) return;
       const angle = safeSeconds(seconds)/GLOBE_MOON_ORBIT_SECONDS*TAU;
       localPosition.copy(start).multiplyScalar(Math.cos(angle)).addScaledVector(tangent,Math.sin(angle)).multiplyScalar(GLOBE_MOON_ORBIT_RADIUS);
-      mesh.position.copy(localPosition).applyQuaternion(globe.quaternion);
+      // Watch the orbit from space independently of planet turns and zoom.
+      // Camera movement supplies the near-view perspective without re-framing
+      // the orbit or introducing a shortest-arc jump on a long globe turn.
+      mesh.position.copy(localPosition).applyQuaternion(spaceFrame);
       // Tidal orientation is genuine sphere rotation, not a camera-facing card.
       facing.copy(mesh.position).negate().normalize();
-      worldOrbitNormal.copy(orbitNormal).applyQuaternion(globe.quaternion);
+      worldOrbitNormal.copy(orbitNormal).applyQuaternion(spaceFrame);
       east.crossVectors(worldOrbitNormal,facing).normalize();
       north.crossVectors(facing,east).normalize();
       basis.makeBasis(east,north,facing);

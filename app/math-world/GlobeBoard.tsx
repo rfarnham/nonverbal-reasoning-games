@@ -79,6 +79,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
   const trip = useRef<{ cancel: () => void; skip?: () => void; finishActivity?: () => void } | null>(null);
   const animation = useRef<{ cancel: () => void } | null>(null);
   const motion = useRef(false);
+  const pointer = useRef<{ x: number; y: number; moved: boolean; dragging: boolean } | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const irisRef = useRef<HTMLDivElement>(null);
   const [activity, setActivity] = useState<ArchipelagoVoyage | null>(null);
@@ -138,8 +139,15 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
       ? transportGlobeOrientation(frame.current.orientation ?? northUpGlobeOrientation(frame.current.focus), next.focus)
       : frame.current.orientation);
     frame.current = { ...frame.current, ...next, orientation, completedStopIds: p.progress.completedStopIds, storyScattered: p.storyScattered, dangerStages: p.dangerStages,
+      overviewSpinning: phaseRef.current === "overview" && !pointer.current && !boardRef.current?.contains(document.activeElement) && !p.interactionLocked,
       stormStages: getBossStormStages(p.progress, p.qaUnlocked, next.activeDestinationId ?? frame.current.activeDestinationId) };
     sceneRef.current?.render(frame.current);
+  }
+  function turnOverviewScenery(radians: number) {
+    if (phaseRef.current !== "overview" || pointer.current || boardRef.current?.contains(document.activeElement) || latest.current.interactionLocked || animation.current) return false;
+    const orientation = turnGlobeOrientation(frame.current.orientation ?? northUpGlobeOrientation(frame.current.focus), radians, 0);
+    paint({ orientation, focus: globeOrientationFocus(orientation) });
+    return true;
   }
   function restingPosition(): Vec3 | undefined {
     const p = latest.current;
@@ -303,7 +311,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
     const timer = window.setTimeout(() => { if (alive && !sceneRef.current) setRenderer("fallback"); }, 8000);
     void import("./globe-scene").then(({ createGlobeScene }) => {
       if (!alive || !canvasRef.current) return;
-      const scene = createGlobeScene(canvasRef.current, { assetBasePath: basePath, animateScenery: !getSceneryPaused(), onProject: positionMarkers, onUnavailable: () => { if (alive) { setRenderer("fallback"); cancelTrip(); animation.current?.cancel(); settlePose(); } } });
+      const scene = createGlobeScene(canvasRef.current, { assetBasePath: basePath, animateScenery: !getSceneryPaused(), onProject: positionMarkers, onOverviewTurn: turnOverviewScenery, onUnavailable: () => { if (alive) { setRenderer("fallback"); cancelTrip(); animation.current?.cancel(); settlePose(); } } });
       if (!alive) { scene.dispose(); return; }
       sceneRef.current = scene; scene.setSkyMode(visitSkyMode); setRenderer("webgl"); paint({ avatarPosition: restingPosition() });
     }).catch(() => { if (alive) setRenderer("fallback"); });
@@ -368,7 +376,6 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
     else { animation.current?.cancel(); apply(1); }
   }
   const VoyageActivity = props.voyageActivity;
-  const pointer = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   return <section className={styles.boardSection} aria-label={`${titleFor(destinationId)} globe map`}>
     <div className={styles.boardToolbar}>
       <span className={styles.boardEyebrow}>{phase === "overview" ? "A world of discoveries" : props.danger ? "A danger crossing" : props.boss ? "Into the hurricane" : getWorldBiome(props.world.number).label}</span>
@@ -389,9 +396,11 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
       </div>
     </div>
     <div ref={boardRef} className={styles.board} data-globe-phase={phase} data-globe-renderer={renderer} data-globe-boss={props.boss?.id} data-voyage-from={voyage?.fromDestinationId} data-voyage-to={voyage?.toDestinationId} data-story-cinematic={props.storyScene ? storyStill ? "still" : "active" : undefined} aria-busy={busy}
-      onPointerDown={event => { if (phase !== "overview" || (event.target as HTMLElement).closest("button")) return; pointer.current = { x: event.clientX, y: event.clientY, moved: false }; event.currentTarget.setPointerCapture(event.pointerId); }}
-      onPointerMove={event => { const p = pointer.current; if (!p) return; const dx = event.clientX - p.x, dy = event.clientY - p.y; if (Math.hypot(dx, dy) > 2) p.moved = true; turn(-dx * 0.006, dy * 0.006); p.x = event.clientX; p.y = event.clientY; }}
-      onPointerUp={() => { pointer.current = null; }} onPointerCancel={() => { pointer.current = null; }}>
+      onFocusCapture={() => paint()} onBlurCapture={() => { queueMicrotask(() => { if (boardRef.current && sceneRef.current) paint(); }); }}
+      onPointerDown={event => { if (phase !== "overview") return; const dragging = !(event.target as HTMLElement).closest("button"); pointer.current = { x: event.clientX, y: event.clientY, moved: false, dragging }; if (dragging) event.currentTarget.setPointerCapture(event.pointerId); paint(); }}
+      onPointerMove={event => { const p = pointer.current; if (!p?.dragging) return; const dx = event.clientX - p.x, dy = event.clientY - p.y; if (Math.hypot(dx, dy) > 2) p.moved = true; turn(-dx * 0.006, dy * 0.006); p.x = event.clientX; p.y = event.clientY; }}
+      onPointerLeave={() => { if (pointer.current && !pointer.current.dragging) { pointer.current = null; paint(); } }}
+      onPointerUp={() => { pointer.current = null; paint(); }} onPointerCancel={() => { pointer.current = null; paint(); }} onLostPointerCapture={() => { if (pointer.current) { pointer.current = null; paint(); } }}>
       <div ref={canvasRef} className={styles.canvas} data-globe-canvas aria-hidden="true" />
       {renderer === "loading" && <div className={styles.loading} role="status"><span>◎</span>Opening your globe…</div>}
       {renderer === "fallback" && !props.boss && !props.danger && <CoastScene mobile={narrow} className={styles.fallbackMap} completedRoadSlot={-1} worldNumber={props.world.number} />}
