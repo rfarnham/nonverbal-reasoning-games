@@ -7,6 +7,7 @@ import { QUESTIONS_BY_STOP, WORLD_DEFINITIONS, stopsForWorld, type WorldDefiniti
 import { getWorldMapLayout } from "./map-layouts.ts";
 import { GLOBE_DESTINATIONS, GLOBE_DANGER_REGIONS, getGlobeDestination, getGlobeMap, getGlobeRoadPoints, getVoyageRoute, sampleSurfaceRoute, getSurfaceRouteTangent, getSurfaceRouteLength, sphericalInterpolate, type Vec3 } from "./globe-geometry.ts";
 import { advanceGlobeAnimationTime, globeTransitionDuration, globeOrientationFocus, interpolateGlobeOrientation, northUpGlobeOrientation, transportGlobeOrientation, turnGlobeOrientation, voyageProgress } from "./globe-navigation.ts";
+import { rotateGlobeOnAxis } from "./globe-camera";
 import type { GlobeSceneFrame, GlobeProjection, GlobeScene } from "./globe-scene";
 import type { GlobeSkyMode } from "./globe-lighting";
 import type { ArchipelagoVoyage, VoyageActivityProps } from "./voyage.ts";
@@ -141,13 +142,16 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
       ? transportGlobeOrientation(frame.current.orientation ?? northUpGlobeOrientation(frame.current.focus), next.focus)
       : frame.current.orientation);
     frame.current = { ...frame.current, ...next, orientation, completedStopIds: p.progress.completedStopIds, storyScattered: p.storyScattered, dangerStages: p.dangerStages,
-      overviewSpinning: phaseRef.current === "overview" && !pointer.current && !boardRef.current?.contains(document.activeElement) && !p.interactionLocked,
+      overviewSpinning: phaseRef.current === "overview" && !pointer.current && !hasFocusedMapControl() && !p.interactionLocked,
       stormStages: getBossStormStages(p.progress, p.qaUnlocked, next.activeDestinationId ?? frame.current.activeDestinationId) };
     sceneRef.current?.render(frame.current);
   }
+  function hasFocusedMapControl() {
+    return document.activeElement !== boardRef.current && !!boardRef.current?.contains(document.activeElement);
+  }
   function turnOverviewScenery(radians: number) {
-    if (phaseRef.current !== "overview" || pointer.current || boardRef.current?.contains(document.activeElement) || latest.current.interactionLocked || animation.current) return false;
-    const orientation = turnGlobeOrientation(frame.current.orientation ?? northUpGlobeOrientation(frame.current.focus), radians, 0);
+    if (phaseRef.current !== "overview" || pointer.current || hasFocusedMapControl() || latest.current.interactionLocked || animation.current) return false;
+    const orientation = rotateGlobeOnAxis(frame.current.orientation ?? northUpGlobeOrientation(frame.current.focus), radians);
     paint({ orientation, focus: globeOrientationFocus(orientation) });
     return true;
   }
@@ -398,6 +402,14 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
       </div>
     </div>
     <div ref={boardRef} className={styles.board} data-globe-phase={phase} data-globe-renderer={renderer} data-globe-boss={props.boss?.id} data-relevant-danger={Object.keys(props.dangerStages ?? {}).find(id => (props.dangerStages?.[id] ?? 0) > 0)} data-voyage-from={voyage?.fromDestinationId} data-voyage-to={voyage?.toDestinationId} data-story-cinematic={props.storyScene ? storyStill ? "still" : "active" : undefined} aria-busy={busy}
+      role="group" aria-label="Globe view" tabIndex={phase === "overview" && renderer === "webgl" ? 0 : undefined}
+      aria-keyshortcuts={phase === "overview" ? "ArrowLeft ArrowRight ArrowUp ArrowDown" : undefined}
+      onKeyDown={event => {
+        if (event.target !== event.currentTarget || phase !== "overview") return;
+        const directions: Record<string, [number, number]> = { ArrowLeft: [-.3, 0], ArrowRight: [.3, 0], ArrowUp: [0, .25], ArrowDown: [0, -.25] };
+        const direction = directions[event.key];
+        if (direction) { event.preventDefault(); turn(...direction, true); }
+      }}
       onFocusCapture={() => paint()} onBlurCapture={() => { queueMicrotask(() => { if (boardRef.current && sceneRef.current) paint(); }); }}
       onPointerDown={event => { if (phase !== "overview") return; const dragging = !(event.target as HTMLElement).closest("button"); pointer.current = { x: event.clientX, y: event.clientY, moved: false, dragging }; if (dragging) event.currentTarget.setPointerCapture(event.pointerId); paint(); }}
       onPointerMove={event => { const p = pointer.current; if (!p?.dragging) return; const dx = event.clientX - p.x, dy = event.clientY - p.y; if (Math.hypot(dx, dy) > 2) p.moved = true; turn(-dx * 0.006, dy * 0.006); p.x = event.clientX; p.y = event.clientY; }}
@@ -441,12 +453,6 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
           style={renderer === "fallback" ? { left: `${book.x}%`, top: `${book.y}%`, visibility: "visible" } : { visibility: "hidden" }}
           aria-label={`Storybook on island ${index + 1}: ${props.storyBookLabels?.[index] ?? "coming soon"}`} aria-haspopup="dialog" onClick={event => props.onStory(index, event.currentTarget)}><BookIcon /></button>)}
       </div>
-      {phase === "overview" && renderer === "webgl" && <div className={styles.orbitControls} aria-label="Turn the globe">
-        <button type="button" aria-label="Turn globe left" onClick={() => turn(-0.45, 0, true)}>←</button>
-        <button type="button" aria-label="Turn globe up" onClick={() => turn(0, 0.35, true)}>↑</button>
-        <button type="button" aria-label="Turn globe down" onClick={() => turn(0, -0.35, true)}>↓</button>
-        <button type="button" aria-label="Turn globe right" onClick={() => turn(0.45, 0, true)}>→</button>
-      </div>}
       {voyage && <div className={styles.voyageCard} role="status"><span className={styles.voyageKicker}>ALL ABOARD</span><strong>Sailing to {titleFor(voyage.toDestinationId)}</strong><div><button type="button" onClick={() => trip.current?.skip?.()}>Skip voyage</button><button type="button" onClick={cancelTrip}>Cancel voyage</button></div></div>}
       {activity && VoyageActivity && <div className={styles.activity}><VoyageActivity voyage={activity} onContinue={() => trip.current?.finishActivity?.()} onCancel={cancelTrip} /></div>}
       {props.storyScene && <div className={styles.crystalCaption}>
@@ -455,6 +461,6 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
       </div>}
       <div ref={irisRef} className={styles.iris} aria-hidden="true" />
     </div>
-    <p className={styles.boardCaption}>{props.storyScene ? "The Tideheart’s light is scattered, but not lost." : props.danger && phase !== "overview" ? (props.dangerStages?.[props.danger.id] ?? 0) > 0 ? "One crossing. Take your time and use your paper packet." : "This crossing is clear. Your voyage notes and packet are still here." : props.boss && phase !== "overview" ? "The ship faces the storm. Print the whole test to take on this challenge." : renderer === "fallback" ? "Choose an island stop, or use the list below." : phase === "overview" ? "Drag to turn the globe. Choose a destination to set sail." : props.storyBookLabels ? "Choose a stop to explore. Open the two books to discover Oceania’s story." : "Choose a stop to explore. The two books hold stories to come."}</p>
+    <p className={styles.boardCaption}>{props.storyScene ? "The Tideheart’s light is scattered, but not lost." : props.danger && phase !== "overview" ? (props.dangerStages?.[props.danger.id] ?? 0) > 0 ? "One crossing. Take your time and use your paper packet." : "This crossing is clear. Your voyage notes and packet are still here." : props.boss && phase !== "overview" ? "The ship faces the storm. Print the whole test to take on this challenge." : renderer === "fallback" ? "Choose an island stop, or use the list below." : phase === "overview" ? "Drag or use the arrow keys to orbit. Choose a destination to set sail." : props.storyBookLabels ? "Choose a stop to explore. Open the two books to discover Oceania’s story." : "Choose a stop to explore. The two books hold stories to come."}</p>
   </section>;
 });

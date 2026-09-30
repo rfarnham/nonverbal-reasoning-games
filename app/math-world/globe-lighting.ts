@@ -10,8 +10,8 @@ export { SKY_CYCLE_SECONDS } from "./globe-celestial-frame.ts";
 export type GlobeSkyMode = "cycle" | "day" | "sunset" | "night";
 const up = new THREE.Vector3(0, 1, 0);
 
-/** Presets place the sun relative to the inspected coast. The automatic sun is
- * planet-fixed and advances only with active scenery time, never wall time. */
+/** Presets place the light relative to the inspected coast. Auto is one fixed
+ * world-space sun, expressed here in the axially rotating planet's coordinates. */
 export function getGlobeSunDirection(seconds: number, mode: GlobeSkyMode, focus: Vec3, anchor: Vec3, target = new THREE.Vector3(), presetEast?: Vec3) {
   const center = new THREE.Vector3().copy(mode === "cycle" ? anchor : focus).normalize();
   const east = new THREE.Vector3().crossVectors(up, center);
@@ -23,9 +23,9 @@ export function getGlobeSunDirection(seconds: number, mode: GlobeSkyMode, focus:
   }
   if (east.lengthSq() < 0.001) east.set(1, 0, 0);
   east.normalize();
-  const angle = mode === "cycle" ? 0.62 + getCelestialCycleAngle(seconds)
-    : mode === "day" ? 0.5 : mode === "sunset" ? 1.55 : 2.65;
-  return target.copy(center).multiplyScalar(Math.cos(angle)).addScaledVector(east, Math.sin(angle)).normalize();
+  const angle = mode === "cycle" ? .62 : mode === "day" ? .5 : mode === "sunset" ? 1.55 : 2.65;
+  target.copy(center).multiplyScalar(Math.cos(angle)).addScaledVector(east, Math.sin(angle)).normalize();
+  return mode === "cycle" ? target.applyAxisAngle(up, getCelestialCycleAngle(seconds)) : target;
 }
 
 /** Near the surface, the atmosphere hides celestial detail until after dusk. */
@@ -58,14 +58,12 @@ export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, came
   sun.shadow.radius = 2;
   const nightFill = new THREE.DirectionalLight(0x8abaff, 0.24);
   scene.add(ambient, sun, nightFill);
-  const celestialSky = createGlobeCelestialSky(scene, camera);
-  const distantSun = createGlobeSun(scene, camera);
+  const celestialSky = createGlobeCelestialSky(scene, camera, anchor);
+  const distantSun = createGlobeSun(scene, camera, anchor);
   const moon = createGlobeMoon(scene, globe, camera, anchor);
   const sunDirection = new THREE.Vector3();
   const presetEast = new THREE.Vector3(), viewToPlanet = new THREE.Quaternion();
   const sunWorld = { value: new THREE.Vector3() };
-  const spaceSun = new THREE.Vector3(), viewFront = new THREE.Vector3(0, 0, 1);
-  const sunTurn = new THREE.Quaternion(), sunBlend = new THREE.Quaternion();
   const time = { value: 0 };
   const patched = new Set<THREE.Material>();
   const fog = new THREE.Fog(0x9acbdc, 1.1, 3.7);
@@ -126,17 +124,10 @@ export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, came
     installSurfaceLighting,
     update(seconds: number, mode: GlobeSkyMode, focus: Vec3, zoom: number) {
       const atmosphere = getGlobeAtmosphereBlend(zoom);
-      presetEast.set(1, 0, 0).applyQuaternion(viewToPlanet.copy(globe.quaternion).invert());
+      presetEast.set(1, 0, 0).applyQuaternion(camera.quaternion).applyQuaternion(viewToPlanet.copy(globe.quaternion).invert());
       getGlobeSunDirection(seconds, mode, focus, anchor, sunDirection, presetEast);
       time.value = seconds;
       sunWorld.value.copy(sunDirection).applyQuaternion(globe.quaternion);
-      // A stationary light in the wide view lets the rotating surface cross
-      // the terminator. Close views retain the existing local day/night cycle.
-      getGlobeSunDirection(0, mode, viewFront, viewFront, spaceSun);
-      sunTurn.setFromUnitVectors(spaceSun, sunWorld.value);
-      sunBlend.identity().slerp(sunTurn, atmosphere);
-      sunWorld.value.copy(spaceSun).applyQuaternion(sunBlend);
-      sunDirection.copy(sunWorld.value).applyQuaternion(viewToPlanet);
       sun.position.copy(sunWorld.value).multiplyScalar(4);
       nightFill.position.copy(sun.position).multiplyScalar(-1);
       const facing = sunDirection.x*focus.x + sunDirection.y*focus.y + sunDirection.z*focus.z;

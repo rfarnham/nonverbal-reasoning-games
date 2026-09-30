@@ -17,7 +17,8 @@ import { createGlobeCrystalStory } from "./globe-crystal-story";
 import { northUpGlobeOrientation, type GlobeOrientation } from "./globe-navigation";
 import { sampleStormShipMotion } from "./storm-ship-motion";
 import { createSceneryClock } from "./scenery-clock";
-import { SKY_CYCLE_SECONDS } from "./globe-celestial-frame";
+import { getCelestialCycleAngle } from "./globe-celestial-frame";
+import { createGlobeReferenceFrame } from "./globe-camera";
 import { placeOccupiedStopBadge, placeStopCaption } from "./globe-marker-layout";
 import {
   GLOBE_DESTINATIONS, GLOBE_DANGER_REGIONS, getGlobeDestination, getGlobeRoadPoints, mapPointToGlobe,
@@ -201,7 +202,19 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   let width = 1; let height = 1;
   const startingSceneryTime = carriedSceneryTime;
   let sceneryTime = startingSceneryTime;
-  let overviewElapsed = 0;
+  let lastViewTime = sceneryTime;
+  const referenceFrame = createGlobeReferenceFrame();
+  const cameraFrame = new THREE.Quaternion();
+  const viewPosition = new THREE.Vector3();
+  const viewQuaternion = new THREE.Quaternion();
+  function updateView() {
+    if (!frame) return;
+    referenceFrame.update(sceneryTime, frame.orientation ?? northUpGlobeOrientation(frame.focus), globe.quaternion, cameraFrame);
+    camera.position.copy(viewPosition).applyQuaternion(cameraFrame);
+    camera.quaternion.copy(cameraFrame).multiply(viewQuaternion);
+    camera.updateMatrixWorld();
+    lastViewTime = sceneryTime;
+  }
   let lastPaintTime = 0;
   let sceneryEnabled = options.animateScenery ?? true;
   let onScreen = false;
@@ -210,6 +223,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   let visibleDangerStages: Record<string, number> = {};
   const updateScenery = () => {
     if (!frame) return;
+    updateView();
     lighting.update(sceneryTime, skyMode, frame.focus, frame.zoom);
     sea.update(sceneryTime, globe, camera, lighting.sunDirection);
     continents.update(sceneryTime, lighting.sunDirection);
@@ -232,14 +246,12 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     request: callback => window.requestAnimationFrame(callback),
     cancel: id => window.cancelAnimationFrame(id), now: () => performance.now(),
     onFrame: seconds => {
-      const elapsed = Math.max(0, Math.min(.1, startingSceneryTime + seconds - sceneryTime));
       sceneryTime = startingSceneryTime + seconds;
-      overviewElapsed = frame?.overviewSpinning ? Math.min(.1, overviewElapsed + elapsed) : 0;
-      // The board owns the actual orientation, so navigation and HTML markers
-      // follow every idle planet turn. The same clock pauses all scenery.
       if (frame && performance.now() - lastPaintTime > 25) {
-        const repainted = frame.overviewSpinning && options.onOverviewTurn?.(overviewElapsed * Math.PI * 2 / SKY_CYCLE_SECONDS);
-        overviewElapsed = 0;
+        // Match the physical axial turn exactly. Q advances on its local Y
+        // axis while P does the same, leaving the overview camera stationary.
+        const turn = -getCelestialCycleAngle(sceneryTime - lastViewTime);
+        const repainted = frame.overviewSpinning && options.onOverviewTurn?.(turn);
         if (!repainted) { updateScenery(); renderer.render(scene, camera); lastPaintTime = performance.now(); }
       }
     },
@@ -425,12 +437,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   }
   function draw(next: GlobeSceneFrame) {
     if (disposed || unavailable) return;
-    // An explicit navigation/interaction paint consumes any pending idle turn;
-    // returning to an overview never catches up on time spent handling input.
-    overviewElapsed = 0;
     frame = next;
-    const orientation = next.orientation ?? northUpGlobeOrientation(next.focus);
-    globe.quaternion.set(orientation.x, orientation.y, orientation.z, orientation.w).normalize();
     const zoom = clamp(next.zoom, 0, 1);
     const tan = Math.tan(camera.fov * Math.PI / 360);
     const aspect = width / height;
@@ -450,7 +457,9 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     // The opening cinematic frames the raised crystal, then eases back to the
     // planet center as the camera widens. Its top must not clip off-screen.
     camera.lookAt(0, 0, zoom * (next.storyProgress != null ? 1.125 : 1));
-    camera.updateMatrixWorld();
+    viewPosition.copy(camera.position);
+    viewQuaternion.copy(camera.quaternion);
+    updateView();
     const completed = new Set(next.completedStopIds);
     const activeStops = WORLD_DEFINITIONS.find(world => world.id === next.activeDestinationId)?.stopIds ?? [];
     for (const [id, marker] of stopMarkers) {

@@ -1,4 +1,6 @@
 import * as THREE from "three";
+import type { Vec3 } from "./globe-geometry.ts";
+import { northUpGlobeOrientation } from "./globe-navigation.ts";
 
 // Authoring scale only: both sky layers project directions at infinite depth.
 export const CELESTIAL_SKY_RADIUS = 9;
@@ -77,12 +79,13 @@ const infiniteSkyProjection = /* glsl */`
   gl_Position = clip.xyww;
 `;
 
-/** A fixed space backdrop. Navigation and the scenery clock rotate the planet,
- * never this catalogue. Camera tilt still changes the viewing direction during
- * zoom; direction-only projection removes translation parallax. */
-export function createGlobeCelestialSky(scene: THREE.Scene, camera: THREE.Camera) {
+/** A fixed space backdrop. The real orbiting camera changes the view of this
+ * catalogue; time never rotates the stars. Translation has no parallax. */
+export function createGlobeCelestialSky(scene: THREE.Scene, camera: THREE.Camera, anchor: Vec3 = { x: 0, y: 0, z: 1 }) {
   const group = new THREE.Group();
   group.name = "Fixed celestial sphere";
+  const initial = northUpGlobeOrientation(anchor);
+  group.quaternion.set(initial.x, initial.y, initial.z, initial.w).invert();
   group.visible = false;
   scene.add(group);
   const visibility = { value: 0 };

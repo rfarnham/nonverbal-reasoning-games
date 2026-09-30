@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
-import { northUpGlobeOrientation } from '../app/math-world/globe-navigation.ts';
 import { createGlobeMoon, createGlobeMoonGeometry, sampleGlobeMoonOrbit, getMoonIlluminatedFraction, GLOBE_MOON_RADIUS, GLOBE_MOON_ORBIT_RADIUS, GLOBE_MOON_ORBIT_SECONDS } from '../app/math-world/globe-moon.ts';
 
 const anchor={x:.28,y:.19,z:.94};
@@ -56,8 +55,7 @@ test('moon orbit is independent of globe turns, shares surface sunlight, and dis
   globe.quaternion.setFromAxisAngle(new THREE.Vector3(0,1,0),.72);
   const sun=new THREE.Vector3(.2,-.4,.9).normalize();moon.update(34,sun,0);
   assert.equal(mesh.parent,scene,'the moon is a true scene object, not a camera overlay or a rotating planet child');
-  const initial=northUpGlobeOrientation(anchor), spaceFrame=new THREE.Quaternion(initial.x,initial.y,initial.z,initial.w);
-  assert.ok(mesh.position.distanceTo(sampleGlobeMoonOrbit(34,anchor).applyQuaternion(spaceFrame))<1e-10);
+  assert.ok(mesh.position.distanceTo(sampleGlobeMoonOrbit(34,anchor))<1e-10);
   const orbitPosition=mesh.position.clone();
   globe.quaternion.setFromAxisAngle(new THREE.Vector3(1,0,0),2.4);
   moon.update(34,sun,0);

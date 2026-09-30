@@ -7,20 +7,30 @@ test("the distant sun stays compact, circular and inside desktop and phone viewp
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera();
   const effect = createGlobeSun(scene, camera), sun = scene.children[0];
   for (const [width, height] of [[1440, 900], [820, 900], [620, 900], [390, 844], [844, 390]]) {
+    camera.position.set(0,0,0);
+    camera.quaternion.identity();
+    camera.aspect=width/height;
+    camera.updateProjectionMatrix();
+    camera.updateMatrixWorld();
     sun.onBeforeRender({ getSize: size => size.set(width, height) });
-    const { sunCenter, sunHalfSize } = sun.material.uniforms;
+    const { sunDirection, sunHalfSize } = sun.material.uniforms;
+    const sunCenter = sunDirection.value.clone().project(camera);
     const horizontalRadius = sunHalfSize.value.x * width / 2;
     const verticalRadius = sunHalfSize.value.y * height / 2;
     assert.ok(Math.abs(horizontalRadius - verticalRadius) < 1e-10, "aspect never turns the solar disc into an oval");
     assert.ok(horizontalRadius <= 64, "corona footprint remains bounded on large displays");
     assert.ok(horizontalRadius >= 50, "phone disc remains visible");
-    assert.ok(sunCenter.value.x + sunHalfSize.value.x < 1, "corona has a right margin");
-    assert.ok(sunCenter.value.y + sunHalfSize.value.y < 1, "corona stays below top controls");
+    assert.ok(sunCenter.x + sunHalfSize.value.x < 1, "corona has a right margin");
+    assert.ok(sunCenter.y + sunHalfSize.value.y < 1, "corona stays below top controls");
     camera.position.set(width / 100, 3, -5);
     camera.rotation.set(.4, .2, 1.2);
-    const composedPosition = sunCenter.value.clone();
+    const composedDirection = sunDirection.value.clone();
+    camera.updateMatrixWorld();
     effect.update(0);
-    assert.deepEqual(sunCenter.value, composedPosition, "camera and planet navigation do not move the scenic sun");
+    sun.onBeforeRender({ getSize: size => size.set(width, height) });
+    assert.deepEqual(sunDirection.value, composedDirection, "navigation leaves the sun at its authored direction in space");
+    const viewDirection = composedDirection.clone().applyQuaternion(camera.quaternion.clone().invert());
+    assert.ok(viewDirection.distanceTo(composedDirection)>.1,"an orbiting camera sees a different solar position");
   }
   effect.dispose();
 });

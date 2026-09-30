@@ -1,6 +1,5 @@
 import * as THREE from "three";
 import type { Vec3 } from "./globe-geometry.ts";
-import { northUpGlobeOrientation } from "./globe-navigation.ts";
 
 /** Deliberately storybook scale: a real sphere following an independent inclined orbit. */
 export const GLOBE_MOON_RADIUS = .19;
@@ -225,8 +224,6 @@ export function createGlobeMoon(scene: THREE.Scene, globe: THREE.Group, camera: 
   scene.add(mesh);
   const { start, tangent } = orbitBasis(anchor);
   const orbitNormal = start.clone().cross(tangent).normalize();
-  const initial = northUpGlobeOrientation(anchor);
-  const spaceFrame = new THREE.Quaternion(initial.x, initial.y, initial.z, initial.w);
   const localPosition = new THREE.Vector3(), worldSun = new THREE.Vector3(), worldOrbitNormal = new THREE.Vector3();
   const facing = new THREE.Vector3(), east = new THREE.Vector3(), north = new THREE.Vector3();
   const basis = new THREE.Matrix4(), inverseMoon = new THREE.Quaternion();
@@ -239,10 +236,10 @@ export function createGlobeMoon(scene: THREE.Scene, globe: THREE.Group, camera: 
       // Watch the orbit from space independently of planet turns and zoom.
       // Camera movement supplies the near-view perspective without re-framing
       // the orbit or introducing a shortest-arc jump on a long globe turn.
-      mesh.position.copy(localPosition).applyQuaternion(spaceFrame);
+      mesh.position.copy(localPosition);
       // Tidal orientation is genuine sphere rotation, not a camera-facing card.
       facing.copy(mesh.position).negate().normalize();
-      worldOrbitNormal.copy(orbitNormal).applyQuaternion(spaceFrame);
+      worldOrbitNormal.copy(orbitNormal);
       east.crossVectors(worldOrbitNormal,facing).normalize();
       north.crossVectors(facing,east).normalize();
       basis.makeBasis(east,north,facing);

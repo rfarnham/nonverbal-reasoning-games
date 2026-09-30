@@ -38,11 +38,11 @@ function Ship({ x, y, scale = 1 }: { x: number; y: number; scale?: number }) {
 }
 
 /** A local ink-and-wash illustration; the story text supplies its meaning. */
-function StoryIllustration({ kind }: { kind: StoryIllustration }) {
+function StoryIllustration({ kind, className = styles.illustration }: { kind: StoryIllustration; className?: string }) {
   const prefix = useId().replace(/:/g, "");
   const night = kind === "fracture";
   const crystal = kind === "tideheart" || night;
-  return <svg className={styles.illustration} viewBox="0 0 640 240" aria-hidden="true" focusable="false">
+  return <svg className={className} viewBox="0 0 640 240" aria-hidden="true" focusable="false">
     <defs>
       <linearGradient id={`${prefix}-sky`} x2="0" y2="1"><stop stopColor={night ? "#15283f" : "#d9e7dc"} /><stop offset="1" stopColor={night ? "#426879" : "#f7eacb"} /></linearGradient>
       <linearGradient id={`${prefix}-sea`} x2="0" y2="1"><stop stopColor="#70a9a4" /><stop offset="1" stopColor="#2d6a77" /></linearGradient>
@@ -108,6 +108,14 @@ export type StoryPageProps = {
   actionLabel?: string;
 };
 
+/** Shared artwork for the onboarding scroll and read-only book. */
+export function StoryArtwork({ illustration, className = styles.illustration }: { illustration: StoryPageProps["page"]["illustration"]; className?: string }) {
+  return typeof illustration === "string" ? <StoryIllustration kind={illustration} className={className} />
+    : <Image className={className} src={`${(process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "")}${illustration.src}`}
+      width={illustration.width} height={illustration.height} alt={illustration.alt} unoptimized priority
+      style={{ height: "auto", maxHeight: "38vh", objectFit: "contain", borderRadius: "20px" }} />;
+}
+
 export function StoryPage({ page, onContinue, onClose, actionLabel = "Continue" }: StoryPageProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -135,7 +143,7 @@ export function StoryPage({ page, onContinue, onClose, actionLabel = "Continue" 
       <div className={styles.scrollRoll} aria-hidden="true" />
       <div className={styles.sheet}>
         <div className={styles.folio} aria-hidden="true"><span>Oceania</span><span>✦</span><span>The island chronicles</span></div>
-        {typeof page.illustration === "string" ? <StoryIllustration kind={page.illustration} /> : <Image className={styles.illustration} src={`${(process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "")}${page.illustration.src}`} width={page.illustration.width} height={page.illustration.height} alt={page.illustration.alt} unoptimized priority style={{ height: "auto", maxHeight: "38vh", objectFit: "contain", borderRadius: "20px" }} />}
+        <StoryArtwork illustration={page.illustration} />
         <header className={styles.header}>
           <p className={styles.kicker}>{page.kicker}</p>
           <h2 ref={headingRef} tabIndex={-1} id={titleId} className={styles.title}>{page.title}</h2>

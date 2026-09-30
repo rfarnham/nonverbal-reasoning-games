@@ -6,10 +6,10 @@ Requested: give both hurricane challenges beautiful illustrated book introductio
 
 - Each hurricane receives a distinct, bundled 3:2 painting and two short narrative paragraphs in the existing manuscript reader.
 - A hurricane briefing appears on first entry; acknowledging it persists independently of question or workbook progress. Reloading must not repeatedly interrupt the player.
-- The storybook contains acknowledged story pages, read island books, and encountered dangers/storms. Repeated danger kinds appear once, in voyage order. Future plot pages are not exposed merely by QA navigation being unlocked.
+- The storybook opens with a hinged cover animation and an Oceania title page. Persistent illustrated arrows (and Left/Right keys) turn through acknowledged story pages, read island books, and encountered dangers/storms in one reader. Repeated danger kinds appear once, in voyage order. Future plot pages are not exposed merely by QA navigation being unlocked. The replay shell has no slogans, subtitles, or story kickers beyond the title page’s “Story so far” label.
 - Rereading and opening the glossary never advance the story, questions, packets, boat, or completion state.
-- A compact glossary defines relevant sea, weather, geography and crystal terms, including squall, tide and octahedron, in short fourth-grade-friendly sentences.
-- Labeled book and field-guide buttons sit beside the globe on wide screens and below it on small screens, without covering map stops. Native dialogs support keyboard/Escape, heading focus, focus restoration and readable phone layouts.
+- A compact glossary shows only its heading and relevant sea, weather, geography and crystal vocabulary, including squall, tide and octahedron, with short fourth-grade-friendly definitions and a close control.
+- Labeled book and field-guide buttons sit beside the globe on wide screens and below it on small screens, without covering map stops. Native dialogs support keyboard/Escape, heading focus, focus restoration and readable phone layouts. The book uses facing pages on wide screens and one scrollable page on phones, with 44px-or-larger controls always in reach. Reduced motion skips the cover animation; no animation blocks reading or closing.
 - Existing first-world story chronology, full-test printing, danger packets, boss timing, QA separation and scenery controls remain intact.
 
 ## Checklist
