@@ -56,10 +56,12 @@ export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, came
   sun.shadow.bias = -0.00015;
   sun.shadow.normalBias = 0.0009;
   sun.shadow.radius = 2;
-  const nightFill = new THREE.DirectionalLight(0x8abaff, 0.24);
+  // Diffuse fill keeps night terrain legible without a second, anti-solar
+  // specular highlight on the water. The sun is the only directional source.
+  const nightFill = new THREE.AmbientLight(0x8abaff, 0.08);
   scene.add(ambient, sun, nightFill);
   const celestialSky = createGlobeCelestialSky(scene, camera, anchor);
-  const distantSun = createGlobeSun(scene, camera, anchor);
+  const distantSun = createGlobeSun(scene, camera);
   const moon = createGlobeMoon(scene, globe, camera, anchor);
   const sunDirection = new THREE.Vector3();
   const presetEast = new THREE.Vector3(), viewToPlanet = new THREE.Quaternion();
@@ -129,7 +131,6 @@ export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, came
       time.value = seconds;
       sunWorld.value.copy(sunDirection).applyQuaternion(globe.quaternion);
       sun.position.copy(sunWorld.value).multiplyScalar(4);
-      nightFill.position.copy(sun.position).multiplyScalar(-1);
       const facing = sunDirection.x*focus.x + sunDirection.y*focus.y + sunDirection.z*focus.z;
       const daylight = THREE.MathUtils.smoothstep(facing, -.23, .3);
       const twilight = Math.exp(-Math.pow(facing/.25, 2));
@@ -146,7 +147,7 @@ export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, came
       if (nextSky !== skyStyle) { container.style.background = nextSky; skyStyle = nextSky; }
       const nightVisibility = getNightSkyVisibility(sunDirection, focus);
       celestialSky.update(getGlobeSkyVisibility(sunDirection, focus, zoom));
-      distantSun.update(atmosphere);
+      distantSun.update(sunWorld.value, atmosphere);
       moon.update(seconds, sunDirection, nightVisibility);
     },
     dispose() {
