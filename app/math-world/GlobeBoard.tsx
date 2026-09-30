@@ -25,6 +25,10 @@ import { DANGER_STORIES } from "./danger-content.ts";
 import Image from "next/image";
 import styles from "./globe.module.css";
 
+function hasFocusedMapControl(board: HTMLElement | null) {
+  return document.activeElement !== board && !!board?.contains(document.activeElement);
+}
+
 type Phase = "overview" | "focused" | "focusing" | "sailing" | "hopping" | "activity" | "story";
 export type GlobeBoardHandle = { sailTo: (id: string) => void; openStop: (id: string) => void; focus: () => void };
 type Props = {
@@ -142,15 +146,12 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
       ? transportGlobeOrientation(frame.current.orientation ?? northUpGlobeOrientation(frame.current.focus), next.focus)
       : frame.current.orientation);
     frame.current = { ...frame.current, ...next, orientation, completedStopIds: p.progress.completedStopIds, storyScattered: p.storyScattered, dangerStages: p.dangerStages,
-      overviewSpinning: phaseRef.current === "overview" && !pointer.current && !hasFocusedMapControl() && !p.interactionLocked,
+      overviewSpinning: phaseRef.current === "overview" && !pointer.current && !hasFocusedMapControl(boardRef.current) && !p.interactionLocked,
       stormStages: getBossStormStages(p.progress, p.qaUnlocked, next.activeDestinationId ?? frame.current.activeDestinationId) };
     sceneRef.current?.render(frame.current);
   }
-  function hasFocusedMapControl() {
-    return document.activeElement !== boardRef.current && !!boardRef.current?.contains(document.activeElement);
-  }
   function turnOverviewScenery(radians: number) {
-    if (phaseRef.current !== "overview" || pointer.current || hasFocusedMapControl() || latest.current.interactionLocked || animation.current) return false;
+    if (phaseRef.current !== "overview" || pointer.current || hasFocusedMapControl(boardRef.current) || latest.current.interactionLocked || animation.current) return false;
     const orientation = rotateGlobeOnAxis(frame.current.orientation ?? northUpGlobeOrientation(frame.current.focus), radians);
     paint({ orientation, focus: globeOrientationFocus(orientation) });
     return true;

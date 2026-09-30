@@ -54,7 +54,7 @@
 .pageArrow:hover:not(:disabled) { border-color: #c4b38c; background: #fffdf280; }
 .pageArrow:disabled { opacity: .25; cursor: default; }
 .pageCount { justify-self: center; color: #756342; font-family: Georgia, "Times New Roman", serif; font-size: .8rem; font-variant-numeric: tabular-nums; }
-.openingCover { position: absolute; z-index: 2; inset: 0 0 0 50%; padding: 23px; border: 7px solid #24484c; border-radius: 3px 15px 15px 3px; background: linear-gradient(90deg, #18383c, #2a5053 9%, #23464a); box-shadow: 7px 7px 18px #071a2b44; color: #e6cc91; transform-origin: left center; transform-style: preserve-3d; pointer-events: none; animation: openCover 920ms cubic-bezier(.25,.62,.32,1) both; }
+.openingCover { backface-visibility: hidden; position: absolute; z-index: 2; inset: 0 0 0 50%; padding: 23px; border: 7px solid #24484c; border-radius: 3px 15px 15px 3px; background: linear-gradient(90deg, #18383c, #2a5053 9%, #23464a); box-shadow: 7px 7px 18px #071a2b44; color: #e6cc91; transform-origin: left center; transform-style: preserve-3d; pointer-events: none; animation: openCover 920ms cubic-bezier(.25,.62,.32,1) both; }
 .coverBorder { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; padding: 20px; border: 1px solid #b79c5f; box-shadow: inset 0 0 0 7px #24464a, inset 0 0 0 8px #b79c5f77; }
 .coverTitle { font-family: Georgia, "Times New Roman", serif; font-size: clamp(2.4rem, 4.5vw, 4rem); letter-spacing: -.04em; }
 .coverCompass { width: min(80%, 210px); height: auto; margin: 28px 0; }
