@@ -29,7 +29,8 @@ type Uniforms = {
 
 function paintedMaterial(uniforms: Uniforms, fragment: string, deform = "", transparent = false) {
   return new THREE.ShaderMaterial({
-    uniforms, transparent, depthWrite: !transparent, side: THREE.DoubleSide,
+    // Solid relief keeps depth, while the shared stage can still fade its arrival.
+    uniforms, transparent: true, depthWrite: !transparent, side: THREE.DoubleSide,
     vertexShader: /* glsl */ `${COMMON}
       attribute vec3 color; varying vec3 painted; varying vec3 localPoint; varying vec3 localNormal;
       void main(){ vec3 p=position; ${deform}
@@ -175,6 +176,93 @@ function krakenGeometry() {
   return { body: combined(body), details: combined(details) };
 }
 
+/** Two banks of carved ice frame an open central channel. The submerged
+ * silhouettes sit just above the opaque globe ocean, so their blue depth is
+ * visible without making the planet's ocean transparent. */
+function icebergGeometry() {
+  const peaks: THREE.BufferGeometry[] = [], submerged: THREE.BufferGeometry[] = [];
+  const positions = [
+    [-.52, -.37, .20, .49], [-.56, .13, .22, .30], [-.37, .59, .16, .35],
+    [.46, -.47, .18, .66], [.56, .05, .23, .56], [.43, .49, .16, .20],
+  ];
+  for (const [index, [cx, cz, radius, height]] of positions.entries()) {
+    const vertices: number[] = [], colors: number[] = [], uv: number[] = [];
+    const tabletop = index === 1 || index === 5;
+    const rings = tabletop ? [1, .95, .86, .72] : index === 3 ? [1, .72, .28, .035] : [1, .88, .58, .045];
+    const elevations = [.025, height * .31, height * .77, height];
+    const sides = 8, ringsPoints: THREE.Vector3[][] = [];
+    for (let ring = 0; ring < rings.length; ring++) ringsPoints.push(Array.from({ length: sides }, (_, side) => {
+      const angle = side / sides * TAU + index * .53;
+      const roughness = .82 + random(index * 51 + side * 5 + 92) * .23;
+      return new THREE.Vector3(cx + Math.cos(angle) * radius * rings[ring] * roughness + ring * radius * .035,
+        elevations[ring] + (ring === 0 ? 0 : random(index * 63 + side + 111) * (tabletop && ring === 3 ? .012 : height * .12)),
+        cz + Math.sin(angle) * radius * rings[ring] * roughness - ring * radius * .018);
+    }));
+    const triangle = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, tone: number) => {
+      const color = new THREE.Color(tone);
+      for (const v of [a, b, c]) { vertices.push(v.x, v.y, v.z); colors.push(color.r, color.g, color.b); uv.push(v.x, v.z); }
+    };
+    for (let ring = 0; ring < rings.length - 1; ring++) for (let side = 0; side < sides; side++) {
+      const next = (side + 1) % sides;
+      const tint = ring === 2 ? 0xe9fcff : [0x8adbe9, 0xb6eff5, 0xd1f7fa, 0x72c5df][(index + side + ring) % 4];
+      triangle(ringsPoints[ring][side], ringsPoints[ring + 1][side], ringsPoints[ring][next], tint);
+      triangle(ringsPoints[ring][next], ringsPoints[ring + 1][side], ringsPoints[ring + 1][next], tint);
+    }
+    const crown = ringsPoints[3].reduce((sum, point) => sum.add(point), new THREE.Vector3()).multiplyScalar(1 / sides);
+    for (let side = 0; side < sides; side++) triangle(ringsPoints[3][side], crown, ringsPoints[3][(side + 1) % sides], 0xe9fcff);
+    const peak = new THREE.BufferGeometry();
+    peak.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+    peak.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+    peak.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+    peak.setIndex(Array.from({ length: vertices.length / 3 }, (_, vertex) => vertex));
+    peak.computeVertexNormals(); peaks.push(peak);
+    const shelf = new THREE.CircleGeometry(radius * 1.22, 10);
+    shelf.rotateX(-Math.PI / 2); shelf.scale(1, 1, .90); shelf.translate(cx, .012, cz);
+    submerged.push(colorGeometry(shelf, index % 2 ? 0x31adca : 0x46d0db));
+    // Small fractured floes are flat pentagonal ice rather than white cubes.
+    for (let shard = 0; shard < 2; shard++) {
+      const angle = index + shard * 1.9, fleck = new THREE.CylinderGeometry(.026, .034, .022, 5);
+      fleck.translate(cx + Math.cos(angle) * radius * 1.08, .025, cz + Math.sin(angle) * radius * 1.08);
+      peaks.push(colorGeometry(fleck, 0xc9f1f4));
+    }
+  }
+  return { peaks: combined(peaks), submerged: combined(submerged) };
+}
+
+/** Authored crescent shelves and branching sea fans preserve the .28-wide
+ * anchorage. Coral uses tapered limbs and shallow fans, never stacked blocks. */
+function reefGeometry() {
+  const rocks: THREE.BufferGeometry[] = [], coral: THREE.BufferGeometry[] = [];
+  const shelves = [[-.46,-.48],[-.64,-.34],[-.70,-.13],[-.60,.05],[-.52,.17],[-.56,.38],[-.45,.58],
+    [.38,-.58],[.54,-.40],[.65,-.21],[.58,-.02],[.69,.12],[.56,.28],[.51,.47]];
+  for (const [index, [cx, cz]] of shelves.entries()) {
+    const angle = Math.atan2(cz, cx);
+    const rock = new THREE.IcosahedronGeometry(1, 1);
+    rock.scale(.115 + random(index + 17) * .045, .023 + random(index + 39) * .063, .075 + random(index + 62) * .055);
+    rock.rotateY(index * .9); rock.translate(cx, .025, cz);
+    rocks.push(colorGeometry(rock, [0x918e78, 0x718b85, 0xa9a18b][index % 3]));
+    if (index % 2 === 0) {
+      const plate = new THREE.CylinderGeometry(.064, .019, .028, 10, 1);
+      plate.scale(1, 1, .74); plate.rotateZ(.16); plate.rotateY(index);
+      plate.translate(cx * .87, .058, cz * .87);
+      coral.push(colorGeometry(plate, [0xefb657, 0xd78fba, 0xe88562][index % 3]));
+    }
+    if (index % 2 === 1) {
+      const h = .15 + random(index + 123) * .085, color = [0xee827c, 0xce8fc6, 0xefb463][index % 3];
+      const base = new THREE.Vector3(cx * .89, .035, cz * .89);
+      const top = base.clone().add(new THREE.Vector3(.016 * Math.cos(angle), h, .016 * Math.sin(angle)));
+      coral.push(tube([base, base.clone().lerp(top, .5), top], .010, color, 7, 5));
+      for (const side of [-1, 1]) {
+        const shoulder = base.clone().lerp(top, .48), tip = top.clone().add(new THREE.Vector3(Math.cos(angle + Math.PI / 2) * .053 * side, -.017, Math.sin(angle + Math.PI / 2) * .053 * side));
+        coral.push(tube([shoulder, shoulder.clone().lerp(tip, .55), tip], .007, color, 6, 5));
+        const fork = shoulder.clone().lerp(tip, .58);
+        coral.push(tube([fork, fork.clone().add(new THREE.Vector3(Math.cos(angle) * .026, .049, Math.sin(angle) * .026))], .004, color, 3, 3));
+      }
+    }
+  }
+  return { rocks: combined(rocks), coral: combined(coral) };
+}
+
 function discGeometry() {
   const geometry = new THREE.RingGeometry(0, .95, 112, 18); geometry.rotateX(-Math.PI / 2);
   return colorGeometry(geometry, 0x147d91);
@@ -225,6 +313,43 @@ function particleMaterial(uniforms: Uniforms, kind: "rain" | "foam") {
   });
 }
 
+function fogMaterial(uniforms: Uniforms) {
+  return new THREE.ShaderMaterial({
+    uniforms, transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    vertexShader: /* glsl */ `${COMMON}
+      attribute vec4 dangerParticle; varying vec2 mistUV; varying float mistSeed; varying float mistAlpha;
+      void main(){
+        vec4 d=dangerParticle;
+        float a=d.x*6.283185+sin(dangerSeconds*.025+d.z*7.)*.16;
+        float r=.15+d.y*.42;
+        vec3 p=vec3(cos(a)*r,.065+d.z*.30,sin(a)*r*.78);
+        p.x+=sin(dangerSeconds*.06+d.w*6.)*.055;
+        vec4 view=modelViewMatrix*vec4(seaPoint(p),1.);
+        vec2 size=vec2(.48+d.w*.22,.23+d.y*.18);
+        view.xy+=position.xy*size*dangerRadius;
+        gl_Position=projectionMatrix*view; mistUV=uv; mistSeed=d.w*11.;
+        mistAlpha=.16+d.z*.11;
+      }`,
+    fragmentShader: /* glsl */ `${COMMON}
+      varying vec2 mistUV; varying float mistSeed; varying float mistAlpha;
+      float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+      float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1.,0.)),f.x),mix(hash(i+vec2(0.,1.)),hash(i+1.),f.x),f.y);}
+      void main(){
+        vec2 uv=mistUV-.5;
+        float edge=1.-smoothstep(.20,.50,length(uv));
+        float billow=noise(mistUV*4.+vec2(dangerSeconds*.018,mistSeed));
+        billow+=noise(mistUV*9.+vec2(mistSeed,-dangerSeconds*.023))*.35;
+        float day=smoothstep(-.2,.3,dangerSun.y);
+        vec3 mist=mix(vec3(.10,.25,.34),vec3(.74,.90,.91),day);
+        // Cool scattered light leaves the ship readable through the thinner veils.
+        mist+=vec3(.04,.10,.11)*(1.-day);
+        gl_FragColor=vec4(mist,edge*smoothstep(.12,.76,billow)*mistAlpha*dangerStage);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
+  });
+}
+
 /** All hazards share immutable geometry. GPU animation uses the map's paused
  * clock; eligibility and progress are supplied by the caller, never inferred. */
 export function createGlobeDangers(globe: THREE.Group) {
@@ -233,6 +358,8 @@ export function createGlobeDangers(globe: THREE.Group) {
   const keep = (geometry: THREE.BufferGeometry) => { geometries.add(geometry); return geometry; };
   const cloud = keep(squallCloudGeometry()), kraken = krakenGeometry(); keep(kraken.body); keep(kraken.details);
   const disc = keep(discGeometry()), rain = keep(particleGeometry(150)), foam = keep(particleGeometry(130));
+  const fog = keep(particleGeometry(64)), ice = icebergGeometry(), reef = reefGeometry();
+  keep(ice.peaks); keep(ice.submerged); keep(reef.rocks); keep(reef.coral);
   const winds: THREE.BufferGeometry[] = [];
   for (let band = 0; band < 3; band++) winds.push(tube(Array.from({ length: 48 }, (_, i) => {
     const t = i / 47, curl = Math.max(0, (t - .62) / .38) * Math.PI * 1.6;
@@ -279,6 +406,60 @@ export function createGlobeDangers(globe: THREE.Group) {
         lit=mix(vec3(.15,.4,.5),vec3(.60,.89,.91),daylight);
         alpha*=wake*smoothstep(.32,.50,r)*(1.-smoothstep(.74,.95,r))*.20;
       `, "p.y=.02;", true), 1);
+    } else if (region.dangerKind === "fog") {
+      add("low layered drifting fog", fog, fogMaterial(uniforms), 4);
+      add("silver sea ribbons", disc, paintedMaterial(uniforms, /* glsl */ `
+        float r=length(localPoint.xz);
+        float ribbon=pow(.5+.5*sin(localPoint.z*31.+sin(localPoint.x*7.-dangerSeconds*.12)*1.5),12.);
+        lit=mix(vec3(.12,.31,.40),vec3(.59,.85,.85),daylight);
+        alpha*=ribbon*smoothstep(.22,.42,r)*(1.-smoothstep(.68,.91,r))*.17;
+      `, "p.y=.018;", true), 1);
+      add("trailing mist wisps", wind, paintedMaterial(uniforms, /* glsl */ `
+        lit=mix(vec3(.16,.34,.42),vec3(.78,.93,.92),daylight);
+        alpha*=.09+.06*sin(localPoint.x*6.-dangerSeconds*.16);
+      `, "p.y=.065+(p.y-.10)*.35; p.x+=sin(dangerSeconds*.10+p.z)*.035; p.z-=.15;", true), 3);
+    } else if (region.dangerKind === "icebergs") {
+      const drift = "p.x+=sin(dangerSeconds*.045+position.z*4.)*.012; p.z+=cos(dangerSeconds*.038+position.x*5.)*.009;";
+      add("sculpted glacier peaks and fractured floes", ice.peaks, paintedMaterial(uniforms, /* glsl */ `
+        float frost=smoothstep(.16,.58,localPoint.y);
+        float glint=pow(max(0.,dot(reflect(-dangerSun,normalize(localNormal)),vec3(0.,1.,0.))),32.);
+        lit+=vec3(.07,.20,.27)*(1.-daylight)+vec3(.38,.56,.62)*glint*.24;
+        lit=mix(lit,lit+vec3(.13,.15,.14)*daylight,frost);
+      `, drift));
+      add("submerged turquoise ice shelves", ice.submerged, paintedMaterial(uniforms, /* glsl */ `
+        float caustic=pow(.5+.5*sin(localPoint.x*47.+sin(localPoint.z*39.+dangerSeconds*.12)),8.);
+        lit=painted*(.27+daylight*.72)+vec3(.12,.37,.43)*caustic*.23;
+        alpha*=.47;
+      `, drift, true), 1);
+      add("ice channel ripples and delicate foam", disc, paintedMaterial(uniforms, /* glsl */ `
+        float r=length(localPoint.xz),a=atan(localPoint.z,localPoint.x);
+        float wash=pow(.5+.5*sin(r*77.+a*3.-dangerSeconds*.28),22.);
+        float shore=exp(-pow((abs(localPoint.x)-.49)*9.,2.));
+        lit=mix(vec3(.20,.43,.57),vec3(.82,.97,1.),daylight);
+        alpha*=wash*shore*smoothstep(.30,.43,r)*(1.-smoothstep(.80,.93,r))*.43;
+      `, "p.y=.026;", true), 2);
+    } else if (region.dangerKind === "reef") {
+      add("shallow reef crescents", disc, paintedMaterial(uniforms, /* glsl */ `
+        float r=length(localPoint.xz);
+        float bank=exp(-pow((abs(localPoint.x)-(.55+.045*sin(localPoint.z*9.)))*9.,2.));
+        bank*=1.-smoothstep(.38,.68,abs(localPoint.z));
+        float caustic=pow(.5+.5*sin(localPoint.x*41.+sin(localPoint.z*35.+dangerSeconds*.14)*2.),10.);
+        vec3 sand=mix(vec3(.028,.24,.27),vec3(.18,.66,.61),daylight);
+        lit=sand+vec3(.17,.29,.19)*caustic*(.2+.8*daylight);
+        alpha*=bank*(1.-smoothstep(.80,.94,r))*.8;
+      `, "p.y=.016;", true), 1);
+      add("weathered rocky reef arcs", reef.rocks, paintedMaterial(uniforms, "lit+=vec3(.018,.06,.07)*(1.-daylight);"));
+      details = add("branching coral gardens and sea fans", reef.coral, paintedMaterial(uniforms, /* glsl */ `
+        lit+=painted*(.16+.12*(1.-daylight));
+      `, "p.x+=sin(dangerSeconds*.32+position.z*12.)*.004*smoothstep(.04,.20,position.y);"));
+      add("breaking reef foam", disc, paintedMaterial(uniforms, /* glsl */ `
+        float r=length(localPoint.xz),a=atan(localPoint.z,localPoint.x);
+        float bank=exp(-pow((abs(localPoint.x)-(.68+.025*sin(localPoint.z*11.)))*18.,2.));
+        bank*=1.-smoothstep(.38,.67,abs(localPoint.z));
+        float wave=pow(.5+.5*sin(r*93.-dangerSeconds*.47+a*3.+sin(a*8.)),12.);
+        lit=mix(vec3(.16,.39,.47),vec3(.92,.98,.86),daylight);
+        alpha*=bank*wave*.66;
+      `, "p.y=.025;", true), 2);
     } else {
       add("deep spiral funnel", disc, paintedMaterial(uniforms, /* glsl */ `
         float r=length(localPoint.xz),a=atan(localPoint.z,localPoint.x);

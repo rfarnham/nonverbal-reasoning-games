@@ -11,6 +11,7 @@ import { createGlobeLife } from "./globe-life";
 import { createGlobeMarine } from "./globe-marine";
 import { createGlobeHarbors } from "./globe-harbors";
 import { createGlobeStorms } from "./globe-storms";
+import { createDangerReveal } from "./danger-reveal";
 import { createGlobeDangers } from "./globe-dangers";
 import { createGlobeCrystalStory } from "./globe-crystal-story";
 import { northUpGlobeOrientation, type GlobeOrientation } from "./globe-navigation";
@@ -205,6 +206,8 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   let sceneryEnabled = options.animateScenery ?? true;
   let onScreen = false;
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const dangerReveal = createDangerReveal();
+  let visibleDangerStages: Record<string, number> = {};
   const updateScenery = () => {
     if (!frame) return;
     lighting.update(sceneryTime, skyMode, frame.focus, frame.zoom);
@@ -216,7 +219,9 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     marine.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, lighting.sunDirection);
     harbors.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, lighting.sunDirection);
     storms.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, frame.stormStages ?? {}, sceneryEnabled && !reducedMotion.matches, lighting.sunDirection);
-    dangers.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, frame.dangerStages ?? {}, sceneryEnabled && !reducedMotion.matches, lighting.sunDirection);
+    visibleDangerStages = dangerReveal.sample(sceneryTime, frame.dangerStages ?? {}, { running: sceneryEnabled, reducedMotion: reducedMotion.matches });
+    renderer.domElement.dataset.visibleDangers = Object.keys(visibleDangerStages).filter(id => visibleDangerStages[id] > 0).join(" ");
+    dangers.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, visibleDangerStages, sceneryEnabled && !reducedMotion.matches, lighting.sunDirection);
     updatePlayerShip();
     updateLavaLight();
     wakeTime.value = sceneryTime;
@@ -332,7 +337,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     let strength = 0, encounterInfluence = 0;
     for (const region of oceanEncounters) {
       const distance = shipNormal.angleTo(vector(region.center));
-      const influence = ((region.kind === "danger" ? frame.dangerStages : frame.stormStages)?.[region.id] ?? 0)
+      const influence = ((region.kind === "danger" ? visibleDangerStages : frame.stormStages)?.[region.id] ?? 0)
         * (1 - THREE.MathUtils.smoothstep(distance, region.angularRadius * .22, region.angularRadius));
       encounterInfluence = Math.max(encounterInfluence, influence);
       strength = Math.max(strength, influence * (region.kind === "danger" ? .48 : 1));

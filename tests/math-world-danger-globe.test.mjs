@@ -13,7 +13,7 @@ test('sixteen distinct sea encounters leave all teaching geography and hurricane
   assert.equal(GLOBE_DESTINATIONS.length, 34);
   assert.equal(GLOBE_DANGER_REGIONS.length, 16);
   assert.deepEqual(GLOBE_DANGER_LOCATIONS.map(d => d.afterWorld), Array.from({length:16},(_,i)=>(i+1)*2));
-  assert.deepEqual(GLOBE_DANGER_LOCATIONS.map(d => d.kind), Array.from({length:16},(_,i)=>['squall','kraken','maelstrom'][i%3]));
+  assert.deepEqual(GLOBE_DANGER_LOCATIONS.map(d => d.kind), ['squall','kraken','maelstrom','fog','reef','squall','kraken','icebergs','maelstrom','icebergs','fog','reef','squall','kraken','maelstrom','icebergs']);
   for(const region of GLOBE_DANGER_REGIONS) {
     assert.equal(getGlobeDestination(region.id),region);
     assert.ok(Math.abs(Math.hypot(...Object.values(region.center))-1)<1e-10);
@@ -49,7 +49,8 @@ test('danger scenery has bounded, smooth geometry and shares only immutable buff
     if(!object.isMesh)return;draws++;geometries.add(object.geometry);
     assert.notEqual(object.geometry.type,'BoxGeometry','creatures and clouds have authored curved forms');
   });
-  assert.equal(draws,54,'each hazard uses at most four draws');
+  assert.equal(draws,53,'sixteen varied encounters retain the small draw budget');
+  for (const group of globe.children[0].children) assert.ok(group.children.length <= 4, `${group.name} uses at most four draws`);
   let triangles=0;
   for(const geometry of geometries) {
     const positions=geometry.getAttribute('position');
@@ -83,6 +84,59 @@ test('eligibility, shared clock, night lighting, LOD and hemisphere culling are 
   const krakenRegion=GLOBE_DANGER_REGIONS[1],details=globe.getObjectByName(`${krakenRegion.id} suction cups and amber eyes`);
   dangers.update(4,krakenRegion.center,0,krakenRegion.id,{[krakenRegion.id]:1},true);assert.equal(details.visible,false);
   dangers.update(4,krakenRegion.center,1,krakenRegion.id,{[krakenRegion.id]:1},true);assert.equal(details.visible,true);
+  dangers.dispose();
+});
+
+test('new sea passages have distinct relief and leave the central ship anchorage open', () => {
+  const globe=new THREE.Group(),dangers=createGlobeDangers(globe);
+  const fogRegion=GLOBE_DANGER_REGIONS.find(region=>region.dangerKind==='fog');
+  const fog=globe.getObjectByName(`${fogRegion.id} fog`);
+  const veils=fog.children.find(mesh=>mesh.name.includes('layered drifting fog'));
+  assert.ok(veils.geometry.isInstancedBufferGeometry);
+  assert.ok(veils.geometry.instanceCount>=48,'many fine wisps build the bank without a solid cloud shell');
+  for(const mesh of fog.children) {
+    assert.equal(mesh.material.transparent,true);
+    assert.equal(mesh.material.depthWrite,false,'fog never occludes the ship as an opaque surface');
+  }
+  for(const [kind,parts] of [['icebergs',['glacier peaks','submerged turquoise']],['reef',['rocky reef arcs','coral gardens']]]) {
+    const region=GLOBE_DANGER_REGIONS.find(region=>region.dangerKind===kind);
+    const group=globe.getObjectByName(`${region.id} ${kind}`);
+    for(const part of parts) {
+      const mesh=group.children.find(mesh=>mesh.name.includes(part));
+      assert.ok(mesh,`${kind} includes ${part}`);
+      const positions=mesh.geometry.attributes.position;
+      for(let index=0;index<positions.count;index++) {
+        const radius=Math.hypot(positions.getX(index),positions.getZ(index));
+        assert.ok(radius>.28,`${part} leaves the central ship and single stop clear`);
+        assert.ok(radius<.96,`${part} leaves space for its small drift inside the sea disk`);
+      }
+    }
+  }
+  dangers.dispose();
+});
+
+test('all six kinds fade their arrival and reuse the paused scenery clock without mutating geometry', () => {
+  const globe=new THREE.Group(),dangers=createGlobeDangers(globe);
+  for(const kind of new Set(GLOBE_DANGER_REGIONS.map(region=>region.dangerKind))) {
+    const region=GLOBE_DANGER_REGIONS.find(region=>region.dangerKind===kind);
+    const group=globe.getObjectByName(`${region.id} ${kind}`);
+    const before=group.children.flatMap(mesh=>Object.values(mesh.geometry.attributes).map(attribute=>[attribute,Array.from(attribute.array)]));
+    dangers.update(37,region.center,1,region.id,{[region.id]:.18},true,new THREE.Vector3(1,0,0));
+    assert.equal(group.visible,true);
+    for(const mesh of group.children) {
+      assert.equal(mesh.material.uniforms.dangerStage.value,.18);
+      assert.equal(mesh.material.transparent,true,`${kind} relief blends partial appearance stages`);
+      assert.equal(mesh.material.uniforms.dangerSeconds.value,37);
+    }
+    dangers.update(37,region.center,1,region.id,{[region.id]:.18},false,new THREE.Vector3(-1,0,0));
+    for(const mesh of group.children) {
+      assert.equal(mesh.material.uniforms.dangerSeconds.value,37,'a stopped shared clock freezes drifting, foam and fog');
+      assert.equal(mesh.material.uniforms.dangerFlash.value,0);
+    }
+    for(const [attribute,previous] of before)assert.deepEqual(Array.from(attribute.array),previous);
+    dangers.update(38,region.center,1,region.id,{},true);
+    assert.equal(group.visible,false,`${kind} immediately leaves the globe when no longer relevant`);
+  }
   dangers.dispose();
 });
 
