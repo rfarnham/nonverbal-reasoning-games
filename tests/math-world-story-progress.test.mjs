@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createInitialProgress } from '../app/math-world/engine.ts';
 import { WORLD_DEFINITIONS } from '../app/math-world/world-data.ts';
-import { createStoryProgress, automaticStoryPage, advanceStoryPage, markStoryBookRead, readStoryProgress, writeStoryProgress, pendingFirstWorldEnding, WORLD_STORY_STORAGE_KEY, WORLD_STORY_PLAYTEST_KEY } from '../app/math-world/story-progress.ts';
+import { createStoryProgress, automaticStoryPage, advanceStoryPage, markStoryBookRead, markEncounterRead, readStoryProgress, writeStoryProgress, pendingFirstWorldEnding, WORLD_STORY_STORAGE_KEY, WORLD_STORY_PLAYTEST_KEY } from '../app/math-world/story-progress.ts';
 const first=WORLD_DEFINITIONS[0], second=WORLD_DEFINITIONS[1];
 const complete={...createInitialProgress(),completedStopIds:first.stopIds};
 function storage(){const values=new Map();return {getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),values};}
@@ -40,4 +40,23 @@ test('story storage handles corrupt, future, blocked and unavailable storage wit
  assert.deepEqual(readStoryProgress(false,blocked),createStoryProgress());
  const story=advanceStoryPage(createStoryProgress(),'intro');assert.doesNotThrow(()=>writeStoryProgress(story,false,blocked));assert(story.introSeen);
  assert.doesNotThrow(()=>writeStoryProgress(story,false,null));
+});
+
+test('encounter reading migrates old saves, validates IDs and persists without advancing the first chapter',()=>{
+ const s=storage();
+ s.setItem(WORLD_STORY_STORAGE_KEY,JSON.stringify({version:1,introSeen:true,ending:'unseen',readBooks:[0]}));
+ const old=readStoryProgress(false,s);
+ assert.deepEqual(old.readEncounters,[]);
+ let story=markEncounterRead(old,'boss-2025');
+ story=markEncounterRead(story,'danger-08');
+ assert.equal(markEncounterRead(story,'boss-2025'),story);
+ for(const invalid of ['boss-2027','danger-01','danger-34','unknown'])assert.equal(markEncounterRead(story,invalid),story);
+ assert.deepEqual(story.readBooks,[0]);assert.equal(story.ending,'unseen');
+ writeStoryProgress(story,false,s);assert.deepEqual(readStoryProgress(false,s),story);
+ writeStoryProgress(markEncounterRead(createStoryProgress(),'boss-2026'),true,s);
+ assert.deepEqual(readStoryProgress(false,s).readEncounters,['boss-2025','danger-08']);
+ assert.deepEqual(readStoryProgress(true,s).readEncounters,['boss-2026']);
+ s.setItem(WORLD_STORY_STORAGE_KEY,JSON.stringify({...story,readEncounters:['danger-08','danger-08','boss-2025','danger-01',null,2,{}]}));
+ assert.deepEqual(readStoryProgress(false,s).readEncounters,['danger-08','boss-2025']);
+ assert.deepEqual(old.readEncounters,[],'marking a read never mutates the previous snapshot');
 });

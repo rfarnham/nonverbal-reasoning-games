@@ -8,11 +8,19 @@ export type WorldStoryProgress = Readonly<{
   version: 1;
   introSeen: boolean;
   readBooks: readonly number[];
+  readEncounters: readonly string[];
   ending: StoryEnding;
 }>;
 export const WORLD_STORY_STORAGE_KEY = "spatial-gym-math-world-story-v1";
 export const WORLD_STORY_PLAYTEST_KEY = "spatial-gym-math-world-story-playtest-v1";
-export const createStoryProgress = (): WorldStoryProgress => ({ version: 1, introSeen: false, readBooks: [], ending: "unseen" });
+export const createStoryProgress = (): WorldStoryProgress => ({ version: 1, introSeen: false, readBooks: [], readEncounters: [], ending: "unseen" });
+const encounterIds = new Set(["boss-2025", "boss-2026", ...Array.from({ length: 16 }, (_, index) => `danger-${String((index + 1) * 2).padStart(2, "0")}`)]);
+
+/** A reading acknowledgement only: no question, packet or voyage state changes. */
+export function markEncounterRead(story: WorldStoryProgress, id: string): WorldStoryProgress {
+  return encounterIds.has(id) && !story.readEncounters.includes(id)
+    ? { ...story, readEncounters: [...story.readEncounters, id] } : story;
+}
 export function firstWorldComplete(progress: WorldProgress): boolean {
   return WORLD_DEFINITIONS[0].stopIds.every(id => progress.completedStopIds.includes(id));
 }
@@ -44,7 +52,8 @@ export function readStoryProgress(qa = false, storage: StorageLike | null = brow
     const raw = JSON.parse(storage?.getItem(qa ? WORLD_STORY_PLAYTEST_KEY : WORLD_STORY_STORAGE_KEY) ?? "null");
     if (!raw || raw.version !== 1 || typeof raw.introSeen !== "boolean" || !["unseen", "shattering", "appeal", "complete"].includes(raw.ending)) return createStoryProgress();
     return { version: 1, introSeen: raw.introSeen, ending: raw.ending,
-      readBooks: Array.isArray(raw.readBooks) ? [...new Set<number>(raw.readBooks.filter((value: unknown) => value === 0 || value === 1))].sort() : [] };
+      readBooks: Array.isArray(raw.readBooks) ? [...new Set<number>(raw.readBooks.filter((value: unknown) => value === 0 || value === 1))].sort() : [],
+      readEncounters: Array.isArray(raw.readEncounters) ? [...new Set<string>(raw.readEncounters.filter((value: unknown) => typeof value === "string" && encounterIds.has(value)))] : [] };
   } catch { return createStoryProgress(); }
 }
 export function writeStoryProgress(story: WorldStoryProgress, qa = false, storage: StorageLike | null = browserStorage()): void {

@@ -10,9 +10,12 @@ import { printWorldWorkbook, printDangerWorkbook } from "./workbook.ts";
 import { printBossWorkbook } from "./boss-workbook.ts";
 import { StoryPage } from "./StoryPage";
 import { FIRST_WORLD_STORY } from "./story-content.ts";
-import { advanceStoryPage, automaticStoryPage, markStoryBookRead, type AutomaticStoryPage, type WorldStoryProgress } from "./story-progress.ts";
+import { advanceStoryPage, automaticStoryPage, markStoryBookRead, markEncounterRead, type AutomaticStoryPage, type WorldStoryProgress } from "./story-progress.ts";
 import { dangerAfterWorld, dangerById, dangerSceneryStages, hasCrossedDanger, type DangerDefinition } from "./danger-definitions.ts";
 import { DANGER_STORIES } from "./danger-content.ts";
+import { BOSS_STORIES } from "./boss-story-content.ts";
+import { VoyageLibrary, type ReadingPanel } from "./VoyageLibrary";
+import { storySoFar, VOYAGE_GLOSSARY } from "./voyage-reading.ts";
 import { dangerPacketQuestions, dangerPacketAccuracy, type DangerState, type DangerPacket } from "./danger-engine.ts";
 import shell from "./math-world.module.css";
 import styles from "./globe.module.css";
@@ -33,9 +36,10 @@ export function GlobeAdventure(props: Props) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const storyRef = useRef<HTMLDialogElement>(null);
   const storyOpener = useRef<HTMLButtonElement | null>(null);
-  const [readDangerId, setReadDangerId] = useState<string | null>(null);
   const packet = danger ? props.dangerState.packets[danger.id] : undefined;
-  const dangerBriefing = !!danger && !packet?.briefingRead && readDangerId !== danger.id;
+  const dangerBriefing = !!danger && !packet?.briefingRead && !props.storyProgress.readEncounters.includes(danger.id);
+  const bossBriefing = !!boss && !props.storyProgress.readEncounters.includes(boss.id);
+  const [library, setLibrary] = useState<ReadingPanel | null>(null);
   const [revisitDanger, setRevisitDanger] = useState(false);
   const [story, setStory] = useState<number | null>(null);
   const [preview, setPreview] = useState<AutomaticStoryPage | null>(null);
@@ -58,7 +62,7 @@ export function GlobeAdventure(props: Props) {
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => { headingRef.current?.focus({ preventScroll: true }); }, [destinationId]);
   useEffect(() => {
-    const closeReading = () => { storyRef.current?.close(); setPreview(null); setStory(null); setRevisitDanger(false); };
+    const closeReading = () => { storyRef.current?.close(); setPreview(null); setStory(null); setRevisitDanger(false); setLibrary(null); };
     window.addEventListener("popstate", closeReading);
     return () => window.removeEventListener("popstate", closeReading);
   }, []);
@@ -67,7 +71,8 @@ export function GlobeAdventure(props: Props) {
   const chapterStage = preview ?? automaticPage;
   const chapterPage = chapterStage && chapterStage !== "shattering" ? FIRST_WORLD_STORY[chapterStage] : null;
   const bookPage = world.number === 1 && story !== null ? (story === 0 ? FIRST_WORLD_STORY.book1 : FIRST_WORLD_STORY.book2) : null;
-  const reading = dangerBriefing || (!!danger && revisitDanger) || !!chapterStage || story !== null;
+  const narrativeReading = dangerBriefing || bossBriefing || (!!danger && revisitDanger) || !!chapterStage || story !== null;
+  const reading = narrativeReading || library !== null;
   function continueChapter() {
     if (!chapterStage) return;
     if (preview) setPreview(preview === "fracture" ? "shattering" : preview === "shattering" ? "appeal" : null);
@@ -81,7 +86,7 @@ export function GlobeAdventure(props: Props) {
   function navigate(id: string) {
     storyRef.current?.close();
     setPreview(null); setStory(null);
-    setPrintError(null); setRevisitDanger(false);
+    setPrintError(null); setRevisitDanger(false); setLibrary(null);
     const targetDanger = dangerById(id);
     if (targetDanger) { props.onChooseDanger(targetDanger); return; }
     const targetBoss = BOSS_CHALLENGES.find(candidate => candidate.id === id);
@@ -110,6 +115,7 @@ export function GlobeAdventure(props: Props) {
     {qaUnlocked && <p className={styles.testNotice}><strong>Test mode</strong><span>Every destination is unlocked. Select a danger to preview it; other dangers follow your progress. Your adventure progress stays separate.</span></p>}
     {!boss && !danger && <div className={styles.progressRow}><span>{completedCount} / {stops.length} stops explored</span><progress aria-label={`${world.title} completion`} max={stops.length} value={completedCount} /><span>{questions} questions · Untimed</span></div>}
     {checkpoint && !boss && !danger && <div className={styles.completion} role="status"><span aria-hidden="true">✓</span><div><strong>{complete ? "Archipelago complete!" : `${checkpoint.shortLabel} complete!`}</strong><p>{QUESTIONS_BY_STOP.get(checkpoint.id)?.length} questions solved · {stopFirstTryAccuracy(progress.stopAttempts[checkpoint.id], QUESTIONS_BY_STOP.get(checkpoint.id) ?? [])}% first-try accuracy</p></div></div>}
+    <div className={styles.mapAndLibrary}>
     <GlobeBoard ref={boardRef} danger={danger} dangerStages={dangerSceneryStages(progress, props.dangerState, qaUnlocked, destinationId)} canNavigate={props.canNavigate} onOpenDanger={props.onOpenDanger} dangerReady={!!packet?.briefingRead} dangerComplete={!!packet?.completedAt} world={world} boss={boss} progress={progress} qaUnlocked={qaUnlocked}
       initialOverview={initialOverview} restingStopId={props.avatarStopId ?? progress.checkpointStopId}
       onNavigate={navigate} onOpenStop={props.onOpenStop} onInspectStop={props.onInspectStop} onBusyChange={onBusyChange}
@@ -117,6 +123,9 @@ export function GlobeAdventure(props: Props) {
       storyScattered={props.storyProgress.ending === "appeal" || props.storyProgress.ending === "complete"}
       storyBookLabels={!danger && world.number === 1 ? [FIRST_WORLD_STORY.book1.title, FIRST_WORLD_STORY.book2.title] : undefined}
       onStory={(index, opener) => { storyOpener.current = opener; setStory(index); }} />
+    <VoyageLibrary pages={storySoFar(props.storyProgress, props.dangerState)} glossary={VOYAGE_GLOSSARY}
+      panel={library} onPanelChange={setLibrary} disabled={printing || busy || narrativeReading} />
+    </div>
     {!danger && <section className={styles.actions} aria-label="World actions" inert={reading}>
       <div><strong>{boss ? "A full test awaits" : complete ? "Every trail explored" : "Your next discovery"}</strong><p>{boss ? "Print the test and work through it with pencil and paper." : complete ? "Your boat is ready for the next adventure." : "Choose a stop on the globe, or explore the list below."}</p></div>
       {boss ? nextWorld && <button className={styles.primary} disabled={busy || printing || !props.canNavigate(nextWorld.id)} onClick={() => boardRef.current?.sailTo(nextWorld.id)}>{boss.afterWorld === WORLD_DEFINITIONS.length ? `Back to World ${nextWorld.number}` : `Continue to World ${nextWorld.number}`} →</button>
@@ -140,7 +149,9 @@ export function GlobeAdventure(props: Props) {
       <button type="button" disabled={busy || reading} onClick={() => setPreview("intro")}>Read the welcome</button>
       {(qaUnlocked || props.storyProgress.ending === "complete") && <button type="button" disabled={busy || reading} onClick={() => setPreview("fracture")}>{qaUnlocked ? "Preview crystal shattering" : "Revisit the falling stars"}</button>}
     </div>}
-    {danger && (dangerBriefing || revisitDanger) && <StoryPage page={DANGER_STORIES[danger.kind]} actionLabel="Prepare for the crossing" onContinue={() => { setReadDangerId(danger.id); setRevisitDanger(false); }} />}
+    {danger && (dangerBriefing || revisitDanger) && <StoryPage page={DANGER_STORIES[danger.kind]} actionLabel="Prepare for the crossing" onContinue={() => { props.onStoryProgress(markEncounterRead(props.storyProgress, danger.id)); setRevisitDanger(false); }} />}
+    {boss && bossBriefing && <StoryPage key={boss.id} page={BOSS_STORIES[boss.id]} actionLabel="Prepare for the storm"
+      onContinue={() => props.onStoryProgress(markEncounterRead(props.storyProgress, boss.id))} />}
     {chapterPage && <StoryPage key={chapterPage.id} page={chapterPage} onContinue={continueChapter}
       actionLabel={chapterStage === "intro" ? "Begin exploring" : chapterStage === "fracture" ? "Watch the sky" : "I’ll help find the shards"} />}
     {!chapterPage && bookPage && <StoryPage key={bookPage.id} page={bookPage} onContinue={closeBook} actionLabel="Back to the map" />}

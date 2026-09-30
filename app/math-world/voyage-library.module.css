@@ -1,0 +1,121 @@
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+  gap: 12px;
+  width: 104px;
+  padding-top: 18px;
+}
+
+.libraryButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  min-height: 112px;
+  padding: 9px 6px 13px;
+  border: 1px solid #c9cbbd;
+  border-radius: 20px;
+  background: #faf7ed;
+  color: #263e42;
+  box-shadow: 0 3px 0 #dedfce;
+  font: inherit;
+  font-size: .75rem;
+  font-weight: 800;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: transform 140ms, background 140ms;
+}
+.libraryButton svg { display: block; width: 60px; height: 68px; }
+.storyButton { border-color: #cdc4ad; background: #faf5e8; }
+.glossaryButton { border-color: #b8cdc3; background: #eff5ec; }
+.libraryButton:hover:not(:disabled) { transform: translateY(-2px); background: #fffdf7; }
+.libraryButton:disabled { opacity: .55; cursor: default; }
+.libraryButton:focus-visible, .close:focus-visible, .chapter:focus-visible { outline: 3px solid #1679d2; outline-offset: 4px; }
+
+.dialog {
+  width: min(780px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #8d805f;
+  border-radius: 18px;
+  background: #f7efd9;
+  color: #30392f;
+  box-shadow: 0 24px 80px #071a2b55;
+  scrollbar-width: thin;
+  scrollbar-color: #aa9065 #f7efd9;
+}
+.dialog::backdrop { background: #081a28cc; backdrop-filter: blur(7px); }
+.bookSheet {
+  position: relative;
+  min-width: 0;
+  padding: 25px clamp(23px, 5vw, 45px) 26px;
+  border-left: 7px solid #385651;
+  background: linear-gradient(90deg, #e3d3af77, transparent 28px), linear-gradient(110deg, #f7eed6, #fff7e4 55%, #f2e6c9);
+}
+.header { border-bottom: 1px solid #d6c49a; padding-bottom: 19px; }
+.folio { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 23px; color: #74603d; font-size: .59rem; font-weight: 800; letter-spacing: .11em; line-height: 1.5; text-transform: uppercase; }
+.headingRow { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.kicker { margin: 0 0 5px; color: #756044; font-size: .66rem; font-weight: 750; line-height: 1.5; letter-spacing: .1em; text-transform: uppercase; }
+.headingRow h2 { margin: 0; color: #28474a; font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.9rem, 4vw, 2.5rem); line-height: 1.15; letter-spacing: -.03em; }
+.headingRow h2:focus { outline: none; }
+.close { display: flex; flex-shrink: 0; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding: 7px 13px; border: 1px solid #b7a57f; border-radius: 999px; background: #fbf2dc; color: #4b493b; font: inherit; font-size: .75rem; font-weight: 750; cursor: pointer; }
+.close > span:first-child { font-size: 1.4rem; font-weight: 400; line-height: 1; }
+.close:hover { background: #fffaf0; }
+.intro { margin: 13px 0 0; color: #625c4b; font-size: .88rem; line-height: 1.6; }
+.contents { list-style: none; margin: 0; padding: 0; }
+.contents li { border-bottom: 1px solid #ddcea9; }
+.chapter { display: flex; align-items: center; gap: 18px; width: 100%; min-height: 86px; margin: 0; padding: 17px 4px; border: 0; background: transparent; color: #2e4646; font: inherit; text-align: left; cursor: pointer; }
+.chapter:hover { background: #fffbec99; }
+.chapterNumber { flex: 0 0 32px; color: #83704c; font-family: Georgia, "Times New Roman", serif; font-size: 1.4rem; }
+.chapterText { display: grid; gap: 5px; min-width: 0; }
+.chapterText > span { color: #706346; font-size: .6rem; font-weight: 750; line-height: 1.5; letter-spacing: .07em; text-transform: uppercase; }
+.chapterText > strong { font-family: Georgia, "Times New Roman", serif; font-size: 1.15rem; line-height: 1.25; font-weight: 700; }
+.arrow { margin-left: auto; padding-left: 7px; color: #668079; font-size: 1.3rem; }
+.empty { display: grid; justify-items: center; gap: 8px; padding: 33px 5px 15px; text-align: center; }
+.empty svg { width: 60px; height: 68px; }
+.empty p { margin: 6px 0 0; font-family: Georgia, "Times New Roman", serif; font-size: 1.3rem; font-weight: 700; }
+.empty > span { color: #625c4b; font-size: .85rem; line-height: 1.6; }
+.glossary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 30px; margin: 2px 0 0; }
+.entry { padding: 19px 0; border-bottom: 1px solid #ddcea9; break-inside: avoid; }
+.entry dt { margin: 0 0 7px; color: #284e4b; font-family: Georgia, "Times New Roman", serif; font-size: 1.18rem; font-weight: 700; line-height: 1.25; }
+.entry dd { margin: 0; font-size: .88rem; line-height: 1.6; overflow-wrap: break-word; }
+.endmark { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 28px auto 0; color: #a68952; font-size: .5rem; }
+.endmark span { width: 48px; height: 1px; background: #cbb889; }
+
+@media (max-width: 820px) {
+  .rail { flex-direction: row; justify-content: center; align-self: auto; width: 100%; padding: 0; }
+  .libraryButton { flex-direction: row; gap: 10px; width: auto; min-width: 150px; min-height: 58px; padding: 7px 17px 7px 10px; border-radius: 15px; }
+  .libraryButton svg { width: 36px; height: 41px; }
+}
+@media (max-width: 620px) {
+  .dialog { width: calc(100vw - 20px); max-height: calc(100dvh - 20px); border-radius: 12px; }
+  .bookSheet { padding: 20px 22px 24px; border-left-width: 5px; }
+  .folio { font-size: .52rem; letter-spacing: .08em; margin-bottom: 21px; }
+  .headingRow { gap: 10px; }
+  .headingRow h2 { font-size: 2rem; }
+  .kicker { font-size: .58rem; letter-spacing: .06em; }
+  .close { gap: 5px; padding: 7px 10px; }
+  .chapter { gap: 11px; }
+  .chapterNumber { flex-basis: 27px; font-size: 1.25rem; }
+  .chapterText > strong { font-size: 1.05rem; }
+  .glossary { grid-template-columns: minmax(0, 1fr); }
+  .entry { padding: 16px 0; }
+}
+@media (max-width: 390px) {
+  .rail { gap: 8px; }
+  .libraryButton { min-width: 0; padding-right: 12px; gap: 6px; font-size: .72rem; }
+  .bookSheet { padding-right: 17px; padding-left: 17px; }
+  .headingRow h2 { font-size: 1.8rem; }
+  .folio { font-size: .47rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .libraryButton { transition: none; }
+  .libraryButton:hover:not(:disabled) { transform: none; }
+}
