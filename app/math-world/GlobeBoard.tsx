@@ -12,6 +12,8 @@ import type { GlobeSkyMode } from "./globe-lighting";
 import type { ArchipelagoVoyage, VoyageActivityProps } from "./voyage.ts";
 import CoastScene from "./CoastScene";
 import { getBossStormStages, bossStormStageLabel } from "./boss-storm-state.ts";
+import { CalmPassageArtwork } from "./CalmPassageArtwork";
+import { DangerIcon } from "./DangerIcon";
 import { StormArtwork, StormIcon } from "./StormArtwork";
 import { getWorldBiome } from "./globe-biome-data";
 import { getSceneryPaused, setSceneryPaused, subscribeSceneryPreference } from "./scenery-preference";
@@ -388,14 +390,15 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
       }}>{phase === "overview" ? `Explore ${titleFor(destinationId)}` : "Show globe"} <span aria-hidden="true">{phase === "overview" ? "↘" : "◎"}</span></button>
       </div>
     </div>
-    <div ref={boardRef} className={styles.board} data-globe-phase={phase} data-globe-renderer={renderer} data-globe-boss={props.boss?.id} data-voyage-from={voyage?.fromDestinationId} data-voyage-to={voyage?.toDestinationId} data-story-cinematic={props.storyScene ? storyStill ? "still" : "active" : undefined} aria-busy={busy}
+    <div ref={boardRef} className={styles.board} data-globe-phase={phase} data-globe-renderer={renderer} data-globe-boss={props.boss?.id} data-relevant-danger={Object.keys(props.dangerStages ?? {}).find(id => (props.dangerStages?.[id] ?? 0) > 0)} data-voyage-from={voyage?.fromDestinationId} data-voyage-to={voyage?.toDestinationId} data-story-cinematic={props.storyScene ? storyStill ? "still" : "active" : undefined} aria-busy={busy}
       onPointerDown={event => { if (phase !== "overview" || (event.target as HTMLElement).closest("button")) return; pointer.current = { x: event.clientX, y: event.clientY, moved: false }; event.currentTarget.setPointerCapture(event.pointerId); }}
       onPointerMove={event => { const p = pointer.current; if (!p) return; const dx = event.clientX - p.x, dy = event.clientY - p.y; if (Math.hypot(dx, dy) > 2) p.moved = true; turn(-dx * 0.006, dy * 0.006); p.x = event.clientX; p.y = event.clientY; }}
       onPointerUp={() => { pointer.current = null; }} onPointerCancel={() => { pointer.current = null; }}>
       <div ref={canvasRef} className={styles.canvas} data-globe-canvas aria-hidden="true" />
       {renderer === "loading" && <div className={styles.loading} role="status"><span>◎</span>Opening your globe…</div>}
       {renderer === "fallback" && !props.boss && !props.danger && <CoastScene mobile={narrow} className={styles.fallbackMap} completedRoadSlot={-1} worldNumber={props.world.number} />}
-      {renderer === "fallback" && props.danger && <Image className={styles.stormFallback} src={`${basePath}${DANGER_STORIES[props.danger.kind].illustration.src}`} width={1536} height={1024} alt="" unoptimized />}
+      {renderer === "fallback" && props.danger && (props.dangerStages?.[props.danger.id] ?? 0) > 0 && <Image className={styles.stormFallback} src={`${basePath}${DANGER_STORIES[props.danger.kind].illustration.src}`} width={1536} height={1024} alt="" unoptimized />}
+      {renderer === "fallback" && props.danger && !(props.dangerStages?.[props.danger.id] ?? 0) && <CalmPassageArtwork className={styles.stormFallback} />}
       {renderer === "fallback" && props.boss && <StormArtwork className={styles.stormFallback} />}
       {renderer === "fallback" && props.storyScene && <CrystalFallStill className={styles.crystalStill} />}
       <div className={styles.markerLayer} inert={!!props.storyScene}>
@@ -404,10 +407,11 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
           const boss = BOSS_CHALLENGES.find(boss => boss.id === destination.id);
           const available = props.canNavigate ? props.canNavigate(destination.id) : boss ? canOpenBoss(props.progress, boss, props.qaUnlocked) : canOpenWorld(props.progress, destination.id, props.qaUnlocked);
           const world = WORLD_DEFINITIONS.find(world => world.id === destination.id);
+          const danger = dangerById(destination.id);
           return <button type="button" key={destination.id} ref={node => { if (node) nodes.current.set(`world:${destination.id}`, node); else nodes.current.delete(`world:${destination.id}`); }}
             className={`${styles.worldPin} ${boss ? styles.stormPin : ""} ${destination.id === destinationId ? styles.selectedPin : ""}`} style={{ visibility: "hidden" }}
             data-globe-destination={destination.id} data-storm-strength={boss ? stormStages[boss.id] : undefined} disabled={!available || busy || renderer !== "webgl"} aria-label={`${titleFor(destination.id)}. ${boss ? `${bossStormStageLabel(stormStages[boss.id])}. ` : ""}${available ? "Sail here" : "Locked"}.`} onClick={() => { void sailTo(destination.id); }}>
-            <span>{boss ? <StormIcon /> : world?.number ?? (dangerById(destination.id)?.kind === "squall" ? "ϟ" : dangerById(destination.id)?.kind === "kraken" ? "◈" : "◎")}</span>{!available && <small aria-hidden="true">⌑</small>}
+            <span>{boss ? <StormIcon /> : danger ? <DangerIcon kind={danger.kind} /> : world?.number}</span>{!available && <small aria-hidden="true">⌑</small>}
           </button>;
         })}
         {!props.boss && !props.danger && stops.map((stop, index) => {
@@ -442,6 +446,6 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
       </div>}
       <div ref={irisRef} className={styles.iris} aria-hidden="true" />
     </div>
-    <p className={styles.boardCaption}>{props.storyScene ? "The Tideheart’s light is scattered, but not lost." : props.danger && phase !== "overview" ? "One crossing. Take your time and use your paper packet." : props.boss && phase !== "overview" ? "The ship faces the storm. Print the whole test to take on this challenge." : renderer === "fallback" ? "Choose an island stop, or use the list below." : phase === "overview" ? "Drag to turn the globe. Choose a destination to set sail." : props.storyBookLabels ? "Choose a stop to explore. Open the two books to discover Oceania’s story." : "Choose a stop to explore. The two books hold stories to come."}</p>
+    <p className={styles.boardCaption}>{props.storyScene ? "The Tideheart’s light is scattered, but not lost." : props.danger && phase !== "overview" ? (props.dangerStages?.[props.danger.id] ?? 0) > 0 ? "One crossing. Take your time and use your paper packet." : "This crossing is clear. Your voyage notes and packet are still here." : props.boss && phase !== "overview" ? "The ship faces the storm. Print the whole test to take on this challenge." : renderer === "fallback" ? "Choose an island stop, or use the list below." : phase === "overview" ? "Drag to turn the globe. Choose a destination to set sail." : props.storyBookLabels ? "Choose a stop to explore. Open the two books to discover Oceania’s story." : "Choose a stop to explore. The two books hold stories to come."}</p>
   </section>;
 });

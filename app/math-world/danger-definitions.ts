@@ -4,7 +4,7 @@ import { BOSS_CHALLENGES, canOpenBoss } from "./boss-challenges.ts";
 import { WORLD_DEFINITIONS } from "./world-data.ts";
 import type { DangerState } from "./danger-engine.ts";
 
-const titles = { squall: "The Thunder Squall", kraken: "The Kraken Crossing", maelstrom: "The Whirling Deep" };
+const titles = { squall: "The Thunder Squall", kraken: "The Kraken Crossing", maelstrom: "The Whirling Deep", fog: "The Lantern Fog", icebergs: "The Iceberg Passage", reef: "The Hidden Reef" };
 export const DANGERS = GLOBE_DANGER_LOCATIONS.map(location => ({ ...location, title: titles[location.kind] }));
 export type DangerDefinition = (typeof DANGERS)[number];
 export const dangerById = (id: string | null | undefined) => DANGERS.find(danger => danger.id === id);
@@ -41,6 +41,11 @@ export function canNavigateDestination(progress: WorldProgress, state: DangerSta
   const boundary = boss?.afterWorld ?? (world!.number - 1);
   return DANGERS.filter(candidate => candidate.afterWorld <= boundary).every(candidate => hasCrossedDanger(progress, state, candidate));
 }
-export function dangerSceneryStages(progress: WorldProgress, state: DangerState, qa = false): Record<string, number> {
-  return Object.fromEntries(DANGERS.map(danger => [danger.id, state.packets[danger.id]?.completedAt ? .35 : qa || canNavigateDestination(progress, state, danger.id) ? 1 : 0]));
+/** Only the imminent, uncompleted crossing belongs on the globe. Browsing a
+ * cleared coast does not summon its old danger. QA unlocks navigation, but only
+ * an explicitly selected danger overrides the real progression for preview. */
+export function dangerSceneryStages(progress: WorldProgress, state: DangerState, qa = false, activeDestinationId?: string | null): Record<string, number> {
+  const preview = qa ? dangerById(activeDestinationId) : undefined;
+  const relevant = preview ?? nextDueDanger(progress, state);
+  return Object.fromEntries(DANGERS.map(danger => [danger.id, danger.id === relevant?.id ? 1 : 0]));
 }

@@ -107,10 +107,10 @@ export function GlobeAdventure(props: Props) {
         onClick={() => void print()}><span aria-hidden="true">▤</span>{printing ? "Preparing workbook…" : danger ? packet ? "Print review packet" : "Prepare & print packet" : boss ? "Print whole test workbook" : "Print workbook"}</button>
     </header>
     {printError && <p role="alert" className={styles.error}>{printError}</p>}
-    {qaUnlocked && <p className={styles.testNotice}><strong>Test mode</strong><span>Every archipelago, danger and storm is open. Your adventure progress stays separate.</span></p>}
+    {qaUnlocked && <p className={styles.testNotice}><strong>Test mode</strong><span>Every destination is unlocked. Select a danger to preview it; other dangers follow your progress. Your adventure progress stays separate.</span></p>}
     {!boss && !danger && <div className={styles.progressRow}><span>{completedCount} / {stops.length} stops explored</span><progress aria-label={`${world.title} completion`} max={stops.length} value={completedCount} /><span>{questions} questions · Untimed</span></div>}
     {checkpoint && !boss && !danger && <div className={styles.completion} role="status"><span aria-hidden="true">✓</span><div><strong>{complete ? "Archipelago complete!" : `${checkpoint.shortLabel} complete!`}</strong><p>{QUESTIONS_BY_STOP.get(checkpoint.id)?.length} questions solved · {stopFirstTryAccuracy(progress.stopAttempts[checkpoint.id], QUESTIONS_BY_STOP.get(checkpoint.id) ?? [])}% first-try accuracy</p></div></div>}
-    <GlobeBoard ref={boardRef} danger={danger} dangerStages={dangerSceneryStages(progress, props.dangerState, qaUnlocked)} canNavigate={props.canNavigate} onOpenDanger={props.onOpenDanger} dangerReady={!!packet?.briefingRead} dangerComplete={!!packet?.completedAt} world={world} boss={boss} progress={progress} qaUnlocked={qaUnlocked}
+    <GlobeBoard ref={boardRef} danger={danger} dangerStages={dangerSceneryStages(progress, props.dangerState, qaUnlocked, destinationId)} canNavigate={props.canNavigate} onOpenDanger={props.onOpenDanger} dangerReady={!!packet?.briefingRead} dangerComplete={!!packet?.completedAt} world={world} boss={boss} progress={progress} qaUnlocked={qaUnlocked}
       initialOverview={initialOverview} restingStopId={props.avatarStopId ?? progress.checkpointStopId}
       onNavigate={navigate} onOpenStop={props.onOpenStop} onInspectStop={props.onInspectStop} onBusyChange={onBusyChange}
       interactionLocked={reading} storyScene={chapterStage === "shattering"} onStorySceneEnd={continueChapter}
