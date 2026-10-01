@@ -269,6 +269,23 @@
   .primary:not(:disabled):hover { transform: none; }
 }
 .frontierControls { display: flex; flex-direction: column; gap: 13px; padding-bottom: 18px; border-bottom: 1px solid var(--search-line); }
+.worksheetToolbar { padding: 20px; margin: 20px 0; border: 1px solid var(--search-line); border-radius: 16px; background: var(--search-panel, #fffdf8); }
+.worksheetHeading { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.worksheetHeading h3 { margin: 0; font-size: 1rem; }
+.worksheetHeading p { margin: 6px 0 0; font-size: .78rem; color: var(--search-muted); }
+.worksheetActions { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin: 18px 0 10px; }
+.worksheetActions button { font-size: .75rem; }
+.worksheetLimit { display: grid; gap: 6px; font-size: .73rem; font-weight: 650; }
+.worksheetLimit input { width: 100px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--search-line); border-radius: 10px; background: #fffdf8; color: var(--search-ink); font: inherit; }
+.worksheetChoice { min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 10px 15px; border-bottom: 1px solid var(--search-line); font-size: .76rem; cursor: pointer; }
+.worksheetChoice:has(input:checked) { background: #eef5ef; }
+.worksheetChoice input { width: 20px; height: 20px; flex-shrink: 0; accent-color: #16836b; }
+.worksheetChoice:has(input:disabled) { cursor: default; }
+.worksheetLimit input:focus-visible, .worksheetChoice input:focus-visible { outline: 3px solid #1679d2; outline-offset: 4px; }
+.companionQuickstart { font-size: .75rem; line-height: 1.7; overflow-wrap: anywhere; }
+.companionQuickstart summary { cursor: pointer; min-height: 44px; align-content: center; font-weight: 650; }
+.companionQuickstart ol { margin: 8px 0; padding-left: 20px; }
+.companionQuickstart code { overflow-wrap: anywhere; }
 .frontierControls .textButton { align-self: start; }
 .frontierControls > div:empty { display: none; }
 .frontierDisclosure { font-size: .72rem; line-height: 1.7; margin: 0; padding: 12px; background: #f1eee3; border-radius: 9px; color: #4b566b; }

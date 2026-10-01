@@ -8,6 +8,45 @@ small candidate set using a user-supplied API key or a personal Codex companion.
 Question text, descriptions, answer data, and source images are encrypted before
 entering `public/`.
 
+## Search from a picture
+
+Unlock the bank in `/question-search/`, then choose **Upload picture**, paste an
+image, or choose **Take picture**. The camera asks for permission and offers a
+device-camera or upload fallback. Live camera access requires HTTPS or localhost.
+Keep the question, diagrams, and answer choices inside the crop; drag a rectangle
+or adjust the four edge sliders with the keyboard. **Use cropped picture** applies
+the crop locally and starts text extraction. **Reset to full picture** keeps the
+entire image.
+
+Bundled Tesseract performs English OCR in the browser. The extracted words appear
+in **Text from picture**, where you can correct recognition mistakes or add missing
+text. OCR helps with printed words; handwriting, mathematical notation, and diagram
+relationships can be misread. It does not infer a solution method. No picture is
+sent to an AI service just by capturing, cropping, or extracting its text.
+
+Choose **Search locally** for offline retrieval, or configure **My companion** or
+**My API key** and choose **Search with AI**. AI search receives the cropped picture
+as well as the typed and extracted text, so its understanding is not limited to
+OCR. It expands the query, retrieves from the local bank, then compares original
+candidate diagrams and their reasoning. The results identify which matches were
+reviewed by AI and explain their relationship to the input.
+
+## Print a worksheet
+
+Use the result checkboxes to select or deselect questions. Bulk selection can add
+the visible results or replace the selection with a chosen number of the
+highest-ranked results. A worksheet holds up to 50 questions. Pagination preserves
+the selection; a new search clears it. Review the selection before printing:
+retrieval scores and AI labels are recommendations, not a guarantee that every
+candidate teaches the intended concept.
+
+Choose **Preview / print worksheet**, wait for every question image to load, then
+choose **Print / Save PDF**. The preview uses the original question cards and
+choices, one question per page with space to work. It does not add an answer key.
+The browser's print dialog lets you select a printer or save a PDF. Images are
+decrypted locally for the preview; printing does not call an AI or document service.
+A saved PDF or physical worksheet contains readable bank material.
+
 ## Access and privacy
 
 This is shared-password encryption, not individual GitHub authentication. Give
@@ -177,11 +216,23 @@ locking the bank clears them; they are not included in offline cache, recipes,
 candidate exports, or GitHub assets. Model results can still contain question
 content, so treat an exported report as private.
 
-API access is distinct from a ChatGPT or Gemini app subscription. Finite request
-counts bound a search's work but do not make a paid API key free or constitute an
-account-wide monetary cap. The application does not purchase credits, change
-billing settings, or fall back from subscription access to a paid API. Quota or
-authentication failures stop frontier work and leave local retrieval available.
+This application's **My API key** mode uses provider API billing, separately from
+a ChatGPT or Gemini app subscription. **My companion** uses the official Codex
+CLI's ChatGPT sign-in. Finite request counts bound a search's work but do not make
+a paid API key free or constitute an account-wide monetary cap. The application
+does not purchase credits, change billing settings, or fall back from subscription
+access to a paid API. Quota or authentication failures stop frontier work and leave
+local retrieval available.
+
+OpenAI also documents [Sign in with ChatGPT plan usage for eligible open-source
+apps](https://developers.openai.com/siwc/quickstart). That separate OAuth integration
+is not implemented here. Its current [registration flow requires a loopback
+callback listener](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
+and [protected local or self-hosted credential storage outside browser
+storage](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions).
+It therefore still requires a local runtime for the documented flow; it is not a
+standalone GitHub Pages sign-in option. Do not paste ChatGPT login tokens into the
+API-key field.
 
 The model, prompt, corpus version, candidate budget, and inspected image evidence
 matter when comparing results. The pilot below measures the existing local
@@ -196,16 +247,33 @@ Codex CLI. Sign in with the intended personal ChatGPT account, then start the
 companion from this repository:
 
 ```sh
-codex login
+codex login status
+# If needed, run codex login and choose ChatGPT.
 node scripts/question-search-companion.mjs
 ```
+
+On macOS, if the desktop app provides Codex but it is not on PATH, use its bundled
+binary. For an installation at the path below:
+
+```sh
+"/Applications/ChatGPT.app/Contents/Resources/codex" login status
+node scripts/question-search-companion.mjs \
+  --codex-bin "/Applications/ChatGPT.app/Contents/Resources/codex"
+```
+
+Use the actual installed path if your app is elsewhere. If the status says sign-in
+is needed, run that same binary with `login` first. Leave the companion terminal
+running while searching. It can run on the laptop itself; p620-bench is optional.
 
 The default address is `http://127.0.0.1:4318`. The companion checks that Codex is
 signed in through ChatGPT, rejects API-key login, and requires CLI support for
 isolated configuration, images, ephemeral sessions, and structured output. If
 `codex` is not on PATH, supply `--codex-bin /absolute/path/to/codex`. An optional
 `--model MODEL_ID` chooses a model available to that account; otherwise Codex uses
-its default. `--help` lists the remaining options.
+its CLI default. The companion deliberately ignores inherited user configuration
+and does not currently set a reasoning effort, so **Account default** does not
+promise the model or maximum reasoning setting used in a separate Codex chat.
+`--help` lists the remaining options.
 
 On first start, the companion generates a private bearer token in
 `work/question-search-companion/token` with owner-only file permissions. Open that
@@ -231,6 +299,12 @@ Open `http://localhost:3000/question-search/`, unlock the bank, and choose
 **My companion** with `http://127.0.0.1:4318`. This local preview requires Python 3
 and uses the same encrypted assets and browser search code. Do not disable browser
 security settings to make the public page connect.
+
+Copy the private companion token into the page and choose **Test connection**.
+Once connected, upload or take the question picture, crop it, check the OCR text,
+and choose **Search with AI**. All question selection and worksheet printing then
+stay in the browser. The laptop needs internet access for Codex inference, but
+does not need to be on the home LAN when it runs its own companion.
 
 Only authenticated `/v1/status` and `/v1/generate` endpoints are exposed. The
 companion accepts one request at a time, bounds request size and duration,

@@ -1,0 +1,74 @@
+.primary, .secondary {
+  min-height: 44px;
+  padding: 10px 18px;
+  border: 1px solid #cfcabd;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.primary { background: #17213d; color: #fffdf8; border-color: #17213d; }
+.secondary { background: #fffdf8; color: #17213d; }
+.primary:disabled, .secondary:disabled { opacity: .55; cursor: not-allowed; }
+.primary:focus-visible, .secondary:focus-visible { outline: 3px solid #1679d2; outline-offset: 4px; }
+.dialog {
+  width: min(880px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 0;
+  border: 1px solid #cfcabd;
+  border-radius: 20px;
+  background: #fbf8f0;
+  color: #17213d;
+}
+.dialog::backdrop { background: rgb(23 33 61 / 60%); }
+.controls { display: flex; flex-wrap: wrap; align-items: start; gap: 14px; padding: 24px; }
+.controls > div:first-child { flex: 1; min-width: 190px; }
+.controls h2 { margin: 0 0 6px; font-size: 1.4rem; letter-spacing: -.04em; }
+.controls p { margin: 0; line-height: 1.5; font-size: .9rem; }
+.note { width: 100%; color: #657087; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; width: 100%; }
+.actions p { flex: 1; min-width: 170px; }
+.error { color: #a2352e; font-size: .9rem; }
+.pages { padding: 0 24px 24px; }
+.page { margin: 0 0 20px; padding: 24px; background: white; color: #17213d; border: 1px solid #cfcabd; }
+.page:last-child { margin-bottom: 0; }
+.pageHeader { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.pageHeader h3 { margin: 0; font-size: 1.2rem; }
+.pageHeader > span { font-size: .8rem; display: flex; gap: 6px; }
+.nameLine { display: inline-block; width: 100px; border-bottom: 1px solid #657087; }
+.source { margin: 10px 0 18px; font-size: .75rem; color: #657087; overflow-wrap: anywhere; }
+.questionImage { display: block; width: 100%; height: auto; max-height: 200mm; object-fit: contain; object-position: top center; }
+.workSpace { min-height: 70px; margin-top: 24px; border-top: 1px solid #cfcabd; }
+.workSpace span { font-size: .75rem; color: #657087; display: block; padding-top: 6px; }
+.pageFooter { display: flex; justify-content: space-between; gap: 16px; font-size: .6rem; color: #657087; }
+.pageFooter span:first-child { overflow-wrap: anywhere; }
+@media (max-width: 620px) {
+  .controls { padding: 18px; }
+  .pages { padding: 0 12px 12px; }
+  .page { padding: 14px; }
+  .pageHeader { gap: 10px; }
+  .nameLine { width: 55px; }
+}
+@page question-search-worksheet { size: auto; margin: 12mm; }
+@media print {
+  :global(html):has(.portal[data-printing="true"]), :global(body):has(.portal[data-printing="true"]) {
+    height: auto !important; min-height: 0 !important; overflow: visible !important; margin: 0 !important; padding: 0 !important; background: white !important;
+  }
+  :global(body):has(.portal[data-printing="true"]) > :not(.portal) { display: none !important; }
+  .portal[data-printing="true"] { display: block !important; }
+  .portal[data-printing="true"] .dialog {
+    position: static !important; display: block !important; width: auto !important; max-width: none !important; height: auto !important; max-height: none !important;
+    margin: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 0 !important; overflow: visible !important; background: white !important;
+  }
+  .portal[data-printing="true"] .dialog::backdrop { display: none; }
+  .portal[data-printing="true"] .controls { display: none !important; }
+  .portal[data-printing="true"] .pages { padding: 0; margin: 0; }
+  .portal[data-printing="true"] .page { page: question-search-worksheet; margin: 0; padding: 0; border: 0; break-inside: avoid; break-after: page; page-break-inside: avoid; page-break-after: always; }
+  .portal[data-printing="true"] .page:last-child { break-after: auto; page-break-after: auto; }
+  .portal[data-printing="true"] .pageHeader { font-size: 10pt; }
+  .portal[data-printing="true"] .pageHeader h3 { font-size: 13pt; }
+  .portal[data-printing="true"] .source { font-size: 8pt; margin: 3mm 0 4mm; }
+  .portal[data-printing="true"] .questionImage { max-height: 185mm; object-fit: contain; }
+  .portal[data-printing="true"] .workSpace { min-height: 14mm; margin-top: 5mm; }
+  .portal[data-printing="true"] .pageFooter { font-size: 6pt; margin-top: 2mm; }
+}

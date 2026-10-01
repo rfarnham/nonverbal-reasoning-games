@@ -37,7 +37,7 @@ export default function FrontierControls({ connection, onChange, disabled }: {
   return <div className={styles.frontierControls}>
     <label className={styles.field}>Search with<select aria-label="Search with" value={connection.kind} disabled={disabled} onChange={(event) => {
       const kind = event.target.value;
-      change(kind === "api" ? { kind, provider: "openai", apiKey: "", model: models.openai } : kind === "companion" ? { kind, url: "http://localhost:4318", token: "" } : { kind: "local" });
+      change(kind === "api" ? { kind, provider: "openai", apiKey: "", model: models.openai } : kind === "companion" ? { kind, url: "http://127.0.0.1:4318", token: "" } : { kind: "local" });
     }}><option value="local">Search locally</option><option value="api">My API key</option><option value="companion">My companion</option></select></label>
     {connection.kind === "local" && <p className={styles.finePrint}>Search the precomputed index on this device. No AI account needed.</p>}
     {connection.kind === "api" && <>
@@ -55,6 +55,7 @@ export default function FrontierControls({ connection, onChange, disabled }: {
       <label className={styles.field}>Companion access token<input type="password" autoComplete="off" spellCheck={false} value={connection.token} disabled={disabled} onChange={(event) => change({ ...connection, token: event.target.value })} placeholder="Token from your companion" required /><span className={styles.finePrint}>This is separate from the bank password.</span></label>
       <div className={styles.connectionActions}><button type="button" className={styles.secondary} disabled={disabled || test.busy || !connection.url.trim() || !connection.token.trim()} onClick={() => void testConnection()}>{test.busy ? "Checking…" : "Test connection"}</button><button type="button" className={styles.textButton} disabled={disabled || !connection.token} onClick={() => change({ ...connection, token: "" })}>Clear token</button></div>
       <div aria-live="polite" aria-atomic="true">{test.message && <p className={test.failed ? styles.error : styles.finePrint}>{test.message}</p>}</div>
+      <details className={styles.companionQuickstart}><summary>Use Codex on this laptop</summary><ol><li>Sign into the Codex CLI with your ChatGPT account.</li><li>In this project, run <code>npm run search:companion</code> and leave it running.</li><li>Use <code>http://127.0.0.1:4318</code> above. Copy the token from <code>work/question-search-companion/token</code>.</li><li>Test the connection, add your picture, then select <strong>Search with AI</strong>.</li></ol><p>If the hosted page cannot reach localhost, open the search page from your local project on port 3000. No home server is needed.</p></details>
       <a className={styles.textButton} href="https://github.com/rfarnham/nonverbal-reasoning-games/blob/main/docs/question-search.md#set-up-the-personal-companion" target="_blank" rel="noopener noreferrer">Companion setup instructions ↗</a>
       <p className={styles.frontierDisclosure}>Searching sends your question and selected candidates to your companion and its AI provider. Your computer must be online and reachable. Only its subscription allowance is used.</p>
     </>}

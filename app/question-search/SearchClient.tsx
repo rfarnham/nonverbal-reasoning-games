@@ -9,6 +9,9 @@ import { clearOffline, inspectImage, loadManifest, recognizeImage, unlockCorpus,
 import { parseSearchQuery } from "@/lib/question-search/engine";
 import { runFrontierSearch, type FrontierConnection } from "@/lib/question-search/frontier";
 import FrontierControls from "./FrontierControls";
+import QuestionImageInput from "./QuestionImageInput";
+import QuestionWorksheet from "./QuestionWorksheet";
+import { MAX_WORKSHEET_QUESTIONS, addWorksheetQuestions, removeWorksheetQuestions, worksheetLimit } from "@/lib/question-search/selection";
 import type { MatchRelationship, SearchHit, SearchJudgment, SearchManifest, SearchQuery, SearchQuestion, SearchResponse } from "@/lib/question-search/types";
 import styles from "./question-search.module.css";
 
@@ -156,6 +159,12 @@ function SearchWorkspace({ session, onLock }: { session: SearchSession; onLock: 
   const [imageBusy, setImageBusy] = useState(false);
   const [imageStatus, setImageStatus] = useState("");
   const [ocrText, setOcrText] = useState("");
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [selectedQuestions, setSelectedQuestions] = useState<SearchQuestion[]>([]);
+  const [topCount, setTopCount] = useState("10");
+  const [selectionBusy, setSelectionBusy] = useState(false);
+  const selectionSerial = useRef(0);
+  const selectedIds = useMemo(() => new Set(selectedQuestions.map((question) => question.id)), [selectedQuestions]);
   const [result, setResult] = useState<SearchResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -177,7 +186,6 @@ function SearchWorkspace({ session, onLock }: { session: SearchSession; onLock: 
   const mounted = useRef(true);
   const resultHeading = useRef<HTMLHeadingElement>(null);
   const queryInput = useRef<HTMLTextAreaElement>(null);
-  const upload = useRef<HTMLInputElement>(null);
   const grades = useMemo(() => [...new Set(session.corpus.questions.map((q) => q.source.grade))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })), [session]);
   const topics = Object.entries(session.corpus.facets.topics).sort((a, b) => a[1].localeCompare(b[1]));
   const strategies = Object.entries(session.corpus.facets.strategies).sort((a, b) => a[1].localeCompare(b[1]));
@@ -193,15 +201,17 @@ function SearchWorkspace({ session, onLock }: { session: SearchSession; onLock: 
     queryInput.current?.focus();
     // These are request generation counters, not DOM refs: invalidate their latest values.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    return () => { mounted.current = false; searchSerial.current++; searchController.current?.abort(); imageSerial.current++; if (imageRef.current) URL.revokeObjectURL(imageRef.current); };
+    return () => { mounted.current = false; searchSerial.current++; selectionSerial.current++; searchController.current?.abort(); imageSerial.current++; if (imageRef.current) URL.revokeObjectURL(imageRef.current); };
   }, []);
   function cancelSearch(showNotice = true) {
     searchController.current?.abort(); searchController.current = null;
     searchSerial.current++; setBusy(false); setSearchStatus("");
     if (showNotice) setNotice("Search cancelled. Any displayed results are from local retrieval.");
   }
-  async function runSearch(query: SearchQuery, origin?: SearchQuestion | null, locally = false) {
+  async function runSearch(query: SearchQuery, origin?: SearchQuestion | null, locally = false, preserveSelection = false) {
     searchController.current?.abort();
+    selectionSerial.current++; setSelectionBusy(false);
+    if (!preserveSelection) setSelectedQuestions([]);
     const controller = new AbortController(); searchController.current = controller;
     const serial = ++searchSerial.current;
     const current = () => mounted.current && serial === searchSerial.current && !controller.signal.aborted;
@@ -245,7 +255,27 @@ function SearchWorkspace({ session, onLock }: { session: SearchSession; onLock: 
       const response = cachedResults;
       setResult({ ...response, hits: response.hits.slice(nextOffset, nextOffset + PAGE_SIZE), query: { ...response.query, offset: nextOffset, limit: PAGE_SIZE } });
       resultHeading.current?.focus();
-    } else void runSearch({ ...result.query, offset: nextOffset, limit: PAGE_SIZE }, undefined, true);
+    } else void runSearch({ ...result.query, offset: nextOffset, limit: PAGE_SIZE }, undefined, true, true);
+  }
+  async function selectTopQuestions() {
+    if (!result || busy) return;
+    const limit = worksheetLimit(topCount);
+    if (limit === null) { setNotice(`Choose a whole number from 1 to ${MAX_WORKSHEET_QUESTIONS}.`); return; }
+    const serial = ++selectionSerial.current;
+    setSelectionBusy(true); setError("");
+    try {
+      // Reuse the final AI order when available; otherwise retrieve the first N locally across pages.
+      const response = cachedResults ?? await session.search({ ...result.query, offset: 0, limit });
+      if (!mounted.current || serial !== selectionSerial.current) return;
+      const questions = addWorksheetQuestions([], response.hits.slice(0, limit).map((hit) => hit.question));
+      setSelectedQuestions(questions); setNotice(`Selected the top ${questions.length} matching questions.`);
+    } catch (cause) { if (mounted.current && serial === selectionSerial.current) setError(message(cause)); }
+    finally { if (mounted.current && serial === selectionSerial.current) setSelectionBusy(false); }
+  }
+  function selectQuestions(questions: SearchQuestion[]) {
+    const available = new Set([...selectedIds, ...questions.map((question) => question.id)]).size;
+    setSelectedQuestions((previous) => addWorksheetQuestions(previous, questions));
+    if (available > MAX_WORKSHEET_QUESTIONS) setNotice(`A worksheet can contain up to ${MAX_WORKSHEET_QUESTIONS} questions. Deselect some to add others.`);
   }
   function currentQuery(): SearchQuery {
     return { ...recipeExtras, text: [text, ocrText].filter(Boolean).join("\n"), mode, grade: grade || undefined, topics: topic ? [topic, ...(recipeExtras.topics ?? [])] : recipeExtras.topics, strategies: strategy ? [strategy, ...(recipeExtras.strategies ?? [])] : recipeExtras.strategies, imageHash: image?.hash ?? recipeExtras.imageHash, dhash: image?.dhash ?? recipeExtras.dhash, ...exclusions, limit: PAGE_SIZE, offset: 0 };
@@ -254,7 +284,7 @@ function SearchWorkspace({ session, onLock }: { session: SearchSession; onLock: 
   function clearImage() {
     cancelSearch(false);
     imageSerial.current++; if (imageRef.current) URL.revokeObjectURL(imageRef.current); imageRef.current = null;
-    setImage(null); setOcrText(""); setImageBusy(false); setImageStatus(""); if (upload.current) upload.current.value = "";
+    setImage(null); setOcrText(""); setImageBusy(false); setImageStatus(""); setPendingFile(null);
   }
   async function addImage(file: File) {
     clearImage(); setQueryQuestion(null); setExclusions({}); setRecipeExtras({});
@@ -338,11 +368,11 @@ function SearchWorkspace({ session, onLock }: { session: SearchSession; onLock: 
           <FrontierControls connection={connection} disabled={busy} onChange={(next) => { cancelSearch(false); setConnection(next); }} />
           <label className={styles.queryLabel} htmlFor="question-query">Your question</label>
           <textarea ref={queryInput} id="question-query" value={text} onChange={(event) => setText(event.target.value)} rows={6} placeholder="Paste a question, or describe the key idea…" maxLength={20000} />
-          <div className={styles.uploadRow}><label className={styles.uploadButton}><span aria-hidden="true">＋</span> Add a picture<input ref={upload} type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; if (file) void addImage(file); }} /></label><span className={styles.finePrint}>or paste an image below</span></div>
-          <div className={styles.pasteTarget} tabIndex={0} role="group" aria-label="Paste a question image here" onPaste={(event) => { const file = Array.from(event.clipboardData.files).find((item) => item.type.startsWith("image/")); if (file) { event.preventDefault(); void addImage(file); } }}>Paste an image here <span aria-hidden="true">⌘ / Ctrl + V</span></div>
+          <QuestionImageInput disabled={busy || imageBusy} onImage={(file) => void addImage(file)} onError={setError} pendingFile={pendingFile} onPendingFileConsumed={() => setPendingFile(null)} />
+          <div className={styles.pasteTarget} tabIndex={0} role="group" aria-label="Paste a question image here" onPaste={(event) => { const file = Array.from(event.clipboardData.files).find((item) => item.type.startsWith("image/")); if (file) { event.preventDefault(); if (!busy && !imageBusy) setPendingFile(file); } }}>Paste an image here <span aria-hidden="true">⌘ / Ctrl + V</span></div>
           {image && <div className={styles.inputImage}><img src={image.previewUrl} alt="Your uploaded question" /><div><span>{image.name}</span><button className={styles.textButton} type="button" onClick={clearImage}>Remove</button></div></div>}
           {imageStatus && <p className={styles.finePrint} role="status">{imageStatus}</p>}
-          {image && <label className={styles.field}>Text from picture<textarea value={ocrText} onChange={(event) => setOcrText(event.target.value)} rows={4} placeholder="Edit or add the words in your picture…" maxLength={20000} /><span className={styles.finePrint}>Visual similarity helps identify diagrams. It does not establish a shared solution method.</span></label>}
+          {image && <label className={styles.field}>Text from picture<textarea value={ocrText} onChange={(event) => setOcrText(event.target.value)} rows={4} placeholder="Edit or add the words in your picture…" maxLength={20000} /><span className={styles.finePrint}>OCR reads words locally. Check symbols and numbers. AI search also examines the cropped picture to understand its diagram and solution method.</span></label>}
           <label className={styles.field}>Match by<select aria-label="Match by" value={mode} onChange={(event) => setMode(event.target.value as SearchQuery["mode"])}><option value="hybrid">All available evidence</option><option value="strategy">Structure & method</option><option value="text">Question wording</option><option value="visual">Visual resemblance</option></select></label>
           <details className={styles.filters}><summary>Narrow the search{grade || topic || strategy ? " · filters active" : ""}</summary><div className={styles.filterFields}>
             <label className={styles.field}>Grade<select aria-label="Grade" value={grade} onChange={(event) => setGrade(event.target.value)}><option value="">All grades</option>{grades.map((item) => <option value={item} key={item}>{item}</option>)}</select></label>
@@ -376,11 +406,22 @@ function SearchWorkspace({ session, onLock }: { session: SearchSession; onLock: 
         {frontierResult && <section className={styles.understanding} aria-label="AI question understanding"><div className={styles.understandingHeading}><h3>The shared reasoning</h3><span className={styles.aiBadge}>AI reviewed {frontierResult.reviewed} of {frontierResult.retrieved} candidates</span></div><p>{frontierResult.understanding.summary}</p>{frontierResult.understanding.strategies.length > 0 && <div className={styles.tags}>{frontierResult.understanding.strategies.map((item, index) => <span key={index}>{item}</span>)}</div>}{frontierResult.understanding.uncertainties.length > 0 && <div className={styles.uncertainties}><strong>Still uncertain</strong><ul>{frontierResult.understanding.uncertainties.map((item, index) => <li key={index}>{item}</li>)}</ul></div>}<details><summary>Searches used</summary><ul>{frontierResult.understanding.searches.map((item, index) => <li key={index}>{item}</li>)}</ul></details></section>}
         {!result && <div className={styles.emptyState}><div className={styles.searchArt} aria-hidden="true"><span>?</span><span>↗</span><span>≈</span></div><h3>Different questions.<br />A familiar way through.</h3><p>Paste text, upload a picture, or describe a solution method. The search brings together clues for you to inspect.</p><div className={styles.exampleQueries}><span>Try an idea</span>{["work backward through a sequence", "count paths through a grid", "fold a cube from a net"].map((example) => <button key={example} type="button" onClick={() => { setText(example); void runSearch({ text: example, mode: "hybrid", limit: PAGE_SIZE, offset: 0 }, null, true); }}>{example} <span aria-hidden="true">↗</span></button>)}</div></div>}
         {result && !result.hits.length && <div className={styles.emptyState}><h3>No matches with these settings.</h3><p>Try fewer filters, a broader description, or words explaining how the question is solved.</p><button className={styles.secondary} type="button" onClick={() => { setGrade(""); setTopic(""); setStrategy(""); setExclusions({}); setRecipeExtras({}); void runSearch({ text: [text, ocrText].join("\n"), mode: "hybrid", dhash: image?.dhash, imageHash: image?.hash, limit: PAGE_SIZE }, null, true); }}>Broaden search</button></div>}
-        {result && result.hits.length > 0 && <><p className={styles.resultNote}>{frontierResult ? "AI review promotes stronger reasoning matches and moves weaker matches down. Unreviewed candidates retain local ranking. Inspect the explanations; AI judgments can be mistaken." : busy && connection.kind !== "local" ? "Local candidates while AI works. These results have not been reviewed by AI yet." : "Ranked by local retrieval. Open a question to inspect its method and evidence."}</p><div className={styles.resultGrid}>{result.hits.map((hit) => <article className={styles.resultCard} key={hit.question.id}>
+        {result && result.hits.length > 0 && <><p className={styles.resultNote}>{frontierResult ? "AI review promotes stronger reasoning matches and moves weaker matches down. Unreviewed candidates retain local ranking. Inspect the explanations; AI judgments can be mistaken." : busy && connection.kind !== "local" ? "Local candidates while AI works. These results have not been reviewed by AI yet." : "Ranked by local retrieval. Open a question to inspect its method and evidence."}</p><section className={styles.worksheetToolbar} aria-label="Worksheet selection">
+          <div className={styles.worksheetHeading}><div><h3>Make a worksheet</h3><p role="status">{selectedQuestions.length} selected · up to {MAX_WORKSHEET_QUESTIONS} questions</p></div><QuestionWorksheet questions={selectedQuestions} session={session} disabled={busy || selectionBusy} /></div>
+          <div className={styles.worksheetActions}>
+            <label className={styles.worksheetLimit}>Number to select<input type="number" inputMode="numeric" min={1} max={MAX_WORKSHEET_QUESTIONS} step={1} value={topCount} disabled={busy || selectionBusy} onChange={(event) => setTopCount(event.target.value)} /></label>
+            <button type="button" className={styles.secondary} disabled={busy || selectionBusy} onClick={() => void selectTopQuestions()}>{selectionBusy ? "Selecting…" : "Select top N"}</button>
+            <button type="button" className={styles.secondary} disabled={busy || selectionBusy || selectedQuestions.length >= MAX_WORKSHEET_QUESTIONS} onClick={() => selectQuestions(result.hits.map((hit) => hit.question))}>Select this page</button>
+            <button type="button" className={styles.textButton} disabled={busy || selectionBusy || !result.hits.some((hit) => selectedIds.has(hit.question.id))} onClick={() => setSelectedQuestions((previous) => removeWorksheetQuestions(previous, result.hits.map((hit) => hit.question.id)))}>Deselect this page</button>
+            <button type="button" className={styles.textButton} disabled={busy || selectionBusy || !selectedQuestions.length} onClick={() => setSelectedQuestions([])}>Clear selection</button>
+          </div>
+          <p className={styles.finePrint}>Selections stay across pages. “Select top N” replaces them with the highest-ranked matches. A new search clears the selection.</p>
+        </section><div className={styles.resultGrid}>{result.hits.map((hit) => <article className={styles.resultCard} key={hit.question.id}>
+          <label className={styles.worksheetChoice}><input type="checkbox" checked={selectedIds.has(hit.question.id)} disabled={busy || selectionBusy} aria-label={`Include ${sourceLabel(hit.question)}, ${hit.question.source.label}, ${hit.question.id} in worksheet`} onChange={(event) => { if (event.target.checked) selectQuestions([hit.question]); else setSelectedQuestions((previous) => removeWorksheetQuestions(previous, [hit.question.id])); }} /> Include in worksheet</label>
           <button type="button" className={styles.cardOpen} onClick={() => setDetail(hit)} aria-label={`Inspect ${sourceLabel(hit.question)}`}><QuestionImage question={hit.question} session={session} /><div className={styles.cardBody}><div className={styles.cardMeta}><span>{sourceLabel(hit.question)}</span><span aria-hidden="true">↗</span></div><h3>{hit.question.prompt || hit.question.description || "Inspect this visual question"}</h3></div></button>
           <div className={styles.cardFooter}>{hit.ai ? <div className={styles.cardAi}><span className={styles.aiBadge}>AI reviewed · {relationshipLabel(hit.ai.relationship)}</span><p>{hit.ai.reason}</p></div> : frontierResult ? <span className={styles.unreviewed}>Not reviewed by AI</span> : null}{hit.reasons.slice(0, 2).map((reason, index) => <span key={index}>{reason}</span>)}{judgments.some((item) => item.queryId === activeQueryId && item.candidateId === hit.question.id) && <span className={styles.reviewed}>✓ Your review saved</span>}</div>
         </article>)}</div>
-        <nav className={styles.pagination} aria-label="Search result pages"><button className={styles.secondary} type="button" disabled={busy || offset === 0} onClick={() => changePage(Math.max(0, offset - PAGE_SIZE))}>← Previous</button><span>Page {Math.floor(offset / PAGE_SIZE) + 1} of {Math.ceil(result.total / PAGE_SIZE)}</span><button className={styles.secondary} type="button" disabled={busy || offset + PAGE_SIZE >= result.total} onClick={() => changePage(offset + PAGE_SIZE)}>Next →</button></nav>
+        <nav className={styles.pagination} aria-label="Search result pages"><button className={styles.secondary} type="button" disabled={busy || selectionBusy || offset === 0} onClick={() => changePage(Math.max(0, offset - PAGE_SIZE))}>← Previous</button><span>Page {Math.floor(offset / PAGE_SIZE) + 1} of {Math.ceil(result.total / PAGE_SIZE)}</span><button className={styles.secondary} type="button" disabled={busy || selectionBusy || offset + PAGE_SIZE >= result.total} onClick={() => changePage(offset + PAGE_SIZE)}>Next →</button></nav>
         <div className={styles.exportPanel}><div><h3>Take a closer look with an assistant.</h3><p>Export these {result.hits.length} candidates with their evidence and your search recipe.</p><label className={styles.check}><input type="checkbox" checked={includeImages} onChange={(event) => setIncludeImages(event.target.checked)} /> Include question images</label></div><button className={styles.secondary} type="button" disabled={exportBusy} onClick={() => void exportCandidates()}>{exportBusy ? "Preparing packet…" : "Download candidate packet"}</button></div></>}
       </section></div>
       <footer className={styles.footer}><span title={session.corpus.version}>Question Search · index {session.corpus.version.slice(0, 12)}</span><span>Unlocked questions and AI credentials stay in memory. Saved reviews and downloaded exports remain on your device.</span></footer>
