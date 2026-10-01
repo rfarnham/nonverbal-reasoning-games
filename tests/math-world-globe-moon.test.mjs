@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
-import { createGlobeMoon, createGlobeMoonGeometry, sampleGlobeMoonOrbit, getMoonIlluminatedFraction, GLOBE_MOON_RADIUS, GLOBE_MOON_ORBIT_RADIUS, GLOBE_MOON_ORBIT_SECONDS } from '../app/math-world/globe-moon.ts';
+import { createGlobeMoon, createGlobeMoonGeometry, sampleGlobeMoonOrbit, getMoonIlluminatedFraction, GLOBE_MOON_RADIUS, GLOBE_MOON_ORBIT_RADIUS, GLOBE_MOON_ORBIT_SECONDS, GLOBE_MOON_ORBIT_INCLINATION_DEGREES } from '../app/math-world/globe-moon.ts';
+
+import { GLOBE_DESTINATIONS } from '../app/math-world/globe-geometry.ts';
 
 const anchor={x:.28,y:.19,z:.94};
 const close=(a,b,tolerance=1e-10)=>assert.ok(Math.abs(a-b)<tolerance,`${a} ≈ ${b}`);
@@ -18,6 +20,26 @@ test('moon follows one deterministic inclined orbit clear of the globe and close
   }
   assert.deepEqual(sampleGlobeMoonOrbit(NaN,anchor),a);assert.deepEqual(sampleGlobeMoonOrbit(-1,anchor),a);
   const polar=sampleGlobeMoonOrbit(28,{x:0,y:1,z:0});close(polar.length(),GLOBE_MOON_ORBIT_RADIUS);
+});
+
+test('moon stays in one shallow equatorial plane for every anchor and follows the planet spin direction',()=>{
+  const tilt=GLOBE_MOON_ORBIT_INCLINATION_DEGREES*Math.PI/180;
+  assert.equal(GLOBE_MOON_ORBIT_INCLINATION_DEGREES,5);
+  const expectedPole=new THREE.Vector3(0,Math.cos(tilt),Math.sin(tilt));
+  const anchors=[anchor,{x:0,y:1,z:0},{x:0,y:-1,z:0},...GLOBE_DESTINATIONS.map(destination=>destination.center)];
+  for(const center of anchors){
+    const start=sampleGlobeMoonOrbit(0,center),quarter=sampleGlobeMoonOrbit(GLOBE_MOON_ORBIT_SECONDS/4,center);
+    const momentum=start.clone().cross(quarter).normalize();
+    assert.ok(momentum.y<-.99,'moon orbits in the same negative-Y sense as the physical planet');
+    assert.ok(momentum.clone().negate().distanceTo(expectedPole)<1e-10,'opening geography changes phase, never the world-space plane');
+    close(Math.acos(-momentum.y),tilt);
+    for(let step=0;step<=360;step++){
+      const point=sampleGlobeMoonOrbit(step*GLOBE_MOON_ORBIT_SECONDS/360,center);
+      close(point.length(),GLOBE_MOON_ORBIT_RADIUS);
+      assert.ok(Math.abs(point.dot(expectedPole))<1e-10,'the entire orbit stays in the same fixed plane');
+      assert.ok(Math.abs(point.y)<=GLOBE_MOON_ORBIT_RADIUS*Math.sin(tilt)+1e-10,'the moon never climbs more than five degrees above or below the equator');
+    }
+  }
 });
 
 test('phase uses the actual observer-minus-moon vector and a shared directional sun',()=>{

@@ -5,6 +5,11 @@ import type { Vec3 } from "./globe-geometry.ts";
 export const GLOBE_MOON_RADIUS = .19;
 export const GLOBE_MOON_ORBIT_RADIUS = 1.9;
 export const GLOBE_MOON_ORBIT_SECONDS = 224;
+export const GLOBE_MOON_ORBIT_INCLINATION_DEGREES = 5;
+const inclination = GLOBE_MOON_ORBIT_INCLINATION_DEGREES * Math.PI / 180;
+// One fixed orbital plane, close to the planet's XZ equator. The opening
+// destination may choose the moon's starting phase, never the plane's tilt.
+const orbitPole = new THREE.Vector3(0, Math.cos(inclination), Math.sin(inclination));
 const TAU = Math.PI * 2;
 const clamp = (value: number, min = 0, max = 1) => Math.max(min, Math.min(max, value));
 const safeSeconds = (seconds: number) => Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
@@ -14,11 +19,14 @@ function orbitBasis(anchor: Vec3) {
   const east = new THREE.Vector3(0, 1, 0).cross(front);
   if (east.lengthSq() < .0001) east.set(1, 0, 0);
   east.normalize();
-  const north = front.clone().cross(east).normalize();
-  // Start beyond the upper-left limb, including in the narrow overview.
-  const start = front.clone().multiplyScalar(-.45).addScaledVector(east, -.62).addScaledVector(north, .64).normalize();
-  const tangent = east.clone().addScaledVector(north, -.36).addScaledVector(front, .5);
-  tangent.addScaledVector(start, -tangent.dot(start)).normalize();
+  // Start toward the opening globe's left limb, projected into the fixed
+  // shallow plane rather than using the coast's local north as an orbit axis.
+  const start = front.clone().multiplyScalar(-.6).addScaledVector(east, -.8);
+  start.addScaledVector(orbitPole, -start.dot(orbitPole));
+  if (start.lengthSq() < .0001) start.set(1, 0, 0);
+  start.normalize();
+  // The physical planet spins about negative Y; use the same prograde sense.
+  const tangent = new THREE.Vector3().crossVectors(start, orbitPole).normalize();
   return { start, tangent };
 }
 
