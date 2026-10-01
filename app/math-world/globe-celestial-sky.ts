@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { Vec3 } from "./globe-geometry.ts";
-import { createCelestialFrame } from "./globe-celestial-frame.ts";
+import { northUpGlobeOrientation } from "./globe-navigation.ts";
 
 // Authoring scale only: both sky layers project directions at infinite depth.
 export const CELESTIAL_SKY_RADIUS = 9;
@@ -79,14 +79,13 @@ const infiniteSkyProjection = /* glsl */`
   gl_Position = clip.xyww;
 `;
 
-/** A rigid inertial sky seen from the planet-bound reference frame. Two bounded
- * draws, no textures, wall clocks, callbacks or runtime assets. Far-plane depth
- * lets the globe and moon occlude it. Lighting presets affect visibility, while the
- * shared scenery clock still advances the apparent daily rotation. */
-export function createGlobeCelestialSky(scene: THREE.Scene, camera: THREE.Camera, globe: THREE.Group, anchor: Vec3) {
-  const frame = createCelestialFrame(anchor);
+/** A fixed space backdrop. The real orbiting camera changes the view of this
+ * catalogue; time never rotates the stars. Translation has no parallax. */
+export function createGlobeCelestialSky(scene: THREE.Scene, camera: THREE.Camera, anchor: Vec3 = { x: 0, y: 0, z: 1 }) {
   const group = new THREE.Group();
   group.name = "Fixed celestial sphere";
+  const initial = northUpGlobeOrientation(anchor);
+  group.quaternion.set(initial.x, initial.y, initial.z, initial.w).invert();
   group.visible = false;
   scene.add(group);
   const visibility = { value: 0 };
@@ -197,7 +196,7 @@ export function createGlobeCelestialSky(scene: THREE.Scene, camera: THREE.Camera
   group.add(stars);
   let disposed = false;
   return {
-    update(seconds: number, nightVisibility: number) {
+    update(nightVisibility: number) {
       if (disposed) return;
       const amount = Number.isFinite(nightVisibility) ? THREE.MathUtils.clamp(nightVisibility, 0, 1) : 0;
       visibility.value = amount;
@@ -205,7 +204,6 @@ export function createGlobeCelestialSky(scene: THREE.Scene, camera: THREE.Camera
       // Keep the scene graph camera-centered too; the shaders independently
       // guarantee no translation parallax and no finite-shell occlusion.
       camera.getWorldPosition(group.position);
-      frame.update(seconds, globe.quaternion, group.quaternion);
     },
     dispose() {
       if (disposed) return;

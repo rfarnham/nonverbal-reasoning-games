@@ -1,5 +1,10 @@
 # Math World celestial scenery — working plan
 
+> The 30 September 2026 overview design supersedes this historical plan’s
+> planet-bound sky motion and night-only visibility. The current contract is in
+> [globe navigation](math-world-globe-navigation.md): fixed stars, rotating
+> overview planet, independent moon, and atmosphere on close approach only.
+
 Historical reference-frame plan from 2026-09-25; that correction has shipped.
 The 2026-09-27 follow-up is tracked in [the infinite-sky plan](math-world-infinite-sky-plan.md).
 

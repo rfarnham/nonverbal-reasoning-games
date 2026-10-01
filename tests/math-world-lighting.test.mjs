@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Vector3 } from "three";
-import { getGlobeSunDirection, getNightSkyVisibility, SKY_CYCLE_SECONDS } from "../app/math-world/globe-lighting.ts";
+import { getGlobeSunDirection, getNightSkyVisibility, getGlobeAtmosphereBlend, getGlobeSkyVisibility, SKY_CYCLE_SECONDS } from "../app/math-world/globe-lighting.ts";
 
 test("sun presets keep the inspected coast lit, at twilight, or on the night side", () => {
   const anchor = { x: 0, y: 0, z: 1 };
@@ -27,7 +27,7 @@ test("automatic sun is independent of camera navigation and loops only on active
   assert.ok(start.distanceTo(getGlobeSunDirection(NaN, "cycle", anchor, anchor)) < 1e-10);
 });
 
-test("celestial sky is absent at day and sunset, and fully revealed on the night side", () => {
+test("surface atmosphere hides stars at day and sunset, and reveals them at night", () => {
   const anchor = { x: 0, y: 0, z: 1 };
   for (const focus of [anchor, { x: 1, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }, { x: 0, y: -1, z: 0 }]) {
     for (const mode of ["day", "sunset"]) assert.equal(getNightSkyVisibility(getGlobeSunDirection(0, mode, focus, anchor), focus), 0);
@@ -67,4 +67,27 @@ test("manual preset illumination carries the quaternion horizon continuously ove
     assert.ok(automatic.distanceTo(getGlobeSunDirection(41, 'cycle', focus, anchor, new Vector3(), screenRight)) < 1e-9, 'automatic sun ignores the camera tangent');
     orientation = turnGlobeOrientation(orientation, .001, Math.PI / 360);
   }
+});
+
+
+test("space remains starry for every preset; atmosphere enters only near the coast", () => {
+  const focus = {x:0,y:0,z:1};
+  for (const mode of ["day","sunset","night","cycle"]) {
+    const sun = getGlobeSunDirection(0,mode,focus,focus);
+    for (const zoom of [0,.38,.5,.62]) {
+      assert.equal(getGlobeAtmosphereBlend(zoom),0);
+      assert.equal(getGlobeSkyVisibility(sun,focus,zoom),1);
+    }
+    assert.equal(getGlobeSkyVisibility(sun,focus,1),getNightSkyVisibility(sun,focus));
+    let previous = 1;
+    for (let step=62;step<=100;step++) {
+      const visibility = getGlobeSkyVisibility(sun,focus,step/100);
+      assert.ok(visibility <= previous && visibility >= 0);
+      assert.ok(previous-visibility < .05,"no sudden disappearance during atmospheric entry");
+      previous=visibility;
+    }
+  }
+  assert.equal(getGlobeAtmosphereBlend(NaN),0);
+  assert.equal(getGlobeAtmosphereBlend(-1),0);
+  assert.equal(getGlobeAtmosphereBlend(2),1);
 });

@@ -19,6 +19,9 @@
 .completion > span { background: #16836b; color: #fff; border-radius: 50%; width: 30px; height: 30px; display: grid; place-items: center; }
 .completion p { margin: 4px 0 0; font-size: .8rem; color: #507564; }
 .boardSection { position: relative; background: #f3f5ec; border: 1px solid #b6cec5; border-radius: 26px; overflow: hidden; }
+.mapAndLibrary { display: grid; grid-template-columns: minmax(0, 1fr) 104px; align-items: start; gap: 12px; }
+.mapAndLibrary > .boardSection { min-width: 0; }
+@media (max-width: 820px) { .mapAndLibrary { grid-template-columns: minmax(0, 1fr); } }
 .boardToolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 15px 20px; background: #f7faf1; border-bottom: 1px solid #d8e2d4; }
 .boardEyebrow { font-size: .64rem; letter-spacing: .18em; text-transform: uppercase; font-weight: 850; color: #345c62; }
 .boardToolbar button { min-height: 44px; background: #fffdf8; padding: 8px 15px; max-width: 66%; text-align: left; display: flex; align-items: center; gap: 14px; }
@@ -47,8 +50,6 @@
 .completePin { color: white; background: #16836b; box-shadow: 0 3px 0 #0e6656, 0 5px 9px #163c4b30; }
 .stopPin:disabled { opacity: .84 !important; background: #b8c8b6; color: #425c4d; box-shadow: 0 3px 0 #8aa28f; }
 .bookPin { width: 44px; height: 44px; min-width: 44px; min-height: 44px; border-radius: 12px; background: #fff9db; color: #ae692e; border: 2px solid #fffef3; box-shadow: 0 3px 0 #c8a865, 0 5px 8px #163c4b25; font-size: 1.8rem; z-index: 2; }
-.orbitControls { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); display: flex; gap: 7px; padding: 6px; background: #fffdf5e8; border: 1px solid #fff9df; border-radius: 30px; box-shadow: 0 4px 24px #163c4b15; }
-.orbitControls button { width: 44px; height: 44px; border: 0; border-radius: 50%; background: #e4eee2; color: #254d5a; font-size: 1.1rem; cursor: pointer; }
 .boardCaption { margin: 0; padding: 13px 20px; text-align: center; color: #41646a; font-size: .75rem; line-height: 1.45; border-top: 1px solid #c4dace; }
 .voyageCard { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); width: min(460px, calc(100% - 32px)); padding: 17px 21px; background: #fffdf0f5; box-shadow: 0 7px 30px #163c4b25; border: 1px solid #fffdf5; border-radius: 20px; text-align: center; }
 .voyageKicker { display: block; font-size: .62rem; color: #987246; letter-spacing: .18em; font-weight: 850; margin-bottom: 6px; }
@@ -118,7 +119,9 @@
 .crystalCaption .voyageKicker { color:#99e9f4; }
 .crystalCaption button { min-height:44px; flex-shrink:0; border:1px solid #a7eef2; border-radius:24px; padding:10px 17px; background:#d5fcfb; color:#102c42; font:inherit; font-size:.85rem; font-weight:700; cursor:pointer; }
 .crystalStill { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
-.board[data-story-cinematic] .markerLayer, .board[data-story-cinematic] .orbitControls { visibility:hidden; pointer-events:none; }
+.board[data-story-cinematic] .markerLayer { visibility:hidden; pointer-events:none; }
 .board[data-globe-renderer="fallback"][data-story-cinematic] { height:600px; aspect-ratio:auto; }
 .stopPin[data-summit-shard]::after { content:"◆"; position:absolute; right:-6px; top:-12px; color:#c1ffff; font-size:24px; -webkit-text-stroke:1px #167f9b; filter:drop-shadow(0 0 4px #48dce3); pointer-events:none; }
 @media (max-width:620px) { .crystalCaption { inset:auto 10px 10px; display:block; padding:12px 15px; }.crystalCaption strong { font-size:1rem; }.crystalCaption p { font-size:.75rem; }.crystalCaption button { margin-top:10px; width:100%; }.board[data-globe-renderer="fallback"][data-story-cinematic] { height:450px; } }
+
+.board:focus-visible { outline: 3px solid #1679d2; outline-offset: 4px; }

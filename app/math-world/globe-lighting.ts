@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { Vec3 } from "./globe-geometry.ts";
 import { createGlobeCelestialSky } from "./globe-celestial-sky.ts";
 import { createGlobeMoon } from "./globe-moon.ts";
+import { createGlobeSun } from "./globe-sun.ts";
 import { getCelestialCycleAngle } from "./globe-celestial-frame.ts";
 
 export { SKY_CYCLE_SECONDS } from "./globe-celestial-frame.ts";
@@ -9,8 +10,8 @@ export { SKY_CYCLE_SECONDS } from "./globe-celestial-frame.ts";
 export type GlobeSkyMode = "cycle" | "day" | "sunset" | "night";
 const up = new THREE.Vector3(0, 1, 0);
 
-/** Presets place the sun relative to the inspected coast. The automatic sun is
- * planet-fixed and advances only with active scenery time, never wall time. */
+/** Presets place the light relative to the inspected coast. Auto is one fixed
+ * world-space sun, expressed here in the axially rotating planet's coordinates. */
 export function getGlobeSunDirection(seconds: number, mode: GlobeSkyMode, focus: Vec3, anchor: Vec3, target = new THREE.Vector3(), presetEast?: Vec3) {
   const center = new THREE.Vector3().copy(mode === "cycle" ? anchor : focus).normalize();
   const east = new THREE.Vector3().crossVectors(up, center);
@@ -22,19 +23,27 @@ export function getGlobeSunDirection(seconds: number, mode: GlobeSkyMode, focus:
   }
   if (east.lengthSq() < 0.001) east.set(1, 0, 0);
   east.normalize();
-  const angle = mode === "cycle" ? 0.62 + getCelestialCycleAngle(seconds)
-    : mode === "day" ? 0.5 : mode === "sunset" ? 1.55 : 2.65;
-  return target.copy(center).multiplyScalar(Math.cos(angle)).addScaledVector(east, Math.sin(angle)).normalize();
+  const angle = mode === "cycle" ? .62 : mode === "day" ? .5 : mode === "sunset" ? 1.55 : 2.65;
+  target.copy(center).multiplyScalar(Math.cos(angle)).addScaledVector(east, Math.sin(angle)).normalize();
+  return mode === "cycle" ? target.applyAxisAngle(up, getCelestialCycleAngle(seconds)) : target;
 }
 
-/** Celestial detail emerges after dusk, not while the sun is on the horizon.
- * This depends on the inspected coast, so turning toward the day side also
- * hides the sky naturally without changing the planet-fixed automatic sun. */
+/** Near the surface, the atmosphere hides celestial detail until after dusk. */
 export function getNightSkyVisibility(sunDirection: Vec3, focus: Vec3) {
   const scale = Math.hypot(sunDirection.x, sunDirection.y, sunDirection.z) * Math.hypot(focus.x, focus.y, focus.z);
   if (!Number.isFinite(scale) || scale === 0) return 0;
   const facing = (sunDirection.x*focus.x + sunDirection.y*focus.y + sunDirection.z*focus.z) / scale;
   return 1 - THREE.MathUtils.smoothstep(facing, -.38, -.08);
+}
+
+/** Art-directed atmospheric entry, shared by sky, fog and the distant sun.
+ * Sailing and the wide globe remain in clear space on every viewport. */
+export function getGlobeAtmosphereBlend(zoom: number) {
+  return THREE.MathUtils.smoothstep(Number.isFinite(zoom) ? zoom : 0, .62, 1);
+}
+
+export function getGlobeSkyVisibility(sunDirection: Vec3, focus: Vec3, zoom: number) {
+  return THREE.MathUtils.lerp(1, getNightSkyVisibility(sunDirection, focus), getGlobeAtmosphereBlend(zoom));
 }
 
 export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, camera: THREE.Camera, container: HTMLElement, anchor: Vec3) {
@@ -47,9 +56,12 @@ export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, came
   sun.shadow.bias = -0.00015;
   sun.shadow.normalBias = 0.0009;
   sun.shadow.radius = 2;
-  const nightFill = new THREE.DirectionalLight(0x8abaff, 0.24);
+  // Diffuse fill keeps night terrain legible without a second, anti-solar
+  // specular highlight on the water. The sun is the only directional source.
+  const nightFill = new THREE.AmbientLight(0x8abaff, 0.08);
   scene.add(ambient, sun, nightFill);
-  const celestialSky = createGlobeCelestialSky(scene, camera, globe, anchor);
+  const celestialSky = createGlobeCelestialSky(scene, camera, anchor);
+  const distantSun = createGlobeSun(scene, camera);
   const moon = createGlobeMoon(scene, globe, camera, anchor);
   const sunDirection = new THREE.Vector3();
   const presetEast = new THREE.Vector3(), viewToPlanet = new THREE.Quaternion();
@@ -59,6 +71,7 @@ export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, came
   const fog = new THREE.Fog(0x9acbdc, 1.1, 3.7);
   scene.fog = fog;
   const daySky = new THREE.Color(0xa4d8e8), nightSky = new THREE.Color(0x07132d), duskSky = new THREE.Color(0xd9988c);
+  const spaceSky = new THREE.Color(0x030713);
   const sky = new THREE.Color(), horizon = new THREE.Color(), horizonLight = new THREE.Color(0xffdfbd);
   let skyStyle = "";
 
@@ -112,32 +125,35 @@ export function createGlobeLighting(scene: THREE.Scene, globe: THREE.Group, came
     sunDirection,
     installSurfaceLighting,
     update(seconds: number, mode: GlobeSkyMode, focus: Vec3, zoom: number) {
-      presetEast.set(1, 0, 0).applyQuaternion(viewToPlanet.copy(globe.quaternion).invert());
+      const atmosphere = getGlobeAtmosphereBlend(zoom);
+      presetEast.set(1, 0, 0).applyQuaternion(camera.quaternion).applyQuaternion(viewToPlanet.copy(globe.quaternion).invert());
       getGlobeSunDirection(seconds, mode, focus, anchor, sunDirection, presetEast);
       time.value = seconds;
       sunWorld.value.copy(sunDirection).applyQuaternion(globe.quaternion);
       sun.position.copy(sunWorld.value).multiplyScalar(4);
-      nightFill.position.copy(sun.position).multiplyScalar(-1);
       const facing = sunDirection.x*focus.x + sunDirection.y*focus.y + sunDirection.z*focus.z;
       const daylight = THREE.MathUtils.smoothstep(facing, -.23, .3);
       const twilight = Math.exp(-Math.pow(facing/.25, 2));
       sky.copy(nightSky).lerp(daySky, daylight).lerp(duskSky, twilight*.4);
       horizon.copy(sky).lerp(horizonLight, daylight*.22 + twilight*.18);
+      sky.lerp(spaceSky, 1 - atmosphere);
+      horizon.lerp(spaceSky, 1 - atmosphere);
       fog.color.copy(sky);
       // Only distant coastlines soften; overview geography retains its contrast.
       const eyeDistance = camera.position.length();
-      fog.near = zoom > .7 ? .8 : eyeDistance + .4;
-      fog.far = zoom > .7 ? 2.5 : eyeDistance + 3;
+      fog.near = THREE.MathUtils.lerp(eyeDistance + .4, .8, atmosphere);
+      fog.far = THREE.MathUtils.lerp(eyeDistance + 3, 2.5, atmosphere);
       const nextSky = `radial-gradient(ellipse at 50% 100%, #${horizon.getHexString()}, #${sky.getHexString()} 85%)`;
       if (nextSky !== skyStyle) { container.style.background = nextSky; skyStyle = nextSky; }
       const nightVisibility = getNightSkyVisibility(sunDirection, focus);
-      celestialSky.update(seconds, nightVisibility);
+      celestialSky.update(getGlobeSkyVisibility(sunDirection, focus, zoom));
+      distantSun.update(sunWorld.value, atmosphere);
       moon.update(seconds, sunDirection, nightVisibility);
     },
     dispose() {
       scene.remove(ambient, sun, nightFill);
       sun.shadow.dispose();
-      celestialSky.dispose(); moon.dispose();
+      celestialSky.dispose(); distantSun.dispose(); moon.dispose();
       scene.fog = null;
       container.style.removeProperty("background");
     },

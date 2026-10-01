@@ -11,13 +11,17 @@ import { createGlobeLife } from "./globe-life";
 import { createGlobeMarine } from "./globe-marine";
 import { createGlobeHarbors } from "./globe-harbors";
 import { createGlobeStorms } from "./globe-storms";
+import { createDangerReveal } from "./danger-reveal";
+import { createGlobeDangers } from "./globe-dangers";
 import { createGlobeCrystalStory } from "./globe-crystal-story";
 import { northUpGlobeOrientation, type GlobeOrientation } from "./globe-navigation";
 import { sampleStormShipMotion } from "./storm-ship-motion";
 import { createSceneryClock } from "./scenery-clock";
+import { getCelestialCycleAngle } from "./globe-celestial-frame";
+import { createGlobeReferenceFrame } from "./globe-camera";
 import { placeOccupiedStopBadge, placeStopCaption } from "./globe-marker-layout";
 import {
-  GLOBE_DESTINATIONS, getGlobeDestination, getGlobeRoadPoints, mapPointToGlobe,
+  GLOBE_DESTINATIONS, GLOBE_DANGER_REGIONS, getGlobeDestination, getGlobeRoadPoints, mapPointToGlobe,
   type Vec3,
 } from "./globe-geometry";
 
@@ -33,16 +37,19 @@ export type GlobeSceneFrame = Readonly<{
   focus: Vec3; orientation?: GlobeOrientation; zoom: number; activeDestinationId: string;
   completedStopIds: readonly string[];
   stormStages?: Readonly<Record<string, number>>;
+  dangerStages?: Readonly<Record<string, number>>;
   cameraDestinationId?: string; stormCameraBlend?: number;
   avatarPosition?: Vec3; avatarHop?: number;
   boatPosition?: Vec3; boatHeading?: Vec3;
   storyProgress?: number | null; storyPullback?: number; storyScattered?: boolean;
+  overviewSpinning?: boolean;
 }>;
 export type GlobeSceneOptions = Readonly<{
   onProject: (projection: GlobeProjection) => void;
   onUnavailable: () => void;
   assetBasePath?: string;
   animateScenery?: boolean;
+  onOverviewTurn?: (radians: number) => boolean;
 }>;
 export type GlobeScene = Readonly<{
   render: (frame: GlobeSceneFrame) => void; resize: () => void; dispose: () => void;
@@ -149,6 +156,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   const marine = createGlobeMarine(globe);
   const harbors = createGlobeHarbors(globe);
   const storms = createGlobeStorms(globe);
+  const dangers = createGlobeDangers(globe);
   const crystalStory = createGlobeCrystalStory(globe);
   for (const world of WORLD_DEFINITIONS) {
     const authored = getWorldMapLayout(world.number, world.stopIds.length);
@@ -194,12 +202,28 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   let width = 1; let height = 1;
   const startingSceneryTime = carriedSceneryTime;
   let sceneryTime = startingSceneryTime;
+  let lastViewTime = sceneryTime;
+  const referenceFrame = createGlobeReferenceFrame();
+  const cameraFrame = new THREE.Quaternion();
+  const viewPosition = new THREE.Vector3();
+  const viewQuaternion = new THREE.Quaternion();
+  function updateView() {
+    if (!frame) return;
+    referenceFrame.update(sceneryTime, frame.orientation ?? northUpGlobeOrientation(frame.focus), globe.quaternion, cameraFrame);
+    camera.position.copy(viewPosition).applyQuaternion(cameraFrame);
+    camera.quaternion.copy(cameraFrame).multiply(viewQuaternion);
+    camera.updateMatrixWorld();
+    lastViewTime = sceneryTime;
+  }
   let lastPaintTime = 0;
   let sceneryEnabled = options.animateScenery ?? true;
   let onScreen = false;
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const dangerReveal = createDangerReveal();
+  let visibleDangerStages: Record<string, number> = {};
   const updateScenery = () => {
     if (!frame) return;
+    updateView();
     lighting.update(sceneryTime, skyMode, frame.focus, frame.zoom);
     sea.update(sceneryTime, globe, camera, lighting.sunDirection);
     continents.update(sceneryTime, lighting.sunDirection);
@@ -209,6 +233,9 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     marine.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, lighting.sunDirection);
     harbors.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, lighting.sunDirection);
     storms.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, frame.stormStages ?? {}, sceneryEnabled && !reducedMotion.matches, lighting.sunDirection);
+    visibleDangerStages = dangerReveal.sample(sceneryTime, frame.dangerStages ?? {}, { running: sceneryEnabled, reducedMotion: reducedMotion.matches });
+    renderer.domElement.dataset.visibleDangers = Object.keys(visibleDangerStages).filter(id => visibleDangerStages[id] > 0).join(" ");
+    dangers.update(sceneryTime, frame.focus, frame.zoom, frame.activeDestinationId, visibleDangerStages, sceneryEnabled && !reducedMotion.matches, lighting.sunDirection);
     updatePlayerShip();
     updateLavaLight();
     wakeTime.value = sceneryTime;
@@ -220,10 +247,12 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     cancel: id => window.cancelAnimationFrame(id), now: () => performance.now(),
     onFrame: seconds => {
       sceneryTime = startingSceneryTime + seconds;
-      // Camera travel already paints at display cadence. Idle scenery needs only
-      // 30fps and never reprojects HTML buttons whose positions have not changed.
       if (frame && performance.now() - lastPaintTime > 25) {
-        updateScenery(); renderer.render(scene, camera); lastPaintTime = performance.now();
+        // Match the physical axial turn exactly. Q advances on its local Y
+        // axis while P does the same, leaving the overview camera stationary.
+        const turn = -getCelestialCycleAngle(sceneryTime - lastViewTime);
+        const repainted = frame.overviewSpinning && options.onOverviewTurn?.(turn);
+        if (!repainted) { updateScenery(); renderer.render(scene, camera); lastPaintTime = performance.now(); }
       }
     },
   });
@@ -309,21 +338,24 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   const shipEuler = new THREE.Euler();
   const shipNormal = new THREE.Vector3(), shipForward = new THREE.Vector3(), shipRight = new THREE.Vector3();
   const stormRegions = GLOBE_DESTINATIONS.filter(region => region.kind === "boss");
+  const oceanEncounters = [...stormRegions, ...GLOBE_DANGER_REGIONS];
   function updatePlayerShip() {
     if (!frame) return;
-    const activeStorm = stormRegions.find(region => region.id === frame!.activeDestinationId);
+    const activeStorm = oceanEncounters.find(region => region.id === frame!.activeDestinationId);
     const at = frame.boatPosition ?? activeStorm?.center;
     boat.visible = !!at;
     if (!at) { renderer.domElement.dataset.stormShip = "false"; return; }
     shipNormal.copy(at).normalize();
-    let strength = 0;
-    for (const region of stormRegions) {
+    let strength = 0, encounterInfluence = 0;
+    for (const region of oceanEncounters) {
       const distance = shipNormal.angleTo(vector(region.center));
-      strength = Math.max(strength, (frame.stormStages?.[region.id] ?? 0)
-        * (1 - THREE.MathUtils.smoothstep(distance, region.angularRadius * .22, region.angularRadius)));
+      const influence = ((region.kind === "danger" ? visibleDangerStages : frame.stormStages)?.[region.id] ?? 0)
+        * (1 - THREE.MathUtils.smoothstep(distance, region.angularRadius * .22, region.angularRadius));
+      encounterInfluence = Math.max(encounterInfluence, influence);
+      strength = Math.max(strength, influence * (region.kind === "danger" ? .48 : 1));
     }
     const pose = sampleStormShipMotion(sceneryTime, strength);
-    const scale = activeStorm && !frame.boatPosition ? 1.35 : THREE.MathUtils.lerp(3, 1.35, strength);
+    const scale = activeStorm && !frame.boatPosition ? 1.35 : THREE.MathUtils.lerp(3, 1.35, encounterInfluence);
     boat.scale.setScalar(scale);
     shipForward.copy(frame.boatHeading ?? activeStorm?.east ?? { x: 0, y: 1, z: 0 });
     shipForward.addScaledVector(shipNormal, -shipForward.dot(shipNormal));
@@ -406,17 +438,16 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
   function draw(next: GlobeSceneFrame) {
     if (disposed || unavailable) return;
     frame = next;
-    const orientation = next.orientation ?? northUpGlobeOrientation(next.focus);
-    globe.quaternion.set(orientation.x, orientation.y, orientation.z, orientation.w).normalize();
     const zoom = clamp(next.zoom, 0, 1);
     const tan = Math.tan(camera.fov * Math.PI / 360);
     const aspect = width / height;
     const overviewDistance = Math.max(3.7, 1.24 / (tan * aspect)) * (1 + .64 * (next.storyPullback ?? 0));
-    const stormDestination = GLOBE_DESTINATIONS.find(region => region.kind === "boss" && region.id === next.activeDestinationId);
+    const stormDestination = oceanEncounters.find(region => region.id === next.activeDestinationId);
     const cameraRegion = getGlobeDestination(next.cameraDestinationId ?? next.activeDestinationId);
-    const stormViewBlend = clamp(next.stormCameraBlend ?? (cameraRegion.kind === "boss" ? 1 : 0), 0, 1);
-    const focusExtent = THREE.MathUtils.lerp(.205, cameraRegion.angularRadius * 1.34, stormViewBlend);
-    const focusHeight = THREE.MathUtils.lerp(.194, cameraRegion.angularRadius * 1.34, stormViewBlend);
+    const stormViewBlend = clamp(next.stormCameraBlend ?? (cameraRegion.kind !== "teaching" ? 1 : 0), 0, 1);
+    const encounterFrame = cameraRegion.angularRadius * (cameraRegion.kind === "danger" ? 1.8 : 1.34);
+    const focusExtent = THREE.MathUtils.lerp(.205, encounterFrame, stormViewBlend);
+    const focusHeight = THREE.MathUtils.lerp(.194, encounterFrame, stormViewBlend);
     const focusDistance = Math.max(focusExtent / (tan * aspect), focusHeight / tan);
     // Look across the surface in close view: a visible curved horizon connects
     // the focused islands to the same globe seen in the overview.
@@ -426,7 +457,9 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     // The opening cinematic frames the raised crystal, then eases back to the
     // planet center as the camera widens. Its top must not clip off-screen.
     camera.lookAt(0, 0, zoom * (next.storyProgress != null ? 1.125 : 1));
-    camera.updateMatrixWorld();
+    viewPosition.copy(camera.position);
+    viewQuaternion.copy(camera.quaternion);
+    updateView();
     const completed = new Set(next.completedStopIds);
     const activeStops = WORLD_DEFINITIONS.find(world => world.id === next.activeDestinationId)?.stopIds ?? [];
     for (const [id, marker] of stopMarkers) {
@@ -469,9 +502,15 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
     reconcileScenery();
     const worlds: Record<string, GlobeProjectedPoint> = {};
     for (const region of GLOBE_DESTINATIONS) worlds[region.id] = project(vector(region.center).multiplyScalar(region.kind === "boss" ? 1.065 : 1.031));
+    for (const region of GLOBE_DANGER_REGIONS) worlds[region.id] = project(vector(region.center).multiplyScalar(1.035));
     const stops: Record<string, GlobeProjectedPoint> = {};
     const books: Record<string, GlobeProjectedPoint> = {};
     const world = WORLD_DEFINITIONS.find(candidate => candidate.id === next.activeDestinationId);
+    const danger = GLOBE_DANGER_REGIONS.find(region => region.id === next.activeDestinationId);
+    if (danger) {
+      const anchor = project(vector(danger.center).multiplyScalar(1.009));
+      stops[`${danger.id}:review`] = { ...anchor, y: anchor.y + 38, badgeOffset: { x: 0, y: 38 }, captionSide: "below" };
+    }
     if (world) {
       for (const id of world.stopIds) {
         const at = stopAnchors.get(id);
@@ -517,7 +556,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
       sceneryClock.dispose();
       document.removeEventListener("visibilitychange", visibilityChanged);
       reducedMotion.removeEventListener("change", visibilityChanged);
-      weather.dispose(); life.dispose(); marine.dispose(); harbors.dispose(); storms.dispose(); crystalStory.dispose(); biomes.dispose(); continents.dispose(); lighting.dispose(); sea.dispose();
+      weather.dispose(); life.dispose(); marine.dispose(); harbors.dispose(); storms.dispose(); dangers.dispose(); crystalStory.dispose(); biomes.dispose(); continents.dispose(); lighting.dispose(); sea.dispose();
       renderer.domElement.removeEventListener("webglcontextlost", contextLost);
       for (const geometry of geometries) geometry.dispose();
       for (const entry of materials) entry.dispose();

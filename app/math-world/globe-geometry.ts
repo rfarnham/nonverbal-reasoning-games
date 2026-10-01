@@ -1,12 +1,13 @@
 import { getWorldMapLayout, type MapLayout } from "./map-layouts.ts";
 import { WORLD_DEFINITIONS } from "./world-data.ts";
 import { GLOBE_CONTINENTS } from "./globe-continent-data.ts";
+import { GLOBE_DANGER_LOCATIONS, type GlobeDangerKind } from "./globe-danger-locations.ts";
 
 /** Unit-sphere geometry shared by the painted globe, HTML controls, and travel. */
 export type Vec3 = Readonly<{ x: number; y: number; z: number }>;
 export type GlobeDestination = Readonly<{
   id: string;
-  kind: "teaching" | "boss";
+  kind: "teaching" | "boss" | "danger";
   /** Storm destinations retain the number of their preceding teaching world. */
   worldNumber: number;
   center: Vec3;
@@ -126,6 +127,15 @@ function makeDestinations(): GlobeDestination[] {
 export const GLOBE_DESTINATIONS: readonly GlobeDestination[] = makeDestinations();
 export const GLOBE_REGIONS: readonly GlobeDestination[] = GLOBE_DESTINATIONS.filter(region => region.kind === "teaching");
 export const GLOBE_BOSS_REGIONS: readonly GlobeDestination[] = GLOBE_DESTINATIONS.filter(region => region.kind === "boss");
+export type GlobeDangerRegion = GlobeDestination & Readonly<{ kind: "danger"; dangerKind: GlobeDangerKind; afterWorld: number }>;
+export const GLOBE_DANGER_REGIONS: readonly GlobeDangerRegion[] = GLOBE_DANGER_LOCATIONS.map(location => {
+  const basis = frame(latitudeLongitudeToGlobe(location.latitude, location.longitude));
+  return { ...basis, id: location.id, kind: "danger", dangerKind: location.kind,
+    worldNumber: location.afterWorld, afterWorld: location.afterWorld,
+    angularRadius: location.angularRadius, harbor: basis.center };
+});
+/** Adding sea encounters must not change legacy land, harbor, or shard indexing. */
+export const GLOBE_ROUTE_DESTINATIONS: readonly GlobeDestination[] = [...GLOBE_DESTINATIONS, ...GLOBE_DANGER_REGIONS];
 
 export const GLOBE_GEOGRAPHIC_CLUSTERS = CLUSTER_LAYOUTS.map((cluster, index) => {
   const first = CLUSTER_LAYOUTS.slice(0, index).reduce((count, item) => count + item.coordinates.length, 0);
@@ -141,7 +151,7 @@ export const GLOBE_LAND_OBSTACLES: readonly Readonly<{ id: string; center: Vec3;
 export function getGlobeDestination(id: string | number): GlobeDestination {
   const region = typeof id === "number"
     ? GLOBE_REGIONS.find(candidate => candidate.worldNumber === id)
-    : GLOBE_DESTINATIONS.find(candidate => candidate.id === id);
+    : GLOBE_ROUTE_DESTINATIONS.find(candidate => candidate.id === id);
   if (!region) throw new Error(`Unknown globe destination: ${id}`);
   return region;
 }
@@ -265,6 +275,9 @@ function getOceanGraph(): OceanGraph {
     const angle = portAngle + index / coastCount * Math.PI * 2;
     return tangentPointToGlobe(region, Math.cos(angle) * GLOBE_HARBOR_RADIUS, Math.sin(angle) * GLOBE_HARBOR_RADIUS);
   }));
+  // One exact central anchorage per danger. It connects to the same ocean graph
+  // and receives the same hull clearance and smooth corner treatment as ports.
+  nodes.push(...GLOBE_DANGER_REGIONS.map(region => region.harbor));
   // Polar shore nodes let long voyages go around the ice rather than crossing it.
   for (const cap of GLOBE_POLAR_CAPS) for (let index = 0; index < 32; index++) {
     const angle = index * Math.PI / 16;
@@ -293,8 +306,10 @@ export function getVoyageRoute(fromId: string | number, toId: string | number): 
   const cached = voyageCache.get(key);
   if (cached) return cached.map(point => ({ ...point }));
   const graph = getOceanGraph();
-  const source = GLOBE_DESTINATIONS.indexOf(from) * coastCount;
-  const target = GLOBE_DESTINATIONS.indexOf(to) * coastCount;
+  const nodeFor = (destination: GlobeDestination) => destination.kind === "danger"
+    ? GLOBE_DESTINATIONS.length * coastCount + GLOBE_DANGER_REGIONS.findIndex(region => region.id === destination.id)
+    : GLOBE_DESTINATIONS.indexOf(destination) * coastCount;
+  const source = nodeFor(from), target = nodeFor(to);
   const lengths = graph.nodes.map(() => Infinity), previous = graph.nodes.map(() => -1), visited = new Set<number>();
   lengths[source] = 0;
   while (visited.size < graph.nodes.length) {
@@ -304,6 +319,9 @@ export function getVoyageRoute(fromId: string | number, toId: string | number): 
     if (current === target) break;
     visited.add(current);
     for (const edge of graph.edges[current]) {
+      const isDanger = edge.to >= GLOBE_DESTINATIONS.length * coastCount
+        && edge.to < GLOBE_DESTINATIONS.length * coastCount + GLOBE_DANGER_REGIONS.length;
+      if (isDanger && edge.to !== target) continue;
       const length = lengths[current] + edge.length;
       if (length < lengths[edge.to]) { lengths[edge.to] = length; previous[edge.to] = current; }
     }

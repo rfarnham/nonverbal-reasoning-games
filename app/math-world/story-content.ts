@@ -27,7 +27,7 @@ export const FIRST_WORLD_STORY = {
     title: "A light against the storm",
     paragraphs: [
       "Long ago, fierce winds tore across Oceania. Towering waves broke apart the land, leaving scattered groups of islands called archipelagos. The seas between them grew so dangerous that neighbors could no longer visit one another.",
-      "So the scientists of Oceania built something extraordinary: the Tideheart. It was a giant crystal computer, shaped like two square pyramids joined at their bases. Its clear faces shone with a brilliant blue light.",
+      "So the scientists of Oceania built something extraordinary: the Tideheart. It was a giant crystal computer shaped like an octahedron: two square pyramids joined at their bases. Its eight clear faces shone with a brilliant blue light.",
       "Inside the crystal, countless tiny signals raced like stars. The Tideheart studied the wind, the clouds, and the currents. At last, it began to understand the wild weather.",
     ],
     illustration: "tideheart",
