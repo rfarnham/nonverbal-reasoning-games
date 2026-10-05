@@ -21,6 +21,7 @@
     "arithmetic:explain": "node scripts/arithmetic-curriculum.mjs explain",
     "arithmetic:verify-all": "node scripts/arithmetic-curriculum.mjs verify-all",
     "test": "npm run generate:games && node --test tests/*.test.mjs && npm run test:mk-core && npm run test:search-build",
+    "test:browser": "node --test tests/browser/*.test.mjs",
     "test:mk-core": "python3 -m pytest -q tools/math_kangaroo_trainer/tests/synthetic",
     "audit:mk": "python3 -m math_kangaroo_trainer stage0 build --source work/math-kangaroo-complete-question-bank/data/questions.sqlite3 --output work/math-kangaroo-adaptive-engine/stage0 --sample-size 180 --seed 20260801",
     "lint": "npm run generate:games && eslint .",
@@ -49,6 +50,7 @@
     "@types/three": "^0.186.0",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.6",
+    "playwright": "1.62.1",
     "typescript": "5.9.3"
   },
   "type": "module"
