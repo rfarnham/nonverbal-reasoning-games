@@ -33,7 +33,10 @@
     "search:query": "node scripts/query-question-search.mjs",
     "search:companion": "node scripts/question-search-companion.mjs",
     "search:evaluate": "node scripts/evaluate-question-search.mjs",
-    "test:search-build": "python3 tests/question-search-export.test.py && python3 tests/question-search-lsa.test.py"
+    "test:search-build": "python3 tests/question-search-export.test.py && python3 tests/question-search-lsa.test.py",
+    "prebuild": "python3 scripts/homework-vault-archive.py unpack",
+    "prebuild:pages": "python3 scripts/homework-vault-archive.py unpack",
+    "predev": "python3 scripts/homework-vault-archive.py unpack"
   },
   "dependencies": {
     "next": "16.2.6",

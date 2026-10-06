@@ -174,6 +174,10 @@ and Journey play through the same engine.
 
 See [Adding a game](docs/ADDING_A_GAME.md) for the full contract.
 
+## Encrypted homework arcade
+
+[Open the homework arcade](https://rfarnham.github.io/nonverbal-reasoning-games/homework-arcade/). This separate single-page practice space preserves its worksheet administration rules, including auditory-only prompts, ordered sections, and parent-reviewed spoken answers. Its worksheets, prompts, answer keys, images, and neural narration are encrypted before publication. See [the arcade guide](docs/HOMEWORK_ARCADE.md).
+
 ## Deployment
 
 Every push to `main` is checked, statically exported, and deployed by

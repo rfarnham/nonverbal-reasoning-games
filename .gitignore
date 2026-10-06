@@ -40,7 +40,8 @@ yarn-error.log*
 *.tsbuildinfo
 /.wrangler/
 /outputs/
-/work/
+/work/*
+!/work/homework-arcade-ciphertext/
 /tmp/
 /.venv/
 .pytest_cache/
@@ -53,3 +54,6 @@ __pycache__/
 
 # Generated runtime; approved source material lives in content/ and public/.
 /app/math-world/data/runtime.generated.json
+
+# Restored encrypted homework assets are generated from checked-in ciphertext bundles.
+/public/homework-arcade/vault/

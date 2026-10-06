@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A private homework practice arcade.">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; frame-src blob:; object-src blob:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+  <title>Homework Arcade</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" type="module"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <dialog id="resource-dialog" aria-labelledby="resource-title">
+    <div class="dialog-head"><h2 id="resource-title"></h2><button id="close-resource" class="quiet">Close</button></div>
+    <p id="resource-status" role="status"></p>
+    <div id="resource-body"></div>
+  </dialog>
+</body>
+</html>
