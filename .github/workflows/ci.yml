@@ -35,3 +35,9 @@ jobs:
 
       - name: Run project checks
         run: npm run check
+
+      - name: Install Chromium for browser checks
+        run: npx playwright install --with-deps chromium
+
+      - name: Check mobile catalog browsing and navigation
+        run: npm run test:browser

@@ -119,6 +119,20 @@ npm test
 
 `npm run check` runs the full local validation sequence.
 
+The mobile catalog browser check verifies that browsing the shelf does not
+prefetch unopened games or labs and that touch and keyboard navigation still
+work under the GitHub Pages base path. Run it against the production export:
+
+```bash
+npm run build:pages
+npx playwright install chromium
+npm run test:browser
+```
+
+To use an existing Chromium installation, set
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to its executable path. Pull-request CI
+also runs this browser check.
+
 The full check also runs the adaptive core's invented-data tests. Set up its
 Python 3.12 environment once before running `npm test` or `npm run check`:
 

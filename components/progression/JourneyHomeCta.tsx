@@ -35,6 +35,7 @@ export function JourneyHomeCta({
     <Link
       className={`button ${secondary ? "button-secondary" : "button-primary"} journey-home-cta`}
       href="/journey/"
+      prefetch={false}
     >
       {label}
       <span aria-hidden="true">→</span>

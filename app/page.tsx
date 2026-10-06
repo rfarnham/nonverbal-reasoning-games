@@ -65,7 +65,7 @@ export default function Home() {
   return (
     <main>
       <header className="site-header">
-        <Link className="brand" href="/" aria-label="Spatial Gym home">
+        <Link className="brand" href="/" prefetch={false} aria-label="Spatial Gym home">
           <span className="brand-mark" aria-hidden="true">
             <span />
             <span />
@@ -126,6 +126,7 @@ export default function Home() {
           </p>
         </div>
 
+        {/* Keep destinations on demand so scrolling does not load game bundles. */}
         <div className="game-grid">
           {games.map((game, index) => (
             <article className="game-card game-card-live" key={game.slug}>
@@ -146,6 +147,7 @@ export default function Home() {
               <Link
                 className="game-link"
                 href={game.href}
+                prefetch={false}
                 aria-label={`Start a round of ${game.title}`}
               >
                 Start a round <span aria-hidden="true">→</span>
@@ -175,7 +177,7 @@ export default function Home() {
               <span className="status-pill status-lab">Handwriting practice</span>
               <h3>Subtraction Steps</h3>
               <p>Write your answers and borrow marks. Build fluency through five adaptive tiers with focused mistake review.</p>
-              <Link className="game-link" href="/lab/subtraction-trainer/">
+              <Link className="game-link" href="/lab/subtraction-trainer/" prefetch={false}>
                 Start practicing <span aria-hidden="true">→</span>
               </Link>
             </div>
@@ -195,7 +197,7 @@ export default function Home() {
                 Practice subtraction facts by sight or sound using tap,
                 handwriting, or spoken answers.
               </p>
-              <Link className="game-link" href="/lab/subtraction-flash/">
+              <Link className="game-link" href="/lab/subtraction-flash/" prefetch={false}>
                 Open the lab <span aria-hidden="true">→</span>
               </Link>
             </div>
@@ -214,7 +216,7 @@ export default function Home() {
                 Draw answer-key-verified spatial questions by grade, point
                 value, and question type. Answer letters reshuffle every time.
               </p>
-              <Link className="game-link" href="/lab/math-kangaroo/">
+              <Link className="game-link" href="/lab/math-kangaroo/" prefetch={false}>
                 Open the lab <span aria-hidden="true">→</span>
               </Link>
             </div>
@@ -260,7 +262,7 @@ export default function Home() {
             games.
           </p>
         </div>
-        <Link href="/question-search/">Question search · contributors</Link>
+        <Link href="/question-search/" prefetch={false}>Question search · contributors</Link>
         <a href="https://github.com/rfarnham/nonverbal-reasoning-games">
           View the project on GitHub <span aria-hidden="true">↗</span>
         </a>
