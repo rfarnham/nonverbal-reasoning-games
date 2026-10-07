@@ -1,6 +1,7 @@
 const root = document.querySelector('#root');
 const dialog = document.querySelector('#resource-dialog');
 const STORAGE = 'homework-arcade-progress-v1';
+const CORRECT_PAUSE_MS = 1500;
 const categories = {
   analogies: {name:'Word connections',icon:'A:B',color:'#e9614d',desc:'Find the same relationship in a new pair.'},
   similarities: {name:'What’s alike?',icon:'≈',color:'#167668',desc:'Find a shared idea. Explain how things belong together.'},
@@ -195,17 +196,25 @@ function coachCompare(q){
  revealCoachPrompt(q);
  if(q.rubric){
   el('feedback').innerHTML=`<div class="coach-example"><div class="eyebrow">Grown-up’s guide</div><p><strong>2 · Clear core meaning:</strong> ${e(q.rubric['2'])}</p><p><strong>1 · Partly correct:</strong> ${e(q.rubric['1'])}</p><p><strong>0 · Still to learn:</strong> ${e(q.rubric['0'])}</p><p class="small">Judge the meaning and specificity; these examples are not required wording.</p><div class="coach-score"><button data-points="2">Clear meaning · 2</button><button data-points="1" class="quiet">Partly correct · 1</button><button data-points="0" class="quiet">Practice again · 0</button></div></div>`;
-  document.querySelectorAll('[data-points]').forEach(button=>button.addEventListener('click',()=>{const points=Number(button.dataset.points);mark(points>0);progress.items[q.id].points=points;saveProgress();answered=true;disableResponse();showFeedback(points>0,points===2?'A clear definition. Can you give another example?':points===1?'You have part of the idea. Compare your answer with the core meaning.':'Keep exploring the word together.',true);}));return;
+  document.querySelectorAll('[data-points]').forEach(button=>button.addEventListener('click',()=>{const points=Number(button.dataset.points);mark(points>0);progress.items[q.id].points=points;saveProgress();answered=true;disableResponse();showFeedback(points>0,points===2?'A clear definition. Can you give another example?':points===1?'You have part of the idea. Compare your answer with the core meaning.':'Keep exploring the word together.',true,points===2);}));return;
  }
  const sample=q.example||(q.answer?answers(q).join(' · '):'There can be more than one good answer. Explain why your answer fits.');
  el('feedback').innerHTML=`<div class="coach-example"><div class="eyebrow">Compare ideas</div><p>${e(sample)}</p>${q.explanation?`<p>${e(q.explanation)}</p>`:''}<p class="small">A grown-up checks the meaning, not the exact words.</p><div class="coach-score"><button id="coach-good">That makes sense</button><button id="coach-practice" class="quiet">Let’s practice this again</button></div></div>`;
  el('coach-good').addEventListener('click',()=>{mark(true);answered=true;disableResponse();showFeedback(true,'Good thinking. Try giving a second answer or an example.');});
  el('coach-practice').addEventListener('click',()=>{mark(false);if(q.auditory){answered=true;disableResponse();showFeedback(false,q.explanation||sample,true);return;}el('feedback').innerHTML=`<div class="feedback wrong"><h3>Keep exploring</h3><p>${e(q.explanation||sample)}</p><button id="retry" class="quiet">Try another response</button><button id="move-on" class="text-btn">Move on</button></div>`;el('retry').addEventListener('click',()=>{el('feedback').replaceChildren();el('response')?.focus();});el('move-on').addEventListener('click',next);});
 }
-function showFeedback(ok,text,advance=false){
+function showFeedback(ok,text,advance=false,autoAdvance=ok){
  if(answered)revealCoachPrompt(current());
  el('feedback').innerHTML=`<div class="feedback ${ok?'':'wrong'}"><h3>${ok?'Nicely done!':'Keep thinking'}</h3><p>${e(text)}</p>${ok||advance?`<button id="next">${stopPending?'Choose another challenge':'Next challenge'}</button>`:''}</div>`;
  el('next')?.addEventListener('click',next);if(ok)el('next').focus({preventScroll:true});
+ if(ok&&autoAdvance)advanceAfterCorrect();
+}
+function advanceAfterCorrect(){
+ const version=renderVersion,question=current();
+ if(!answered||!key||!question||finished)return;
+ el('next').insertAdjacentHTML('afterend','<button id="stay" class="quiet">Stay here</button><p id="advance-status" class="small" role="status">Next challenge in a moment.</p>');
+ const timer=later(()=>{if(key&&answered&&!finished&&version===renderVersion&&current()===question)next();},CORRECT_PAUSE_MS);
+ el('stay').addEventListener('click',()=>{clearTimeout(timer);timers.delete(timer);el('stay').remove();el('advance-status').textContent='Take your time. Choose Next challenge when you’re ready.';});
 }
 async function sequenceBuffer(asset){
  if(audioBuffers.has(asset.id))return audioBuffers.get(asset.id);
@@ -254,7 +263,7 @@ function renderRecall(q){
    // Partial recall is practice completed, with missed items available for review.
    if(found.length!==words.length){progress.items[q.id].done=true;progress.items[q.id].reviewed=false;saveProgress();sessionDone+=1;}
    answered=true;el('check-recall').disabled=true;el('recall-response').readOnly=true;
-   el('feedback').innerHTML=`<div class="feedback"><h3>${found.length} of ${words.length} remembered</h3><p>${missed.length?`Still to practice: ${e(missed.join(', '))}`:'You remembered every word.'}</p><p class="small">Check spelling or a spoken answer together. Grouping words can help you remember.</p><button id="next">Next challenge</button></div>`;el('next').addEventListener('click',next);
+   el('feedback').innerHTML=`<div class="feedback"><h3>${found.length} of ${words.length} remembered</h3><p>${missed.length?`Still to practice: ${e(missed.join(', '))}`:'You remembered every word.'}</p><p class="small">Check spelling or a spoken answer together. Grouping words can help you remember.</p><button id="next">Next challenge</button></div>`;el('next').addEventListener('click',next);if(found.length===words.length)advanceAfterCorrect();
   });};el('hide-list').addEventListener('click',hide);
  });
 }
@@ -271,7 +280,7 @@ function renderAuditoryRecall(q){
   }catch{if(version===renderVersion){el('start-recall').disabled=false;el('recall-state').textContent='Audio couldn’t play. The waiting minute has not started.';}}
  });
 }
-function finishRecall(q,count){if(answered)return;const words=q.words||[];mark(count===words.length);if(count!==words.length){progress.items[q.id].done=true;progress.items[q.id].reviewed=false;saveProgress();sessionDone+=1;}progress.items[q.id].recalled=count;saveProgress();answered=true;el('check-recall').disabled=true;el('spoken-recall').disabled=true;el('recall-response').readOnly=true;showFeedback(true,`${count} of ${words.length} remembered. Original list: ${words.join(', ')}. Check spelling or spoken answers together.`,true);}
+function finishRecall(q,count){if(answered)return;const words=q.words||[];mark(count===words.length);if(count!==words.length){progress.items[q.id].done=true;progress.items[q.id].reviewed=false;saveProgress();sessionDone+=1;}progress.items[q.id].recalled=count;saveProgress();answered=true;el('check-recall').disabled=true;el('spoken-recall').disabled=true;el('recall-response').readOnly=true;showFeedback(true,`${count} of ${words.length} remembered. Original list: ${words.join(', ')}. Check spelling or spoken answers together.`,true,count===words.length);}
 function renderStory(q){
  const audible=q.auditory;
  el('question-content').insertAdjacentHTML('beforeend',`<p class="question-instruction">${audible?'Listen to the story once or twice, then answer from memory.':'Read the story once or twice, then answer from memory.'}</p>${audible?'<div class="sequence-stage" id="story-state">Ready to listen</div>':`<div class="story" id="story-text">${e(q.story)}</div>`}<div class="actions"><button id="read-story" class="quiet">${audible?'Listen to the story':'Read the story aloud'}</button><button id="hide-story" ${audible?'disabled':''}>Ready for questions</button><span id="story-status" class="small" role="status"></span></div><div id="story-stage"></div>`);
@@ -281,8 +290,9 @@ function renderStory(q){
   el('story-stage').innerHTML=`<div class="story-questions">${(q.subquestions||[]).map((s,i)=>`<div><label for="story-response-${i}">${audible?`Answer ${i+1}`:`${i+1}. ${e(s.prompt)}`}</label>${audible?`<button class="quiet recall-question" data-story-audio="${i}">Hear question ${i+1}</button>`:''}<input id="story-response-${i}" autocomplete="off"></div>`).join('')}</div><div class="actions"><button id="story-compare">Compare answers</button><span id="recall-status" class="small" role="status"></span></div>`;
   document.querySelectorAll('[data-story-audio]').forEach(button=>button.addEventListener('click',()=>{playClip(q.audio?.subquestions?.[Number(button.dataset.storyAudio)]).catch(()=>{el('recall-status').textContent='Audio couldn’t play. Try again.';});}));
   el('story-compare').addEventListener('click',()=>{
+   if(answered)return;
    el('feedback').innerHTML=`<div class="coach-example"><div class="eyebrow">Story answers</div>${(q.subquestions||[]).map((s,i)=>`<p>${i+1}. ${e(s.prompt)}<br><strong>${e(Array.isArray(s.answer)?s.answer.join(' / '):s.answer)}</strong></p>`).join('')}<p class="small">A grown-up can accept answers with the same meaning.</p><div class="actions"><button id="story-good">Remembered the story</button><button id="story-practice" class="quiet">Practice again later</button></div></div>`;
-   el('story-good').addEventListener('click',()=>{mark(true);answered=true;showFeedback(true,'You listened closely. Can you retell the story in your own words?');});
+   el('story-good').addEventListener('click',()=>{if(answered)return;el('story-compare').disabled=true;mark(true);answered=true;showFeedback(true,'You listened closely. Can you retell the story in your own words?');});
    el('story-practice').addEventListener('click',()=>{mark(false);next();});
   });
  });
@@ -312,6 +322,7 @@ function renderFinish(){
 }
 async function openResource(index,page=1){
  const resource=data?.resources[index];if(!resource)return;
+ el('stay')?.click();
  const version=key;el('resource-title').textContent=resource.name;el('resource-status').textContent='Opening encrypted worksheet…';el('resource-body').replaceChildren();if(!dialog.open)dialog.showModal();
  try{
   const url=await assetUrl(resource.asset,'application/pdf');if(!key||key!==version||!dialog.open){URL.revokeObjectURL(url);urls.delete(url);return;}
