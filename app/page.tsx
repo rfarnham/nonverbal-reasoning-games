@@ -171,6 +171,19 @@ export default function Home() {
         <div className="lab-grid">
           <article className="lab-card">
             <div className="lab-card-equation" aria-hidden="true">
+              <span>△</span><i>+</i><span>□</span><i>=</i><strong>?</strong>
+            </div>
+            <div className="lab-card-copy">
+              <span className="status-pill status-lab">Math &amp; spatial practice</span>
+              <h3>Think Academy Lab</h3>
+              <p>Explore 15 problem types with a mixed test or focused practice. Start at the recorded difficulty and stretch through three extra challenges.</p>
+              <Link className="game-link" href="/lab/think-academy/" prefetch={false}>
+                Open the lab <span aria-hidden="true">→</span>
+              </Link>
+            </div>
+          </article>
+          <article className="lab-card">
+            <div className="lab-card-equation" aria-hidden="true">
               <span>32</span><i>−</i><span>7</span><i>=</i><strong>?</strong>
             </div>
             <div className="lab-card-copy">

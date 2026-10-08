@@ -50,6 +50,11 @@ questions.
 | [Borrow Flash](https://rfarnham.github.io/nonverbal-reasoning-games/lab/subtraction-flash/) | Visual and listening subtraction practice with tap, handwriting, and speech answers | Playable |
 | [Subtraction Steps](https://rfarnham.github.io/nonverbal-reasoning-games/lab/subtraction-trainer/) | Draw-only vertical subtraction, a writable workspace, five adaptive fluency tiers, and mistake review | Playable |
 | [Math Kangaroo Shuffle](https://rfarnham.github.io/nonverbal-reasoning-games/lab/math-kangaroo/) | Random spatial questions filtered by grade, point value, and question type | Playable |
+| [Think Academy Lab](https://rfarnham.github.io/nonverbal-reasoning-games/lab/think-academy/) | Mixed tests or focused practice across 15 recorded question types, at the original difficulty and three further challenge levels | Playable |
+
+The [Think Academy Lab source and curriculum](docs/think-academy-lab.md)
+records all 15 question panels (21 answer slots) extracted from the supplied
+screen capture and explains how their generated variants increase in challenge.
 
 ## Contributor question search
 
