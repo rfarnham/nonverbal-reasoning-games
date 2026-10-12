@@ -15,12 +15,15 @@ There is no account, download, backend, or analytics.
 is a password-gated playtest of 20 spiral worlds, with four six-question stops
 per world. See the [curriculum outline](docs/math-world-20-world-curriculum.md).
 
-The secondary **Journey** path connects a stable, snapshotted set of up to
-eight canonical games across seven boards: Starter, Junior I–II, Expert I–II,
+The secondary **Journey** path snapshots all current canonical games across
+seven boards: Starter, Junior I–II, Expert I–II,
 and Wizard I–II. It includes local player profiles, animal avatars, saved stop
 progress, Turbo Time, redemption, level challenges, collectible XP, and two
-Math Kangaroo spatial-review stops on every board from Junior I onward. The
-game shelf remains available for standalone Campaign and Infinite play; shelf
+Math Kangaroo spatial-review stops on every board from Junior I onward. Each
+board's eight ordinary stops rotate through larger game collections,
+and each level challenge covers every snapshotted game. Existing profiles keep
+their original membership and earned progress. The game shelf remains available
+for standalone Campaign and Infinite play; shelf
 rounds never alter Journey progress.
 
 ## Games
@@ -33,6 +36,7 @@ rounds never alter Journey progress.
 | [Braids](https://rfarnham.github.io/nonverbal-reasoning-games/games/braids/) | Spatial perspective and depth tracking | Playable |
 | [Whose Left?](https://rfarnham.github.io/nonverbal-reasoning-games/games/whose-left/) | Spatial perspective and direction tracking | Playable |
 | [Shape Fold](https://rfarnham.github.io/nonverbal-reasoning-games/games/shape-fold/) | Spatial folding and visual prediction | Playable |
+| [Folded Items](https://rfarnham.github.io/nonverbal-reasoning-games/games/folded-items/) | Tracking labeled items through folds and identifying hidden layers | Playable |
 | [Domino Twist](https://rfarnham.github.io/nonverbal-reasoning-games/games/domino-twist/) | Spatial composition and part-whole reasoning | Playable |
 | [Changing Strips](https://rfarnham.github.io/nonverbal-reasoning-games/games/changing-strips/) | Visual sequencing and ordered pattern replacement | Playable |
 | [Bracelet Search](https://rfarnham.github.io/nonverbal-reasoning-games/games/bracelet-search/) | Sequence search and mental reversal | Playable |
@@ -80,6 +84,7 @@ app/
     changing-strips/  # route, catalog metadata, and shelf icon
     domino-twist/     # route, catalog metadata, and shelf icon
     extra-piece/      # route, catalog metadata, and shelf icon
+    folded-items/     # labeled-item folding; separate from hole punching
     libra/            # route, catalog metadata, and shelf icon
     pattern-matrix/   # route, catalog metadata, and shelf icon
     rotation-match/   # route, catalog metadata, and shelf icon

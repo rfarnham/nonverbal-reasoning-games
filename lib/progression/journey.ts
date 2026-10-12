@@ -94,9 +94,7 @@ function validateGameSnapshot(
     };
   });
 
-  const coreGames = validated
-    .filter(({ role }) => role === "game")
-    .slice(0, JOURNEY_GAMES_PER_BOARD);
+  const coreGames = validated.filter(({ role }) => role === "game");
   const reviewGames = validated.filter(({ role }) => role === "review");
   if (reviewGames.length > 1) {
     throw new Error("A journey snapshot currently supports one review provider.");
@@ -110,9 +108,7 @@ function validateGameSnapshot(
 function canonicalGames(
   games: readonly JourneyGame[],
 ): readonly JourneyGame[] {
-  return games
-    .filter(({ role }) => (role ?? "game") === "game")
-    .slice(0, JOURNEY_GAMES_PER_BOARD);
+  return games.filter(({ role }) => (role ?? "game") === "game");
 }
 
 function reviewProvider(
@@ -153,9 +149,15 @@ export function buildJourneyBoard(
   }
   const difficulty = journeyLevelDifficulty(journeyLevel);
   const xp = XP_PER_JOURNEY_STOP[journeyLevel];
+  // Keep saved plans with up to eight games byte-for-byte stable. Larger
+  // snapshots rotate through the complete catalog without lengthening boards.
+  const gameOffset =
+    coreGames.length > JOURNEY_GAMES_PER_BOARD
+      ? boardIndex * JOURNEY_GAMES_PER_BOARD
+      : 0;
   const ordinaryGames = Array.from(
     { length: JOURNEY_GAMES_PER_BOARD },
-    (_, index) => coreGames[index % coreGames.length]!,
+    (_, index) => coreGames[(gameOffset + index) % coreGames.length]!,
   );
   const useSecondTurboGame =
     journeyLevel === "junior-1" ||
@@ -296,9 +298,9 @@ export function buildJourneyPlan(
 export function buildLegacyJourneyPlan(
   gameSnapshot: readonly JourneyGame[],
 ): JourneyPlan {
-  const games = validateGameSnapshot(gameSnapshot).filter(
-    ({ role }) => role === "game",
-  );
+  const games = validateGameSnapshot(gameSnapshot)
+    .filter(({ role }) => role === "game")
+    .slice(0, JOURNEY_GAMES_PER_BOARD);
   const legacyLevels: readonly ProgressionLevel[] = [
     "starter",
     "junior",

@@ -290,6 +290,9 @@ Journey is generic:
 - never copy a game's puzzle data or generation logic into Journey;
 - snapshot the ordered game membership when a profile starts so a later catalog
   change cannot rearrange earned progress;
+- include every discovered canonical game in new profiles; when there are more
+  than eight, rotate an eight-game ordinary-stop window between boards while
+  culmination still covers every snapshotted game;
 - store compact question references and content versions, not rendered rounds.
 
 Each profile advances through seven Journey boards:

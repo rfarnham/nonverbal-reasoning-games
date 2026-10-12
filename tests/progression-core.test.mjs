@@ -12,6 +12,7 @@ import {
   assertProgressionAttemptIntegrity,
   beginAttemptRedemption,
   beginCulminationSection,
+  buildLegacyJourneyPlan,
   buildJourneyPlan,
   canPlayerAccessJourneyNode,
   closeAttemptSummary,
@@ -36,6 +37,7 @@ import {
   switchPlayerProfile,
   turboQuestionReference,
   updatePlayerProfileIdentity,
+  upgradePlayerProfileJourneyPlan,
   upsertProfileAttempt,
 } from "../lib/progression/index.ts";
 
@@ -177,7 +179,7 @@ test("journey is seven generic boards with balanced review cadence and doubling 
   assert.equal(firstNormal.id, sameNormalPosition.id);
 });
 
-test("journey construction caps core games, snapshots review content, and stays immutable", () => {
+test("journey construction snapshots all core games and review content immutably", () => {
   assert.throws(
     () => buildJourneyPlan(games),
     /needs one discovered review provider/,
@@ -205,8 +207,8 @@ test("journey construction caps core games, snapshots review content, and stays 
     },
     reviewGame,
   ]);
-  assert.equal(expandedJourney.gameSnapshot.length, 9);
-  assert.equal(expandedJourney.gameSnapshot.some(({ slug }) => slug === "game-9"), false);
+  assert.equal(expandedJourney.gameSnapshot.length, 10);
+  assert.equal(expandedJourney.gameSnapshot.some(({ slug }) => slug === "game-9"), true);
   assert.equal(
     expandedJourney.gameSnapshot.some(({ slug }) => slug === reviewGame.slug),
     true,
@@ -220,6 +222,74 @@ test("journey construction caps core games, snapshots review content, and stays 
   const journey = buildJourneyPlan([...input, reviewGame]);
   input[0].slug = "changed-later";
   assert.equal(journey.gameSnapshot[0].slug, "game-1");
+});
+
+test("larger Journey snapshots rotate eight ordinary games and culminate with every game", () => {
+  const fullCatalog = Array.from({ length: 11 }, (_, index) => ({
+    slug: `game-${index + 1}`,
+    title: `Game ${index + 1}`,
+    contentVersion: "campaign-v1",
+    generatorVersion: "generator-v1",
+  }));
+  const journey = buildJourneyPlan([...fullCatalog, reviewGame]);
+  assert.equal(journey.gameSnapshot.length, 12);
+  assert.deepEqual(journey.boards.map(({ availableXp }) => availableXp), [
+    325, 750, 1500, 3000, 6000, 12000, 24000,
+  ]);
+  const ordinaryCoverage = new Set();
+  const turboCoverage = new Set();
+  for (const [boardIndex, board] of journey.boards.entries()) {
+    const normal = board.nodes.filter(({ kind }) => kind === "normal");
+    assert.equal(normal.length, 8);
+    assert.equal(board.nodes.filter(({ kind }) => kind === "turbo").length, 4);
+    assert.deepEqual(normal.map(({ gameSlug }) => gameSlug),
+      Array.from({ length: 8 }, (_, index) =>
+        fullCatalog[(boardIndex * 8 + index) % fullCatalog.length].slug,
+      ),
+    );
+    for (const { gameSlug } of normal) ordinaryCoverage.add(gameSlug);
+    for (const { gameSlug } of board.nodes.filter(({ kind }) => kind === "turbo")) {
+      turboCoverage.add(gameSlug);
+    }
+    const culmination = board.nodes.at(-1);
+    assert.deepEqual(culmination.gameSlugs, fullCatalog.map(({ slug }) => slug));
+    assert.equal(
+      culmination.sections.filter(({ selection }) => selection === "mistakes").length,
+      fullCatalog.length,
+    );
+  }
+  assert.equal(ordinaryCoverage.size, fullCatalog.length);
+  assert.equal(turboCoverage.size, fullCatalog.length);
+});
+
+test("catalog growth preserves existing profile membership and legacy plan boundaries", () => {
+  const expandedCatalog = [
+    ...games,
+    { slug: "new-game", title: "New Game" },
+    reviewGame,
+  ];
+  for (const count of [1, 7, 8]) {
+    const originalSnapshot = [...games.slice(0, count), reviewGame];
+    const profile = createPlayerProfile({
+      id: `saved-${count}`,
+      name: "Ada",
+      avatarId: "hedgehog",
+      gameSnapshot: originalSnapshot,
+      nowMs: 1,
+    });
+    const before = buildJourneyPlan(profile.gameSnapshot);
+    const upgraded = upgradePlayerProfileJourneyPlan(profile, expandedCatalog, 2);
+    assert.equal(upgraded, profile);
+    assert.deepEqual(buildJourneyPlan(upgraded.gameSnapshot), before);
+    for (const board of before.boards) {
+      assert.deepEqual(
+        board.nodes.filter(({ kind }) => kind === "normal").map(({ gameSlug }) => gameSlug),
+        Array.from({ length: 8 }, (_, index) => games[index % count].slug),
+      );
+    }
+  }
+  const originalLegacy = buildLegacyJourneyPlan(games);
+  assert.deepEqual(buildLegacyJourneyPlan(expandedCatalog), originalLegacy);
 });
 
 test("only a result strictly greater than 70 percent clears", () => {

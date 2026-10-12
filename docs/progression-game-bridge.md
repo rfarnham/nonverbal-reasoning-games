@@ -28,6 +28,14 @@ Journey automatically.
 Journey membership still comes from the generated game catalog in
 `lib/games.ts`. There is no second list of Journey games.
 
+New profiles snapshot the complete ordered catalog. Each board keeps eight
+ordinary stops and four Turbo stops; catalogs larger than eight use successive
+eight-game windows, wrapping through that saved order. Culminations include
+every snapshotted canonical game. A catalog release does not append games to an
+existing profile or change its saved stops. Profiles with eight or fewer games
+retain the original board order, and legacy four-board plans retain their
+original eight-game cap.
+
 ## Game-owned bridge files
 
 Every released route has these two files beside its page and engine:

@@ -7,7 +7,6 @@ import {
   createTurboProgressionAttempt,
   currentAttemptSection,
   currentRedemptionQuestion,
-  JOURNEY_GAMES_PER_BOARD,
   type CampaignQuestionReference,
   type JourneyQuestionReference,
   type JourneyNode,
@@ -38,17 +37,15 @@ function nextAttemptId(stopId: string) {
 
 export function journeyCatalogSnapshot() {
   return [
-    ...games
-      .slice(0, JOURNEY_GAMES_PER_BOARD)
-      .map(({ slug, title, progression }) => ({
-        slug,
-        title,
-        role: "game" as const,
-        contentVersion: progression.contentVersion,
-        generatorVersion: progression.generatorVersion,
-        journeyContentVersion:
-          progression.journeyContentVersion ?? progression.contentVersion,
-      })),
+    ...games.map(({ slug, title, progression }) => ({
+      slug,
+      title,
+      role: "game" as const,
+      contentVersion: progression.contentVersion,
+      generatorVersion: progression.generatorVersion,
+      journeyContentVersion:
+        progression.journeyContentVersion ?? progression.contentVersion,
+    })),
     ...journeyReviews.map(
       ({ slug, title, journeyContentVersion }) => ({
         slug,

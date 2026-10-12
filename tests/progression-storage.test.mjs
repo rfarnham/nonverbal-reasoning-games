@@ -111,6 +111,48 @@ test("versioned storage round-trips exact in-progress answer and section state",
   assert.equal(resumed.rounds[0].lastAnswerToken, "choice-2");
 });
 
+test("larger game snapshots retain rotating stops and active attempts after reload", () => {
+  const fullCatalog = Array.from({ length: 11 }, (_, index) => ({
+    slug: `game-${index + 1}`,
+    title: `Game ${index + 1}`,
+    contentVersion: `campaign-${index + 1}`,
+    generatorVersion: `generator-${index + 1}`,
+  }));
+  const snapshot = [...fullCatalog, reviewGame];
+  const journey = buildJourneyPlan(snapshot);
+  const node = journey.boards[1].nodes.find(
+    (candidate) => candidate.kind === "normal" && candidate.gameSlug === "game-11",
+  );
+  assert.ok(node);
+  let attempt = createNormalProgressionAttempt({
+    id: "large-snapshot-resume",
+    node,
+    campaignQuestions: questions(node.gameSlug, node.level),
+    nowMs: 2,
+  });
+  attempt = recordQuestionAttempt(attempt, {
+    correct: false,
+    answerToken: "choice-3",
+    nowMs: 3,
+  });
+  const profile = upsertProfileAttempt(createPlayerProfile({
+    id: "large-snapshot-profile",
+    name: "testUser123",
+    avatarId: "hedgehog",
+    gameSnapshot: snapshot,
+    nowMs: 1,
+  }), attempt);
+  const storage = memoryStorage();
+  assert.equal(saveProgressionState(
+    addPlayerProfile(createProgressionState(), profile), storage,
+  ), true);
+  const loaded = loadProgressionState(storage).profiles[0];
+  assert.deepEqual(loaded.gameSnapshot, profile.gameSnapshot);
+  assert.deepEqual(buildJourneyPlan(loaded.gameSnapshot), journey);
+  assert.equal(loaded.activeAttemptId, attempt.id);
+  assert.deepEqual(loaded.attempts[attempt.id], attempt);
+});
+
 test("storage retains locked-position attempts only for the exact test profile", () => {
   const journey = buildJourneyPlan(journeyGames);
   const futureNode = journey.boards[1].nodes[0];
