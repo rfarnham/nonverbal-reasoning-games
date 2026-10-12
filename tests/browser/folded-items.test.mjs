@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { before, after, test } from 'node:test';
 import { chromium } from 'playwright';
 import {
-  ROUNDS, describeItem, foldDirectionLabel, generateInfiniteRound, roundFingerprint,
+  ROUNDS, describeAnswer, describeItem, foldDirectionLabel, generateInfiniteRound, roundFingerprint,
 } from '../../app/games/folded-items/game-engine.ts';
 import { progressionAdapter } from '../../app/games/folded-items/progression-adapter.ts';
 import { journeyReviews } from '../../lib/journey-reviews.ts';
@@ -68,15 +68,16 @@ async function waitForRound(page, round) {
   assert.equal(await choices(page).count(), 4);
   for (let index = 0; index < 4; index++) {
     assert.equal(await choices(page).nth(index).getAttribute('aria-keyshortcuts'), String(index + 1));
-    assert.equal(await choices(page).nth(index).getAttribute('aria-label'), `Option ${index + 1}${round.answerMode === 'ordered' ? ', top to bottom' : ''}: ${round.options[index].map(id => describeItem(round, id)).join(', ')}`);
+    assert.equal(await choices(page).nth(index).getAttribute('aria-label'), `Option ${index + 1}${round.answerMode === 'ordered' ? ', top to bottom' : ''}: ${describeAnswer(round, round.options[index], round.optionOrientations[index])}`);
   }
   await assertFocused(choices(page).first());
 }
-async function answer(page, round, { correct = true, keyboard = false, reloadDuringFeedback = false } = {}) {
-  const index = correct ? round.correctIndex : (round.correctIndex + 1) % 4;
+async function answer(page, round, { correct = true, keyboard = false, reloadDuringFeedback = false, optionIndex = null } = {}) {
+  const index = optionIndex ?? (correct ? round.correctIndex : (round.correctIndex + 1) % 4);
   const clue = page.getByRole('region', { name: 'Labeled paper and folds', exact: true });
   const promptBefore = correct ? null : await clue.innerHTML();
   const optionsBefore = correct ? null : await choices(page).evaluateAll(elements => elements.map(element => element.textContent));
+  const glyphsBefore = correct ? null : await choices(page).evaluateAll(elements => elements.map(element => [...element.querySelectorAll('svg')].map(svg => svg.outerHTML)));
   if (keyboard) await page.keyboard.press(String(index + 1));
   else await choices(page).nth(index).click();
   if (correct) {
@@ -96,6 +97,7 @@ async function answer(page, round, { correct = true, keyboard = false, reloadDur
       await page.getByRole('status').filter({ hasText: 'Not quite' }).waitFor();
     }
     assert.equal(await clue.innerHTML(), promptBefore, 'A mistake preserves the complete visual and accessible prompt without revealing the folding result.');
+    assert.deepEqual(await choices(page).evaluateAll(elements => elements.map(element => [...element.querySelectorAll('svg')].map(svg => svg.outerHTML))), glyphsBefore, 'A mistake never changes the pictured answer orientations.');
     assert.equal(await page.locator('[class*="teachingArea"]').count(), 0, 'A mistake never runs the solution animation.');
     assert.equal(await page.locator('[class*="missingItem"], [class*="extraItem"]').count(), 0, 'A mistake never adds or identifies correct-answer tokens.');
     assert.deepEqual(await choices(page).evaluateAll(elements => elements.map(element => element.textContent.replace(/×/g, ''))), optionsBefore, 'Only the cross is added; all answer content remains unchanged.');
@@ -289,6 +291,7 @@ test('all levels fit the phone and tablet breakpoints; Wizard preserves the hidd
   const clue = page.getByRole('region', { name: 'Labeled paper and folds', exact: true });
   const hidden = page.getByRole('img', { name: /^Find the hidden first fold\./ });
   await hidden.waitFor();
+  await page.getByText('After fold 1 · symbols shown upright', { exact: true }).waitFor();
   assert.match(await hidden.textContent(), /\?/);
   const hiddenDirection = foldDirectionLabel(wizard[0].folds[0]);
   assert.equal((await clue.textContent()).includes(hiddenDirection), false);
@@ -538,6 +541,78 @@ test('phone teaching remains in view through both folds and the next round', asy
     await assertFocused(next);
     await advance(page);
   }
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+
+function orientationTransforms(orientations) {
+  return orientations.map(({ flipX, flipY }) => `translate(32 32) scale(${flipX ? -1 : 1} ${flipY ? -1 : 1}) translate(-32 -32)`);
+}
+async function renderedOrientations(locator) {
+  return locator.locator('svg[class*="itemToken"]').evaluateAll(elements => elements.map(element => element.firstElementChild.getAttribute('transform')));
+}
+async function assertUnmarkedGlyphs(page) {
+  const marks = await page.locator('text[class*="glyphText"]').evaluateAll(elements => elements.flatMap(element =>
+    [...element.parentElement.children].filter(sibling => ['path', 'line'].includes(sibling.tagName.toLowerCase())).map(sibling => sibling.outerHTML)));
+  assert.deepEqual(marks, [], 'Alphanumeric glyphs have no baseline or ground marks in any view.');
+}
+
+test('Wizard answers preserve real glyph flips, including an orientation-only trap and read-only history', async () => {
+  const { context, page, errors } = await open({ width: 390, height: 900 });
+  await assertUnmarkedGlyphs(page);
+  await page.getByRole('button', { name: 'Campaign', exact: true }).click();
+  for (const [level, difficulty] of [['Starter', 'Easy'], ['Junior', 'Medium'], ['Expert', 'Hard']]) {
+    if (level !== 'Starter') await page.getByRole('button', { name: new RegExp(`^${level},`) }).click();
+    const round = levelRounds(difficulty)[0];
+    await waitForRound(page, round);
+    for (const [index, option] of round.options.entries()) {
+      assert.deepEqual(await renderedOrientations(choices(page).nth(index)), orientationTransforms(option.map(() => ({ flipX: false, flipY: false }))), `${level} answer glyphs stay upright.`);
+    }
+    await assertUnmarkedGlyphs(page);
+  }
+  await page.getByRole('button', { name: /^Wizard,/ }).click();
+  const round = levelRounds('Wizard')[0];
+  await waitForRound(page, round);
+  assert.equal(round.orientationMatters, true);
+  await page.getByText('After fold 1 · symbols shown upright', { exact: true }).waitFor();
+  const evidence = await renderedOrientations(page.locator('[class*="overlapClue"]'));
+  assert.deepEqual(evidence, orientationTransforms(Array.from({ length: 3 }, () => ({ flipX: false, flipY: false }))), 'The explicitly upright evidence preserves the hidden-fold challenge.');
+  await assertFits(page, '390px Wizard orientation evidence');
+  const orientationTrap = round.optionKinds.indexOf('orientation');
+  assert.ok(orientationTrap >= 0, 'Wizard has a same-items, same-order orientation trap.');
+  assert.deepEqual(round.options[orientationTrap], round.correctItems);
+  assert.notDeepEqual(round.optionOrientations[orientationTrap], round.correctOrientations);
+  for (const [index, orientations] of round.optionOrientations.entries()) {
+    assert.deepEqual(await renderedOrientations(choices(page).nth(index)), orientationTransforms(orientations));
+  }
+  assert.ok(round.correctOrientations.some(({ flipX, flipY }) => flipX || flipY));
+  await assertUnmarkedGlyphs(page);
+  await answer(page, round, { correct: false, keyboard: true, optionIndex: orientationTrap });
+  assert.equal(await score(page), 'First try score 0');
+  assert.equal(await page.getByRole('img', { name: /^Top to bottom:/ }).count(), 0, 'Wrong orientation does not reveal the correct stack.');
+  for (const [index, orientations] of round.optionOrientations.entries()) {
+    assert.deepEqual(await renderedOrientations(choices(page).nth(index)), orientationTransforms(orientations));
+  }
+  await answer(page, round, { keyboard: true });
+  const solved = page.getByRole('img', { name: `Top to bottom: ${describeAnswer(round, round.correctItems, round.correctOrientations)}`, exact: true });
+  assert.deepEqual(await renderedOrientations(solved), orientationTransforms(round.correctOrientations));
+  await assertUnmarkedGlyphs(page);
+  await page.screenshot({ path: resolve(shots, 'wizard-oriented-answer-phone.png'), fullPage: true });
+  await advance(page);
+  const marker = page.getByRole('button', { name: 'Wizard problem 1: incorrect; review problem', exact: true });
+  await marker.click();
+  const history = page.getByRole('heading', { name: 'Wizard · Problem 1', exact: true });
+  await assertFocused(history);
+  const correctHistory = page.getByRole('img', { name: `Correct stack: ${describeAnswer(round, round.correctItems, round.correctOrientations)}`, exact: true });
+  const wrongHistory = page.getByRole('img', { name: `Your first incorrect answer: ${describeAnswer(round, round.options[orientationTrap], round.optionOrientations[orientationTrap])}`, exact: true });
+  assert.deepEqual(await renderedOrientations(correctHistory), orientationTransforms(round.correctOrientations));
+  assert.deepEqual(await renderedOrientations(wrongHistory), orientationTransforms(round.optionOrientations[orientationTrap]));
+  assert.equal(await choices(page).count(), 0);
+  await assertUnmarkedGlyphs(page);
+  await page.getByRole('button', { name: 'Back to current problem', exact: true }).click();
+  await assertFocused(marker);
+  assert.equal(await score(page), 'First try score 0');
   assert.deepEqual(errors, []);
   await context.close();
 });

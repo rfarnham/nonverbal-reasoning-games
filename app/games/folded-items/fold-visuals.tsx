@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type CSSProperties, type Ref } from "react";
 import {
+  describeAnswer,
   describeItem,
   foldDirectionLabel,
   initialPaper,
@@ -10,6 +11,7 @@ import {
   type FoldInstruction,
   type FoldStep,
   type Item,
+  type ItemOrientation,
   type PaperState,
   type Round,
 } from "./game-engine";
@@ -22,10 +24,7 @@ type PaperSize = "sequencePaper" | "answerPaper" | "tutorialPaper" | "reviewPape
 /** The very same glyph is used on the sheet, in evidence, and in the choices. */
 function Glyph({ item }: { item: Item }) {
   if (item.kind !== "shape" || !item.shape) {
-    return <>
-      <text x="32" y="31" textAnchor="middle" dominantBaseline="central" className={styles.glyphText}>{item.label}</text>
-      <path d="M22 57 H42" stroke="#17213d" strokeWidth="2.8" strokeLinecap="round" />
-    </>;
+    return <text x="32" y="32" textAnchor="middle" dominantBaseline="central" className={styles.glyphText}>{item.label}</text>;
   }
   const { outline, mark } = item.shape;
   return <g stroke="#17213d" strokeWidth="3.5" fill="#fffdf8" strokeLinejoin="round">
@@ -43,8 +42,14 @@ function Glyph({ item }: { item: Item }) {
   </g>;
 }
 
-export function ItemToken({ item }: { item: Item }) {
-  return <svg className={styles.itemToken} viewBox="0 0 64 64" aria-hidden="true"><Glyph item={item} /></svg>;
+function orientationTransform(orientation?: ItemOrientation): string {
+  return `translate(32 32) scale(${orientation?.flipX ? -1 : 1} ${orientation?.flipY ? -1 : 1}) translate(-32 -32)`;
+}
+
+export function ItemToken({ item, orientation }: { item: Item; orientation?: ItemOrientation }) {
+  return <svg className={styles.itemToken} viewBox="0 0 64 64" aria-hidden="true">
+    <g transform={orientationTransform(orientation)}><Glyph item={item} /></g>
+  </svg>;
 }
 
 function movingCell(instruction: FoldInstruction, col: number, row: number): boolean {
@@ -55,8 +60,7 @@ function movingCell(instruction: FoldInstruction, col: number, row: number): boo
 }
 
 function orient(paper: PaperState, id: number): string {
-  const orientation = paper.orientations[id];
-  return `translate(32 32) scale(${orientation?.flipX ? -1 : 1} ${orientation?.flipY ? -1 : 1}) translate(-32 -32)`;
+  return orientationTransform(paper.orientations[id]);
 }
 
 function CellGlyph({ round, paper, stack, back = false, target = false }: {
@@ -93,8 +97,8 @@ export function PaperDiagram({ round, paper, size = "sequencePaper", target = fa
 }
 
 /** Ordered answers use a single vertical reading direction at every viewport. */
-export function ItemSet({ round, items, label, hidden = false }: {
-  round: Round; items: readonly number[]; label?: string; hidden?: boolean;
+export function ItemSet({ round, items, orientations, label, hidden = false }: {
+  round: Round; items: readonly number[]; orientations?: readonly ItemOrientation[]; label?: string; hidden?: boolean;
 }) {
   const ordered = round.answerMode === "ordered";
   return <div className={`${styles.itemSet} ${ordered ? styles.orderedSet : ""}`}
@@ -102,7 +106,7 @@ export function ItemSet({ round, items, label, hidden = false }: {
     {ordered ? <span className={styles.stackEndpoint} aria-hidden="true">Top</span> : null}
     <div className={styles.setItems} aria-hidden="true">
       {items.map((id, index) => <span className={`${styles.setItem} ${ordered && id === round.targetId ? styles.targetItem : ""}`} key={`${id}-${index}`}>
-        <ItemToken item={itemById(round, id)} />
+        <ItemToken item={itemById(round, id)} orientation={round.difficulty === "Wizard" ? orientations?.[index] : undefined} />
       </span>)}
     </div>
     {ordered ? <span className={styles.stackEndpoint} aria-hidden="true">Bottom</span> : null}
@@ -240,7 +244,7 @@ export function FoldSequence({ round, compact = false, reveal = false }: {
       </div>)}
     </div>
     {round.overlapClue && !reveal ? <div className={styles.overlapClue}>
-      <span className={styles.stepLabel}>After fold 1</span>
+      <span className={styles.stepLabel}>After fold 1 · symbols shown upright</span>
       <span className={styles.cluePair} role="img" aria-label={`${describeItem(round, round.overlapClue.aboveId)} is directly above ${describeItem(round, round.overlapClue.belowId)}.`}>
         <span>Top</span><ItemToken item={itemById(round, round.overlapClue.aboveId)} />
         <span aria-hidden="true">↓</span><ItemToken item={itemById(round, round.overlapClue.belowId)} /><span>Bottom</span>
@@ -301,7 +305,8 @@ export function FoldingPaper({ round, stageIndex, complete, inline = false }: {
       <div className={styles.finishedStack}>
         <span className={styles.stepLabel}>{round.answerMode === "ordered" ? "The whole stack" : "Stacked together"}</span>
         <ItemSet round={round} items={round.answerMode === "ordered" ? targetStack(round) : round.correctItems}
-          label={`${round.answerMode === "ordered" ? "Top to bottom" : "Stacked together"}: ${round.correctItems.map((id) => describeItem(round, id)).join(", ")}`} />
+          orientations={round.correctOrientations}
+          label={`${round.answerMode === "ordered" ? "Top to bottom" : "Stacked together"}: ${describeAnswer(round, round.correctItems, round.correctOrientations)}`} />
       </div>
     </div> : <AnimatedFold key={`${stageIndex}-${round.source.items.map((item) => item.label).join("-")}`} round={round} step={step} />}
   </div>;

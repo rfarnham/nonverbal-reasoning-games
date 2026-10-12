@@ -19,12 +19,13 @@ export type FoldStep = Readonly<{ index: number; instruction: FoldInstruction; d
 export type OverlapClue = Readonly<{ aboveId: number; belowId: number; stationaryId: number }>;
 export type ItemSet = readonly number[];
 export type AnswerMode = "group" | "ordered";
-export type OptionKind = "correct" | "opposite-sense" | "reverse-stack" | "layer-not-reversed" | "wrong-axis" | "wrong-crease" | "neighbor-stack" | "one-item-off" | "adjacent-layers";
+export type OptionKind = "correct" | "opposite-sense" | "reverse-stack" | "layer-not-reversed" | "wrong-axis" | "wrong-crease" | "neighbor-stack" | "one-item-off" | "adjacent-layers" | "orientation";
 export type Round = Readonly<{
-  difficulty: Difficulty; answerMode: AnswerMode; source: Source;
+  difficulty: Difficulty; answerMode: AnswerMode; orientationMatters: boolean; source: Source;
   folds: readonly FoldInstruction[]; foldSteps: readonly FoldStep[];
   hiddenFoldIndex: null | 0; overlapClue: OverlapClue | null;
   targetId: number; correctItems: ItemSet; options: readonly ItemSet[];
+  correctOrientations: readonly ItemOrientation[]; optionOrientations: readonly (readonly ItemOrientation[])[];
   optionKinds: readonly OptionKind[]; correctIndex: number;
 }>;
 export type AuthoredFoldedItemsRoundSpec = Readonly<{
@@ -124,6 +125,50 @@ export function itemById(round: Pick<Round, "source">, id: number): Item {
   return item;
 }
 export function describeItem(round: Pick<Round, "source">, id: number): string { return itemById(round, id).label; }
+export const UPRIGHT: ItemOrientation = Object.freeze({ flipX: false, flipY: false });
+export const ITEM_ORIENTATIONS: readonly ItemOrientation[] = [UPRIGHT, { flipX: true, flipY: false }, { flipX: false, flipY: true }, { flipX: true, flipY: true }];
+
+// Conservative equivalence classes for unmarked upright sans-serif glyphs.
+// Small font differences never justify a trap: visually symmetric reflections
+// collapse, as do the conventional M/W and turned 6/9 identity ambiguities.
+// Q tails and the vertical asymmetry of G are too small to serve as traps.
+// A horizontal reflection also reverses the order of a multi-digit label.
+function glyphVisualKey(glyph: string, orientation: ItemOrientation): string {
+  let x = orientation.flipX, y = orientation.flipY;
+  let root = glyph;
+  if (root === "W") { root = "M"; y = !y; }
+  if (root === "9") { root = "6"; x = !x; y = !y; }
+  if ("HIOXQ018".includes(root)) { x = false; y = false; }
+  else if ("AMTUVY".includes(root)) x = false;
+  else if ("BCDEKG3".includes(root)) y = false;
+  else if ("NSZ".includes(root)) { x = x !== y; y = false; }
+  return `${root}:${Number(x)}${Number(y)}`;
+}
+export function visualItemKey(item: Item, orientation: ItemOrientation = UPRIGHT): string {
+  if (item.kind === "shape") {
+    const shape = item.shape;
+    return `shape:${shape?.outline}:${shape?.mark}:${shape?.outline === "triangle" && orientation.flipY ? "down" : "up"}`;
+  }
+  const glyphs = [...item.label];
+  if (orientation.flipX) glyphs.reverse();
+  return `${item.kind}:${glyphs.map((glyph) => glyphVisualKey(glyph, orientation)).join("/")}`;
+}
+export function visualAnswerKey(round: Pick<Round, "source" | "answerMode" | "orientationMatters">, items: ItemSet, orientations: readonly ItemOrientation[] = []): string {
+  const tokens = items.map((id, index) => visualItemKey(itemById(round, id), round.orientationMatters ? orientations[index] ?? UPRIGHT : UPRIGHT));
+  return JSON.stringify(round.answerMode === "group" ? tokens.sort() : tokens);
+}
+export function describeOrientedItem(round: Pick<Round, "source">, id: number, orientation: ItemOrientation = UPRIGHT): string {
+  const item = itemById(round, id);
+  const key = visualItemKey(item, orientation);
+  const visible = ITEM_ORIENTATIONS.find((candidate) => visualItemKey(item, candidate) === key)!;
+  const change = visible.flipX && visible.flipY ? "turned 180 degrees" : visible.flipX ? "mirrored left to right" : visible.flipY ? "flipped top to bottom" : "";
+  return change ? `${item.label} (${change})` : item.label;
+}
+export function describeAnswer(round: Pick<Round, "source" | "orientationMatters">, items: ItemSet, orientations: readonly ItemOrientation[] = []): string {
+  return items.map((id, index) => describeOrientedItem(round, id, round.orientationMatters ? orientations[index] ?? UPRIGHT : UPRIGHT)).join(", ");
+}
+function orientationChanged(item: Item, orientation: ItemOrientation): boolean { return visualItemKey(item, orientation) !== visualItemKey(item, UPRIGHT); }
+
 function makeItem(id: number, style: ItemStyle, numberOffset: number): Item {
   if (style === "letters") return { id, kind: "letter", label: String.fromCharCode(65 + id) };
   if (style === "numbers") return { id, kind: "number", label: String(numberOffset + id) };
@@ -132,24 +177,37 @@ function makeItem(id: number, style: ItemStyle, numberOffset: number): Item {
 }
 function appearanceKey(item: Item): string { return item.kind === "shape" ? `shape:${item.shape?.outline}:${item.shape?.mark}` : `${item.kind}:${item.label}`; }
 function answerFromStack(stack: ItemSet, targetId: number, answerMode: AnswerMode): ItemSet { return answerMode === "ordered" ? [...stack] : stack.filter((id) => id !== targetId).sort((a, b) => a - b); }
-type CoreRound = Omit<Round, "options" | "optionKinds" | "correctIndex">;
-type Candidate = Readonly<{ items: ItemSet; kind: OptionKind }>;
+type CoreRound = Omit<Round, "options" | "optionKinds" | "optionOrientations" | "correctIndex">;
+type Candidate = Readonly<{ items: ItemSet; orientations: readonly ItemOrientation[]; kind: OptionKind }>;
 /** Traps are executable misconception programs or a single explicit local error. */
 function misconceptionCandidates(round: CoreRound): Candidate[] {
   const result: Candidate[] = [];
-  const add = (stack: ItemSet, kind: OptionKind, isAnswer = false) => {
+  const finalOrientations = round.foldSteps.at(-1)!.after.orientations;
+  const add = (stack: ItemSet, kind: OptionKind, isAnswer = false, paperOrientations = finalOrientations, explicitOrientations?: readonly ItemOrientation[]) => {
     const items = isAnswer ? [...stack] : answerFromStack(stack, round.targetId, round.answerMode);
-    if (items.length !== round.correctItems.length || new Set(items).size !== items.length || (round.answerMode === "ordered" ? !items.includes(round.targetId) : items.includes(round.targetId)) || patternsEqual(items, round.correctItems, round.answerMode) || result.some((candidate) => patternsEqual(items, candidate.items, round.answerMode))) return;
-    result.push({ items, kind });
+    const orientations = explicitOrientations ?? items.map((id) => round.orientationMatters ? paperOrientations[id] : UPRIGHT);
+    const key = visualAnswerKey(round, items, orientations);
+    if (items.length !== round.correctItems.length || new Set(items).size !== items.length || (round.answerMode === "ordered" ? !items.includes(round.targetId) : items.includes(round.targetId)) || key === visualAnswerKey(round, round.correctItems, round.correctOrientations) || result.some((candidate) => visualAnswerKey(round, candidate.items, candidate.orientations) === key)) return;
+    result.push({ items, orientations, kind });
   };
   const fromProgram = (folds: readonly FoldInstruction[], kind: OptionKind, unturnedStep = -1) => {
     try {
       let state = initialPaper(round.source);
       for (const [index, fold] of folds.entries()) state = applyFold(state, fold, index !== unturnedStep);
       const stack = state.stacks.find((items) => items.includes(round.targetId));
-      if (stack) add(stack, kind);
+      if (stack) add(stack, kind, false, state.orientations);
     } catch { /* A mistaken crease may be outside the newly folded paper. */ }
   };
+  if (round.orientationMatters) {
+    for (const [index, id] of round.correctItems.entries()) {
+      const actual = round.correctOrientations[index];
+      // Forget a visible turn of one actual layer. Do not penalize no-op
+      // reflections or distinguish symbols solely by their hidden identity.
+      if (!orientationChanged(itemById(round, id), actual)) continue;
+      const orientations = round.correctOrientations.map((orientation, slot) => slot === index ? UPRIGHT : orientation);
+      add(round.correctItems, "orientation", true, finalOrientations, orientations);
+    }
+  }
   if (round.answerMode === "ordered") {
     for (let index = round.folds.length - 1; index >= 0; index -= 1) fromProgram(round.folds.map((fold, other) => other === index ? { ...fold, sense: fold.sense === "over" ? "under" : "over" } : fold), "opposite-sense");
     for (let index = 1; index < round.folds.length; index += 1) fromProgram(round.folds, "layer-not-reversed", index);
@@ -180,14 +238,18 @@ function misconceptionCandidates(round: CoreRound): Candidate[] {
   }
   return result;
 }
-function buildOptions(round: CoreRound, correctIndex: number, salt: number): Pick<Round, "options" | "optionKinds"> {
+function buildOptions(round: CoreRound, correctIndex: number, salt: number): Pick<Round, "options" | "optionKinds" | "optionOrientations"> {
   const candidates = misconceptionCandidates(round);
   const chosen: Candidate[] = [];
   const minimum = round.answerMode === "group" || round.difficulty === "Medium" ? 2 : 1;
   const add = (candidate: Candidate | undefined) => {
-    if (!candidate || chosen.includes(candidate) || ![round.correctItems, ...chosen.map(({ items }) => items)].every((items) => patternDifference(candidate.items, items, round.answerMode).total >= minimum)) return;
+    if (!candidate || chosen.includes(candidate)) return;
+    if (round.orientationMatters) {
+      if ([{ items: round.correctItems, orientations: round.correctOrientations }, ...chosen].some((other) => visualAnswerKey(round, candidate.items, candidate.orientations) === visualAnswerKey(round, other.items, other.orientations))) return;
+    } else if (![round.correctItems, ...chosen.map(({ items }) => items)].every((items) => patternDifference(candidate.items, items, round.answerMode).total >= minimum)) return;
     chosen.push(candidate);
   };
+  if (round.orientationMatters) add(candidates.find(({ kind }) => kind === "orientation"));
   if (round.answerMode === "ordered") {
     add(candidates.find(({ kind }) => kind === "opposite-sense"));
     add(candidates.find(({ kind }) => kind === "layer-not-reversed"));
@@ -197,12 +259,12 @@ function buildOptions(round: CoreRound, correctIndex: number, salt: number): Pic
   }
   for (const candidate of candidates.slice(salt % Math.max(1, Math.min(3, candidates.length))).concat(candidates)) { if (chosen.length === 3) break; add(candidate); }
   if (chosen.length !== 3) throw new Error("Cannot build three distinct meaningful fold misconceptions.");
-  const options: ItemSet[] = []; const optionKinds: OptionKind[] = [];
+  const options: ItemSet[] = []; const optionKinds: OptionKind[] = []; const optionOrientations: ItemOrientation[][] = [];
   for (let index = 0; index < 4; index += 1) {
-    const candidate = index === correctIndex ? { items: round.correctItems, kind: "correct" as const } : chosen.shift()!;
-    options.push(candidate.items); optionKinds.push(candidate.kind);
+    const candidate = index === correctIndex ? { items: round.correctItems, orientations: round.correctOrientations, kind: "correct" as const } : chosen.shift()!;
+    options.push(candidate.items); optionKinds.push(candidate.kind); optionOrientations.push([...candidate.orientations]);
   }
-  return { options, optionKinds };
+  return { options, optionKinds, optionOrientations };
 }
 export function matchingFirstFolds(round: Pick<Round, "source" | "folds" | "overlapClue">): readonly FoldInstruction[] {
   if (!round.overlapClue) return [];
@@ -247,7 +309,11 @@ export function buildAuthoredFoldedItemsRound(spec: AuthoredFoldedItemsRoundSpec
     if (stationaryId === undefined) throw new Error("Wizard evidence requires a stationary item.");
     overlapClue = { aboveId: clueStack[0], belowId: clueStack[1], stationaryId };
   }
-  const core: CoreRound = { difficulty: spec.difficulty, answerMode, source, folds: spec.folds.map((fold) => ({ ...fold })), foldSteps: steps, hiddenFoldIndex: spec.difficulty === "Wizard" ? 0 : null, overlapClue, targetId, correctItems: answerFromStack(targetItems, targetId, answerMode) };
+  const orientationMatters = spec.difficulty === "Wizard";
+  const correctItems = answerFromStack(targetItems, targetId, answerMode);
+  const correctOrientations = correctItems.map((id) => orientationMatters ? final.orientations[id] : UPRIGHT);
+  if (orientationMatters && !correctItems.some((id, index) => orientationChanged(itemById({ source }, id), correctOrientations[index]))) throw new Error("Wizard requires a visibly transformed answer item.");
+  const core: CoreRound = { difficulty: spec.difficulty, answerMode, orientationMatters, correctOrientations, source, folds: spec.folds.map((fold) => ({ ...fold })), foldSteps: steps, hiddenFoldIndex: spec.difficulty === "Wizard" ? 0 : null, overlapClue, targetId, correctItems };
   const round: Round = { ...core, ...buildOptions(core, spec.correctIndex, spec.distractorSalt), correctIndex: spec.correctIndex };
   const errors = validateRound(round);
   if (errors.length) throw new Error(`Invalid folded-items round: ${errors.join("; ")}`);
@@ -271,31 +337,46 @@ export function validateRound(round: Round): string[] {
     if (round.source.rows !== dimension || round.source.cols !== dimension || round.folds.length !== 2 || round.answerMode !== "ordered") errors.push("Junior requires 4×4 and Expert/Wizard require 5×5 paper with two ordered folds.");
     if (round.difficulty === "Medium" && round.folds.length === 2 && (foldAxis(round.folds[0].direction) === foldAxis(round.folds[1].direction) || round.folds.some(({ crease }) => crease !== 2))) errors.push("Junior uses two centered perpendicular folds.");
   }
+  if (round.orientationMatters !== (round.difficulty === "Wizard")) errors.push("Only Wizard answers use folded orientations.");
   let expected: ItemSet = [];
+  let expectedOrientations: readonly ItemOrientation[] = [];
+  const validOrientation = (value: ItemOrientation | undefined) => value && typeof value.flipX === "boolean" && typeof value.flipY === "boolean";
   try {
     const steps = foldSteps(round.source, round.folds);
     if (JSON.stringify(steps) !== JSON.stringify(round.foldSteps)) errors.push("Fold stages must be calculated from the source paper.");
     const stack = targetStack(round);
     if (stack.length !== (round.difficulty === "Easy" ? 2 : 4)) errors.push("Target must form a two-item Starter pair or a four-layer ordered stack.");
     expected = answerFromStack(stack, round.targetId, round.answerMode);
+    expectedOrientations = expected.map((id) => round.orientationMatters ? steps.at(-1)!.after.orientations[id] : UPRIGHT);
+    if (JSON.stringify(round.correctOrientations) !== JSON.stringify(expectedOrientations)) errors.push("Correct orientations must be calculated from the folded paper.");
     if (!patternsEqual(round.correctItems, expected, round.answerMode)) errors.push("The correct items must be calculated from the target stack in the required order.");
   } catch (error) { errors.push(error instanceof Error ? error.message : "Invalid paper state."); }
-  if (round.options.length !== 4 || round.optionKinds.length !== 4) errors.push("Exactly four options and labels are required.");
+  if (round.options.length !== 4 || round.optionKinds.length !== 4 || (!Array.isArray(round.optionOrientations) || round.optionOrientations.length !== 4)) errors.push("Exactly four options and labels are required.");
   if (!Number.isInteger(round.correctIndex) || round.correctIndex < 0 || round.correctIndex > 3) errors.push("Invalid correct answer position.");
-  const exact = round.options.flatMap((option, index) => patternsEqual(option, expected, round.answerMode) ? [index] : []);
+  const key = (items: ItemSet, orientations: readonly ItemOrientation[] = []) => {
+    try { return visualAnswerKey(round, items, orientations); } catch { return "invalid"; }
+  };
+  const exact = round.options.flatMap((option, index) => key(option, round.optionOrientations?.[index]) === key(expected, expectedOrientations) ? [index] : []);
   if (exact.length !== 1 || exact[0] !== round.correctIndex) errors.push("Exactly one option must equal the calculated answer.");
-  if (new Set(round.options.map((option) => answerKey(option, round.answerMode))).size !== 4) errors.push("All four options must be distinct.");
+  if (new Set(round.options.map((option, index) => key(option, round.optionOrientations?.[index]))).size !== 4) errors.push("All four options must be distinct.");
   const sourceIds = new Set(round.source.items.map(({ id }) => id));
   let candidates: Candidate[] = [];
   try { candidates = misconceptionCandidates(round); } catch { errors.push("Cannot verify misconception programs."); }
   for (const [index, option] of round.options.entries()) {
     if (option.length !== expected.length || new Set(option).size !== option.length || option.some((id) => !sourceIds.has(id)) || (round.answerMode === "ordered" ? !option.includes(round.targetId) : option.includes(round.targetId))) errors.push(`Option ${index + 1} must contain distinct source items in the required answer mode.`);
+    const rawOrientations = round.optionOrientations?.[index];
+    const orientations = Array.isArray(rawOrientations) ? rawOrientations : [];
+    if (!Array.isArray(rawOrientations) || orientations.length !== option.length || !Array.from(orientations).every(validOrientation)) errors.push("Every option needs one valid orientation per item.");
+    if (!round.orientationMatters && orientations.some((orientation) => validOrientation(orientation) && (orientation.flipX || orientation.flipY))) errors.push("Starter, Junior and Expert choices stay upright.");
     if ((round.optionKinds[index] === "correct") !== (index === round.correctIndex)) errors.push("Option-kind labels must identify the calculated answer.");
-    if (index !== round.correctIndex && !candidates.some((candidate) => candidate.kind === round.optionKinds[index] && patternsEqual(candidate.items, option, round.answerMode))) errors.push("Distractors must follow an executable fold misconception or local error.");
-    for (let other = 0; other < index; other += 1) if (patternDifference(option, round.options[other], round.answerMode).total < (round.answerMode === "group" || round.difficulty === "Medium" ? 2 : 1)) errors.push("Option positions must differ clearly at this difficulty.");
+    if (index !== round.correctIndex && !candidates.some((candidate) => candidate.kind === round.optionKinds[index] && key(candidate.items, candidate.orientations) === key(option, orientations))) errors.push("Distractors must follow an executable fold misconception or local error.");
+    for (let other = 0; !round.orientationMatters && other < index; other += 1) if (patternDifference(option, round.options[other], round.answerMode).total < (round.answerMode === "group" || round.difficulty === "Medium" ? 2 : 1)) errors.push("Option positions must differ clearly at this difficulty.");
   }
   if (round.answerMode === "ordered" && !round.optionKinds.includes("opposite-sense")) errors.push("Ordered rounds must test an opposite over/under sense.");
   if (round.difficulty === "Wizard") {
+    if (!expected.some((id, index) => orientationChanged(itemById(round, id), expectedOrientations[index] ?? UPRIGHT))) errors.push("Wizard requires a visibly transformed answer item.");
+    const orientationTrap = round.options.some((option, index) => round.optionKinds[index] === "orientation" && patternsEqual(option, expected) && key(option, round.optionOrientations?.[index]) !== key(expected, expectedOrientations));
+    if (!orientationTrap) errors.push("Wizard requires a visible orientation-only misconception with the same items and layer order.");
     if (round.hiddenFoldIndex !== 0 || !round.overlapClue) errors.push("Wizard hides the first fold and supplies ordered and stationary evidence.");
     if (round.overlapClue && expected.some((id) => id === round.overlapClue!.aboveId || id === round.overlapClue!.belowId)) errors.push("Wizard evidence must not expose a target overlap.");
     const matches = matchingFirstFolds(round);
@@ -306,7 +387,7 @@ export function validateRound(round: Round): string[] {
 export function roundFingerprint(round: Round): string {
   const identity = (id: number) => appearanceKey(itemById(round, id));
   const final = round.foldSteps.at(-1)!.after;
-  return JSON.stringify({ dimensions: [round.source.rows, round.source.cols], source: round.source.items.map(appearanceKey), target: identity(round.targetId), mode: round.answerMode, effect: final.stacks.map((stack) => round.answerMode === "group" ? stack.map(identity).sort() : stack.map(identity)), hidden: round.hiddenFoldIndex, evidence: round.overlapClue ? [identity(round.overlapClue.aboveId), identity(round.overlapClue.belowId), identity(round.overlapClue.stationaryId)] : null });
+  return JSON.stringify({ dimensions: [round.source.rows, round.source.cols], source: round.source.items.map(appearanceKey), target: identity(round.targetId), mode: round.answerMode, orientationMatters: round.orientationMatters, orientations: round.orientationMatters ? final.stacks.map((stack) => stack.map((id) => visualItemKey(itemById(round, id), final.orientations[id]))) : undefined, effect: final.stacks.map((stack) => round.answerMode === "group" ? stack.map(identity).sort() : stack.map(identity)), hidden: round.hiddenFoldIndex, evidence: round.overlapClue ? [identity(round.overlapClue.aboveId), identity(round.overlapClue.belowId), identity(round.overlapClue.stationaryId)] : null });
 }
 export function buildAuthoredFoldedItemsRounds(specs: readonly AuthoredFoldedItemsRoundSpec[], label = "Folded Items"): readonly Round[] {
   const fingerprints = new Set<string>();
@@ -335,6 +416,20 @@ export function generateInfiniteRound(difficulty: Difficulty, random: RandomSour
     const final = foldSteps(dummySource, program.folds).at(-1)!.after;
     const targetCells = final.stacks.flatMap((stack, index) => stack.length === (difficulty === "Easy" ? 2 : 4) ? [index] : []);
     const spec = { ...program, itemStyle, itemOrder, targetCell: targetCells[randomInteger(random, targetCells.length)], targetDepth: randomInteger(random, difficulty === "Easy" ? 2 : 4), correctIndex: randomInteger(random, 4), distractorSalt: randomInteger(random, 10000), numberOffset: 1 + randomInteger(random, 24) };
+    if (difficulty === "Wizard") {
+      const target = final.stacks[spec.targetCell];
+      const visibleTurn = target.some((id) => orientationChanged(makeItem(id, itemStyle, spec.numberOffset), final.orientations[id]));
+      if (!visibleTurn) {
+        // Construct a perceptible challenge even with constant/randomly hostile
+        // input: place an asymmetric identity on an actually turning layer.
+        const position = target.find((id) => itemOrder.some((candidate) => !target.includes(candidate) && orientationChanged(makeItem(candidate, itemStyle, spec.numberOffset), final.orientations[id])))!;
+        const replacement = itemOrder.find((id) => !target.includes(id) && orientationChanged(makeItem(id, itemStyle, spec.numberOffset), final.orientations[position]));
+        if (replacement !== undefined) {
+          const first = itemOrder.indexOf(position), second = itemOrder.indexOf(replacement);
+          [itemOrder[first], itemOrder[second]] = [itemOrder[second], itemOrder[first]];
+        }
+      }
+    }
     // Random-source validation happens above this boundary. Candidate rejection
     // stays bounded and must never release an invalid or repeated round.
     try {

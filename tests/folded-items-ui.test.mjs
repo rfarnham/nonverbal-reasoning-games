@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import test from "node:test";
 import vm from "node:vm";
 import ts from "typescript";
 
 import { incorrectFeedback } from "../app/games/folded-items/feedback.ts";
 import { canOpenHistoricalReview } from "../app/games/folded-items/historical-review.ts";
+import * as engine from "../app/games/folded-items/game-engine.ts";
 import { ROUNDS, roundFingerprint, validateRound } from "../app/games/folded-items/game-engine.ts";
 import { progressionAdapter } from "../app/games/folded-items/progression-adapter.ts";
 import {
@@ -123,20 +127,20 @@ test("Wizard feedback gives no answer-dependent information about order, items, 
     assert.equal(incorrectFeedback(wizard, optionIndex), expected);
     assert.equal(incorrectFeedback({ ...wizard, correctItems: [101, 102, 103, 104] }, optionIndex), expected);
   }
-  assert.doesNotMatch(expected, /left|right|\bup\b|\bdown\b|under|over|reverse|missing|extra|order|\d/i);
+  assert.doesNotMatch(expected, /left|right|\bup\b|\bdown\b|under|over|reverse|missing|extra|order|mirror|flip|upright|orientation|\d/i);
 });
 
-test("version-one Journey references recover to validated version-two content without reinterpreting the old generator", () => {
+test("legacy Journey references recover to validated oriented content without reinterpreting an old generator", () => {
   for (const [currentRef, resolution] of [
     [campaignQuestionReferences(progressionAdapter, "junior")[0], "campaign-updated"],
     [journeyQuestionReferences(progressionAdapter, "expert-2")[0], "journey-updated"],
-  ]) {
-    const legacy = Object.freeze({ ...currentRef, contentVersion: "1", fingerprint: "legacy-unordered-paper" });
+  ]) for (const contentVersion of ["1", "2"]) {
+    const legacy = Object.freeze({ ...currentRef, contentVersion, fingerprint: "legacy-unordered-paper" });
     const before = JSON.stringify(legacy);
     const resolved = resolveProgressionQuestion(progressionAdapter, legacy);
     assert.equal(resolved.resolution, resolution);
     assert.equal(resolved.migrated, true);
-    assert.equal(resolved.ref.contentVersion, "2");
+    assert.equal(resolved.ref.contentVersion, "3");
     assert.equal(resolved.ref.questionIndex, currentRef.questionIndex);
     assert.equal(resolved.round.answerMode, "ordered");
     assert.deepEqual(validateRound(resolved.round), []);
@@ -144,13 +148,76 @@ test("version-one Journey references recover to validated version-two content wi
     assert.equal(JSON.stringify(legacy), before, "the saved reference is not mutated in place");
   }
   const generated = createFreshGeneratedQuestion(progressionAdapter, { level: "wizard", seedBase: "folded-items-legacy-test" });
-  const legacy = Object.freeze({ ...generated.ref, generatorVersion: "1", fingerprint: "legacy-unordered-generated" });
+  for (const generatorVersion of ["1", "2"]) {
+  const legacy = Object.freeze({ ...generated.ref, generatorVersion, fingerprint: "legacy-unordered-generated" });
   const recovered = resolveProgressionQuestion(progressionAdapter, legacy);
   assert.equal(recovered.resolution, "generated-fallback");
   assert.equal(recovered.ref.source, "campaign");
-  assert.equal(recovered.ref.contentVersion, "2");
+  assert.equal(recovered.ref.contentVersion, "3");
   assert.equal(recovered.round.difficulty, "Wizard");
   assert.deepEqual(validateRound(recovered.round), []);
   const next = resolveProgressionQuestion(progressionAdapter, legacy, { excludedFingerprints: new Set([recovered.fingerprint]) });
   assert.notEqual(next.fingerprint, recovered.fingerprint, "recovery respects already-used puzzle exclusions");
+  }
+});
+
+
+// Render the real TSX rather than duplicate its geometry in test fixtures.
+const require = createRequire(import.meta.url);
+const visualSource = await readFile(new URL("../app/games/folded-items/fold-visuals.tsx", import.meta.url), "utf8");
+const visualCode = ts.transpileModule(visualSource, {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+}).outputText;
+const visualExports = {};
+vm.runInNewContext(visualCode, {
+  exports: visualExports,
+  require: (name) => name === "./game-engine" ? engine
+    : name.endsWith(".module.css") ? { default: new Proxy({}, { get: (_, key) => key }) }
+      : require(name),
+});
+function renderVisual(component, props) { return renderToStaticMarkup(createElement(visualExports[component], props)); }
+function transforms(markup) {
+  return [...markup.matchAll(/translate\(32 32\) scale\((-?1) (-?1)\) translate\(-32 -32\)/g)]
+    .map(([, x, y]) => ({ flipX: x === "-1", flipY: y === "-1" }));
+}
+
+test("all alphanumeric tokens are plain unmarked glyphs in the actual renderer", () => {
+  const items = new Map(ROUNDS.flatMap(({ source }) => source.items)
+    .filter(({ kind }) => kind !== "shape").map(item => [`${item.kind}:${item.label}`, item]));
+  for (const item of items.values()) {
+    for (const orientation of [{ flipX: false, flipY: false }, { flipX: true, flipY: true }]) {
+      const markup = renderVisual("ItemToken", { item, orientation });
+      assert.equal((markup.match(/<text\b/g) ?? []).length, 1);
+      assert.doesNotMatch(markup, /<(?:path|line|rect|circle)\b/, `${item.label} has no ground or baseline mark`);
+      assert.deepEqual(transforms(markup), [orientation]);
+    }
+  }
+});
+
+test("Wizard answer glyphs use real computed transforms while earlier levels stay upright", () => {
+  for (const difficulty of ["Easy", "Medium", "Hard", "Wizard"]) {
+    const round = ROUNDS.find(candidate => candidate.difficulty === difficulty);
+    for (const [index, items] of round.options.entries()) {
+      const orientations = difficulty === "Wizard" ? round.optionOrientations[index]
+        : items.map(() => ({ flipX: true, flipY: true }));
+      const markup = renderVisual("ItemSet", { round, items, orientations, hidden: true });
+      const expected = difficulty === "Wizard" ? orientations
+        : items.map(() => ({ flipX: false, flipY: false }));
+      assert.deepEqual(transforms(markup), expected);
+    }
+  }
+});
+
+test("an orientation-only Wizard trap changes the rendered glyph without changing items or leaking feedback", () => {
+  for (const round of ROUNDS.filter(candidate => candidate.difficulty === "Wizard")) {
+    const trap = round.optionKinds.indexOf("orientation");
+    assert.ok(trap >= 0);
+    assert.deepEqual(round.options[trap], round.correctItems);
+    const correctMarkup = renderVisual("ItemSet", { round, items: round.correctItems, orientations: round.correctOrientations });
+    const trapMarkup = renderVisual("ItemSet", { round, items: round.options[trap], orientations: round.optionOrientations[trap] });
+    assert.notEqual(trapMarkup, correctMarkup);
+    assert.notEqual(engine.visualAnswerKey(round, round.options[trap], round.optionOrientations[trap]),
+      engine.visualAnswerKey(round, round.correctItems, round.correctOrientations), "the changed transform is perceptible after accounting for glyph symmetry");
+    assert.equal(incorrectFeedback(round, trap), incorrectFeedback(round, (trap + 1) % 4));
+  }
 });

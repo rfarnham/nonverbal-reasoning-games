@@ -1,6 +1,7 @@
 # Folded Items design and mechanics audit
 
-Audited against `AGENTS.md` and the owner's October 12, 2026 feedback.
+Audited against `AGENTS.md` and the owner's October 12, 2026 feedback, including
+the follow-up removing baseline marks and making glyph orientation part of Wizard.
 The photograph is a visual reference for legible folds; it is not an independent
 source of product instructions.
 
@@ -16,7 +17,8 @@ source of product instructions.
 | Traps | Advanced alternatives changed item membership but did not test the handedness of a fold. | Validate distinct alternatives from mistaken layer order, over/under placement, and spatial grouping. Use generous distinctions at Starter and Junior and closer mistakes at Expert and Wizard. |
 | Wizard evidence | The hidden-fold catalogue described only the four directions of an underneath fold. | Prove uniqueness across the full legal direction, crease, and over/under catalogue. Evidence must exclude the target stack so it does not supply the answer. Wrong feedback must be identical across Wizard options. |
 | Pictures | Many similar flowers required counting small petal details. | Use flat geometric shapes with simple marks that remain distinct without color. |
-| Rotated labels | Actual folding can make 6/9 and M/W look alike after two perpendicular turns. | Give every alphanumeric token a small baseline that moves with the label, preserving its original reading orientation. |
+| Rotated labels | Baseline marks add visual noise; some unmarked glyphs are symmetric or resemble another item after turning. | Keep letters and numbers unmarked. Wizard answers retain their real folded orientation; earlier-level answers stay upright. Normalize visual symmetries and cross-item aliases before accepting a supposedly different answer. |
+| Wizard orientation | All answer tokens were rendered upright, discarding the mirrored or flipped result of folding. | Compare both ordered identities and the displayed final glyphs. Include a visibly different orientation-only trap with the exact correct identities and order; retain those transforms in solved and historical views. |
 | Generator failure | A bounded failure was described as using every available puzzle. | Catch failure, try bounded deterministic recovery, use an unused authored puzzle at the requested difficulty, then offer results if no fresh puzzle can be prepared. |
 
 ## Session audit
@@ -63,7 +65,22 @@ layer positions and never rely on a style-only distinction.
 A wrong-answer comparison normally highlights missing components in the suite.
 Here it would reveal the solution, so the owner's no-reveal requirement uses a
 concise membership/order diagnosis instead. Wizard receives only a generic
-mismatch that preserves its hidden-fold challenge.
+mismatch that preserves its hidden-fold and glyph-orientation challenge. It must
+not identify an orientation error, restore glyphs upright, or display the correct
+stack after an incorrect choice.
+
+The follow-up explicitly removes baseline and ground marks. No substitute marks
+are added to answer tokens. A flip is a real difficulty feature only when it
+changes the visible glyph: a horizontally mirrored triangle is unchanged, and
+centered circle/square/diamond/hexagon shapes with symmetric marks do not encode
+facing. Letter and number equivalences such as M/W and 6/9 also require
+normalization. These are validation cases, not errors the player should detect
+through tiny font differences.
+
+Wizard’s overlap evidence is explicitly captioned **symbols shown upright**.
+It communicates identities and layer order without silently exposing the hidden
+fold through glyph facing. The actual answer and solved teaching sequence retain
+the computed orientations.
 
 ## Verification record
 
@@ -76,26 +93,28 @@ The dedicated checks are:
   compact versioned references, deterministic replay, and generic discovery.
 - `tests/folded-items-ui.test.mjs`: actual runtime recovery from generator
   exhaustion, immutable historical-review eligibility, nonspoiling feedback,
-  answer-independent Wizard feedback, and safe version-one reference recovery
-  to the revised canonical content.
+  answer-independent Wizard feedback, and safe version-one/two reference recovery
+  to version-three content. The actual TSX renderer is also exercised
+  for unmarked alphanumeric glyphs, Wizard transforms, upright earlier tiers,
+  and perceptible orientation-only traps.
 - `tests/browser/folded-items.test.mjs`: first-attempt immutability, history focus,
   checkpoint/redemption, Infinite promotion and combo, Journey reload/award
   behavior, native keyboard exclusions, wrong-answer non-disclosure at every
   level in both motion preferences, normal fold motion, sound persistence,
   and 390/620/820px layouts. A native-click regression keeps both animated folds
-  in the phone viewport across consecutive rounds.
+  in the phone viewport across consecutive rounds. Wizard checks preserve each
+  transformed choice through incorrect feedback, the solved view, and historical
+  inspection of both the correct answer and the first incorrect answer.
 
-Local verification on October 12, 2026:
+Preliminary orientation follow-up verification on October 12, 2026:
 
-- Seven UI boundary/feedback/migration tests passed.
-- All eight dedicated browser scenarios passed against the final GitHub Pages
-  static export in installed Chrome, including the latest Journey integration.
-- Browser checks covered normal and reduced motion, 390/620/820px layouts,
-  keyboard and pointer answering, hidden Wizard evidence, all 25 distinct shape
-  glyphs, a Journey reload during incorrect feedback, completed-round reload,
-  immutable first-attempt history, redemption, and a single XP claim.
-- Full `npm run check` passed after integrating the latest `main`: lint,
-  TypeScript, Pages export, 1,165 JavaScript tests (8 existing skips), 174 Python
-  tests, and 10 search-build tests, using the unchanged production build
-  configuration.
-- Production deployment is verified separately by the delivery task.
+- All ten UI, actual-renderer, feedback, and legacy-reference tests passed.
+- The full repository check passed before integrating the newer `main`: 1,172
+  JavaScript tests (8 existing skips), 174 Python tests, and 10 search-build tests,
+  plus lint, TypeScript, and the Pages export.
+- Seven of nine browser scenarios passed in that export. Both Wizard scenarios
+  stopped at the new **symbols shown upright** caption, which was present in
+  source but absent from the inspected export. They must pass against the rebuilt
+  final revision; this preliminary result does not certify Wizard orientation.
+- Final repository and browser verification after integrating the newer `main`,
+  followed by production deployment, remain release gates for the delivery task.

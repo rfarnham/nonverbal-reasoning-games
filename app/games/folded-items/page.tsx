@@ -38,6 +38,7 @@ import {
 import {
   ROUNDS,
   TUTORIAL,
+  describeAnswer,
   describeItem,
   generateInfiniteRound,
   initialPaper,
@@ -45,6 +46,7 @@ import {
   patternKey,
   roundFingerprint,
   type Difficulty,
+  type ItemOrientation,
   type Round,
 } from "./game-engine";
 import { FoldSequence, FoldingPaper, ItemSet, ItemToken } from "./fold-visuals";
@@ -173,8 +175,8 @@ function nextIncompleteCampaignLevel(
   return null;
 }
 
-function describePattern(round: Round, items: readonly number[]): string {
-  return items.map((id) => describeItem(round, id)).join(", ");
+function describePattern(round: Round, items: readonly number[], orientations: readonly ItemOrientation[] = []): string {
+  return describeAnswer(round, items, orientations);
 }
 
 function seededRandom(seed: number): () => number {
@@ -1528,13 +1530,15 @@ export default function FoldedItemsPage() {
                     <div>
                       <span>Correct stack</span>
                       <ItemSet round={historicalSessionRound.round} items={historicalSessionRound.round.correctItems}
-                        label={`Correct stack: ${describePattern(historicalSessionRound.round, historicalSessionRound.round.correctItems)}`} />
+                        orientations={historicalSessionRound.round.correctOrientations}
+                        label={`Correct stack: ${describePattern(historicalSessionRound.round, historicalSessionRound.round.correctItems, historicalSessionRound.round.correctOrientations)}`} />
                     </div>
                     {historicalWrongPattern ? (
                       <div className={styles.historicalWrongAnswer}>
                         <span>Your first answer</span>
                         <ItemSet round={historicalSessionRound.round} items={historicalWrongPattern}
-                          label={`Your first incorrect answer: ${describePattern(historicalSessionRound.round, historicalWrongPattern)}`} />
+                          orientations={historicalSessionRound.round.optionOrientations[historicalMistake!.chosenIndex]}
+                          label={`Your first incorrect answer: ${describePattern(historicalSessionRound.round, historicalWrongPattern, historicalSessionRound.round.optionOrientations[historicalMistake!.chosenIndex])}`} />
                         <strong aria-hidden="true">×</strong>
                       </div>
                     ) : null}
@@ -1593,7 +1597,7 @@ export default function FoldedItemsPage() {
                         {round.answerMode === "group" ? "Which item is stacked with" : "Which is the final stack containing"}
                         <span className={styles.targetBadge} role="img" aria-label={describeItem(round, round.targetId)}><ItemToken item={itemById(round, round.targetId)} /></span>?
                       </p>
-                      {round.answerMode === "ordered" ? <p className={styles.orderHint}>Read each answer from top to bottom.</p> : null}
+                      {round.answerMode === "ordered" ? <p className={styles.orderHint}>{round.orientationMatters ? "Read top to bottom. Match every flip and mirror." : "Read each answer from top to bottom."}</p> : null}
                     </div>
                     {(selectedCorrect && (phase === "animating" || phase === "answered")) ? (
                       <FoldingPaper round={round} stageIndex={revealStage}
@@ -1637,7 +1641,7 @@ export default function FoldedItemsPage() {
                             disabled={phase !== "idle"}
                             aria-label={`Option ${
                               optionIndex + 1
-                            }${round.answerMode === "ordered" ? ", top to bottom" : ""}: ${describePattern(round, option)}${answerState}`}
+                            }${round.answerMode === "ordered" ? ", top to bottom" : ""}: ${describePattern(round, option, round.optionOrientations[optionIndex])}${answerState}`}
                             aria-keyshortcuts={`${optionIndex + 1}`}
                             ref={(node) => {
                               optionButtonRefs.current[optionIndex] = node;
@@ -1650,7 +1654,7 @@ export default function FoldedItemsPage() {
                             >
                               {optionIndex + 1}
                             </span>
-                            <ItemSet round={round} items={option} hidden />
+                            <ItemSet round={round} items={option} orientations={round.optionOrientations[optionIndex]} hidden />
                             {showCorrect || showWrong ? (
                               <span
                                 className={styles.choiceMark}
@@ -1764,7 +1768,8 @@ export default function FoldedItemsPage() {
                           </span>
                           <div className={styles.reviewWrong}>
                             <ItemSet round={missedRound} items={wrongPattern}
-                              label={`Your answer: ${describePattern(missedRound, wrongPattern)}`} />
+                              orientations={missedRound.optionOrientations[chosenIndex]}
+                              label={`Your answer: ${describePattern(missedRound, wrongPattern, missedRound.optionOrientations[chosenIndex])}`} />
                             <span aria-hidden="true">×</span>
                           </div>
                         </div>

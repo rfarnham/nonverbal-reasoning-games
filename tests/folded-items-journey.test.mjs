@@ -11,6 +11,7 @@ import {
   matchingFirstFolds,
   roundFingerprint,
   validateRound,
+  visualAnswerKey,
 } from "../app/games/folded-items/game-engine.ts";
 import {
   JOURNEY_EXTRA_CAMPAIGN_ROUNDS,
@@ -57,7 +58,10 @@ test("Folded Items adds 36 deterministic Journey rounds without expanding standa
       const fingerprint = roundFingerprint(round);
       assert.equal(fingerprints.has(fingerprint), false, `${level} must be fresh`);
       fingerprints.add(fingerprint);
+      assert.equal(new Set(round.options.map((items, index) => visualAnswerKey(round, items, round.optionOrientations[index]))).size, 4);
       if (level === "wizard-2") {
+        assert.equal(round.orientationMatters, true);
+        assert.ok(round.optionKinds.includes("orientation"));
         assert.deepEqual(matchingFirstFolds(round), [round.folds[0]]);
         assert.notEqual(round.overlapClue.aboveId, round.targetId);
         assert.notEqual(round.overlapClue.belowId, round.targetId);
@@ -135,7 +139,7 @@ test("the solved opening example is a legible one-fold introduction before order
   assert.equal(TUTORIAL.answerMode, "group");
   assert.equal(describeItem(TUTORIAL, TUTORIAL.targetId), "B");
   assert.deepEqual(TUTORIAL.correctItems.map((id) => describeItem(TUTORIAL, id)), ["F"]);
-  assert.equal(progressionAdapter.contentVersion, "2");
-  assert.equal(progressionAdapter.generatorVersion, "2");
-  assert.equal(progressionAdapter.journeyContentVersion, "2");
+  assert.equal(progressionAdapter.contentVersion, "3");
+  assert.equal(progressionAdapter.generatorVersion, "3");
+  assert.equal(progressionAdapter.journeyContentVersion, "3");
 });

@@ -5,7 +5,8 @@ import {
   answerKey, buildAuthoredFoldedItemsRound, buildAuthoredFoldedItemsRounds, buildRounds,
   describeItem, foldPaper, foldSteps, foldAxis, foldInstructionKey, generateInfiniteRound,
   initialPaper, isMovingCell, itemSetKey, legalFolds, matchingFirstFolds,
-  patternDifference, roundFingerprint, targetStack, validateRound,
+  patternDifference, roundFingerprint, targetStack, validateRound, visualItemKey, visualAnswerKey,
+  describeAnswer, describeOrientedItem, UPRIGHT, ITEM_ORIENTATIONS,
 } from "../app/games/folded-items/game-engine.ts";
 import { CAMPAIGN_ROUND_SPECS } from "../app/games/folded-items/campaign-data.ts";
 
@@ -23,8 +24,11 @@ function assertValid(round, label) {
   const expected = round.answerMode === "ordered" ? stack : stack.filter((id) => id !== round.targetId);
   assert.equal(answerKey(round.correctItems, round.answerMode), answerKey(expected, round.answerMode), `${label}: physical answer`);
   assert.equal(round.options.length, 4);
-  assert.equal(new Set(round.options.map((option) => answerKey(option, round.answerMode))).size, 4);
-  assert.deepEqual(round.options.flatMap((option, index) => answerKey(option, round.answerMode) === answerKey(expected, round.answerMode) ? [index] : []), [round.correctIndex], `${label}: one exact answer`);
+  const orientations = expected.map((id) => round.orientationMatters ? round.foldSteps.at(-1).after.orientations[id] : UPRIGHT);
+  assert.deepEqual(round.correctOrientations, orientations);
+  const keys = round.options.map((option, index) => visualAnswerKey(round, option, round.optionOrientations[index]));
+  assert.equal(new Set(keys).size, 4);
+  assert.deepEqual(keys.flatMap((key, index) => key === visualAnswerKey(round, expected, orientations) ? [index] : []), [round.correctIndex], `${label}: one exact visual answer`);
 }
 const GENERATED = Object.fromEntries(DIFFICULTIES.map((difficulty, difficultyIndex) => {
   const seen = new Set();
@@ -132,7 +136,9 @@ test("Starter groups, Junior orders, Expert expands to 5×5 and off-center flaps
       assert.ok(round.options.some((option, index) => index !== round.correctIndex && itemSetKey(option) === itemSetKey(round.correctItems)), "some wrong answers have exactly the right items in the wrong order");
       assert.ok(round.options.some((option, index) => index !== round.correctIndex && patternDifference(option, round.correctItems, "ordered").total === 2), "a close local order mistake exists");
     }
-    for (let i = 0; i < 4; i++) for (let j = 0; j < i; j++) assert.ok(patternDifference(round.options[i], round.options[j], round.answerMode).total >= (starter || junior ? 2 : 1));
+    for (let i = 0; !round.orientationMatters && i < 4; i++) for (let j = 0; j < i; j++) assert.ok(patternDifference(round.options[i], round.options[j], round.answerMode).total >= (starter || junior ? 2 : 1));
+    assert.equal(round.orientationMatters, round.difficulty === "Wizard");
+    if (!round.orientationMatters) assert.ok(round.optionOrientations.flat().every(({ flipX, flipY }) => !flipX && !flipY));
     assert.equal(round.hiddenFoldIndex, round.difficulty === "Wizard" ? 0 : null);
   }
   for (const start of [0, 3, 6, 9]) assert.equal(new Set(ROUNDS.slice(start, start + 3).map(({ folds }) => folds[0].direction)).size, 1);
@@ -226,4 +232,74 @@ test("invalid and hostile randomness fail clearly and exhaustion stays bounded",
   assert.throws(() => buildAuthoredFoldedItemsRounds([CAMPAIGN_ROUND_SPECS[0], CAMPAIGN_ROUND_SPECS[0]]), /repeats content/);
   assert.throws(() => buildAuthoredFoldedItemsRound({ ...CAMPAIGN_ROUND_SPECS[0], itemOrder: [0, 0, 1, 2, 3, 4, 5, 6] }), /unique permutation/);
   assert.equal(new Set(legalFolds(initialPaper(source(5, 5))).map(foldInstructionKey)).size, 32);
+});
+
+
+test("unmarked glyph equivalences collapse invisible flips, M/W and 6/9 identity ambiguities", () => {
+  const letter = (label) => ({ id: 0, kind: "letter", label });
+  const number = (label) => ({ id: 0, kind: "number", label });
+  const x = { flipX: true, flipY: false }, y = { flipX: false, flipY: true }, turn = { flipX: true, flipY: true };
+  for (const label of "HIOXQ") for (const orientation of ITEM_ORIENTATIONS) assert.equal(visualItemKey(letter(label), orientation), visualItemKey(letter(label)), `${label} is symmetric`);
+  for (const label of "AMTUVWY") assert.equal(visualItemKey(letter(label), x), visualItemKey(letter(label)), `${label} left-right mirror`);
+  for (const label of "NSZ") assert.equal(visualItemKey(letter(label), turn), visualItemKey(letter(label)), `${label} half-turn`);
+  assert.equal(visualItemKey(letter("G"), y), visualItemKey(letter("G")), "a subtle G notch is not an orientation trap");
+  assert.equal(visualItemKey(letter("M"), y), visualItemKey(letter("W")));
+  assert.equal(visualItemKey(letter("W"), turn), visualItemKey(letter("M")));
+  assert.equal(visualItemKey(number("6"), turn), visualItemKey(number("9")));
+  assert.equal(visualItemKey(number("9"), turn), visualItemKey(number("6")));
+  assert.equal(visualItemKey(number("69"), turn), visualItemKey(number("69")), "turning a whole multi-digit label reverses character positions too");
+  assert.notEqual(visualItemKey(number("12"), x), visualItemKey(number("12")));
+  assert.notEqual(visualItemKey(letter("F"), x), visualItemKey(letter("F")));
+  for (const outline of ["circle", "square", "diamond", "hexagon", "triangle"]) for (const mark of ["none", "dot", "plus", "bars", "cross"]) {
+    const item = { id: 0, kind: "shape", shape: { outline, mark }, label: `${outline} ${mark}` };
+    assert.equal(visualItemKey(item, x), visualItemKey(item));
+    assert.equal(visualItemKey(item, turn), visualItemKey(item, y));
+    assert.equal(visualItemKey(item, y) === visualItemKey(item), outline !== "triangle");
+  }
+});
+
+test("every Wizard puzzle requires observable orientation and contains one honest orientation-only trap", () => {
+  for (const round of [...ROUNDS.filter(({ difficulty }) => difficulty === "Wizard"), ...GENERATED.Wizard]) {
+    assert.ok(round.correctItems.some((id, index) => visualItemKey(round.source.items.find((item) => item.id === id), round.correctOrientations[index]) !== visualItemKey(round.source.items.find((item) => item.id === id))));
+    const trap = round.optionKinds.indexOf("orientation");
+    assert.ok(trap >= 0);
+    assert.deepEqual(round.options[trap], round.correctItems, "same identities and same layer order");
+    const changed = round.correctItems.filter((id, index) => {
+      const item = round.source.items.find((item) => item.id === id);
+      return visualItemKey(item, round.correctOrientations[index]) !== visualItemKey(item, round.optionOrientations[trap][index]);
+    });
+    assert.equal(changed.length, 1, "exactly one visibly different glyph is the near-miss");
+    assert.notEqual(describeAnswer(round, round.options[trap], round.optionOrientations[trap]), describeAnswer(round, round.correctItems, round.correctOrientations), "accessible descriptions distinguish the orientation trap");
+    if (round.source.items[0].kind === "shape") assert.ok(changed.every((id) => round.source.items.find((item) => item.id === id).shape.outline === "triangle"));
+  }
+});
+
+test("validator rejects orientation lies, invisible orientation traps and equivalent duplicate choices", () => {
+  const round = ROUNDS.find(({ difficulty, source }) => difficulty === "Wizard" && source.items[0].kind === "shape");
+  const trap = round.optionKinds.indexOf("orientation");
+  const symmetric = round.correctItems.findIndex((id) => round.source.items.find((item) => item.id === id).shape.outline !== "triangle");
+  assert.ok(symmetric >= 0);
+  const invisible = round.correctOrientations.map((orientation, index) => index === symmetric ? { ...orientation, flipX: !orientation.flipX } : orientation);
+  const corrupted = { ...round, optionOrientations: round.optionOrientations.map((orientations, index) => index === trap ? invisible : orientations) };
+  assert.ok(validateRound(corrupted).some((error) => error.includes("distinct")));
+  assert.ok(validateRound(corrupted).some((error) => error.includes("orientation-only")));
+  assert.ok(validateRound({ ...round, correctOrientations: round.correctOrientations.map(() => UPRIGHT) }).some((error) => error.includes("calculated")));
+  assert.ok(validateRound({ ...round, orientationMatters: false }).some((error) => error.includes("Only Wizard")));
+  const upright = ROUNDS[12];
+  const rotated = { ...upright, optionOrientations: upright.optionOrientations.map((orientations) => orientations.map(() => ({ flipX: true, flipY: true }))) };
+  assert.ok(validateRound(rotated).some((error) => error.includes("stay upright")));
+  const symmetricItem = { source: { rows: 1, cols: 1, items: [{ id: 0, kind: "letter", label: "O" }] } };
+  assert.equal(describeOrientedItem(symmetricItem, 0, { flipX: true, flipY: true }), "O", "alt text never invents an invisible distinction");
+});
+
+
+test("orientation validation rejects malformed and sparse payloads without throwing", () => {
+  for (const round of [ROUNDS[0], ROUNDS[12], ROUNDS[36]]) {
+    for (const bad of [null, undefined, {}, [null], [undefined], Array(round.options[0].length), [], [{ flipX: "yes", flipY: false }]]) {
+      const corrupted = { ...round, optionOrientations: round.optionOrientations.map((orientations, index) => index === 0 ? bad : orientations) };
+      assert.ok(validateRound(corrupted).some((error) => error.includes("valid orientation")), `${round.difficulty}: ${String(bad)}`);
+    }
+    for (const bad of [null, undefined, {}, [], Array(4)]) assert.ok(validateRound({ ...round, optionOrientations: bad }).length > 0);
+    for (const bad of [null, undefined, {}, [], Array(round.correctItems.length), [null]]) assert.ok(validateRound({ ...round, correctOrientations: bad }).length > 0);
+  }
 });
