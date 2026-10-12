@@ -50,8 +50,8 @@ test("Folded Items adds 36 deterministic Journey rounds without expanding standa
     ), [3, 3, 3, 3]);
     assert.equal(positions.some((position, index) => index > 0 && positions[index - 1] === position), false);
     assert.equal(new Set([0, 4, 8].map((offset) => positions.slice(offset, offset + 4).join())).size, 3);
-    const flowerRounds = rounds.filter(({ source }) => source.items[0].kind === "flower");
-    assert.equal(flowerRounds.length, 4);
+    const shapeRounds = rounds.filter(({ source }) => source.items[0].kind === "shape");
+    assert.equal(shapeRounds.length, 4);
     for (const round of rounds) {
       assert.deepEqual(validateRound(round), [], level);
       const fingerprint = roundFingerprint(round);
@@ -129,19 +129,13 @@ test("catalog discovery includes Folded Items throughout Journey without excludi
   assert.doesNotMatch(launchSource, /folded-items|shape-fold/);
 });
 
-test("underneath-fold stack order agrees with the labeled worksheet example", () => {
-  const first = foldPaper(initialPaper(TUTORIAL.source), "up");
-  assert.deepEqual(first.stacks, [
-    [0, 12], [1, 13], [2, 14], [3, 15],
-    [4, 8], [5, 9], [6, 10], [7, 11],
-  ]);
-  const final = foldPaper(first, "left");
-  assert.deepEqual(final.stacks, [
-    [0, 12, 15, 3], [1, 13, 14, 2],
-    [4, 8, 11, 7], [5, 9, 10, 6],
-  ]);
-  assert.equal(describeItem(TUTORIAL, first.stacks[0][0]), "A");
-  assert.equal(describeItem(TUTORIAL, first.stacks[0][1]), "M");
+test("the solved opening example is a legible one-fold introduction before ordered Junior play", () => {
+  const first = foldPaper(initialPaper(TUTORIAL.source), { direction: "up", sense: "over", crease: 1 });
+  assert.deepEqual(first.stacks, [[4, 0], [5, 1], [6, 2], [7, 3]]);
+  assert.equal(TUTORIAL.answerMode, "group");
   assert.equal(describeItem(TUTORIAL, TUTORIAL.targetId), "B");
-  assert.deepEqual(TUTORIAL.correctItems.map((id) => describeItem(TUTORIAL, id)), ["C", "N", "O"]);
+  assert.deepEqual(TUTORIAL.correctItems.map((id) => describeItem(TUTORIAL, id)), ["F"]);
+  assert.equal(progressionAdapter.contentVersion, "2");
+  assert.equal(progressionAdapter.generatorVersion, "2");
+  assert.equal(progressionAdapter.journeyContentVersion, "2");
 });

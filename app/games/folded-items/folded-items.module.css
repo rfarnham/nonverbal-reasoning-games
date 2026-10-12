@@ -129,10 +129,6 @@
   gap: 20px;
 }
 
-.exampleFlow .foldSequence {
-  flex-basis: 100%;
-}
-
 .exampleConnector {
   flex: 0 0 auto;
   color: var(--muted);
@@ -181,7 +177,6 @@
   font-weight: 820;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  opacity: 0.64;
 }
 
 .wrongMark {
@@ -244,201 +239,9 @@
   font-size: 1.15rem;
 }
 
-.paperDiagram {
-  --paper-size: min(44vw, 250px);
-  --paper-cols: 4;
-  --paper-rows: 4;
-  --source-cols: 4;
-  width: calc(var(--paper-size) * var(--paper-cols) / var(--source-cols));
-  aspect-ratio: var(--paper-cols) / var(--paper-rows);
-  flex: 0 0 auto;
-  display: grid;
-  grid-template-columns: repeat(var(--paper-cols), minmax(0, 1fr));
-  grid-template-rows: repeat(var(--paper-rows), minmax(0, 1fr));
-  overflow: hidden;
-  border: 2px solid var(--ink);
-  border-radius: 3px;
-  background: var(--panel);
-  box-shadow: 0 2px 0 rgb(23 33 61 / 8%);
-}
-
-.itemCell {
-  min-width: 0;
-  min-height: 0;
-  position: relative;
-  display: grid;
-  place-items: center;
-  border-right: 1px solid #8c929f;
-  border-bottom: 1px solid #8c929f;
-  background: var(--panel);
-}
-
-.itemToken {
-  width: 76%;
-  aspect-ratio: 1;
-  display: grid;
-  place-items: center;
-  color: var(--ink);
-  font-size: clamp(14px, calc(var(--paper-size) / var(--source-cols) * 0.49), 29px);
-  font-weight: 850;
-  letter-spacing: -0.025em;
-  line-height: 1;
-}
-
-.itemToken svg {
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-
-.flower {
-  width: 76%;
-  aspect-ratio: 1;
-  display: block;
-  overflow: visible;
-}
-
-.foldedCell {
-  visibility: hidden;
-}
-
-.targetCell {
-  z-index: 1;
-  outline: 3px solid var(--ink);
-  outline-offset: -4px;
-  background: #fff0c8;
-}
-
-.sequencePaper,
-.tutorialPaper {
-  --paper-size: min(44vw, 250px);
-}
-
-.reviewPaper {
-  --paper-size: 124px;
-}
-
-.reviewPaper .itemToken {
-  font-size: calc(var(--paper-size) / var(--source-cols) * 0.48);
-}
-
-.foldedSequence,
-.foldSequence {
-  width: 100%;
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 16px 13px;
-}
-
-.foldStep {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.sequenceConnector {
-  flex: 0 0 auto;
-  color: var(--muted);
-  font-size: 1rem;
-  font-weight: 900;
-}
-
-.foldCard {
-  flex: 0 0 auto;
-  position: relative;
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-}
-
-.stepLabel {
-  min-height: 16px;
-  color: var(--muted);
-  font-size: 0.65rem;
-  font-weight: 850;
-  letter-spacing: 0.035em;
-  text-transform: uppercase;
-}
-
-.foldCue {
-  width: 64px;
-  height: 64px;
-  display: block;
-  flex: 0 0 auto;
-}
-
-.foldDirection {
-  max-width: 220px;
-  min-height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #b7b2a5;
-  border-radius: 999px;
-  background: #fff0c8;
-  color: var(--ink);
-  padding: 4px 10px;
-  font-size: 0.66rem;
-  font-weight: 800;
-  line-height: 1.35;
-  text-align: center;
-}
-
-.unknownFold {
-  width: min(24vw, 105px);
-  aspect-ratio: 1;
-  display: grid;
-  place-items: center;
-  border: 2px dashed #7a8190;
-  border-radius: 7px;
-  color: var(--ink);
-  font-size: clamp(2rem, 5vw, 3.3rem);
-  font-weight: 850;
-}
-
-.hiddenDirections {
-  color: var(--muted);
-  font-size: 0.8rem;
-  font-weight: 850;
-  letter-spacing: 0.12em;
-}
-
-.overlapClue {
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  margin: 18px auto 0;
-  color: var(--ink);
-  font-size: 0.84rem;
-  font-weight: 750;
-}
-
-.clueItems {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.overlapClue .itemToken,
-.targetBadge .itemToken {
-  --paper-size: 44px;
-  --source-cols: 1;
-  width: 36px;
-  font-size: 25px;
-}
-
-.overlapClue .flower,
-.targetBadge .flower {
-  width: 36px;
-  flex: 0 0 auto;
+.exampleTarget > :last-child {
+  width: 38px;
+  height: 38px;
 }
 
 .exampleTarget {
@@ -450,13 +253,8 @@
   font-weight: 800;
 }
 
-.exampleTarget .itemToken,
-.exampleTarget .flower {
-  width: 38px;
-  font-size: 27px;
-}
-
 .foldLegend {
+  max-width: 600px;
   margin: 17px auto 22px;
   color: var(--muted);
   font-size: 0.8rem;
@@ -480,6 +278,9 @@
 }
 
 .targetBadge {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
   display: inline-grid;
   place-items: center;
   border: 2px solid var(--ink);
@@ -487,275 +288,6 @@
   background: #fff0c8;
   padding: 2px;
   vertical-align: middle;
-}
-
-.itemSet {
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-}
-
-.setItem {
-  width: clamp(30px, 4vw, 47px);
-  aspect-ratio: 1;
-  position: relative;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  border-radius: 5px;
-}
-
-.setItem .itemToken {
-  --paper-size: 52px;
-  --source-cols: 1;
-  width: 88%;
-  font-size: 30px;
-}
-
-.setItem .flower {
-  width: 88%;
-}
-
-.missingItem {
-  border: 2px dashed var(--correct);
-}
-
-.missingItem small,
-.extraItem small {
-  width: 18px;
-  height: 18px;
-  position: absolute;
-  right: -5px;
-  bottom: -5px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--panel);
-  border-radius: 50%;
-  background: var(--correct);
-  color: white;
-  font-family: Arial, sans-serif;
-  font-size: 14px;
-  font-weight: 900;
-  line-height: 1;
-}
-
-.extraItem {
-  outline: 2px solid var(--wrong);
-  outline-offset: -2px;
-}
-
-.extraItem small {
-  background: var(--wrong);
-}
-
-.teachingArea {
-  position: absolute;
-  inset: 18px;
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: 18px;
-  animation: revealIn 140ms ease-out both;
-}
-
-.inlineTeaching {
-  position: static;
-  inset: auto;
-  margin-top: 18px;
-}
-
-.teachingGrid {
-  display: inline-block;
-  position: relative;
-  flex: 0 0 auto;
-  isolation: isolate;
-  transform-style: preserve-3d;
-}
-
-.teachingGrid .paperDiagram {
-  --paper-size: min(54vw, 280px);
-}
-
-.teachingCaption {
-  width: max-content;
-  max-width: min(75vw, 330px);
-  position: absolute;
-  left: 50%;
-  top: calc(100% + 18px);
-  transform: translateX(-50%);
-  color: var(--ink);
-  font-size: 0.86rem;
-  font-weight: 800;
-  line-height: 1.5;
-  text-align: center;
-}
-
-.teachingLabel {
-  max-width: 100%;
-  min-height: 26px;
-  color: var(--ink);
-  font-size: 0.84rem;
-  font-weight: 800;
-  line-height: 1.5;
-  text-align: center;
-}
-
-.stackStrip {
-  max-width: 100%;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 11px;
-  padding: 10px 13px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--panel);
-  color: var(--ink);
-  font-size: 0.78rem;
-  font-weight: 800;
-}
-
-.stackStrip .setItem {
-  width: 39px;
-}
-
-.stackStrip .stepLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.stackStrip .stepLabel .itemToken,
-.stackStrip .stepLabel .flower {
-  width: 32px;
-  font-size: 24px;
-}
-
-.stackStrip .targetBadge {
-  flex: 0 0 auto;
-}
-
-.foldOverlay {
-  position: absolute;
-  z-index: 2;
-  pointer-events: none;
-  opacity: 0.74;
-  transform-style: preserve-3d;
-  backface-visibility: visible;
-  -webkit-backface-visibility: visible;
-  animation-duration: 900ms;
-  animation-timing-function: cubic-bezier(0.2, 0.75, 0.25, 1);
-  animation-fill-mode: both;
-  will-change: transform, opacity;
-}
-
-.foldOverlay .paperDiagram {
-  width: 100%;
-  height: 100%;
-  aspect-ratio: auto;
-  border-radius: 0;
-}
-
-.foldOverlay .itemCell {
-  background: #e5edf8;
-}
-
-.foldLeft,
-.foldRight {
-  top: 0;
-  width: 50%;
-  height: 100%;
-}
-
-.foldLeft {
-  left: 50%;
-  transform-origin: left center;
-  animation-name: foldLeft;
-}
-
-.foldRight {
-  left: 0;
-  transform-origin: right center;
-  animation-name: foldRight;
-}
-
-.foldUp,
-.foldDown {
-  left: 0;
-  width: 100%;
-  height: 50%;
-}
-
-.foldUp {
-  top: 50%;
-  transform-origin: center top;
-  animation-name: foldUp;
-}
-
-.foldDown {
-  top: 0;
-  transform-origin: center bottom;
-  animation-name: foldDown;
-}
-
-@keyframes foldLeft {
-  from { transform: rotateY(0deg); opacity: 0.74; }
-  78% { opacity: 0.74; }
-  to { transform: rotateY(-180deg); opacity: 0; }
-}
-
-@keyframes foldRight {
-  from { transform: rotateY(0deg); opacity: 0.74; }
-  78% { opacity: 0.74; }
-  to { transform: rotateY(180deg); opacity: 0; }
-}
-
-@keyframes foldUp {
-  from { transform: rotateX(0deg); opacity: 0.74; }
-  78% { opacity: 0.74; }
-  to { transform: rotateX(180deg); opacity: 0; }
-}
-
-@keyframes foldDown {
-  from { transform: rotateX(0deg); opacity: 0.74; }
-  78% { opacity: 0.74; }
-  to { transform: rotateX(-180deg); opacity: 0; }
-}
-
-.compactSequence {
-  gap: 7px;
-}
-
-.compactSequence .sequencePaper {
-  --paper-size: 104px;
-}
-
-.compactSequence .sequenceConnector {
-  font-size: 0.75rem;
-}
-
-.compactSequence .foldStep {
-  gap: 6px;
-}
-
-.compactSequence .stepLabel {
-  display: none;
-}
-
-.compactSequence .foldDirection {
-  min-height: 22px;
-  max-width: 110px;
-  padding: 3px 6px;
-  font-size: 0.56rem;
-}
-
-.compactSequence .foldCue {
-  width: 42px;
-  height: 42px;
 }
 
 .gameStatus {
@@ -775,164 +307,6 @@
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: end;
   gap: 14px;
-}
-
-.campaignNavigator {
-  min-width: 0;
-  display: grid;
-  gap: 7px;
-}
-
-.campaignLevels {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 5px;
-}
-
-.campaignLevel {
-  --level-marker: #c9c5bb;
-  min-width: 0;
-  min-height: 44px;
-  position: relative;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: var(--panel);
-  color: var(--ink);
-  cursor: pointer;
-  padding: 5px 8px 5px 22px;
-  font: inherit;
-  font-size: 0.7rem;
-  font-weight: 840;
-}
-
-.campaignLevel::before {
-  content: "";
-  width: 11px;
-  height: 11px;
-  position: absolute;
-  left: 7px;
-  top: 50%;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--level-marker);
-  color: white;
-  font-family: Arial, sans-serif;
-  font-size: 0.52rem;
-  font-weight: 900;
-  line-height: 1;
-  transform: translateY(-50%);
-}
-
-.campaignLevelCorrect {
-  --level-marker: var(--correct);
-}
-
-.campaignLevelCorrect::before {
-  content: "✓";
-}
-
-.campaignLevelIncorrect {
-  --level-marker: var(--wrong);
-}
-
-.campaignLevelIncorrect::before {
-  content: "×";
-}
-
-.campaignLevelNotDone {
-  --level-marker: #aaa69d;
-}
-
-.campaignLevelActive {
-  border-color: var(--ink);
-  box-shadow: inset 0 -3px 0 var(--level-marker);
-}
-
-.campaignLevel:disabled {
-  cursor: default;
-  opacity: 0.72;
-}
-
-.campaignProblems {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(5px, 1fr));
-  align-items: center;
-  gap: 4px;
-}
-
-.campaignProblem {
-  --problem-color: #c9c5bb;
-  min-width: 0;
-  min-height: 44px;
-  position: relative;
-  display: block;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: white;
-  cursor: pointer;
-  font-family: Arial, sans-serif;
-  font-size: 0.56rem;
-  font-weight: 900;
-  line-height: 1;
-  padding: 0;
-  transition:
-    transform 140ms ease;
-}
-
-.campaignProblem::before {
-  content: "";
-  position: absolute;
-  inset: 15px 0;
-  border-radius: 999px;
-  background: var(--problem-color);
-}
-
-.campaignProblem::after {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-}
-
-.campaignProblemCorrect {
-  --problem-color: var(--correct);
-}
-
-.campaignProblemCorrect::after {
-  content: "✓";
-}
-
-.campaignProblemIncorrect {
-  --problem-color: var(--wrong);
-}
-
-.campaignProblemIncorrect::after {
-  content: "×";
-}
-
-.campaignProblemNotDone {
-  --problem-color: #c9c5bb;
-  cursor: default;
-}
-
-.campaignProblemCurrent {
-  transform: scaleY(1.08);
-}
-
-.campaignProblemCurrent::before {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
-}
-
-.campaignProblem[aria-pressed="true"]::before {
-  outline: 3px solid #1679d2;
-  outline-offset: 3px;
-}
-
-.campaignProblem:disabled {
-  cursor: default;
 }
 
 .progressTrack {
@@ -1135,7 +509,7 @@
 }
 
 .historicalPrompt > span,
-.historicalAnswers span {
+.historicalAnswers > div > span {
   color: var(--muted);
   font-size: 0.65rem;
   font-weight: 840;
@@ -1194,17 +568,7 @@
 }
 
 .promptAnimating {
-  opacity: 0.12;
-}
-
-@keyframes revealIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
+  visibility: hidden;
 }
 
 .answerPanel {
@@ -1284,6 +648,8 @@
 }
 
 .feedbackBar {
+  text-align: center;
+  flex-wrap: wrap;
   min-height: 68px;
   display: flex;
   align-items: center;
@@ -1437,8 +803,6 @@
 .primaryButton:focus-visible,
 .modeButton:focus-visible,
 .endButton:focus-visible,
-.campaignLevel:focus-visible,
-.campaignProblem:focus-visible,
 .nextButton:focus-visible,
 .results h1:focus-visible,
 .historicalReview h2:focus-visible {
@@ -1510,53 +874,9 @@
     gap: 12px;
   }
 
-  .foldedSequence,
-  .foldSequence {
-    gap: 14px 9px;
-  }
-
-  .foldStep {
-    gap: 8px;
-  }
-
-  .sequencePaper,
-  .tutorialPaper {
-    --paper-size: min(48vw, 210px);
-  }
-
-  .sequenceConnector {
-    font-size: 0.85rem;
-  }
-
-  .foldDirection {
-    min-height: 26px;
-    max-width: 185px;
-    font-size: 0.62rem;
-  }
-
   .questionText {
     margin-top: 18px;
     font-size: 0.85rem;
-  }
-
-  .setItem {
-    width: clamp(28px, 8.5vw, 42px);
-  }
-
-  .setItem .itemToken {
-    font-size: 27px;
-  }
-
-  .itemSet {
-    gap: 6px;
-  }
-
-  .stackStrip .setItem {
-    width: 32px;
-  }
-
-  .reviewPaper {
-    --paper-size: 118px;
   }
 
   .gameStatus {
@@ -1570,21 +890,6 @@
 
   .campaignStatus {
     grid-template-columns: minmax(0, 1fr) auto auto;
-  }
-
-  .campaignLevel {
-    min-height: 44px;
-    padding-inline: 19px 4px;
-    font-size: 0.64rem;
-  }
-
-  .campaignLevel::before {
-    left: 5px;
-  }
-
-  .campaignProblems {
-    grid-template-columns: repeat(6, minmax(44px, 1fr));
-    gap: 3px;
   }
 
   .historicalReviewHeader {
@@ -1616,6 +921,8 @@
   }
 
   .feedbackBar {
+  text-align: center;
+  flex-wrap: wrap;
     min-height: 64px;
   }
 
@@ -1630,23 +937,6 @@
     font-size: 2.15rem;
   }
 
-  .sequencePaper,
-  .tutorialPaper {
-    --paper-size: min(49vw, 185px);
-  }
-
-  .stepLabel {
-    font-size: 0.6rem;
-  }
-
-  .setItem {
-    width: 34px;
-  }
-
-  .setItem .itemToken {
-    font-size: 27px;
-  }
-
   .modeActions {
     width: min(250px, 100%);
     margin-inline: auto;
@@ -1656,22 +946,6 @@
 
   .campaignStatus {
     grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .campaignLevels {
-    gap: 3px;
-  }
-
-  .campaignLevel {
-    padding-left: 13px;
-    font-size: 0.58rem;
-  }
-
-  .campaignLevel::before {
-    width: 9px;
-    height: 9px;
-    left: 3px;
-    font-size: 0.45rem;
   }
 
   .campaignStatus .roundCount {
@@ -1684,10 +958,6 @@
 
   .reviewVisual {
     gap: 5px;
-  }
-
-  .compactSequence .sequencePaper {
-    --paper-size: 100px;
   }
 }
 
@@ -1704,4 +974,12 @@
   .infiniteSupercharged .energyTrack {
     animation: none;
   }
+}
+
+.orderHint {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-align: center;
+  line-height: 1.4;
 }

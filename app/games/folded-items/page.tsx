@@ -9,7 +9,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type Ref,
 } from "react";
 
 import {
@@ -40,20 +39,16 @@ import {
   ROUNDS,
   TUTORIAL,
   describeItem,
-  foldDirectionLabel,
   generateInfiniteRound,
   initialPaper,
   itemById,
-  patternDifference,
   patternKey,
   roundFingerprint,
-  targetStack,
   type Difficulty,
-  type FoldDirection,
-  type Item,
-  type PaperState,
   type Round,
 } from "./game-engine";
+import { FoldSequence, FoldingPaper, ItemSet, ItemToken } from "./fold-visuals";
+import { incorrectFeedback } from "./feedback";
 import { canOpenHistoricalReview } from "./historical-review";
 import { progressionAdapter } from "./progression-adapter";
 import styles from "./folded-items.module.css";
@@ -68,12 +63,6 @@ type CampaignReviewSelection = {
   level: CampaignLevel;
   problemIndex: number;
 };
-type PaperSize =
-  | "sequencePaper"
-  | "answerPaper"
-  | "tutorialPaper"
-  | "reviewPaper";
-
 type SessionRound = {
   id: string;
   ordinal: number;
@@ -99,7 +88,6 @@ type CampaignProgress = Readonly<
 >;
 type CampaignCursors = Record<CampaignLevel, number>;
 type CustomProperties = CSSProperties & Record<`--${string}`, string>;
-type Cell = number;
 
 const CAMPAIGN_LEVELS: readonly CampaignLevel[] = [
   "Starter",
@@ -189,195 +177,6 @@ function describePattern(round: Round, items: readonly number[]): string {
   return items.map((id) => describeItem(round, id)).join(", ");
 }
 
-function ItemToken({ item }: { item: Item }) {
-  if (item.kind !== "flower" || !item.flower) {
-    return <span className={styles.itemToken}>{item.label}</span>;
-  }
-  const flower = item.flower;
-  return (
-    <svg className={styles.flower} viewBox="0 0 64 64" aria-hidden="true">
-      {Array.from({ length: flower.petals }, (_, index) => (
-        <g key={index} transform={`rotate(${(360 * index) / flower.petals} 32 32)`}>
-          {flower.petalShape === "round" ? (
-            <ellipse cx="32" cy="17" rx="9" ry="14" fill={flower.color} />
-          ) : (
-            <path d="M32 3 L41 23 L32 29 L23 23 Z" fill={flower.color} />
-          )}
-        </g>
-      ))}
-      {flower.center === "circle" ? (
-        <circle cx="32" cy="32" r="7" fill="#f3bd4e" stroke="#17213d" strokeWidth="1.5" />
-      ) : (
-        <path d="M32 23 L41 32 L32 41 L23 32 Z" fill="#fffdf8" stroke="#17213d" strokeWidth="1.5" />
-      )}
-    </svg>
-  );
-}
-
-function PaperDiagram({
-  round,
-  paper,
-  size = "sequencePaper",
-  target = false,
-  blank = false,
-  foldingDirection,
-  label,
-  hidden = false,
-  paperRef,
-}: {
-  round: Round;
-  paper: PaperState;
-  size?: PaperSize;
-  target?: boolean;
-  blank?: boolean;
-  foldingDirection?: FoldDirection;
-  label?: string;
-  hidden?: boolean;
-  paperRef?: Ref<HTMLDivElement>;
-}) {
-  const style: CustomProperties = {
-    "--paper-cols": String(paper.cols),
-    "--paper-rows": String(paper.rows),
-    "--source-cols": String(Math.max(round.source.rows, round.source.cols)),
-    "--source-rows": String(round.source.rows),
-    "--paper-scale": String(paper.cols / Math.max(round.source.rows, round.source.cols)),
-  };
-  return (
-    <div className={`${styles.paperDiagram} ${styles[size]}`} style={style}
-      role={hidden ? undefined : "img"} aria-label={hidden ? undefined : label}
-      aria-hidden={hidden || undefined} ref={paperRef}>
-      {paper.stacks.map((stack, index) => {
-        const item = itemById(round, stack[0]);
-        const isTarget = target && stack[0] === round.targetId;
-        const x = index % paper.cols;
-        const y = Math.floor(index / paper.cols);
-        const moving = foldingDirection === "left" ? x >= paper.cols / 2
-          : foldingDirection === "right" ? x < paper.cols / 2
-          : foldingDirection === "up" ? y >= paper.rows / 2
-          : foldingDirection === "down" ? y < paper.rows / 2 : false;
-        return <span key={index} className={`${styles.itemCell} ${isTarget ? styles.targetCell : ""} ${moving ? styles.foldedCell : ""}`} aria-hidden="true">
-          {!blank || isTarget ? <ItemToken item={item} /> : null}
-        </span>;
-      })}
-    </div>
-  );
-}
-
-function ItemSet({ round, items, missing = [], extra = [], label, hidden = false }: {
-  round: Round;
-  items: readonly number[];
-  missing?: readonly number[];
-  extra?: readonly number[];
-  label?: string;
-  hidden?: boolean;
-}) {
-  return <div className={styles.itemSet} role={hidden ? undefined : "img"}
-    aria-label={hidden ? undefined : label} aria-hidden={hidden || undefined}>
-    {items.map((id) => <span className={`${styles.setItem} ${extra.includes(id) ? styles.extraItem : ""}`} key={id}>
-      <ItemToken item={itemById(round, id)} />
-      {extra.includes(id) ? <small aria-hidden="true">×</small> : null}
-    </span>)}
-    {missing.map((id) => <span className={`${styles.setItem} ${styles.missingItem}`} key={`missing-${id}`}>
-      <ItemToken item={itemById(round, id)} /><small aria-hidden="true">+</small>
-    </span>)}
-  </div>;
-}
-
-function FoldCue({ direction }: { direction: FoldDirection }) {
-  const horizontal = direction === "left" || direction === "right";
-  const moved = direction === "left" || direction === "up";
-  const paths = {
-    left: { arc: "M51 44 C51 62 13 62 13 44", head: "M8 48 L13 41 L18 48" },
-    right: { arc: "M13 44 C13 62 51 62 51 44", head: "M46 48 L51 41 L56 48" },
-    up: { arc: "M44 51 C62 51 62 13 44 13", head: "M48 8 L41 13 L48 18" },
-    down: { arc: "M44 13 C62 13 62 51 44 51", head: "M48 46 L41 51 L48 56" },
-  };
-  return <svg className={styles.foldCue} viewBox="0 0 64 64" aria-hidden="true">
-    <rect x="6" y="6" width="44" height="44" fill="#fffdf8" stroke="#17213d" strokeWidth="2" />
-    <rect x={horizontal && moved ? 28 : 6} y={!horizontal && moved ? 28 : 6}
-      width={horizontal ? 22 : 44} height={horizontal ? 44 : 22} fill="#f06f5f" fillOpacity="0.35" />
-    <path d={horizontal ? "M28 6 V50" : "M6 28 H50"} stroke="#17213d" strokeWidth="2" strokeDasharray="3 3" />
-    <path d={paths[direction].arc} fill="none" stroke="#17213d" strokeWidth="2.5" />
-    <path d={paths[direction].head} fill="none" stroke="#17213d" strokeWidth="2.5" strokeLinejoin="round" />
-  </svg>;
-}
-
-function FoldSequence({ round, compact = false, reveal = false }: {
-  round: Round;
-  compact?: boolean;
-  reveal?: boolean;
-}) {
-  const scaffold = round.difficulty === "Easy" || round.difficulty === "Medium" || reveal;
-  return <div className={`${styles.foldSequence} ${compact ? styles.compactSequence : ""}`}>
-    <div className={styles.foldCard}>
-      <span className={styles.stepLabel}>Start</span>
-      <PaperDiagram round={round} paper={initialPaper(round.source)}
-        label={`Original ${round.source.rows} by ${round.source.cols} paper: ${describePattern(round, round.source.items.map((item) => item.id))}`} />
-    </div>
-    {round.foldSteps.map((step, index) => (
-      <div className={styles.foldStep} key={index}>
-        <span className={styles.sequenceConnector} aria-hidden="true">→</span>
-        <div className={styles.foldCard}>
-          <span className={styles.stepLabel}>Fold {index + 1}</span>
-          {round.hiddenFoldIndex === index && !reveal ? (
-            <div className={styles.unknownFold} role="img" aria-label="First fold is hidden. Any of the four halves can fold underneath. Use the overlap clue to find it.">
-              <span>?</span><small className={styles.hiddenDirections} aria-hidden="true">↑ ↓ ← →</small>
-            </div>
-          ) : <>
-            {scaffold ? <PaperDiagram round={round} paper={step.after}
-              target={index === round.foldSteps.length - 1}
-              label={`${foldDirectionLabel(step.direction)}; top items ${describePattern(round, step.after.stacks.map((stack) => stack[0]))}`} /> : null}
-            <FoldCue direction={step.direction} />
-            <span className={styles.foldDirection}>{foldDirectionLabel(step.direction)}</span>
-          </>}
-        </div>
-      </div>
-    ))}
-    {round.overlapClue && !reveal ? <div className={styles.overlapClue}>
-      <span className={styles.stepLabel}>After fold 1</span>
-      <span className={styles.clueItems}><ItemToken item={itemById(round, round.overlapClue.belowId)} />
-        <span>is under</span><ItemToken item={itemById(round, round.overlapClue.aboveId)} /></span>
-    </div> : null}
-  </div>;
-}
-
-function FoldingPaper({ round, stageIndex, complete, inline = false }: {
-  round: Round;
-  stageIndex: number;
-  complete: boolean;
-  inline?: boolean;
-}) {
-  const step = round.foldSteps[Math.min(stageIndex, round.foldSteps.length - 1)];
-  const movingHorizontal = step.direction === "left" || step.direction === "right";
-  const movingStart = step.direction === "left" || step.direction === "up";
-  const before = step.before;
-  const final = round.foldSteps[round.foldSteps.length - 1].after;
-  const moving: PaperState = {
-    rows: movingHorizontal ? before.rows : before.rows / 2,
-    cols: movingHorizontal ? before.cols / 2 : before.cols,
-    stacks: before.stacks.filter((_, index) => movingHorizontal
-      ? (index % before.cols >= before.cols / 2) === movingStart
-      : (Math.floor(index / before.cols) >= before.rows / 2) === movingStart),
-  };
-  return <div className={`${styles.teachingArea} ${inline ? styles.inlineTeaching : ""}`}>
-    {complete ? <>
-      <PaperDiagram round={round} paper={final} target
-        label={`Folded paper. ${describeItem(round, round.targetId)} is on top.`} />
-      <div className={styles.stackStrip}>
-        <span className={styles.stepLabel}>Under <ItemToken item={itemById(round, round.targetId)} /></span>
-        <ItemSet round={round} items={targetStack(round).slice(1)}
-          label={`Items underneath: ${describePattern(round, round.correctItems)}`} />
-      </div>
-    </> : <div className={styles.teachingGrid} key={stageIndex}>
-      <PaperDiagram round={round} paper={before} foldingDirection={step.direction} hidden />
-      <div className={`${styles.foldOverlay} ${styles[`fold${step.direction[0].toUpperCase()}${step.direction.slice(1)}`]}`}>
-        <PaperDiagram round={round} paper={moving} hidden />
-      </div>
-      <span className={styles.teachingCaption}>{foldDirectionLabel(step.direction)}</span>
-    </div>}
-  </div>;
-}
-
 function seededRandom(seed: number): () => number {
   let state = seed >>> 0;
   return () => {
@@ -461,6 +260,7 @@ export default function FoldedItemsPage() {
   const [campaignReviewSelection, setCampaignReviewSelection] =
     useState<CampaignReviewSelection | null>(null);
 
+  const cluePanelRef = useRef<HTMLElement>(null);
   const optionButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const nextButtonRef = useRef<HTMLButtonElement>(null);
   const levelCompleteButtonRef = useRef<HTMLButtonElement>(null);
@@ -531,11 +331,6 @@ export default function FoldedItemsPage() {
       : undefined;
   const round = activeSessionRound?.round ?? ROUNDS[0];
   const selectedCorrect = selectedIndex === round.correctIndex;
-  const comparison =
-    selectedIndex !== null && !selectedCorrect
-      ? patternDifference(round.options[selectedIndex], round.correctItems)
-      : { missing: [] as readonly Cell[], extra: [] as readonly Cell[] };
-  const differenceCount = comparison.missing.length + comparison.extra.length;
   const foldingStages = useMemo(
     () => [initialPaper(round.source), ...round.foldSteps.map((step) => step.after)],
     [round],
@@ -761,6 +556,13 @@ export default function FoldedItemsPage() {
       clearAttemptTimers();
 
       if (isCorrect) {
+        // The choices sit below the sheet on a phone; bring the teaching
+        // sequence into view before it starts.
+        const panel = cluePanelRef.current;
+        if (panel) {
+          const bounds = panel.getBoundingClientRect();
+          if (bounds.top < 0 || bounds.bottom > window.innerHeight) panel.scrollIntoView({ block: "start", behavior: "instant" });
+        }
         setPhase("animating");
         const stageCount = Math.max(foldingStages.length, 1);
         const foldCount = Math.max(stageCount - 1, 0);
@@ -796,16 +598,6 @@ export default function FoldedItemsPage() {
       }
 
       setPhase("wrong-review");
-      const revealFolds = round.difficulty !== "Wizard";
-      if (revealFolds && reducedMotion) {
-        setRevealStage(foldingStages.length - 1);
-      } else if (revealFolds) {
-        for (let stage = 1; stage < foldingStages.length; stage += 1) {
-          attemptTimersRef.current.push(setTimeout(() => {
-            if (animationTokenRef.current === animationToken) setRevealStage(stage);
-          }, FOLD_STAGE_MS * stage));
-        }
-      }
       attemptTimersRef.current.push(
         setTimeout(
           () => {
@@ -818,7 +610,7 @@ export default function FoldedItemsPage() {
             controlledSession?.retry();
           },
           reducedMotion ? REDUCED_WRONG_REVIEW_MS
-            : WRONG_REVIEW_MS + (revealFolds ? FOLD_STAGE_MS * round.foldSteps.length : 0),
+            : WRONG_REVIEW_MS,
         ),
       );
     },
@@ -1117,7 +909,7 @@ export default function FoldedItemsPage() {
         inputLockedRef.current = true;
         setSelectedIndex(savedOptionIndex);
         setRetryReady(false);
-        setRevealStage(currentRound.foldSteps.length);
+        setRevealStage(0);
         setPhase("wrong-review");
         attemptTimersRef.current.push(
           setTimeout(
@@ -1147,7 +939,8 @@ export default function FoldedItemsPage() {
         ) return;
         const firstOption = optionButtonRefs.current[0];
         if (!firstOption || firstOption.disabled) return;
-        firstOption.focus();
+        firstOption.focus({ preventScroll: true });
+        cluePanelRef.current?.scrollIntoView({ block: "nearest", behavior: "instant" });
         shouldFocusFirstOption.current = false;
       });
     }, 0);
@@ -1203,6 +996,7 @@ export default function FoldedItemsPage() {
         generationExhausted ||
         campaignReviewSelection !== null ||
         phase !== "idle" ||
+        event.repeat ||
         event.altKey ||
         event.ctrlKey ||
         event.metaKey ||
@@ -1231,12 +1025,30 @@ export default function FoldedItemsPage() {
   ]);
 
   useEffect(() => {
+    if (phase !== "animating") return;
+    // A native answer click can finish its own focus/scroll work after the
+    // synchronous answer handler. Reframe after React mounts the teaching
+    // sheet so neither the click nor scroll anchoring can hide the fold.
+    const frame = window.requestAnimationFrame(() => {
+      const panel = cluePanelRef.current;
+      const sheet = panel?.querySelector<SVGElement>("[data-fold-animation]");
+      const bounds = (sheet ?? panel)?.getBoundingClientRect();
+      if (panel && bounds && (bounds.top < 0 || bounds.bottom > window.innerHeight)) {
+        panel.scrollIntoView({ block: "start", behavior: "instant" });
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [phase]);
+
+  useEffect(() => {
     if (phase === "answered") nextButtonRef.current?.focus();
   }, [phase]);
 
   useEffect(() => {
     if (shouldFocusFirstOption.current && hasStarted && !complete) {
-      optionButtonRefs.current[0]?.focus();
+      optionButtonRefs.current[0]?.focus({ preventScroll: true });
+      const panel = cluePanelRef.current;
+      if (panel && panel.getBoundingClientRect().top < 0) panel.scrollIntoView({ block: "start", behavior: "instant" });
       shouldFocusFirstOption.current = false;
     }
   }, [
@@ -1280,10 +1092,8 @@ export default function FoldedItemsPage() {
       setPhase("answered");
     }
     window.addEventListener("resize", finishTeachingMotion);
-    window.addEventListener("scroll", finishTeachingMotion, true);
     return () => {
       window.removeEventListener("resize", finishTeachingMotion);
-      window.removeEventListener("scroll", finishTeachingMotion, true);
     };
   }, [clearAttemptTimers, phase, foldingStages.length]);
 
@@ -1358,26 +1168,26 @@ export default function FoldedItemsPage() {
         ) : !hasStarted ? (
           <section className={styles.tutorial} aria-labelledby="tutorial-title">
             <p className={styles.kicker}>Example</p>
-            <h1 id="tutorial-title">Fold it. Track what’s underneath.</h1>
+            <h1 id="tutorial-title">Fold it. Follow the stack.</h1>
             <div className={styles.exampleFlow}>
-              <FoldSequence round={TUTORIAL} />
-              <span className={styles.exampleTarget}>Under <ItemToken item={itemById(TUTORIAL, TUTORIAL.targetId)} /></span>
+              <FoldSequence round={TUTORIAL} reveal />
+              <span className={styles.exampleTarget}>Stacked with <span role="img" aria-label={describeItem(TUTORIAL, TUTORIAL.targetId)}><ItemToken item={itemById(TUTORIAL, TUTORIAL.targetId)} /></span></span>
               <span className={styles.exampleConnector} aria-hidden="true">
                 →
               </span>
               <div className={styles.exampleAnswer}>
                 <ItemSet round={TUTORIAL} items={TUTORIAL.correctItems}
-                  label={`Items underneath: ${describePattern(TUTORIAL, TUTORIAL.correctItems)}`} />
+                  label={`Stacked with the highlighted item: ${describePattern(TUTORIAL, TUTORIAL.correctItems)}`} />
                 <span className={styles.exampleMark} aria-label="Correct">
                   ✓
                 </span>
               </div>
             </div>
-            <p className={styles.foldLegend}>Each half folds underneath. The top item stays visible. Item order doesn’t matter.</p>
+            <p className={styles.foldLegend}>A moving flap turns over: its layers reverse. Follow the over or under arrow. From Junior, read each answer from top to bottom.</p>
             <div className={styles.nearMiss}>
               <span aria-hidden="true">Not this</span>
               <ItemSet round={TUTORIAL} items={TUTORIAL.options.find((_, index) => index !== TUTORIAL.correctIndex) ?? []}
-                label="Near match: an item from the wrong row" />
+                label="Near match: the item lands in a different stack" />
               <span className={styles.wrongMark} aria-label="Not a match">
                 ×
               </span>
@@ -1531,7 +1341,7 @@ export default function FoldedItemsPage() {
                             }: ${
                               marker === "not-done"
                                 ? "not done"
-                                : `${marker}; review problem`
+                                : `${marker}${problem?.solved ? "; review problem" : ""}`
                             }`}
                             aria-current={isCurrent ? "step" : undefined}
                             aria-pressed={isReviewing}
@@ -1664,7 +1474,7 @@ export default function FoldedItemsPage() {
                 <p className={styles.kicker}>Infinite</p>
                 <h2 id="fresh-set-title">Fresh set complete</h2>
                 <p className={styles.checkpointCopy}>
-                  You’ve used every new puzzle at this level in this run.
+                  No fresh puzzle could be prepared. Your completed puzzles are saved for these results.
                 </p>
                 <button
                   className={styles.primaryButton}
@@ -1716,9 +1526,9 @@ export default function FoldedItemsPage() {
                   </div>
                   <div className={styles.historicalAnswers}>
                     <div>
-                      <span>Correct items underneath</span>
+                      <span>Correct stack</span>
                       <ItemSet round={historicalSessionRound.round} items={historicalSessionRound.round.correctItems}
-                        label={`Correct items underneath: ${describePattern(historicalSessionRound.round, historicalSessionRound.round.correctItems)}`} />
+                        label={`Correct stack: ${describePattern(historicalSessionRound.round, historicalSessionRound.round.correctItems)}`} />
                     </div>
                     {historicalWrongPattern ? (
                       <div className={styles.historicalWrongAnswer}>
@@ -1765,26 +1575,27 @@ export default function FoldedItemsPage() {
               </section>
             ) : (
               <>
-                <div className={styles.gameBoard} id="campaign-play-area">
+                <div className={styles.gameBoard} id="campaign-play-area" style={{ overflowAnchor: "none" }}>
                   <section
                     className={styles.cluePanel}
+                    ref={cluePanelRef}
                     aria-label="Labeled paper and folds"
                   >
                     <div
                       className={`${styles.promptStage} ${
-                        ((selectedCorrect && (phase === "animating" || phase === "answered")) ||
-                         (phase === "wrong-review" && round.difficulty !== "Wizard"))
+                        (selectedCorrect && (phase === "animating" || phase === "answered"))
                           ? styles.promptAnimating
                           : ""
                       }`}
                     >
                       <FoldSequence round={round} />
-                      <p className={styles.questionText}>Which {round.correctItems.length === 1 ? "item is" : "items are"} under
-                        <span className={styles.targetBadge}><ItemToken item={itemById(round, round.targetId)} /></span>?
+                      <p className={styles.questionText}>
+                        {round.answerMode === "group" ? "Which item is stacked with" : "Which is the final stack containing"}
+                        <span className={styles.targetBadge} role="img" aria-label={describeItem(round, round.targetId)}><ItemToken item={itemById(round, round.targetId)} /></span>?
                       </p>
+                      {round.answerMode === "ordered" ? <p className={styles.orderHint}>Read each answer from top to bottom.</p> : null}
                     </div>
-                    {((selectedCorrect && (phase === "animating" || phase === "answered")) ||
-                      (phase === "wrong-review" && round.difficulty !== "Wizard")) ? (
+                    {(selectedCorrect && (phase === "animating" || phase === "answered")) ? (
                       <FoldingPaper round={round} stageIndex={revealStage}
                         complete={revealStage === foldingStages.length - 1} />
                     ) : null}
@@ -1811,27 +1622,9 @@ export default function FoldedItemsPage() {
                         const muted =
                           (phase === "answered" && !isCorrect) ||
                           (phase === "wrong-review" && !isSelected);
-                        const optionComparison =
-                          showWrong && round.difficulty !== "Wizard"
-                            ? patternDifference(
-                                option,
-                                round.correctItems,
-                              )
-                            : {
-                                missing: [] as readonly Cell[],
-                                extra: [] as readonly Cell[],
-                              };
                         const answerState = showCorrect
                           ? ", correct answer"
-                          : showWrong
-                            ? round.difficulty !== "Wizard"
-                              ? `, your answer; ${
-                                  optionComparison.missing.length
-                                } missing and ${
-                                  optionComparison.extra.length
-                                } extra items`
-                              : ", your answer; does not match"
-                            : "";
+                          : showWrong ? ", your answer; does not match" : "";
                         return (
                           <button
                             className={`${styles.optionButton} ${
@@ -1844,7 +1637,7 @@ export default function FoldedItemsPage() {
                             disabled={phase !== "idle"}
                             aria-label={`Option ${
                               optionIndex + 1
-                            }: ${describePattern(round, option)}${answerState}`}
+                            }${round.answerMode === "ordered" ? ", top to bottom" : ""}: ${describePattern(round, option)}${answerState}`}
                             aria-keyshortcuts={`${optionIndex + 1}`}
                             ref={(node) => {
                               optionButtonRefs.current[optionIndex] = node;
@@ -1857,8 +1650,7 @@ export default function FoldedItemsPage() {
                             >
                               {optionIndex + 1}
                             </span>
-                            <ItemSet round={round} items={option} missing={optionComparison.missing}
-                              extra={optionComparison.extra} hidden />
+                            <ItemSet round={round} items={option} hidden />
                             {showCorrect || showWrong ? (
                               <span
                                 className={styles.choiceMark}
@@ -1884,17 +1676,11 @@ export default function FoldedItemsPage() {
                     <strong>Tracking the folds…</strong>
                   ) : phase === "wrong-review" ? (
                     <strong className={styles.wrongText}>
-                      {round.difficulty === "Wizard"
-                        ? "Not quite · these items do not match the overlap clue"
-                        : `Not quite · ${differenceCount} ${
-                            differenceCount === 1
-                              ? "item differs"
-                              : "items differ"
-                          }`}
+                      × Not quite · {incorrectFeedback(round, selectedIndex)}
                     </strong>
                   ) : phase === "answered" ? (
                     <>
-                      <strong className={styles.correctText}>Correct</strong>
+                      <strong className={styles.correctText}>✓ Correct</strong>
                       <button
                         className={styles.nextButton}
                         type="button"
@@ -1957,16 +1743,6 @@ export default function FoldedItemsPage() {
                   ({ sessionRound: missed, chosenIndex }) => {
                     const missedRound = missed.round;
                     const wrongPattern = missedRound.options[chosenIndex];
-                    const reviewComparison =
-                      missedRound.difficulty !== "Wizard"
-                        ? patternDifference(
-                            wrongPattern,
-                            missedRound.correctItems,
-                          )
-                        : {
-                            missing: [] as readonly Cell[],
-                            extra: [] as readonly Cell[],
-                          };
                     return (
                       <article className={styles.reviewCard} key={missed.id}>
                         <span className={styles.reviewRound}>
@@ -1987,8 +1763,7 @@ export default function FoldedItemsPage() {
                             →
                           </span>
                           <div className={styles.reviewWrong}>
-                            <ItemSet round={missedRound} items={wrongPattern} missing={reviewComparison.missing}
-                              extra={reviewComparison.extra}
+                            <ItemSet round={missedRound} items={wrongPattern}
                               label={`Your answer: ${describePattern(missedRound, wrongPattern)}`} />
                             <span aria-hidden="true">×</span>
                           </div>

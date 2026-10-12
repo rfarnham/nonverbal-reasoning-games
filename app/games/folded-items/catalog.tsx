@@ -4,7 +4,7 @@ import { progressionMetadata } from "./progression-metadata";
 export const gameInfo = {
   title: "Folded Items",
   description:
-    "Follow letters, numbers, and flowers through paper folds. Find the items hidden beneath the top one.",
+    "Follow letters, numbers, and shapes through over and under folds. Track which items stack together and their layer order.",
   skills: ["Item tracking", "Spatial folding"],
   estimatedMinutes: 10,
   progression: progressionMetadata,

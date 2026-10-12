@@ -68,12 +68,15 @@ async function waitForRound(page, round) {
   assert.equal(await choices(page).count(), 4);
   for (let index = 0; index < 4; index++) {
     assert.equal(await choices(page).nth(index).getAttribute('aria-keyshortcuts'), String(index + 1));
-    assert.equal(await choices(page).nth(index).getAttribute('aria-label'), `Option ${index + 1}: ${round.options[index].map(id => describeItem(round, id)).join(', ')}`);
+    assert.equal(await choices(page).nth(index).getAttribute('aria-label'), `Option ${index + 1}${round.answerMode === 'ordered' ? ', top to bottom' : ''}: ${round.options[index].map(id => describeItem(round, id)).join(', ')}`);
   }
   await assertFocused(choices(page).first());
 }
-async function answer(page, round, { correct = true, keyboard = false } = {}) {
+async function answer(page, round, { correct = true, keyboard = false, reloadDuringFeedback = false } = {}) {
   const index = correct ? round.correctIndex : (round.correctIndex + 1) % 4;
+  const clue = page.getByRole('region', { name: 'Labeled paper and folds', exact: true });
+  const promptBefore = correct ? null : await clue.innerHTML();
+  const optionsBefore = correct ? null : await choices(page).evaluateAll(elements => elements.map(element => element.textContent));
   if (keyboard) await page.keyboard.press(String(index + 1));
   else await choices(page).nth(index).click();
   if (correct) {
@@ -88,6 +91,14 @@ async function answer(page, round, { correct = true, keyboard = false } = {}) {
     assert.ok(opacity.every((value, optionIndex) => optionIndex === round.correctIndex || value < opacity[round.correctIndex]), 'Solved rounds visually mute irrelevant choices.');
   } else {
     await page.getByRole('status').filter({ hasText: 'Not quite' }).waitFor();
+    if (reloadDuringFeedback) {
+      await page.reload();
+      await page.getByRole('status').filter({ hasText: 'Not quite' }).waitFor();
+    }
+    assert.equal(await clue.innerHTML(), promptBefore, 'A mistake preserves the complete visual and accessible prompt without revealing the folding result.');
+    assert.equal(await page.locator('[class*="teachingArea"]').count(), 0, 'A mistake never runs the solution animation.');
+    assert.equal(await page.locator('[class*="missingItem"], [class*="extraItem"]').count(), 0, 'A mistake never adds or identifies correct-answer tokens.');
+    assert.deepEqual(await choices(page).evaluateAll(elements => elements.map(element => element.textContent.replace(/×/g, ''))), optionsBefore, 'Only the cross is added; all answer content remains unchanged.');
     assert.ok((await choices(page).evaluateAll(elements => elements.map(element => element.disabled))).every(Boolean), 'Feedback prevents duplicate submissions.');
     await page.waitForFunction(selectedIndex => {
       const values = [...document.querySelectorAll('button[aria-keyshortcuts]')].map(element => Number(getComputedStyle(element).opacity));
@@ -244,7 +255,7 @@ test('Infinite promotes only from first attempts and ending offers untimed redem
   await context.close();
 });
 
-test('all levels fit the phone and tablet breakpoints; Wizard preserves the hidden fold and uses distinct flowers', async () => {
+test('all levels fit the phone and tablet breakpoints; Wizard preserves the hidden fold and uses distinct shapes', async () => {
   const { context, page, errors } = await open({ width: 390, height: 844 });
   await assertFits(page, '390px example');
   await page.screenshot({ path: resolve(shots, 'example-phone.png'), fullPage: true });
@@ -260,57 +271,54 @@ test('all levels fit the phone and tablet breakpoints; Wizard preserves the hidd
     }
     if (level === 'Expert') {
       const expert = levelRounds('Hard');
-      const flowerIndex = expert.findIndex(round => round.source.items[0].kind === 'flower');
-      for (let index = 0; index < flowerIndex; index++) {
+      const shapeIndex = expert.findIndex(round => round.source.items[0].kind === 'shape');
+      for (let index = 0; index < shapeIndex; index++) {
         await answer(page, expert[index], { keyboard: true });
         await advance(page);
         await waitForRound(page, expert[index + 1]);
       }
       await page.setViewportSize({ width: 390, height: 844 });
-      await assertFits(page, '390px Expert flowers');
-      await page.screenshot({ path: resolve(shots, 'expert-flowers-phone.png'), fullPage: true });
+      await assertFits(page, '390px Expert shapes');
+      await page.screenshot({ path: resolve(shots, 'expert-shapes-phone.png'), fullPage: true });
       await page.setViewportSize({ width: 1200, height: 900 });
-      await assertFits(page, '1200px Expert flowers');
-      await page.screenshot({ path: resolve(shots, 'expert-flowers-desktop.png'), fullPage: true });
+      await assertFits(page, '1200px Expert shapes');
+      await page.screenshot({ path: resolve(shots, 'expert-shapes-desktop.png'), fullPage: true });
     }
   }
   const wizard = levelRounds('Wizard');
   const clue = page.getByRole('region', { name: 'Labeled paper and folds', exact: true });
-  const hidden = page.getByRole('img', { name: /^First fold is hidden\..*Use the overlap clue to find it\.$/ });
+  const hidden = page.getByRole('img', { name: /^Find the hidden first fold\./ });
   await hidden.waitFor();
   assert.match(await hidden.textContent(), /\?/);
   const hiddenDirection = foldDirectionLabel(wizard[0].folds[0]);
   assert.equal((await clue.textContent()).includes(hiddenDirection), false);
-  const wrongIndex = (wizard[0].correctIndex + 1) % 4;
-  await page.keyboard.press(String(wrongIndex + 1));
-  await page.getByRole('status').filter({ hasText: 'Not quite' }).waitFor();
+  await answer(page, wizard[0], { correct: false, keyboard: true });
   assert.equal(await hidden.count(), 1);
-  assert.equal((await clue.textContent()).includes(hiddenDirection), false, 'A Wizard mistake preserves the hidden direction.');
-  assert.equal(await page.getByRole('img', { name: /^Items underneath:/ }).count(), 0, 'A Wizard mistake does not reveal the item stack.');
+  assert.equal((await clue.textContent()).includes(hiddenDirection), false, 'A Wizard mistake preserves the hidden fold.');
   const imageNames = await clue.getByRole('img').evaluateAll(elements => elements.map(element => element.getAttribute('aria-label')).join(' '));
   assert.equal(imageNames.includes(hiddenDirection), false, 'A Wizard mistake does not reveal the direction through an accessible cue.');
-  await page.getByRole('status').filter({ hasText: 'Try again' }).waitFor();
-  await assertFocused(choices(page).nth(wrongIndex));
 
-  const flowerIndex = wizard.findIndex(round => round.source.items[0].kind === 'flower');
-  assert.ok(flowerIndex >= 0 && flowerIndex < 12, 'Wizard includes a picture-item round.');
-  for (let index = 0; index < flowerIndex; index++) {
+  const shapeIndex = wizard.findIndex(round => round.source.items[0].kind === 'shape');
+  assert.ok(shapeIndex >= 0 && shapeIndex < 12, 'Wizard includes a picture-item round.');
+  for (let index = 0; index < shapeIndex; index++) {
     await answer(page, wizard[index], { keyboard: true });
     await advance(page);
     await waitForRound(page, wizard[index + 1]);
   }
-  const flowers = wizard[flowerIndex];
+  const shapeRound = wizard[shapeIndex];
   const original = page.getByRole('img', { name: /^Original / }).first();
-  const shapes = await original.locator('svg').evaluateAll(elements => elements.map(element => element.innerHTML));
-  assert.equal(shapes.length, flowers.source.items.length);
-  assert.equal(new Set(shapes).size, shapes.length, 'Every picture item has its own visible flower design.');
+  const shapes = await original.evaluate(element => [...element.querySelector('svg').children]
+    .filter(cell => cell.tagName.toLowerCase() === 'g')
+    .map(cell => cell.querySelector('[transform^="translate(32 32)"]').innerHTML));
+  assert.equal(shapes.length, shapeRound.source.items.length);
+  assert.equal(new Set(shapes).size, shapes.length, 'Every picture item has its own visible shape design.');
   for (const width of [390, 620, 820]) {
     await page.setViewportSize({ width, height: 900 });
-    await assertFits(page, `${width}px Wizard flowers`);
-    await page.screenshot({ path: resolve(shots, `wizard-flowers-${width}.png`), fullPage: true });
+    await assertFits(page, `${width}px Wizard shapes`);
+    await page.screenshot({ path: resolve(shots, `wizard-shapes-${width}.png`), fullPage: true });
   }
-  await answer(page, flowers, { keyboard: true });
-  assert.equal(await page.getByRole('img', { name: /^Items underneath:/ }).count(), 1);
+  await answer(page, shapeRound, { keyboard: true });
+  assert.equal(await page.getByRole('img', { name: /^Top to bottom:/ }).count(), 1);
   assert.deepEqual(errors, []);
   await context.close();
 });
@@ -340,7 +348,7 @@ test('Journey uses canonical rounds, persists retry and redemption across reload
   await waitForRound(page, rounds[0]);
   assert.equal(await page.getByRole('button', { name: 'Campaign', exact: true }).count(), 0, 'A controlled stop reuses the game without opening standalone mode.');
   await assertFits(page, '390px Journey question');
-  await answer(page, rounds[0], { correct: false });
+  await answer(page, rounds[0], { correct: false, reloadDuringFeedback: true });
   const missed = activeAttempt(await saved(page));
   assert.equal(missed.rounds[0].firstTryCorrect, false);
   assert.equal(missed.rounds[0].attemptCount, 1);
@@ -409,21 +417,25 @@ test('normal motion tracks the real two folds, settles on resize, and remembers 
   await waitForRound(page, rounds[0]);
   const started = performance.now();
   await choices(page).nth(rounds[0].correctIndex).click();
-  const caption = page.locator('[class*="teachingCaption"]');
-  await caption.filter({ hasText: foldDirectionLabel(rounds[0].folds[0]) }).waitFor();
+  const firstFold = page.getByRole('img', { name: `Fold 1. ${foldDirectionLabel(rounds[0].folds[0])}`, exact: true });
+  await firstFold.waitFor();
   assert.ok((await choices(page).evaluateAll(elements => elements.map(element => element.disabled))).every(Boolean));
-  const paper = page.locator('[class*="teachingGrid"] > [class*="paperDiagram"]');
-  assert.equal(await paper.evaluate(element => element.style.getPropertyValue('--paper-rows')), '4');
-  assert.equal(await paper.evaluate(element => element.style.getPropertyValue('--paper-cols')), '4');
-  await caption.filter({ hasText: foldDirectionLabel(rounds[0].folds[1]) }).waitFor();
-  assert.equal(await paper.evaluate(element => element.style.getPropertyValue('--paper-rows')), '2');
-  assert.equal(await paper.evaluate(element => element.style.getPropertyValue('--paper-cols')), '4');
+  const firstSheet = firstFold.locator('svg[class*="movingSheet"]');
+  assert.equal(await firstSheet.locator(':scope > g > g').count(), rounds[0].foldSteps[0].before.stacks.filter(stack => stack.length).length);
+  const transforms = await firstSheet.locator(':scope > g').evaluateAll(elements => elements.map(element => element.getAttribute('transform')));
+  await page.waitForFunction(({ selector, prior }) => {
+    const sheet = document.querySelector(selector);
+    return sheet && [...sheet.children].some((element, index) => element.getAttribute('transform') !== prior[index]);
+  }, { selector: 'svg[class*="movingSheet"]', prior: transforms });
+  const secondFold = page.getByRole('img', { name: `Fold 2. ${foldDirectionLabel(rounds[0].folds[1])}`, exact: true });
+  await secondFold.waitFor();
+  assert.equal(await secondFold.locator('svg[class*="movingSheet"] > g > g').count(), rounds[0].foldSteps[1].before.stacks.filter(stack => stack.length).length);
   await page.screenshot({ path: resolve(shots, 'normal-motion-second-fold.png'), fullPage: false });
   const next = page.getByRole('button', { name: 'Next', exact: true });
   await next.waitFor();
   await assertFocused(next);
   assert.ok(performance.now() - started >= 2_000, 'Normal motion leaves time to inspect both folds.');
-  assert.equal(await page.getByRole('img', { name: `Items underneath: ${rounds[0].correctItems.map(id => describeItem(rounds[0], id)).join(', ')}`, exact: true }).count(), 1);
+  assert.equal(await page.getByRole('img', { name: `Top to bottom: ${rounds[0].correctItems.map(id => describeItem(rounds[0], id)).join(', ')}`, exact: true }).count(), 1);
   await advance(page);
   await waitForRound(page, rounds[1]);
   await choices(page).nth(rounds[1].correctIndex).click();
@@ -436,6 +448,96 @@ test('normal motion tracks the real two folds, settles on resize, and remembers 
   await page.reload();
   await sound.waitFor();
   await page.waitForFunction(() => document.querySelector('button[aria-label="Sound"]')?.getAttribute('aria-pressed') === 'false');
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+
+test('incorrect answers at every level preserve the puzzle in both motion preferences', async () => {
+  for (const reducedMotion of ['reduce', 'no-preference']) {
+    const { context, page, errors } = await open({ reducedMotion });
+    await page.getByRole('button', { name: 'Campaign', exact: true }).click();
+    for (const [level, difficulty] of [['Starter', 'Easy'], ['Junior', 'Medium'], ['Expert', 'Hard'], ['Wizard', 'Wizard']]) {
+      if (level !== 'Starter') await page.getByRole('button', { name: new RegExp(`^${level},`) }).click();
+      const round = levelRounds(difficulty)[0];
+      await waitForRound(page, round);
+      const before = performance.now();
+      await answer(page, round, { correct: false, keyboard: true });
+      assert.ok(performance.now() - before >= (reducedMotion === 'reduce' ? 1_200 : 2_100), 'Incorrect feedback leaves time to inspect the attempted answer.');
+      assert.equal(await score(page), 'First try score 0');
+      assert.equal(await page.getByRole('button', { name: `${level} problem 1: incorrect`, exact: true }).count(), 1);
+      assert.equal(await page.getByRole('button', { name: /^(Next|Finish level)$/ }).count(), 0, 'An incorrect answer does not advance.');
+    }
+    await page.getByRole('button', { name: /^Starter,/ }).click();
+    const starter = levelRounds('Easy')[0];
+    await waitForRound(page, starter);
+    await answer(page, starter, { keyboard: true });
+    assert.equal(await score(page), 'First try score 0', 'Leaving a missed puzzle and returning cannot turn its retry into a first attempt.');
+    await advance(page);
+    assert.equal(await page.getByRole('button', { name: 'Starter problem 1: incorrect; review problem', exact: true }).count(), 1);
+    assert.deepEqual(errors, []);
+    await context.close();
+  }
+});
+
+test('number shortcuts ignore every native editable control and nested editable content', async () => {
+  const { context, page, errors } = await open();
+  await page.getByRole('button', { name: 'Campaign', exact: true }).click();
+  const round = levelRounds('Easy')[0];
+  await waitForRound(page, round);
+  for (const tag of ['input', 'textarea', 'select', 'editable', 'nested-editable']) {
+    const selector = await page.evaluate(kind => {
+      const control = document.createElement(kind.includes('editable') ? 'div' : kind);
+      control.id = 'keyboard-audit-control';
+      if (kind.includes('editable')) control.contentEditable = 'true';
+      if (kind === 'nested-editable') control.innerHTML = '<span id="keyboard-audit-child" tabindex="0">edit</span>';
+      if (kind === 'select') control.innerHTML = '<option>1</option><option>2</option>';
+      document.querySelector('main').prepend(control);
+      return kind === 'nested-editable' ? '#keyboard-audit-child' : '#keyboard-audit-control';
+    }, tag);
+    await page.locator(selector).focus();
+    await page.keyboard.press(String(round.correctIndex + 1));
+    assert.equal(await score(page), 'First try score 0', `${tag} must not submit an answer`);
+    assert.ok((await choices(page).evaluateAll(elements => elements.map(element => element.disabled))).every(value => !value));
+    await page.locator('#keyboard-audit-control').evaluate(element => element.remove());
+  }
+  await answer(page, round, { keyboard: true });
+  assert.equal(await score(page), 'First try score 1');
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test('phone teaching remains in view through both folds and the next round', async () => {
+  const { context, page, errors } = await open({ width: 390, height: 900 });
+  await page.getByRole('button', { name: 'Campaign', exact: true }).click();
+  await page.getByRole('button', { name: /^Expert,/ }).click();
+  const rounds = levelRounds('Hard');
+  // Reach a shape round with an underfold, after Next has focused and scrolled.
+  for (let index = 0; index < 2; index += 1) {
+    await answer(page, rounds[index]);
+    await advance(page);
+  }
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  for (const index of [2, 3]) {
+    await waitForRound(page, rounds[index]);
+    const source = await page.getByRole('img', { name: /^Original / }).boundingBox();
+    assert.ok(source && source.y >= 0 && source.y + source.height <= 900, 'Next brings the new paper into view without losing answer focus.');
+    // Use a native pointer click, which can itself scroll/focus the answer.
+    await choices(page).nth(rounds[index].correctIndex).click();
+    for (const [stageIndex, wait] of [[0, 300], [1, 1400]]) {
+      await page.waitForTimeout(wait);
+      const stage = page.getByRole('img', { name: `Fold ${stageIndex + 1}. ${foldDirectionLabel(rounds[index].folds[stageIndex])}`, exact: true });
+      assert.equal(await stage.count(), 1, `Fold ${stageIndex + 1} remains active at its teaching sample.`);
+      const sheet = await stage.locator('svg[class*="movingSheet"]').boundingBox();
+      assert.ok(sheet && sheet.x >= 0 && sheet.x + sheet.width <= 390 && sheet.y >= 0 && sheet.y + sheet.height <= 900,
+        `The entire animated paper stays in the phone viewport: ${JSON.stringify(sheet)}`);
+      assert.match(await page.getByRole('status').textContent(), /Tracking the folds/);
+    }
+    const next = page.getByRole('button', { name: 'Next', exact: true });
+    await next.waitFor();
+    await assertFocused(next);
+    await advance(page);
+  }
   assert.deepEqual(errors, []);
   await context.close();
 });
