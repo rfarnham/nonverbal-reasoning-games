@@ -29,7 +29,7 @@ import {
   PROGRESSION_STORAGE_KEY,
   activePlayerProfile,
   addPlayerProfile,
-  buildJourneyPlanForVersion,
+  buildPlayerJourney,
   canPlayerAccessJourneyNode,
   closeAttemptSummary,
   createPlayerProfile,
@@ -52,6 +52,7 @@ import {
   journeyLevelLabel,
   type JourneyNode,
   type JourneyLevel,
+  type JourneyPlan,
   type PlayerProfile,
   type ProgressionLoadStatus,
   type ProgressionState,
@@ -474,11 +475,32 @@ function nodeAlignment(index: number) {
   return [styles.nodeLeft, styles.nodeCenter, styles.nodeRight][index % 3];
 }
 
-function finalJourneyNode(
-  journey: ReturnType<typeof buildJourneyPlanForVersion>,
-): JourneyNode | undefined {
+function finalJourneyNode(journey: JourneyPlan): JourneyNode | undefined {
   const finalBoard = journey.boards[journey.boards.length - 1];
   return finalBoard?.nodes[finalBoard.nodes.length - 1];
+}
+
+// A new prerequisite can move the next stop back without undoing the board a
+// player has reached. Retain that context when opening the map and its tabs.
+function reachedJourneyLevel(profile: PlayerProfile, journey: JourneyPlan) {
+  const cleared = new Set(profile.clearedStopIds);
+  const activeAttempt = profile.activeAttemptId
+    ? profile.attempts[profile.activeAttemptId]
+    : undefined;
+  let reached: JourneyLevel = "starter";
+  for (const [index, board] of journey.boards.entries()) {
+    const previousCulmination = journey.boards[index - 1]?.nodes.find(
+      (node) => node.kind === "culmination",
+    );
+    if (
+      board.nodes.some((node) => cleared.has(node.id)) ||
+      (previousCulmination && cleared.has(previousCulmination.id)) ||
+      board.nodes.some((node) => node.id === activeAttempt?.stopId)
+    ) {
+      reached = board.journeyLevel;
+    }
+  }
+  return reached;
 }
 
 function walkerTravelStyle(index: number): CSSProperties {
@@ -520,13 +542,11 @@ function JourneyBoard({
 }) {
   const trailItemRef = useRef<HTMLLIElement>(null);
   const trailButtonRef = useRef<HTMLButtonElement>(null);
+  const additionItemRef = useRef<HTMLLIElement>(null);
+  const [additionFocusRequest, setAdditionFocusRequest] = useState(0);
   const journey = useMemo(
-    () =>
-      buildJourneyPlanForVersion(
-        profile.gameSnapshot,
-        profile.journeyPlanVersion,
-      ),
-    [profile.gameSnapshot, profile.journeyPlanVersion],
+    () => buildPlayerJourney(profile),
+    [profile],
   );
   const board =
     journey.boards.find(
@@ -545,6 +565,18 @@ function JourneyBoard({
   const cleared = new Set(profile.clearedStopIds);
   const completedOnBoard = board.nodes.filter(({ id }) => cleared.has(id)).length;
   const currentBoardLevel = trailNode?.journeyLevel ?? "wizard-2";
+  const reachedLevel = reachedJourneyLevel(profile, journey);
+  const nextAddition = journey.boards
+    .filter(({ journeyLevel }) =>
+      JOURNEY_LEVELS.indexOf(journeyLevel) <= JOURNEY_LEVELS.indexOf(reachedLevel),
+    )
+    .flatMap(({ nodes }) => nodes)
+    .find((node) =>
+      node.kind === "normal" && node.catalogAddition && !cleared.has(node.id),
+    );
+  const additionTitle = nextAddition?.kind === "normal"
+    ? journey.gameSnapshot.find(({ slug }) => slug === nextAddition.gameSlug)?.title
+    : undefined;
   const avatarId = isAvatarId(profile.avatarId)
     ? profile.avatarId
     : DEFAULT_AVATAR_ID;
@@ -581,6 +613,19 @@ function JourneyBoard({
     displayedLevel,
   ]);
 
+  useEffect(() => {
+    if (
+      additionFocusRequest === 0 ||
+      nextAddition?.journeyLevel !== displayedLevel ||
+      !additionItemRef.current
+    ) return;
+    additionItemRef.current.scrollIntoView({ behavior: "auto", block: "center" });
+    const stopButton = additionItemRef.current.querySelector<HTMLButtonElement>(
+      "button:not(:disabled)",
+    );
+    (stopButton ?? additionItemRef.current).focus({ preventScroll: true });
+  }, [additionFocusRequest, displayedLevel, nextAddition]);
+
   return (
     <main className={styles.board}>
       {testingMode ? (
@@ -593,6 +638,37 @@ function JourneyBoard({
           </span>
         </p>
       ) : null}
+      {nextAddition && !testingMode ? (
+        <section className={styles.catalogUpdate} aria-labelledby="journey-update-title">
+          <div>
+            <h2 id="journey-update-title">New game on your trail</h2>
+            <p>
+              {additionTitle ?? "A new game"} has joined your Journey. Clear its new{" "}
+              {journeyLevelLabel(nextAddition.journeyLevel)} stop
+              {nextAddition.journeyLevel !== reachedLevel
+                ? ` before continuing ${journeyLevelLabel(reachedLevel)}.`
+                : " to complete this trail."}
+              {" "}Your cleared stops and XP are saved.
+            </p>
+            {activeAttempt && activeAttempt.stopId !== nextAddition.id ? (
+              <p>Finish your saved stop first, then visit the new stop.</p>
+            ) : null}
+          </div>
+          <button
+            className={styles.primaryButton}
+            type="button"
+            onClick={() => {
+              onViewLevel(nextAddition.journeyLevel);
+              setAdditionFocusRequest((request) => request + 1);
+            }}
+          >
+            {displayedLevel === nextAddition.journeyLevel
+              ? "Find new stop"
+              : `Visit ${journeyLevelLabel(nextAddition.journeyLevel)} trail`}
+            <span aria-hidden="true">→</span>
+          </button>
+        </section>
+      ) : null}
       <nav className={styles.boardTabs} aria-label="Journey boards">
         {JOURNEY_LEVELS.map((level) => {
           const candidateBoard = journey.boards.find(
@@ -603,6 +679,7 @@ function JourneyBoard({
             firstNode &&
               (testingMode ||
                 level === "starter" ||
+                JOURNEY_LEVELS.indexOf(level) <= JOURNEY_LEVELS.indexOf(reachedLevel) ||
                 isJourneyNodeUnlocked(
                   journey,
                   profile.clearedStopIds,
@@ -687,7 +764,7 @@ function JourneyBoard({
                 )
               : undefined;
             const savedProvider = gameSlug
-              ? profile.gameSnapshot.find(
+              ? journey.gameSnapshot.find(
                   (candidate) => candidate.slug === gameSlug,
                 )
               : undefined;
@@ -705,6 +782,8 @@ function JourneyBoard({
             const isCurrent = nextNode?.id === node.id;
             const isActive = activeAttempt?.stopId === node.id;
             const isTrailPosition = trailNode?.id === node.id;
+            const isNextAddition = nextAddition?.id === node.id;
+            const isAddition = node.kind === "normal" && node.catalogAddition;
             const blockedByActiveAttempt = Boolean(
               activeAttempt && !isActive && !testingMode,
             );
@@ -748,7 +827,11 @@ function JourneyBoard({
               <li
                 className={`${styles.nodeItem} ${nodeAlignment(index)}`}
                 key={node.id}
-                ref={isTrailPosition ? trailItemRef : undefined}
+                tabIndex={isNextAddition ? -1 : undefined}
+                ref={(element) => {
+                  if (isTrailPosition) trailItemRef.current = element;
+                  if (isNextAddition) additionItemRef.current = element;
+                }}
               >
                 <div className={styles.nodeWrap}>
                   {isTrailPosition && displayedLevel === currentBoardLevel ? (
@@ -776,7 +859,7 @@ function JourneyBoard({
                       blockedByActiveAttempt ||
                       (isCleared && !isActive && !testingMode)
                     }
-                    aria-label={`${label}. ${detail}`}
+                    aria-label={`${label}. ${isAddition ? "New game stop. " : ""}${detail}`}
                     aria-current={isTrailPosition ? "step" : undefined}
                     onClick={() => onLaunch(node)}
                     ref={isTrailPosition ? trailButtonRef : undefined}
@@ -806,6 +889,9 @@ function JourneyBoard({
                     ) : null}
                   </button>
                   <span className={styles.nodeCopy}>
+                    {isAddition && !isCleared ? (
+                      <span className={styles.newStopBadge}>New game</span>
+                    ) : null}
                     <strong>{label}</strong>
                     <span>{detail}</span>
                     {isActive && activeAttempt && !activeAttempt.settlement ? (
@@ -837,8 +923,10 @@ export function JourneyClient() {
   const [profilePanelOpen, setProfilePanelOpen] = useState(false);
   const [creatingProfile, setCreatingProfile] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [viewedLevel, setViewedLevel] =
-    useState<JourneyLevel>("starter");
+  const [boardView, setBoardView] = useState<{
+    profileId: string;
+    level: JourneyLevel;
+  } | null>(null);
   const [arrivalNodeId, setArrivalNodeId] = useState<string | null>(null);
   const [levelUpArrival, setLevelUpArrival] =
     useState<JourneyLevelUpArrival | null>(null);
@@ -846,13 +934,7 @@ export function JourneyClient() {
   const profile = state ? activePlayerProfile(state) : undefined;
   const activeProfileId = profile?.id;
   const journey = useMemo(
-    () =>
-      profile
-        ? buildJourneyPlanForVersion(
-            profile.gameSnapshot,
-            profile.journeyPlanVersion,
-          )
-        : null,
+    () => profile ? buildPlayerJourney(profile) : null,
     [profile],
   );
   const nextNode = profile && journey
@@ -872,6 +954,9 @@ export function JourneyClient() {
   const trailNode = journey
     ? activeNode ?? arrivalNode ?? nextNode ?? finalJourneyNode(journey)
     : undefined;
+  const reachedLevel = profile && journey
+    ? reachedJourneyLevel(profile, journey)
+    : "starter";
 
   useEffect(() => {
     const initialTimer = window.setTimeout(() => {
@@ -931,17 +1016,21 @@ export function JourneyClient() {
 
   useEffect(() => {
     if (
+      !activeProfileId ||
       !trailNode ||
       (testingMode && !activeNode && !arrivalNode)
     ) {
       return;
     }
     const timer = window.setTimeout(
-      () => setViewedLevel(trailNode.journeyLevel),
+      () => setBoardView({
+        profileId: activeProfileId,
+        level: activeNode?.journeyLevel ?? arrivalNode?.journeyLevel ?? reachedLevel,
+      }),
       0,
     );
     return () => window.clearTimeout(timer);
-  }, [activeNode, arrivalNode, testingMode, trailNode]);
+  }, [activeNode, activeProfileId, arrivalNode, reachedLevel, testingMode, trailNode]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -1017,6 +1106,7 @@ export function JourneyClient() {
     let existing = workingProfile.activeAttemptId
       ? workingProfile.attempts[workingProfile.activeAttemptId]
       : undefined;
+    if (!testingMode && existing && existing.stopId !== canonicalNode.id) return;
     if (
       !testingMode &&
       workingProfile.clearedStopIds.includes(canonicalNode.id) &&
@@ -1284,9 +1374,11 @@ export function JourneyClient() {
       ) : null}
       <JourneyBoard
         profile={profile}
-        viewedLevel={viewedLevel}
+        viewedLevel={boardView?.profileId === profile.id
+          ? boardView.level
+          : activeNode?.journeyLevel ?? reachedLevel}
         arrivalNodeId={arrivalNodeId}
-        onViewLevel={setViewedLevel}
+        onViewLevel={(level) => setBoardView({ profileId: profile.id, level })}
         onLaunch={launch}
         onRestartActive={restartActiveStop}
       />

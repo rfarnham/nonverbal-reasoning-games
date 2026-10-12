@@ -19,6 +19,7 @@ import {
   type JourneyPlan,
   type JourneyPlanVersion,
   type ProgressionLevel,
+  type PlayerProfile,
 } from "./types.ts";
 
 function legacyNodeId(
@@ -376,10 +377,77 @@ export function buildLegacyJourneyPlan(
 export function buildJourneyPlanForVersion(
   gameSnapshot: readonly JourneyGame[],
   version: JourneyPlanVersion,
+  additions: readonly JourneyGame[] = [],
 ): JourneyPlan {
-  return version === 1
+  const original = version === 1
     ? buildLegacyJourneyPlan(gameSnapshot)
     : buildJourneyPlan(gameSnapshot);
+  if (!additions.length) return original;
+  if (version === 1 || additions.some(({ role }) => role === "review")) {
+    throw new Error("Catalog additions require the current Journey plan and canonical games.");
+  }
+  // Validate the combined membership, including duplicate slugs, but never
+  // rebuild the ordinary-game window from this expanded set.
+  const games = validateGameSnapshot([...original.gameSnapshot, ...additions]);
+  const addedGames = games.filter(({ slug }) =>
+    additions.some((game) => game.slug.trim() === slug),
+  );
+  return {
+    gameSnapshot: games,
+    boards: original.boards.map((board) => {
+      const culmination = board.nodes.at(-1)!;
+      if (culmination.kind !== "culmination") {
+        throw new Error("A Journey board must end in a culmination.");
+      }
+      const extraNodes: JourneyNode[] = addedGames.map((game, index) => ({
+        id: `${board.journeyLevel}:catch-up:${game.slug}`,
+        kind: "normal",
+        catalogAddition: true,
+        journeyLevel: board.journeyLevel,
+        level: board.level,
+        position: culmination.position + index,
+        gameSlug: game.slug,
+        collectionId: journeyCampaignCollectionId(board.journeyLevel),
+        questionOffset: 0,
+        questionCount: 12,
+        xp: XP_PER_JOURNEY_STOP[board.journeyLevel],
+      }));
+      const nodes: JourneyNode[] = [
+        ...board.nodes.slice(0, -1),
+        ...extraNodes,
+        {
+          ...culmination,
+          position: culmination.position + addedGames.length,
+          sections: [
+            ...culmination.sections.filter(({ selection }) => selection === "mistakes"),
+            ...addedGames.map(({ slug }) => ({
+              selection: "mistakes" as const,
+              gameSlug: slug,
+              questionCount: 3 as const,
+            })),
+            ...culmination.sections.filter(({ selection }) => selection === "fixed"),
+          ],
+          gameSlugs: [...culmination.gameSlugs, ...addedGames.map(({ slug }) => slug)],
+        },
+      ];
+      return {
+        ...board,
+        nodes,
+        availableXp: board.availableXp + extraNodes.reduce((sum, node) => sum + node.xp, 0),
+      };
+    }),
+  };
+}
+
+/** Reconstruct a profile's original trail plus its append-only catalog updates. */
+export function buildPlayerJourney(
+  profile: Pick<PlayerProfile, "gameSnapshot" | "journeyPlanVersion" | "journeyAdditions">,
+): JourneyPlan {
+  return buildJourneyPlanForVersion(
+    profile.gameSnapshot,
+    profile.journeyPlanVersion,
+    profile.journeyAdditions,
+  );
 }
 
 export function findJourneyNode(

@@ -1,4 +1,4 @@
-export const PROGRESSION_SCHEMA_VERSION = 3 as const;
+export const PROGRESSION_SCHEMA_VERSION = 4 as const;
 export const CURRENT_JOURNEY_PLAN_VERSION = 2 as const;
 export type JourneyPlanVersion = 1 | typeof CURRENT_JOURNEY_PLAN_VERSION;
 
@@ -177,6 +177,8 @@ type JourneyNodeBase = {
 
 export type NormalJourneyNode = JourneyNodeBase & {
   kind: "normal";
+  /** A later catalog addition, taught without rearranging the original trail. */
+  catalogAddition?: true;
   gameSlug: string;
   collectionId: string;
   questionOffset: 0;
@@ -383,6 +385,8 @@ export type PlayerProfile = {
   updatedAtMs: number;
   journeyPlanVersion: JourneyPlanVersion;
   gameSnapshot: readonly JourneyGame[];
+  /** Append-only canonical games discovered after this profile was created. */
+  journeyAdditions?: readonly JourneyGame[];
   clearedStopIds: readonly string[];
   xpAwards: readonly XpAward[];
   /** Legacy idempotency index retained while storage migrates to xpAwards. */

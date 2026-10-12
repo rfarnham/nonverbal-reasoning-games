@@ -15,7 +15,7 @@ import {
 } from "@/lib/game-audio";
 import {
   activePlayerProfile,
-  buildJourneyPlanForVersion,
+  buildPlayerJourney,
   closeAttemptSummary,
   cosmeticJourneyLevelCrossed,
   findJourneyNode,
@@ -151,10 +151,7 @@ export function JourneySummaryClient() {
   const preview = useMemo(() => {
     if (!loaded) return null;
     const { profile, attempt } = loaded;
-    const journey = buildJourneyPlanForVersion(
-      profile.gameSnapshot,
-      profile.journeyPlanVersion,
-    );
+    const journey = buildPlayerJourney(profile);
     const node = findJourneyNode(journey, attempt.stopId);
     if (!node) return null;
     const basic = attempt.settlement ?? summarizeAttempt(attempt);
@@ -403,10 +400,7 @@ export function JourneySummaryClient() {
         !practiceReplay &&
         !currentTestingMode
       ) {
-        const journey = buildJourneyPlanForVersion(
-          closedProfile.gameSnapshot,
-          closedProfile.journeyPlanVersion,
-        );
+        const journey = buildPlayerJourney(closedProfile);
         const retryNode = findJourneyNode(journey, currentAttempt.stopId);
         if (!retryNode) throw new Error("Retry stop is no longer available.");
         const retryAttempt = createJourneyAttempt(closedProfile, retryNode);

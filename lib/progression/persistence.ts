@@ -68,7 +68,7 @@ const ROUND_PHASES: readonly AttemptRoundPhase[] = [
   "solved",
 ];
 const ATTEMPT_KINDS = ["normal", "review", "turbo", "culmination"] as const;
-const LEGACY_SCHEMA_VERSIONS = [0, 1, 2] as const;
+const LEGACY_SCHEMA_VERSIONS = [0, 1, 2, 3] as const;
 
 function isSupportedSchemaVersion(value: unknown): boolean {
   return (
@@ -585,10 +585,26 @@ function parseProfile(
   const updatedAtMs = nonNegativeNumber(profile?.updatedAtMs) ?? createdAtMs;
   if (!id || !name || !avatarId || !gameSnapshot) return undefined;
 
-  const journey = buildJourneyPlanForVersion(
-    gameSnapshot,
-    journeyPlanVersion,
-  );
+  // Additions are decoded before clears, awards, and attempts, because their
+  // stable IDs are real stops in the profile's persisted plan.
+  const rawAdditions = profile?.journeyAdditions;
+  if (rawAdditions !== undefined && !Array.isArray(rawAdditions)) return undefined;
+  let journey: JourneyPlan;
+  let journeyAdditions: readonly JourneyGame[] | undefined;
+  try {
+    journey = buildJourneyPlanForVersion(
+      gameSnapshot,
+      journeyPlanVersion,
+      (rawAdditions ?? []) as readonly JourneyGame[],
+    );
+    if (rawAdditions !== undefined) {
+      journeyAdditions = journey.gameSnapshot.filter(
+        ({ slug }) => !gameSnapshot.some((game) => game.slug === slug),
+      );
+    }
+  } catch {
+    return undefined;
+  }
   const completion = normalizedCompletion(
     journey,
     profile?.clearedStopIds,
@@ -646,7 +662,7 @@ function parseProfile(
         .filter(
           (missed): missed is MissedQuestion =>
             missed !== undefined &&
-            gameSnapshot.some(({ slug }) => slug === missed.question.gameSlug),
+            journey.gameSnapshot.some(({ slug }) => slug === missed.question.gameSlug),
         )
     : [];
   const missedByKey = new Map<string, MissedQuestion>();
@@ -710,6 +726,7 @@ function parseProfile(
     updatedAtMs,
     journeyPlanVersion,
     gameSnapshot,
+    ...(journeyAdditions === undefined ? {} : { journeyAdditions }),
     clearedStopIds,
     xpAwards,
     awardedStopIds,
@@ -824,10 +841,14 @@ export function decodeProgressionStateDiagnostic(
       };
     }
     const state = migrateProgressionState(raw);
+    const inputProfiles = legacyProfiles(record.profiles);
+    const lostProfile = inputProfiles.length !== state.profiles.length;
     return {
       state,
       status:
-        version !== PROGRESSION_SCHEMA_VERSION
+        lostProfile
+          ? "corrupt"
+          : version !== PROGRESSION_SCHEMA_VERSION
           ? "migrated"
           : jsonEquivalent(raw, state)
             ? "loaded"
@@ -895,6 +916,12 @@ export function saveProgressionState(
   if (!storage) return false;
   try {
     const normalized = migrateProgressionState(state);
+    // Normalization may repair old attempt fields, but must never silently
+    // replace saved progress after an invalid plan causes a profile to drop.
+    if (
+      normalized.profiles.length !== state.profiles.length ||
+      normalized.profiles.some((profile, index) => profile.id !== state.profiles[index]?.id)
+    ) return false;
     storage.setItem(storageKey, JSON.stringify(normalized));
     return true;
   } catch {

@@ -19,7 +19,7 @@ import {
   saveProgressionState,
 } from "./persistence.ts";
 import {
-  buildJourneyPlanForVersion,
+  buildPlayerJourney,
   findJourneyNode,
 } from "./journey.ts";
 import {
@@ -355,10 +355,7 @@ function questionGameMatchesJourney(
   gameSlug: string,
 ): boolean {
   const node = findJourneyNode(
-    buildJourneyPlanForVersion(
-      profile.gameSnapshot,
-      profile.journeyPlanVersion,
-    ),
+    buildPlayerJourney(profile),
     attempt.stopId,
   );
   if (

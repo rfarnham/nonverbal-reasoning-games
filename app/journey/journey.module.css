@@ -551,6 +551,44 @@
   letter-spacing: 0.08em;
 }
 
+.catalogUpdate {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  margin-bottom: 24px;
+  padding: 20px;
+  border: 1px solid var(--journey-line);
+  border-left: 5px solid #35a999;
+  border-radius: 18px;
+  background: var(--journey-panel);
+}
+
+.catalogUpdate > div {
+  flex: 1 1 300px;
+  min-width: 0;
+}
+
+.catalogUpdate h2 {
+  margin: 0 0 7px;
+  font-size: 1.05rem;
+  letter-spacing: -0.025em;
+}
+
+.catalogUpdate p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.catalogUpdate p + p {
+  margin-top: 8px;
+}
+
+.catalogUpdate button {
+  white-space: normal;
+}
+
 .boardTabs {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
@@ -821,6 +859,23 @@
   color: var(--journey-muted);
   font-size: 0.7rem;
   line-height: 1.35;
+}
+
+.nodeCopy .newStopBadge {
+  justify-self: start;
+  margin-bottom: 3px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #e2f2ec;
+  color: #176650;
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.nodeItem:focus-visible {
+  outline: 3px solid var(--journey-focus);
+  outline-offset: 4px;
+  border-radius: 14px;
 }
 
 .restartStopButton {

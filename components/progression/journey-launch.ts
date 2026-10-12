@@ -1,6 +1,7 @@
 import { games } from "@/lib/games";
 import { journeyReviews } from "@/lib/journey-reviews";
 import {
+  buildPlayerJourney,
   createCulminationProgressionAttempt,
   createNormalProgressionAttempt,
   createReviewProgressionAttempt,
@@ -72,7 +73,7 @@ export function journeyCampaignQuestions(
 }
 
 function currentGameVersions(profile: PlayerProfile, gameSlug: string) {
-  const savedGame = profile.gameSnapshot.find(({ slug }) => slug === gameSlug);
+  const savedGame = buildPlayerJourney(profile).gameSnapshot.find(({ slug }) => slug === gameSlug);
   if (!savedGame) {
     throw new Error(`${gameSlug} is not part of this profile's saved Journey.`);
   }
@@ -95,7 +96,7 @@ function currentJourneyContentVersion(
   profile: PlayerProfile,
   gameSlug: string,
 ): string {
-  const savedGame = profile.gameSnapshot.find(({ slug }) => slug === gameSlug);
+  const savedGame = buildPlayerJourney(profile).gameSnapshot.find(({ slug }) => slug === gameSlug);
   if (!savedGame) {
     throw new Error(`${gameSlug} is not part of this profile's saved Journey.`);
   }
