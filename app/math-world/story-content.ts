@@ -1,5 +1,6 @@
-/** Authored first chapter. Later islands keep their book placeholders. */
-export type StoryIllustration = "welcome" | "tideheart" | "peace" | "fracture" | "appeal";
+/** The original opening is preserved; later chapters live in voyage-story-content. */
+export type StoryIllustration = "welcome" | "tideheart" | "peace" | "fracture" | "appeal"
+  | "chart" | "beacon" | "wind" | "sails" | "reforging" | "ascent";
 
 export type StoryPageContent = {
   id: string;

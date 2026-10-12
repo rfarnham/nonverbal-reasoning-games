@@ -3,12 +3,13 @@ import { BOSS_STORIES } from "./boss-story-content.ts";
 import { DANGER_STORIES } from "./danger-content.ts";
 import { GLOBE_DANGER_LOCATIONS } from "./globe-danger-locations.ts";
 import { FIRST_WORLD_STORY } from "./story-content.ts";
+import { VOYAGE_STORY_GLOSSARY } from "./voyage-story-content.ts";
 import type { DangerState } from "./danger-engine.ts";
 import type { StoryPageProps } from "./StoryPage";
-import type { WorldStoryProgress } from "./story-progress.ts";
+import { acknowledgedVoyageChapters, type WorldStoryProgress } from "./story-progress.ts";
 
 /** A small field guide to words used in Oceania's story and scenery. */
-export const VOYAGE_GLOSSARY = [
+export const ORIGINAL_VOYAGE_GLOSSARY = [
   { term: "Archipelago", definition: "A group of islands close to one another." },
   { term: "Coral", definition: "Tiny sea animals whose hard skeletons can build reefs." },
   { term: "Current", definition: "A steady flow of water moving in one direction." },
@@ -28,6 +29,8 @@ export const VOYAGE_GLOSSARY = [
   { term: "Tide", definition: "The regular rise and fall of the sea." },
   { term: "Voyage", definition: "A long journey, especially a trip across the sea." },
 ] as const satisfies readonly Readonly<{ term: string; definition: string }>[];
+export const VOYAGE_GLOSSARY = [...ORIGINAL_VOYAGE_GLOSSARY, ...VOYAGE_STORY_GLOSSARY]
+  .sort((a, b) => a.term.localeCompare(b.term, "en"));
 
 /** Reading history is independent of map access, including QA unlocks. Repeated
  * danger kinds share one chronicle page; their packets remain separate. */
@@ -46,10 +49,14 @@ export function storySoFar(story: WorldStoryProgress, dangers: DangerState): Sto
     const packet = dangers.packets[danger.id];
     if (packet?.briefingRead || packet?.completedAt) read.add(danger.id);
   }
+  const chapters = acknowledgedVoyageChapters(story);
   const encounters = [
-    ...GLOBE_DANGER_LOCATIONS.map(danger => ({ id: danger.id, order: danger.afterWorld * 2, page: DANGER_STORIES[danger.kind] })),
-    ...BOSS_CHALLENGES.map(boss => ({ id: boss.id, order: boss.afterWorld * 2 + 1, page: BOSS_STORIES[boss.id] })),
+    ...GLOBE_DANGER_LOCATIONS.map(danger => ({ id: danger.id, order: danger.afterWorld * 4, page: DANGER_STORIES[danger.kind] })),
+    ...BOSS_CHALLENGES.map(boss => ({ id: boss.id, order: boss.afterWorld * 4 + 1, page: BOSS_STORIES[boss.id] })),
+    ...chapters.map(chapter => ({ id: chapter.id,
+      order: chapter.worldNumber * 4 + (chapter.shardWorld === undefined ? 2 : -2), page: chapter })),
   ].sort((a, b) => a.order - b.order);
+  for (const chapter of chapters) read.add(chapter.id);
   const included = new Set<string>();
   for (const encounter of encounters) {
     if (read.has(encounter.id) && !included.has(encounter.page.id)) {

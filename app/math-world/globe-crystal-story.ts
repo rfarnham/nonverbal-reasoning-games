@@ -191,13 +191,15 @@ export function createGlobeCrystalStory(globe: THREE.Group) {
 
   const matrix=new THREE.Matrix4(),rotation=new THREE.Quaternion(),spin=new THREE.Quaternion(),position=new THREE.Vector3(),scale=new THREE.Vector3();
   const up=new THREE.Vector3(0,1,0),forward=new THREE.Vector3(0,0,1),axis=new THREE.Vector3(.3,.8,.4).normalize();
-  let disposed=false, lastPose: number|undefined, lastStatic=false;
-  function update(progress: number|null, scattered=false) {
+  let disposed=false, lastPose: number|undefined, lastStatic=false, lastCollection="";
+  function update(progress: number|null, scattered=false, collectedWorlds: readonly number[] = []) {
     if(disposed)return;
     root.visible=progress!==null||scattered;if(!root.visible)return;
     const staticMarkers=progress===null,p=staticMarkers?1:clamp(progress!);
-    if(lastPose===p&&lastStatic===staticMarkers)return;
-    lastPose=p;lastStatic=staticMarkers;
+    const collected=new Set(staticMarkers ? collectedWorlds.filter(world=>Number.isInteger(world)&&world>=1&&world<=32) : []);
+    const collection=[...collected].sort((a,b)=>a-b).join(",");
+    if(lastPose===p&&lastStatic===staticMarkers&&lastCollection===collection)return;
+    lastPose=p;lastStatic=staticMarkers;lastCollection=collection;
     const burst=clamp((p-.21)/.17),intact=1-clamp((p-.215)/.04);
     root.userData.storyProgress=p;
     crystalMaterial.uniforms.crystalEnergy.value=clamp(p/.22)*2;
@@ -218,7 +220,7 @@ export function createGlobeCrystalStory(globe: THREE.Group) {
       const flight=crystalShardFlightProgress(target,p),point=sampleCrystalShardFlight(target,flight),launched=p>=target.launch;
       position.copy(point);rotation.setFromUnitVectors(up,position.clone().normalize());
       spin.setFromAxisAngle(axis,flight*Math.PI*8+index);rotation.multiply(spin);
-      const size=launched?(flight===1?.0048:.0075):0;
+      const size=launched&&!collected.has(target.worldNumber)?(flight===1?.0048:.0075):0;
       scale.set(size*.72,size*1.65,size*.72);matrix.compose(position,rotation,scale);shards.setMatrixAt(index,matrix);
       const impact=clamp((p-target.arrival)/.105),landed=p>=target.arrival;
       position.copy(target.point).multiplyScalar(1.002);rotation.setFromUnitVectors(forward,position.clone().normalize());

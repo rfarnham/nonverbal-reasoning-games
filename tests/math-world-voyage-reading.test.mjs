@@ -5,7 +5,8 @@ import { DANGER_STORIES } from "../app/math-world/danger-content.ts";
 import { createDangerState, ensureDangerPacket } from "../app/math-world/danger-engine.ts";
 import { GLOBE_DANGER_LOCATIONS } from "../app/math-world/globe-danger-locations.ts";
 import { FIRST_WORLD_STORY } from "../app/math-world/story-content.ts";
-import { createStoryProgress } from "../app/math-world/story-progress.ts";
+import { createStoryProgress, markVoyageChapterRead } from "../app/math-world/story-progress.ts";
+import { VOYAGE_CHAPTERS } from "../app/math-world/voyage-story-content.ts";
 import { storySoFar, VOYAGE_GLOSSARY } from "../app/math-world/voyage-reading.ts";
 
 const NOW = "2026-09-30T23:00:00.000Z";
@@ -110,12 +111,59 @@ test("review selection cannot change reading history, packet identity, answers o
   ]));
 });
 
+test("optional island chapters appear only after acknowledgement and follow their archipelagos", () => {
+  const story = { ...completeChapter(), readChapters: ["oceania-voyage-17", "oceania-voyage-04", "oceania-voyage-02", "oceania-voyage-16"],
+    readEncounters: ["boss-2025", "danger-04", "danger-02"] };
+  assert.deepEqual(ids(story), [
+    ...pageIds(Object.values(FIRST_WORLD_STORY)), "oceania-voyage-02", DANGER_STORIES.squall.id,
+    "oceania-voyage-04", DANGER_STORIES.kraken.id, "oceania-voyage-16", BOSS_STORIES["boss-2025"].id,
+    "oceania-voyage-17",
+  ]);
+  assert.equal(ids(story).includes("oceania-voyage-01"), false);
+  assert.equal(ids(story).includes("oceania-voyage-18"), false);
+  assert.deepEqual(ids(story, createDangerState("story-reader", true)), ids(story));
+});
+
+test("invalid ledgers and premature finale acknowledgements cannot expose new chapters", () => {
+  const unopened = { ...createStoryProgress(), readChapters: ["oceania-voyage-01"] };
+  assert.deepEqual(ids(unopened), []);
+  const malformed = { ...completeChapter(), readChapters: [
+    "oceania-voyage-00", "oceania-voyage-99", "oceania-voyage-reforging", "oceania-voyage-ascent", "oceania-call", "danger-02",
+  ], readEncounters: ["oceania-voyage-01", "oceania-voyage-ascent"] };
+  assert.deepEqual(ids(malformed), pageIds(Object.values(FIRST_WORLD_STORY)));
+  const normal = markVoyageChapterRead(completeChapter(), "oceania-voyage-08");
+  assert.deepEqual(ids({ ...normal, readChapters: [...normal.readChapters, ...normal.readChapters, "unknown"] }), [
+    ...pageIds(Object.values(FIRST_WORLD_STORY)), "oceania-voyage-08",
+  ]);
+});
+
+test("the acknowledged finale follows all shard chapters and encountered final crossings", () => {
+  let story = completeChapter();
+  for (const chapter of VOYAGE_CHAPTERS) story = markVoyageChapterRead(story, chapter.id);
+  story = { ...story, readEncounters: ["danger-32", "boss-2026"] };
+  assert.deepEqual(ids(story), [
+    ...pageIds(Object.values(FIRST_WORLD_STORY)), ...VOYAGE_CHAPTERS.slice(0,32).map(chapter => chapter.id),
+    DANGER_STORIES.icebergs.id, BOSS_STORIES["boss-2026"].id, "oceania-voyage-reforging", "oceania-voyage-ascent",
+  ]);
+});
+
+test("replaying optional chapters keeps story acknowledgements and danger packets immutable", () => {
+  const story = markVoyageChapterRead(completeChapter(), "oceania-voyage-07");
+  const dangers = freshDangers();
+  const before = structuredClone({ story, dangers });
+  Object.freeze(story.readChapters); Object.freeze(story); Object.freeze(dangers.packets); Object.freeze(dangers);
+  const pages = storySoFar(story, dangers);
+  pages.splice(0, pages.length);
+  assert.deepEqual({ story, dangers }, before);
+  assert.equal(ids(story).at(-1), "oceania-voyage-07");
+});
+
 test("the glossary stays short, alphabetical, grounded in the stories and friendly to young readers", () => {
-  assert.ok(VOYAGE_GLOSSARY.length >= 16 && VOYAGE_GLOSSARY.length <= 20);
+  assert.ok(VOYAGE_GLOSSARY.length >= 18 && VOYAGE_GLOSSARY.length <= 40);
   const terms = VOYAGE_GLOSSARY.map(entry => entry.term);
   assert.equal(new Set(terms).size, terms.length);
   assert.deepEqual(terms, [...terms].sort((a, b) => a.localeCompare(b)));
-  const storyText = [...Object.values(FIRST_WORLD_STORY), ...Object.values(DANGER_STORIES), ...Object.values(BOSS_STORIES)]
+  const storyText = [...Object.values(FIRST_WORLD_STORY), ...Object.values(DANGER_STORIES), ...Object.values(BOSS_STORIES), ...VOYAGE_CHAPTERS]
     .flatMap(page => page.paragraphs).join(" ").toLowerCase();
   for (const entry of VOYAGE_GLOSSARY) {
     assert.ok(storyText.includes(entry.term.toLowerCase()), `${entry.term} is introduced in the voyage`);

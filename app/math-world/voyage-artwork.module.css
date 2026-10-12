@@ -1,0 +1,25 @@
+.artwork {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 205px;
+  margin: 0 auto 23px;
+  overflow: visible;
+}
+
+/* Motion comes from the finite scenery clock, not a looping CSS animation.
+   SVG's authored final state also remains meaningful without JavaScript. */
+.artwork [data-tide-shard],
+.artwork [data-reforged-heart],
+.artwork [data-rising-ship],
+.artwork [data-blue-signal] {
+  transform-box: view-box;
+}
+
+@media (max-width: 620px) {
+  .artwork { margin-bottom: 18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .artwork { scroll-behavior: auto; }
+}

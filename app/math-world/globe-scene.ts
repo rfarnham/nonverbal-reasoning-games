@@ -42,6 +42,7 @@ export type GlobeSceneFrame = Readonly<{
   avatarPosition?: Vec3; avatarHop?: number;
   boatPosition?: Vec3; boatHeading?: Vec3;
   storyProgress?: number | null; storyPullback?: number; storyScattered?: boolean;
+  storyCollectedWorlds?: readonly number[];
   overviewSpinning?: boolean;
 }>;
 export type GlobeSceneOptions = Readonly<{
@@ -495,7 +496,7 @@ export function createGlobeScene(container: HTMLElement, options: GlobeSceneOpti
       shadow.material.opacity = .22*(1-Math.min(.8,(next.avatarHop ?? 0)*15));
     }
     updateScenery();
-    crystalStory.update(next.storyProgress ?? null, next.storyScattered);
+    crystalStory.update(next.storyProgress ?? null, next.storyScattered, next.storyCollectedWorlds);
     globe.updateMatrixWorld(true);
     renderer.render(scene, camera);
     lastPaintTime = performance.now();

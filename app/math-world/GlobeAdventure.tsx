@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GlobeBoard, type GlobeBoardHandle } from "./GlobeBoard";
 import { WorldNavigation } from "./WorldNavigation";
 import { BOSS_CHALLENGES, bossAfterWorld, type BossChallenge } from "./boss-challenges.ts";
@@ -10,14 +10,14 @@ import { printWorldWorkbook, printDangerWorkbook } from "./workbook.ts";
 import { printBossWorkbook } from "./boss-workbook.ts";
 import { StoryPage } from "./StoryPage";
 import { FIRST_WORLD_STORY } from "./story-content.ts";
-import { advanceStoryPage, automaticStoryPage, markStoryBookRead, markEncounterRead, type AutomaticStoryPage, type WorldStoryProgress } from "./story-progress.ts";
+import { VOYAGE_CHAPTERS } from "./voyage-story-content.ts";
+import { advanceStoryPage, automaticStoryPage, markStoryBookRead, markEncounterRead, markVoyageChapterRead, nextVoyageChapter, recoveredShardWorlds, type AutomaticStoryPage, type WorldStoryProgress } from "./story-progress.ts";
 import { dangerAfterWorld, dangerById, dangerSceneryStages, hasCrossedDanger, type DangerDefinition } from "./danger-definitions.ts";
 import { DANGER_STORIES } from "./danger-content.ts";
 import { BOSS_STORIES } from "./boss-story-content.ts";
 import { VoyageLibrary, type ReadingPanel } from "./VoyageLibrary";
-import { storySoFar, VOYAGE_GLOSSARY } from "./voyage-reading.ts";
+import { storySoFar, ORIGINAL_VOYAGE_GLOSSARY, VOYAGE_GLOSSARY } from "./voyage-reading.ts";
 import { dangerPacketQuestions, dangerPacketAccuracy, type DangerState, type DangerPacket } from "./danger-engine.ts";
-import shell from "./math-world.module.css";
 import styles from "./globe.module.css";
 
 type Props = {
@@ -34,14 +34,15 @@ export function GlobeAdventure(props: Props) {
   const { world, boss, danger, progress, qaUnlocked } = props;
   const boardRef = useRef<GlobeBoardHandle>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const storyRef = useRef<HTMLDialogElement>(null);
   const storyOpener = useRef<HTMLButtonElement | null>(null);
+  const restoreVoyageFocus = useRef(false);
   const packet = danger ? props.dangerState.packets[danger.id] : undefined;
   const dangerBriefing = !!danger && !packet?.briefingRead && !props.storyProgress.readEncounters.includes(danger.id);
   const bossBriefing = !!boss && !props.storyProgress.readEncounters.includes(boss.id);
   const [library, setLibrary] = useState<ReadingPanel | null>(null);
   const [revisitDanger, setRevisitDanger] = useState(false);
   const [story, setStory] = useState<number | null>(null);
+  const [voyageReading, setVoyageReading] = useState<{ id: string; fromBook: boolean; replaying?: boolean } | null>(null);
   const [preview, setPreview] = useState<AutomaticStoryPage | null>(null);
   const [busy, setBusy] = useState(false);
   const [printing, setPrinting] = useState(false);
@@ -62,17 +63,32 @@ export function GlobeAdventure(props: Props) {
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => { headingRef.current?.focus({ preventScroll: true }); }, [destinationId]);
   useEffect(() => {
-    const closeReading = () => { storyRef.current?.close(); setPreview(null); setStory(null); setRevisitDanger(false); setLibrary(null); };
+    const closeReading = () => { setPreview(null); setStory(null); setVoyageReading(null); setRevisitDanger(false); setLibrary(null); };
     window.addEventListener("popstate", closeReading);
     return () => window.removeEventListener("popstate", closeReading);
   }, []);
-  useEffect(() => { if (world.number !== 1 && story !== null && !storyRef.current?.open) storyRef.current?.showModal(); }, [story, world.number]);
   const automaticPage = automaticStoryPage(props.storyProgress, progress, world.id, !!boss || !!danger);
   const chapterStage = preview ?? automaticPage;
   const chapterPage = chapterStage && chapterStage !== "shattering" ? FIRST_WORLD_STORY[chapterStage] : null;
   const bookPage = world.number === 1 && story !== null ? (story === 0 ? FIRST_WORLD_STORY.book1 : FIRST_WORLD_STORY.book2) : null;
-  const narrativeReading = dangerBriefing || bossBriefing || (!!danger && revisitDanger) || !!chapterStage || story !== null;
+  const voyageAvailable = props.storyProgress.ending === "complete";
+  const voyageChapter = voyageAvailable ? VOYAGE_CHAPTERS.find(chapter => chapter.id === voyageReading?.id) : undefined;
+  const islandChapter = VOYAGE_CHAPTERS.find(chapter => chapter.shardWorld === world.number);
+  const nextChapter = nextVoyageChapter(props.storyProgress);
+  const collectedShards = useMemo(() => recoveredShardWorlds(props.storyProgress), [props.storyProgress]);
+  const narrativeReading = dangerBriefing || bossBriefing || (!!danger && revisitDanger) || !!chapterStage || story !== null || !!voyageChapter;
   const reading = narrativeReading || library !== null;
+  useEffect(() => {
+    if (!restoreVoyageFocus.current || reading || busy || printing) return;
+    const opener = storyOpener.current;
+    const frame = requestAnimationFrame(() => {
+      if (opener?.isConnected && !opener.disabled) {
+        opener.focus({ preventScroll: true });
+        restoreVoyageFocus.current = false;
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [busy, printing, reading]);
   function continueChapter() {
     if (!chapterStage) return;
     if (preview) setPreview(preview === "fracture" ? "shattering" : preview === "shattering" ? "appeal" : null);
@@ -83,9 +99,22 @@ export function GlobeAdventure(props: Props) {
     setStory(null);
     requestAnimationFrame(() => { if (storyOpener.current?.isConnected) storyOpener.current.focus({ preventScroll: true }); });
   }
+  function closeVoyage() {
+    restoreVoyageFocus.current = true;
+    setVoyageReading(null);
+  }
+  function continueVoyage() {
+    if (!voyageChapter) return;
+    const nextStory = markVoyageChapterRead(props.storyProgress, voyageChapter.id);
+    props.onStoryProgress(nextStory);
+    const next = !voyageReading?.fromBook ? voyageReading?.replaying
+      ? VOYAGE_CHAPTERS[VOYAGE_CHAPTERS.findIndex(chapter => chapter.id === voyageChapter.id) + 1]
+      : nextVoyageChapter(nextStory) : undefined;
+    if (next) setVoyageReading({ id: next.id, fromBook: false, replaying: voyageReading?.replaying });
+    else closeVoyage();
+  }
   function navigate(id: string) {
-    storyRef.current?.close();
-    setPreview(null); setStory(null);
+    setPreview(null); setStory(null); setVoyageReading(null);
     setPrintError(null); setRevisitDanger(false); setLibrary(null);
     const targetDanger = dangerById(id);
     if (targetDanger) { props.onChooseDanger(targetDanger); return; }
@@ -121,10 +150,21 @@ export function GlobeAdventure(props: Props) {
       onNavigate={navigate} onOpenStop={props.onOpenStop} onInspectStop={props.onInspectStop} onBusyChange={onBusyChange}
       interactionLocked={reading} storyScene={chapterStage === "shattering"} onStorySceneEnd={continueChapter}
       storyScattered={props.storyProgress.ending === "appeal" || props.storyProgress.ending === "complete"}
-      storyBookLabels={!danger && world.number === 1 ? [FIRST_WORLD_STORY.book1.title, FIRST_WORLD_STORY.book2.title] : undefined}
-      onStory={(index, opener) => { storyOpener.current = opener; setStory(index); }} />
-    <VoyageLibrary pages={storySoFar(props.storyProgress, props.dangerState)} glossary={VOYAGE_GLOSSARY}
-      panel={library} onPanelChange={setLibrary} disabled={printing || busy || narrativeReading} />
+      storyCollectedWorlds={collectedShards}
+      storyBookLabels={!danger && world.number === 1 ? [FIRST_WORLD_STORY.book1.title, FIRST_WORLD_STORY.book2.title] : voyageAvailable && islandChapter ? [islandChapter.title] : []}
+      onStory={(index, opener) => {
+        storyOpener.current = opener;
+        if (world.number === 1) setStory(index);
+        else if (voyageAvailable && islandChapter) setVoyageReading({ id: islandChapter.id, fromBook: true });
+      }} />
+    <VoyageLibrary pages={storySoFar(props.storyProgress, props.dangerState)} glossary={voyageAvailable ? VOYAGE_GLOSSARY : ORIGINAL_VOYAGE_GLOSSARY}
+      panel={library} onPanelChange={setLibrary} disabled={printing || busy || narrativeReading}
+      continueStoryLabel={nextChapter ? props.storyProgress.readChapters?.length ? "Continue the story" : "The shard voyage" : "Revisit the voyage"}
+      onContinueStory={voyageAvailable ? opener => {
+        const chapter = nextChapter ?? VOYAGE_CHAPTERS[0];
+        storyOpener.current = opener;
+        setVoyageReading({ id: chapter.id, fromBook: false, replaying: !nextChapter });
+      } : undefined} />
     </div>
     {!danger && <section className={styles.actions} aria-label="World actions" inert={reading}>
       <div><strong>{boss ? "A full test awaits" : complete ? "Every trail explored" : "Your next discovery"}</strong><p>{boss ? "Print the test and work through it with pencil and paper." : complete ? "Your boat is ready for the next adventure." : "Choose a stop on the globe, or explore the list below."}</p></div>
@@ -155,10 +195,7 @@ export function GlobeAdventure(props: Props) {
     {chapterPage && <StoryPage key={chapterPage.id} page={chapterPage} onContinue={continueChapter}
       actionLabel={chapterStage === "intro" ? "Begin exploring" : chapterStage === "fracture" ? "Watch the sky" : "I’ll help find the shards"} />}
     {!chapterPage && bookPage && <StoryPage key={bookPage.id} page={bookPage} onContinue={closeBook} actionLabel="Back to the map" />}
-    {world.number !== 1 && <dialog ref={storyRef} className={shell.storyDialog} aria-labelledby="globe-story-title" onClose={() => { setStory(null); storyOpener.current?.focus({ preventScroll: true }); }}>
-      <div className={styles.storyIcon} aria-hidden="true">▤</div><p className={styles.kicker}>{world.title} · Island {(story ?? 0) + 1}</p>
-      <h2 id="globe-story-title">Story coming soon</h2><p>A little story will connect this island to the rest of the adventure.</p>
-      <button type="button" className={styles.primary} onClick={() => storyRef.current?.close()}>Back to the map</button>
-    </dialog>}
+    {voyageChapter && <StoryPage key={voyageChapter.id} page={voyageChapter} onContinue={continueVoyage} onClose={closeVoyage}
+      actionLabel={voyageReading?.fromBook ? "Back to the map" : voyageChapter.id === VOYAGE_CHAPTERS.at(-1)?.id ? "Keep the light" : "Read on"} />}
   </main>;
 }

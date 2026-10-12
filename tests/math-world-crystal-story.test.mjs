@@ -10,6 +10,25 @@ const radius = point => Math.hypot(point.x, point.y, point.z);
 const distance = (a,b) => Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);
 const close = (a,b,tolerance=1e-10) => assert.ok(Math.abs(a-b)<tolerance, `${a} ≈ ${b}`);
 
+test('story recovery removes only acknowledged summit shards and leaves the sundering replay intact',()=>{
+  const globe=new THREE.Group(),effect=createGlobeCrystalStory(globe);
+  const shards=globe.getObjectByName('One fallen crystal shard per archipelago summit');
+  const matrix=new THREE.Matrix4(),scale=new THREE.Vector3();
+  const shardScale=world=>{shards.getMatrixAt(world-1,matrix);return scale.setFromMatrixScale(matrix).clone();};
+  effect.update(null,true,[32,1,1,99,NaN]);
+  assert.equal(shardScale(1).length(),0);
+  assert.equal(shardScale(32).length(),0);
+  assert.ok(shardScale(2).length()>0);
+  const version=shards.instanceMatrix.version;
+  effect.update(null,true,[1,32]);
+  assert.equal(shards.instanceMatrix.version,version,'equivalent story acknowledgments reuse the static pose');
+  effect.update(1,true,[1,32]);
+  for(let world=1;world<=32;world++)assert.ok(shardScale(world).length()>0,'the original sundering still shows every shard');
+  effect.update(null,true,Array.from({length:32},(_,index)=>index+1));
+  for(let world=1;world<=32;world++)assert.equal(shardScale(world).length(),0,'recovered story shards do not remain on the globe');
+  effect.dispose();
+});
+
 test('crystal fragments map exactly to each authored archipelago summit, not ordinary stops, books or bosses',()=>{
   const expected = WORLD_DEFINITIONS.map(world=>world.stopIds.at(-1));
   assert.equal(new Set(CRYSTAL_SHARD_TARGETS.map(target=>target.stopId)).size,expected.length);

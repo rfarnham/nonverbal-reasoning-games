@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useId, useRef } from "react";
 import type { StoryIllustration, StoryPageContent } from "./story-content";
+import { isVoyageIllustration, VoyageArtwork } from "./VoyageArtwork";
 import styles from "./story.module.css";
 
 function Crystal({ prefix, fractured = false }: { prefix: string; fractured?: boolean }) {
@@ -110,7 +111,9 @@ export type StoryPageProps = {
 
 /** Shared artwork for the onboarding scroll and read-only book. */
 export function StoryArtwork({ illustration, className = styles.illustration }: { illustration: StoryPageProps["page"]["illustration"]; className?: string }) {
-  return typeof illustration === "string" ? <StoryIllustration kind={illustration} className={className} />
+  return typeof illustration === "string" ? isVoyageIllustration(illustration)
+    ? <VoyageArtwork key={illustration} kind={illustration} className={className} />
+    : <StoryIllustration kind={illustration} className={className} />
     : <Image className={className} src={`${(process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "")}${illustration.src}`}
       width={illustration.width} height={illustration.height} alt={illustration.alt} unoptimized priority
       style={{ height: "auto", maxHeight: "38vh", objectFit: "contain", borderRadius: "20px" }} />;

@@ -3,6 +3,7 @@
 .libraryButton svg { display: block; width: 60px; height: 68px; }
 .storyButton { border-color: #cdc4ad; background: #faf5e8; }
 .glossaryButton { border-color: #b8cdc3; background: #eff5ec; }
+.voyageButton { border-color: #d2bd8d; background: #fbf0d9; }
 .libraryButton:hover:not(:disabled) { transform: translateY(-2px); background: #fffdf7; }
 .libraryButton:disabled { opacity: .55; cursor: default; }
 .libraryButton:focus-visible, .close:focus-visible, .pageArrow:focus-visible { outline: 3px solid #1679d2; outline-offset: 4px; }
@@ -63,7 +64,7 @@
 @keyframes bookReveal { 0%, 8% { opacity: 0; transform: scale(.97); } 32%, 100% { opacity: 1; transform: scale(1); } }
 
 @media (max-width: 820px) {
-  .rail { flex-direction: row; justify-content: center; align-self: auto; width: 100%; padding: 0; }
+  .rail { flex-direction: row; flex-wrap: wrap; justify-content: center; align-self: auto; width: 100%; padding: 0; }
   .libraryButton { flex-direction: row; gap: 10px; width: auto; min-width: 150px; min-height: 58px; padding: 7px 17px 7px 10px; border-radius: 15px; }
   .libraryButton svg { width: 36px; height: 41px; }
   .storyDialog { width: calc(100vw - 36px); height: min(800px, calc(100dvh - 36px)); }

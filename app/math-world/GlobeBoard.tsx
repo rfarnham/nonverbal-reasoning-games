@@ -40,6 +40,7 @@ type Props = {
   onBusyChange: (busy: boolean) => void; onStory: (index: number, opener: HTMLButtonElement) => void;
   voyageActivity?: ComponentType<VoyageActivityProps>;
   interactionLocked?: boolean; storyScene?: boolean; storyScattered?: boolean;
+  storyCollectedWorlds?: readonly number[];
   onStorySceneEnd?: () => void; storyBookLabels?: readonly string[];
 };
 const basePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
@@ -145,7 +146,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
     const orientation = next.orientation ?? (next.focus
       ? transportGlobeOrientation(frame.current.orientation ?? northUpGlobeOrientation(frame.current.focus), next.focus)
       : frame.current.orientation);
-    frame.current = { ...frame.current, ...next, orientation, completedStopIds: p.progress.completedStopIds, storyScattered: p.storyScattered, dangerStages: p.dangerStages,
+    frame.current = { ...frame.current, ...next, orientation, completedStopIds: p.progress.completedStopIds, storyScattered: p.storyScattered, storyCollectedWorlds: p.storyCollectedWorlds, dangerStages: p.dangerStages,
       overviewSpinning: phaseRef.current === "overview" && !pointer.current && !hasFocusedMapControl(boardRef.current) && !p.interactionLocked,
       stormStages: getBossStormStages(p.progress, p.qaUnlocked, next.activeDestinationId ?? frame.current.activeDestinationId) };
     sceneRef.current?.render(frame.current);
@@ -370,7 +371,7 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
     animation.current?.cancel();
     paint({ focus: getGlobeDestination(destinationId)!.center, orientation: northUpGlobeOrientation(getGlobeDestination(destinationId)!.center), activeDestinationId: destinationId, cameraDestinationId: undefined, stormCameraBlend: undefined, avatarPosition: restingPosition() });
   }, [destinationId]);
-  useEffect(() => { paint({ avatarPosition: trip.current || props.storyScene ? frame.current.avatarPosition : restingPosition() }); }, [props.dangerStages, props.progress, props.restingStopId, props.qaUnlocked, props.storyScattered, props.storyScene]);
+  useEffect(() => { paint({ avatarPosition: trip.current || props.storyScene ? frame.current.avatarPosition : restingPosition() }); }, [props.dangerStages, props.progress, props.restingStopId, props.qaUnlocked, props.storyScattered, props.storyScene, props.storyCollectedWorlds]);
   useEffect(() => { positionMarkers(projectionRef.current); }, [phase, destinationId, renderer, narrow, props.progress, props.qaUnlocked]);
   function turn(dx: number, dy: number, animated = false) {
     if (busy) return;
@@ -441,15 +442,17 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
           const available = canOpenRequiredStop(props.progress, stop.id, props.qaUnlocked);
           const fallback = renderer === "fallback";
           const point = layout.stopPoints[index];
+          const shardAtSummit = !!props.storyScattered && index === stops.length - 1;
+          const shardRecovered = !!props.storyCollectedWorlds?.includes(props.world.number);
           return <button type="button" key={stop.id} ref={node => { if (node) nodes.current.set(`stop:${stop.id}`, node); else nodes.current.delete(`stop:${stop.id}`); }}
             className={`${styles.stopPin} ${complete ? styles.completePin : currentStop?.id === stop.id ? styles.currentPin : ""}`}
             style={fallback ? { left: `${point.x}%`, top: `${point.y}%`, visibility: "visible" } : { visibility: "hidden" }}
-            data-stop-id={stop.id} data-summit-shard={!!props.storyScattered && index === stops.length - 1 ? "true" : undefined} disabled={!available || busy} aria-current={currentStop?.id === stop.id ? "step" : undefined}
-            aria-label={`${stop.label}. ${complete ? "Completed" : available ? "Available" : "Locked"}. ${QUESTIONS_BY_STOP.get(stop.id)?.length} questions.${props.storyScattered && index === stops.length - 1 ? " A Tideheart shard rests at this summit." : ""}`} onClick={() => { void openStop(stop.id); }}>
+            data-stop-id={stop.id} data-summit-shard={shardAtSummit && !shardRecovered ? "true" : undefined} disabled={!available || busy} aria-current={currentStop?.id === stop.id ? "step" : undefined}
+            aria-label={`${stop.label}. ${complete ? "Completed" : available ? "Available" : "Locked"}. ${QUESTIONS_BY_STOP.get(stop.id)?.length} questions.${shardAtSummit ? shardRecovered ? " This summit’s Tideheart shard has been recovered in the story." : " A Tideheart shard rests at this summit." : ""}`} onClick={() => { void openStop(stop.id); }}>
             <span>{complete ? "✓" : !available ? "⌑" : stop.kind === "culmination" ? "★" : index + 1}</span><small>{stop.shortLabel}</small>
           </button>;
         })}
-        {!props.boss && !props.danger && layout.books.map((book, index) => <button type="button" key={`${props.world.id}:${book.id}`} ref={node => { const key = `book:${props.world.id}:${book.id}`; if (node) nodes.current.set(key, node); else nodes.current.delete(key); }}
+        {!props.boss && !props.danger && layout.books.map((book, index) => props.storyBookLabels && !props.storyBookLabels[index] ? null : <button type="button" key={`${props.world.id}:${book.id}`} ref={node => { const key = `book:${props.world.id}:${book.id}`; if (node) nodes.current.set(key, node); else nodes.current.delete(key); }}
           className={styles.bookPin} disabled={busy} data-story-island-id={book.islandId} data-story-book-id={book.id}
           style={renderer === "fallback" ? { left: `${book.x}%`, top: `${book.y}%`, visibility: "visible" } : { visibility: "hidden" }}
           aria-label={`Storybook on island ${index + 1}: ${props.storyBookLabels?.[index] ?? "coming soon"}`} aria-haspopup="dialog" onClick={event => props.onStory(index, event.currentTarget)}><BookIcon /></button>)}
@@ -462,6 +465,6 @@ export const GlobeBoard = forwardRef<GlobeBoardHandle, Props>(function GlobeBoar
       </div>}
       <div ref={irisRef} className={styles.iris} aria-hidden="true" />
     </div>
-    <p className={styles.boardCaption}>{props.storyScene ? "The Tideheart’s light is scattered, but not lost." : props.danger && phase !== "overview" ? (props.dangerStages?.[props.danger.id] ?? 0) > 0 ? "One crossing. Take your time and use your paper packet." : "This crossing is clear. Your voyage notes and packet are still here." : props.boss && phase !== "overview" ? "The ship faces the storm. Print the whole test to take on this challenge." : renderer === "fallback" ? "Choose an island stop, or use the list below." : phase === "overview" ? "Drag or use the arrow keys to orbit. Choose a destination to set sail." : props.storyBookLabels ? "Choose a stop to explore. Open the two books to discover Oceania’s story." : "Choose a stop to explore. The two books hold stories to come."}</p>
+    <p className={styles.boardCaption}>{props.storyScene ? "The Tideheart’s light is scattered, but not lost." : props.danger && phase !== "overview" ? (props.dangerStages?.[props.danger.id] ?? 0) > 0 ? "One crossing. Take your time and use your paper packet." : "This crossing is clear. Your voyage notes and packet are still here." : props.boss && phase !== "overview" ? "The ship faces the storm. Print the whole test to take on this challenge." : renderer === "fallback" ? "Choose an island stop, or use the list below." : phase === "overview" ? "Drag or use the arrow keys to orbit. Choose a destination to set sail." : props.world.number === 1 && props.storyBookLabels ? "Choose a stop to explore. Open the two books to discover Oceania’s story." : props.storyBookLabels?.length ? "An island chronicle waits in the book. The shard voyage continues in the library." : "Choose a stop to explore."}</p>
   </section>;
 });
