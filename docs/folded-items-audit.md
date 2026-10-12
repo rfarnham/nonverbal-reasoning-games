@@ -59,8 +59,10 @@ stay flat and high-contrast; depth is teaching information, not decoration.
 
 The owner also explicitly introduces stack order at Junior. Ordered alternatives
 may contain the same item identities in different positions, because their
-vertical positions are the reasoning task. They must differ in at least two
-layer positions and never rely on a style-only distinction.
+vertical positions are the reasoning task. At Junior, alternatives must differ
+in at least two layer positions and never rely on a style-only distinction.
+Wizard may keep the exact same identities and order while changing one visibly
+asymmetric glyph's orientation, as explicitly requested by the owner.
 
 A wrong-answer comparison normally highlights missing components in the suite.
 Here it would reveal the solution, so the owner's no-reveal requirement uses a
@@ -106,15 +108,17 @@ The dedicated checks are:
   transformed choice through incorrect feedback, the solved view, and historical
   inspection of both the correct answer and the first incorrect answer.
 
-Preliminary orientation follow-up verification on October 12, 2026:
+Final orientation follow-up verification on October 12, 2026, after integrating
+the newer `main`:
 
 - All ten UI, actual-renderer, feedback, and legacy-reference tests passed.
-- The full repository check passed before integrating the newer `main`: 1,172
-  JavaScript tests (8 existing skips), 174 Python tests, and 10 search-build tests,
+- The full repository check passed: 1,179 JavaScript tests passed (8 existing
+  skips), 174 Python tests, and 10 search-build tests,
   plus lint, TypeScript, and the Pages export.
-- Seven of nine browser scenarios passed in that export. Both Wizard scenarios
-  stopped at the new **symbols shown upright** caption, which was present in
-  source but absent from the inspected export. They must pass against the rebuilt
-  final revision; this preliminary result does not certify Wizard orientation.
-- Final repository and browser verification after integrating the newer `main`,
-  followed by production deployment, remain release gates for the delivery task.
+- All nine dedicated browser scenarios passed against the final merged Pages
+  export, including Wizard orientation-only traps, nonspoiling wrong feedback,
+  transformed solved and historical views, and the upright evidence caption.
+- Desktop and 390px phone screenshots were visually inspected: unmarked glyphs,
+  transformed choices, and the upright caption remain legible without clipping
+  or horizontal overflow.
+- Production deployment verification remains the final delivery gate.
