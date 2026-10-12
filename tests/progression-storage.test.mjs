@@ -16,6 +16,7 @@ import {
   createTurboProgressionAttempt,
   decodeProgressionState,
   decodeProgressionStateDiagnostic,
+  discardActiveProgressionAttempt,
   loadProgressionState,
   loadProgressionStateDiagnostic,
   previousJourneyNodeIds,
@@ -688,7 +689,7 @@ test("schema-v2 profiles retain old clears and XP before an idle seven-board upg
   );
 });
 
-test("test mode discards an unfinished legacy run so every current stop is available", () => {
+test("legacy upgrades preserve every active run until it is explicitly discarded", () => {
   const legacyJourney = buildLegacyJourneyPlan(games);
   const legacyNode = legacyJourney.boards[0].nodes[0];
   const attempt = createNormalProgressionAttempt({
@@ -712,10 +713,25 @@ test("test mode discards an unfinished legacy run so every current stop is avail
     activeAttemptId: attempt.id,
   };
 
-  const upgraded = upgradePlayerProfileJourneyPlan(
+  const deferredTestProfile = upgradePlayerProfileJourneyPlan(
     legacyTestProfile,
     journeyGames,
     3,
+  );
+  assert.equal(deferredTestProfile, legacyTestProfile);
+  assert.equal(deferredTestProfile.journeyPlanVersion, 1);
+  assert.equal(deferredTestProfile.activeAttemptId, attempt.id);
+  assert.deepEqual(deferredTestProfile.attempts[attempt.id], attempt);
+
+  const idleTestProfile = discardActiveProgressionAttempt(
+    deferredTestProfile,
+    attempt.id,
+    4,
+  );
+  const upgraded = upgradePlayerProfileJourneyPlan(
+    idleTestProfile,
+    journeyGames,
+    5,
   );
   const upgradedJourney = buildJourneyPlan(upgraded.gameSnapshot);
 
@@ -736,4 +752,5 @@ test("test mode discards an unfinished legacy run so every current stop is avail
   );
   assert.equal(protectedPlayer.journeyPlanVersion, 1);
   assert.equal(protectedPlayer.activeAttemptId, attempt.id);
+  assert.deepEqual(protectedPlayer.attempts[attempt.id], attempt);
 });

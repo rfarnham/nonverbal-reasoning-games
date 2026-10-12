@@ -14,6 +14,7 @@ import {
   beginCulminationSection,
   buildLegacyJourneyPlan,
   buildJourneyPlan,
+  buildPlayerJourney,
   canPlayerAccessJourneyNode,
   closeAttemptSummary,
   createCulminationProgressionAttempt,
@@ -262,7 +263,7 @@ test("larger Journey snapshots rotate eight ordinary games and culminate with ev
   assert.equal(turboCoverage.size, fullCatalog.length);
 });
 
-test("catalog growth preserves existing profile membership and legacy plan boundaries", () => {
+test("catalog growth preserves original trails and appends new game practice", () => {
   const expandedCatalog = [
     ...games,
     { slug: "new-game", title: "New Game" },
@@ -279,14 +280,35 @@ test("catalog growth preserves existing profile membership and legacy plan bound
     });
     const before = buildJourneyPlan(profile.gameSnapshot);
     const upgraded = upgradePlayerProfileJourneyPlan(profile, expandedCatalog, 2);
-    assert.equal(upgraded, profile);
+    assert.deepEqual(upgraded.gameSnapshot, profile.gameSnapshot);
     assert.deepEqual(buildJourneyPlan(upgraded.gameSnapshot), before);
+    const expectedAdditions = expandedCatalog.filter(({ slug, role }) =>
+      role !== "review" && !profile.gameSnapshot.some((game) => game.slug === slug),
+    ).map(({ slug }) => slug);
+    assert.deepEqual(upgraded.journeyAdditions.map(({ slug }) => slug), expectedAdditions);
+    const updatedJourney = buildPlayerJourney(upgraded);
     for (const board of before.boards) {
       assert.deepEqual(
         board.nodes.filter(({ kind }) => kind === "normal").map(({ gameSlug }) => gameSlug),
         Array.from({ length: 8 }, (_, index) => games[index % count].slug),
       );
+      const updatedBoard = updatedJourney.boards.find(
+        ({ journeyLevel }) => journeyLevel === board.journeyLevel,
+      );
+      assert.deepEqual(
+        updatedBoard.nodes.filter(({ kind, catalogAddition }) =>
+          kind !== "culmination" && !catalogAddition,
+        ),
+        board.nodes.filter(({ kind }) => kind !== "culmination"),
+      );
+      assert.deepEqual(
+        updatedBoard.nodes.filter(({ catalogAddition }) => catalogAddition)
+          .map(({ gameSlug }) => gameSlug),
+        expectedAdditions,
+      );
+      assert.equal(updatedBoard.nodes.at(-1).id, board.nodes.at(-1).id);
     }
+    assert.equal(upgradePlayerProfileJourneyPlan(upgraded, expandedCatalog, 3), upgraded);
   }
   const originalLegacy = buildLegacyJourneyPlan(games);
   assert.deepEqual(buildLegacyJourneyPlan(expandedCatalog), originalLegacy);

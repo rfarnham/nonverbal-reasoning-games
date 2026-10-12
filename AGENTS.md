@@ -290,6 +290,16 @@ Journey is generic:
 - never copy a game's puzzle data or generation logic into Journey;
 - snapshot the ordered game membership when a profile starts so a later catalog
   change cannot rearrange earned progress;
+- reconcile newly discovered canonical games into existing profiles with an
+  append-only additions snapshot; never reorder or replace the original
+  membership, stop IDs, cleared stops, question history, or earned XP;
+- teach each later addition in its own 12-question stop before each board's
+  culmination, using that board's canonical Campaign or Journey-only bank;
+- require outstanding added stops on previous boards before starting further
+  stops on the player's current board, while keeping reached boards viewable
+  and clearly linking to the earliest new prerequisite;
+- finish an active saved attempt before applying a catalog update; never
+  rewrite its questions, answers, redemption queue, or active practice time;
 - include every discovered canonical game in new profiles; when there are more
   than eight, rotate an eight-game ordinary-stop window between boards while
   culmination still covers every snapshotted game;
@@ -305,6 +315,15 @@ after each half of the ordinary/Turbo path. Their cadence is:
 
 `(ordinary, ordinary, turbo) × 2, spatial review` repeated twice, then
 culmination.
+
+These are the base trails. An existing profile may also have added-game stops
+before its culminations. Each such stop has a stable ID based on its board and
+game, follows the normal clear and redemption rules, and awards that board's XP
+once. Completed culminations remain completed; later culminations include all
+games in the original snapshot and additions. Catalog reconciliation MUST be
+idempotent across reloads, catalog reorderings, and repeated updates, and MUST
+retain additions if the current catalog temporarily omits a game. The map MUST
+label new stops and explain that previous clears and XP are retained.
 
 An ordinary stop runs the selected game's 12-question Campaign level for the
 board difficulty. Junior II, Expert II, and Wizard II use separate,
@@ -376,6 +395,7 @@ amount, doubling each board: Starter 25, Junior I 50, Junior II 100, Expert I
 by stop ID and retained in a write-once amount ledger so later balance changes
 cannot rewrite earned XP. Starter’s 13 nodes total 325 XP; each later board has
 15 nodes and totals 750, 1500, 3000, 6000, 12000, and 24000 XP respectively.
+These base totals exclude any later added-game stops on existing profiles.
 Show total XP on the board and pair acquisition with a brief locally
 synthesized jingle when sound is enabled.
 

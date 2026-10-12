@@ -2,6 +2,7 @@ import { summarizeAttempt } from "./attempts.ts";
 import {
   buildJourneyPlan,
   buildJourneyPlanForVersion,
+  buildPlayerJourney,
   findJourneyNode,
   isJourneyNodeUnlocked,
   nextJourneyNode,
@@ -59,10 +60,7 @@ function uniqueStrings(values: readonly string[]): readonly string[] {
 }
 
 function profileJourney(profile: PlayerProfile): JourneyPlan {
-  return buildJourneyPlanForVersion(
-    profile.gameSnapshot,
-    profile.journeyPlanVersion,
-  );
+  return buildPlayerJourney(profile);
 }
 
 export function createProgressionState(): ProgressionState {
@@ -101,23 +99,51 @@ export function createPlayerProfile({
 }
 
 /**
- * Moves an idle four-board profile onto the expanded seven-board plan without
- * rewriting history. Existing clears map to their matching I boards, and the
- * write-once XP amounts remain exactly what the player originally earned.
- * An in-flight legacy attempt deliberately stays on plan v1 until it closes.
+ * Reconciles an idle profile with the discovered catalog without rebuilding its
+ * original trail. Legacy four-board profiles first upgrade to seven boards;
+ * new canonical games then join through a separate append-only snapshot.
+ * Every in-flight attempt keeps its saved plan until its summary closes.
  */
 export function upgradePlayerProfileJourneyPlan(
   profile: PlayerProfile,
   currentSnapshot: readonly JourneyGame[],
   nowMs?: number,
 ): PlayerProfile {
+  // An active stop (including redemption and its summary) keeps exactly its
+  // saved plan until it closes. Catalog updates must never invalidate a run.
+  if (profile.activeAttemptId !== null) return profile;
+  const upgraded = upgradeLegacyPlayerJourney(profile, currentSnapshot, nowMs);
+  if (upgraded.journeyPlanVersion !== CURRENT_JOURNEY_PLAN_VERSION) return upgraded;
+  const known = new Set([
+    ...upgraded.gameSnapshot,
+    ...(upgraded.journeyAdditions ?? []),
+  ].map(({ slug }) => slug));
+  const discovered = currentSnapshot.filter(
+    ({ slug, role }) => (role ?? "game") === "game" && !known.has(slug),
+  );
+  if (!discovered.length) return upgraded;
+  const updated = {
+    ...upgraded,
+    journeyAdditions: [...(upgraded.journeyAdditions ?? []), ...discovered],
+    updatedAtMs: nowOrCurrent(nowMs),
+  };
+  // Validate membership before persisting any change, then store normalized
+  // metadata without retaining mutable objects from the live catalog.
+  const validated = buildPlayerJourney(updated);
+  return {
+    ...updated,
+    journeyAdditions: validated.gameSnapshot.filter(
+      ({ slug }) => !upgraded.gameSnapshot.some((game) => game.slug === slug),
+    ),
+  };
+}
+
+function upgradeLegacyPlayerJourney(
+  profile: PlayerProfile,
+  currentSnapshot: readonly JourneyGame[],
+  nowMs?: number,
+): PlayerProfile {
   if (profile.journeyPlanVersion === CURRENT_JOURNEY_PLAN_VERSION) {
-    return profile;
-  }
-  if (
-    profile.activeAttemptId !== null &&
-    !isJourneyTestProfile(profile)
-  ) {
     return profile;
   }
   const reviewProvider = currentSnapshot.find(
