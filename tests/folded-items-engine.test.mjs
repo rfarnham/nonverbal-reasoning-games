@@ -4,7 +4,7 @@ import {
   DIFFICULTIES, FOLD_DIRECTIONS, FOLD_SENSES, GENERATOR_MAX_ATTEMPTS, ROUNDS, TUTORIAL,
   answerKey, buildAuthoredFoldedItemsRound, buildAuthoredFoldedItemsRounds, buildRounds,
   describeItem, foldPaper, foldSteps, foldAxis, foldInstructionKey, generateInfiniteRound,
-  initialPaper, isMovingCell, itemSetKey, legalFolds, matchingFirstFolds,
+  initialPaper, isMovingCell, itemSetKey, legalFolds,
   patternDifference, roundFingerprint, targetStack, validateRound, visualItemKey, visualAnswerKey,
   describeAnswer, describeOrientedItem, UPRIGHT, ITEM_ORIENTATIONS,
 } from "../app/games/folded-items/game-engine.ts";
@@ -122,7 +122,7 @@ test("Campaign has 48 deterministic authored questions, balanced irregular answe
   try { assert.deepEqual(buildRounds(), ROUNDS); } finally { Math.random = originalRandom; }
 });
 
-test("Starter groups, Junior orders, Expert expands to 5×5 and off-center flaps, Wizard removes one cue", () => {
+test("Starter groups, Junior orders, Expert expands to 5×5 and off-center flaps, Wizard tracks every mirror and flip", () => {
   for (const round of ROUNDS) {
     const starter = round.difficulty === "Easy", junior = round.difficulty === "Medium";
     assert.equal(round.source.items.length, starter ? 8 : junior ? 16 : 25);
@@ -139,7 +139,7 @@ test("Starter groups, Junior orders, Expert expands to 5×5 and off-center flaps
     for (let i = 0; !round.orientationMatters && i < 4; i++) for (let j = 0; j < i; j++) assert.ok(patternDifference(round.options[i], round.options[j], round.answerMode).total >= (starter || junior ? 2 : 1));
     assert.equal(round.orientationMatters, round.difficulty === "Wizard");
     if (!round.orientationMatters) assert.ok(round.optionOrientations.flat().every(({ flipX, flipY }) => !flipX && !flipY));
-    assert.equal(round.hiddenFoldIndex, round.difficulty === "Wizard" ? 0 : null);
+
   }
   for (const start of [0, 3, 6, 9]) assert.equal(new Set(ROUNDS.slice(start, start + 3).map(({ folds }) => folds[0].direction)).size, 1);
   const hard = ROUNDS.filter(({ difficulty }) => difficulty === "Hard");
@@ -149,22 +149,20 @@ test("Starter groups, Junior orders, Expert expands to 5×5 and off-center flaps
   assert.deepEqual(complexity("Hard"), complexity("Wizard"));
 });
 
-test("Wizard combines stack and stationary evidence to prove exactly one instruction from the full catalogue", () => {
+test("Wizard specifies both folds and has no hidden operation or inference-only evidence", () => {
   for (const round of [...ROUNDS, ...GENERATED.Wizard].filter(({ difficulty }) => difficulty === "Wizard")) {
-    assert.deepEqual(matchingFirstFolds(round), [round.folds[0]]);
-    const clue = round.overlapClue;
-    assert.ok(!round.correctItems.includes(clue.aboveId)); assert.ok(!round.correctItems.includes(clue.belowId));
-    const complete = legalFolds(initialPaper(round.source));
-    assert.equal(complete.length, 32);
-    const pairOnly = complete.filter((fold) => foldPaper(initialPaper(round.source), fold).stacks.some((stack) => stack.length === 2 && stack[0] === clue.aboveId && stack[1] === clue.belowId));
-    assert.equal(pairOnly.length, 2, "pair alone preserves opposite-direction/opposite-sense ambiguity");
-    const cell = round.source.items.findIndex(({ id }) => id === clue.stationaryId);
-    const stationaryOnly = complete.filter((fold) => !isMovingCell(Math.floor(cell / 5), cell % 5, fold));
-    assert.ok(stationaryOnly.length > 1, "stationary clue alone is insufficient");
-    assert.deepEqual(matchingFirstFolds({ ...round, overlapClue: { ...clue, belowId: clue.aboveId } }), []);
-    assert.ok(validateRound({ ...round, overlapClue: { ...clue, stationaryId: round.targetId } }).some((error) => error.includes("exactly one legal first fold")));
-    const swapped = matchingFirstFolds({ ...round, overlapClue: { ...clue, aboveId: clue.belowId, belowId: clue.aboveId } });
-    assert.deepEqual(swapped, [{ ...round.folds[0], sense: round.folds[0].sense === "over" ? "under" : "over" }]);
+    assert.equal(round.folds.length, 2);
+    assert.equal(round.foldSteps.length, 2);
+    assert.equal(Object.hasOwn(round, "hiddenFoldIndex"), false);
+    assert.equal(Object.hasOwn(round, "overlapClue"), false);
+    for (const [index, step] of round.foldSteps.entries()) {
+      assert.deepEqual(step.instruction, round.folds[index]);
+      assert.ok(legalFolds(step.before).some((instruction) => foldInstructionKey(instruction) === foldInstructionKey(step.instruction)));
+      assert.deepEqual(foldPaper(step.before, step.instruction), step.after);
+    }
+    const fingerprint = JSON.parse(roundFingerprint(round));
+    assert.equal(Object.hasOwn(fingerprint, "hidden"), false);
+    assert.equal(Object.hasOwn(fingerprint, "evidence"), false);
   }
 });
 

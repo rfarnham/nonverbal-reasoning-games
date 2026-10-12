@@ -120,7 +120,7 @@ test("wrong feedback teaches the kind of mistake without listing the solution", 
   assert.doesNotThrow(() => incorrectFeedback(round, null));
 });
 
-test("Wizard feedback gives no answer-dependent information about order, items, or the hidden fold", () => {
+test("Wizard feedback gives no answer-dependent information about order, items, or orientation", () => {
   const wizard = { ...ROUNDS[0], difficulty: "Wizard", answerMode: "ordered" };
   const expected = incorrectFeedback(wizard, null);
   for (const optionIndex of [0, 1, 2, 3]) {
@@ -133,14 +133,16 @@ test("Wizard feedback gives no answer-dependent information about order, items, 
 test("legacy Journey references recover to validated oriented content without reinterpreting an old generator", () => {
   for (const [currentRef, resolution] of [
     [campaignQuestionReferences(progressionAdapter, "junior")[0], "campaign-updated"],
+    [campaignQuestionReferences(progressionAdapter, "wizard")[0], "campaign-updated"],
     [journeyQuestionReferences(progressionAdapter, "expert-2")[0], "journey-updated"],
-  ]) for (const contentVersion of ["1", "2"]) {
+    [journeyQuestionReferences(progressionAdapter, "wizard-2")[0], "journey-updated"],
+  ]) for (const contentVersion of ["1", "2", "3"]) {
     const legacy = Object.freeze({ ...currentRef, contentVersion, fingerprint: "legacy-unordered-paper" });
     const before = JSON.stringify(legacy);
     const resolved = resolveProgressionQuestion(progressionAdapter, legacy);
     assert.equal(resolved.resolution, resolution);
     assert.equal(resolved.migrated, true);
-    assert.equal(resolved.ref.contentVersion, "3");
+    assert.equal(resolved.ref.contentVersion, "4");
     assert.equal(resolved.ref.questionIndex, currentRef.questionIndex);
     assert.equal(resolved.round.answerMode, "ordered");
     assert.deepEqual(validateRound(resolved.round), []);
@@ -148,12 +150,12 @@ test("legacy Journey references recover to validated oriented content without re
     assert.equal(JSON.stringify(legacy), before, "the saved reference is not mutated in place");
   }
   const generated = createFreshGeneratedQuestion(progressionAdapter, { level: "wizard", seedBase: "folded-items-legacy-test" });
-  for (const generatorVersion of ["1", "2"]) {
+  for (const generatorVersion of ["1", "2", "3"]) {
   const legacy = Object.freeze({ ...generated.ref, generatorVersion, fingerprint: "legacy-unordered-generated" });
   const recovered = resolveProgressionQuestion(progressionAdapter, legacy);
   assert.equal(recovered.resolution, "generated-fallback");
   assert.equal(recovered.ref.source, "campaign");
-  assert.equal(recovered.ref.contentVersion, "3");
+  assert.equal(recovered.ref.contentVersion, "4");
   assert.equal(recovered.round.difficulty, "Wizard");
   assert.deepEqual(validateRound(recovered.round), []);
   const next = resolveProgressionQuestion(progressionAdapter, legacy, { excludedFingerprints: new Set([recovered.fingerprint]) });
@@ -180,6 +182,19 @@ function transforms(markup) {
   return [...markup.matchAll(/translate\(32 32\) scale\((-?1) (-?1)\) translate\(-32 -32\)/g)]
     .map(([, x, y]) => ({ flipX: x === "-1", flipY: y === "-1" }));
 }
+
+test("every Wizard fold sequence shows both real operation cues without inference clues", () => {
+  for (const round of ROUNDS.filter(candidate => candidate.difficulty === "Wizard")) {
+    for (const reveal of [false, true]) {
+      const markup = renderVisual("FoldSequence", { round, reveal });
+      for (const [index, instruction] of round.folds.entries()) {
+        const label = `Fold ${index + 1}. ${engine.foldDirectionLabel(instruction)}`;
+        assert.ok(markup.includes(`aria-label="${label}"`), `${round.id}: ${label} is shown before and after solving`);
+      }
+      assert.doesNotMatch(markup, /unknownFold|overlapClue|stationaryClue|hidden first fold|symbols shown upright|stays in place|>\?</);
+    }
+  }
+});
 
 test("all alphanumeric tokens are plain unmarked glyphs in the actual renderer", () => {
   const items = new Map(ROUNDS.flatMap(({ source }) => source.items)

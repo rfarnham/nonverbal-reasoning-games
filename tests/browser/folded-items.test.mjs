@@ -70,7 +70,21 @@ async function waitForRound(page, round) {
     assert.equal(await choices(page).nth(index).getAttribute('aria-keyshortcuts'), String(index + 1));
     assert.equal(await choices(page).nth(index).getAttribute('aria-label'), `Option ${index + 1}${round.answerMode === 'ordered' ? ', top to bottom' : ''}: ${describeAnswer(round, round.options[index], round.optionOrientations[index])}`);
   }
+  await assertExplicitFolds(page, round);
   await assertFocused(choices(page).first());
+}
+async function assertExplicitFolds(page, round) {
+  const clue = page.getByRole('region', { name: 'Labeled paper and folds', exact: true });
+  for (const [index, instruction] of round.folds.entries()) {
+    const cue = clue.getByRole('img', { name: `Fold ${index + 1}. ${foldDirectionLabel(instruction)}`, exact: true });
+    assert.equal(await cue.count(), 1, `Fold ${index + 1} is specified exactly once.`);
+    assert.equal(await cue.isVisible(), true, `Fold ${index + 1} remains visible.`);
+    assert.ok((await cue.textContent()).includes(foldDirectionLabel(instruction)));
+  }
+  assert.equal(await clue.getByRole('img', { name: /hidden first fold|stays in its original place|is directly above/ }).count(), 0, 'There is no hidden-operation or inference clue.');
+  assert.equal(await clue.locator('[class*="unknownFold"], [class*="overlapClue"]').count(), 0);
+  assert.doesNotMatch(await clue.locator('[class*="foldInstructions"]').textContent(), /\?/);
+  assert.doesNotMatch(await clue.textContent(), /symbols shown upright|stays in place/);
 }
 async function answer(page, round, { correct = true, keyboard = false, reloadDuringFeedback = false, optionIndex = null } = {}) {
   const index = optionIndex ?? (correct ? round.correctIndex : (round.correctIndex + 1) % 4);
@@ -96,6 +110,7 @@ async function answer(page, round, { correct = true, keyboard = false, reloadDur
       await page.reload();
       await page.getByRole('status').filter({ hasText: 'Not quite' }).waitFor();
     }
+    await assertExplicitFolds(page, round);
     assert.equal(await clue.innerHTML(), promptBefore, 'A mistake preserves the complete visual and accessible prompt without revealing the folding result.');
     assert.deepEqual(await choices(page).evaluateAll(elements => elements.map(element => [...element.querySelectorAll('svg')].map(svg => svg.outerHTML))), glyphsBefore, 'A mistake never changes the pictured answer orientations.');
     assert.equal(await page.locator('[class*="teachingArea"]').count(), 0, 'A mistake never runs the solution animation.');
@@ -257,7 +272,7 @@ test('Infinite promotes only from first attempts and ending offers untimed redem
   await context.close();
 });
 
-test('all levels fit the phone and tablet breakpoints; Wizard preserves the hidden fold and uses distinct shapes', async () => {
+test('all levels fit the phone and tablet breakpoints; Wizard specifies both folds and uses distinct shapes', async () => {
   const { context, page, errors } = await open({ width: 390, height: 844 });
   await assertFits(page, '390px example');
   await page.screenshot({ path: resolve(shots, 'example-phone.png'), fullPage: true });
@@ -288,18 +303,9 @@ test('all levels fit the phone and tablet breakpoints; Wizard preserves the hidd
     }
   }
   const wizard = levelRounds('Wizard');
-  const clue = page.getByRole('region', { name: 'Labeled paper and folds', exact: true });
-  const hidden = page.getByRole('img', { name: /^Find the hidden first fold\./ });
-  await hidden.waitFor();
-  await page.getByText('After fold 1 · symbols shown upright', { exact: true }).waitFor();
-  assert.match(await hidden.textContent(), /\?/);
-  const hiddenDirection = foldDirectionLabel(wizard[0].folds[0]);
-  assert.equal((await clue.textContent()).includes(hiddenDirection), false);
+  await assertExplicitFolds(page, wizard[0]);
   await answer(page, wizard[0], { correct: false, keyboard: true });
-  assert.equal(await hidden.count(), 1);
-  assert.equal((await clue.textContent()).includes(hiddenDirection), false, 'A Wizard mistake preserves the hidden fold.');
-  const imageNames = await clue.getByRole('img').evaluateAll(elements => elements.map(element => element.getAttribute('aria-label')).join(' '));
-  assert.equal(imageNames.includes(hiddenDirection), false, 'A Wizard mistake does not reveal the direction through an accessible cue.');
+  await assertExplicitFolds(page, wizard[0]);
 
   const shapeIndex = wizard.findIndex(round => round.source.items[0].kind === 'shape');
   assert.ok(shapeIndex >= 0 && shapeIndex < 12, 'Wizard includes a picture-item round.');
@@ -575,10 +581,8 @@ test('Wizard answers preserve real glyph flips, including an orientation-only tr
   const round = levelRounds('Wizard')[0];
   await waitForRound(page, round);
   assert.equal(round.orientationMatters, true);
-  await page.getByText('After fold 1 · symbols shown upright', { exact: true }).waitFor();
-  const evidence = await renderedOrientations(page.locator('[class*="overlapClue"]'));
-  assert.deepEqual(evidence, orientationTransforms(Array.from({ length: 3 }, () => ({ flipX: false, flipY: false }))), 'The explicitly upright evidence preserves the hidden-fold challenge.');
-  await assertFits(page, '390px Wizard orientation evidence');
+  await assertExplicitFolds(page, round);
+  await assertFits(page, '390px Wizard with both folds specified');
   const orientationTrap = round.optionKinds.indexOf('orientation');
   assert.ok(orientationTrap >= 0, 'Wizard has a same-items, same-order orientation trap.');
   assert.deepEqual(round.options[orientationTrap], round.correctItems);

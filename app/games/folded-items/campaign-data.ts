@@ -32,7 +32,7 @@ const JUNIOR: readonly (readonly FoldInstruction[])[] = [
 ];
 // The 5×5 paper uses an honest between-cell crease: initially two rows/columns
 // fold onto three. The second half introduces one-row/column flaps. Wizard uses
-// the same programs and density, hiding the first cue and requiring visible item orientations.
+// the same specified programs and density, requiring visible item orientations.
 const ADVANCED: readonly (readonly FoldInstruction[])[] = [
   [fold("up", "over", 3), fold("left", "over", 3)],
   [fold("down", "under", 2), fold("right", "over", 2)],

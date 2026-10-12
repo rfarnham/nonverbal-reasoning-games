@@ -8,7 +8,6 @@ import {
   describeItem,
   foldPaper,
   initialPaper,
-  matchingFirstFolds,
   roundFingerprint,
   validateRound,
   visualAnswerKey,
@@ -62,9 +61,9 @@ test("Folded Items adds 36 deterministic Journey rounds without expanding standa
       if (level === "wizard-2") {
         assert.equal(round.orientationMatters, true);
         assert.ok(round.optionKinds.includes("orientation"));
-        assert.deepEqual(matchingFirstFolds(round), [round.folds[0]]);
-        assert.notEqual(round.overlapClue.aboveId, round.targetId);
-        assert.notEqual(round.overlapClue.belowId, round.targetId);
+        assert.equal(round.folds.length, 2);
+        assert.equal(Object.hasOwn(round, "hiddenFoldIndex"), false);
+        assert.equal(Object.hasOwn(round, "overlapClue"), false);
       }
     }
   }
@@ -139,7 +138,7 @@ test("the solved opening example is a legible one-fold introduction before order
   assert.equal(TUTORIAL.answerMode, "group");
   assert.equal(describeItem(TUTORIAL, TUTORIAL.targetId), "B");
   assert.deepEqual(TUTORIAL.correctItems.map((id) => describeItem(TUTORIAL, id)), ["F"]);
-  assert.equal(progressionAdapter.contentVersion, "3");
-  assert.equal(progressionAdapter.generatorVersion, "3");
-  assert.equal(progressionAdapter.journeyContentVersion, "3");
+  assert.equal(progressionAdapter.contentVersion, "4");
+  assert.equal(progressionAdapter.generatorVersion, "4");
+  assert.equal(progressionAdapter.journeyContentVersion, "4");
 });

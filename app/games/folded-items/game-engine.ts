@@ -16,14 +16,12 @@ export type PaperState = Readonly<{
   orientations: Readonly<Record<number, ItemOrientation>>;
 }>;
 export type FoldStep = Readonly<{ index: number; instruction: FoldInstruction; direction: FoldDirection; sense: FoldSense; crease: number; before: PaperState; after: PaperState }>;
-export type OverlapClue = Readonly<{ aboveId: number; belowId: number; stationaryId: number }>;
 export type ItemSet = readonly number[];
 export type AnswerMode = "group" | "ordered";
 export type OptionKind = "correct" | "opposite-sense" | "reverse-stack" | "layer-not-reversed" | "wrong-axis" | "wrong-crease" | "neighbor-stack" | "one-item-off" | "adjacent-layers" | "orientation";
 export type Round = Readonly<{
   difficulty: Difficulty; answerMode: AnswerMode; orientationMatters: boolean; source: Source;
   folds: readonly FoldInstruction[]; foldSteps: readonly FoldStep[];
-  hiddenFoldIndex: null | 0; overlapClue: OverlapClue | null;
   targetId: number; correctItems: ItemSet; options: readonly ItemSet[];
   correctOrientations: readonly ItemOrientation[]; optionOrientations: readonly (readonly ItemOrientation[])[];
   optionKinds: readonly OptionKind[]; correctIndex: number;
@@ -32,7 +30,7 @@ export type AuthoredFoldedItemsRoundSpec = Readonly<{
   difficulty: Difficulty; rows: number; cols: number; itemStyle: ItemStyle;
   itemOrder: readonly number[]; folds: readonly FoldInstruction[];
   targetCell: number; targetDepth?: number; correctIndex: number; distractorSalt: number;
-  overlapCell?: number; numberOffset?: number;
+  numberOffset?: number;
 }>;
 export type RandomSource = () => number;
 export const GENERATOR_MAX_ATTEMPTS = 64;
@@ -266,20 +264,6 @@ function buildOptions(round: CoreRound, correctIndex: number, salt: number): Pic
   }
   return { options, optionKinds, optionOrientations };
 }
-export function matchingFirstFolds(round: Pick<Round, "source" | "folds" | "overlapClue">): readonly FoldInstruction[] {
-  if (!round.overlapClue) return [];
-  const { aboveId, belowId, stationaryId } = round.overlapClue;
-  return legalFolds(initialPaper(round.source)).filter((fold) => {
-    try {
-      const stationaryCell = round.source.items.findIndex(({ id }) => id === stationaryId);
-      if (stationaryCell < 0 || ![aboveId, belowId].includes(stationaryId) || isMovingCell(Math.floor(stationaryCell / round.source.cols), stationaryCell % round.source.cols, fold)) return false;
-      let after = foldPaper(initialPaper(round.source), fold);
-      if (!after.stacks.some((stack) => stack.length === 2 && stack[0] === aboveId && stack[1] === belowId)) return false;
-      for (const next of round.folds.slice(1)) after = foldPaper(after, next);
-      return true;
-    } catch { return false; }
-  });
-}
 export function buildAuthoredFoldedItemsRound(spec: AuthoredFoldedItemsRoundSpec): Round {
   if (!DIFFICULTIES.includes(spec.difficulty)) throw new Error(`Unknown difficulty: ${spec.difficulty}.`);
   if (!Number.isInteger(spec.correctIndex) || spec.correctIndex < 0 || spec.correctIndex > 3) throw new Error("Answer position must be from 0 to 3.");
@@ -296,24 +280,11 @@ export function buildAuthoredFoldedItemsRound(spec: AuthoredFoldedItemsRoundSpec
   const targetId = targetItems[depth];
   if (targetId === undefined) throw new Error("Target depth is outside its stack.");
   const answerMode = spec.difficulty === "Easy" ? "group" : "ordered";
-  let overlapClue: OverlapClue | null = null;
-  if (spec.difficulty === "Wizard") {
-    const possibleCells = steps[0].after.stacks.flatMap((stack, index) => stack.length === 2 && !stack.some((id) => targetItems.includes(id)) ? [index] : []);
-    const clueCell = spec.overlapCell ?? possibleCells[spec.distractorSalt % possibleCells.length];
-    const clueStack = steps[0].after.stacks[clueCell];
-    if (!clueStack || clueStack.length !== 2 || clueStack.some((id) => targetItems.includes(id))) throw new Error("Wizard evidence must describe a different item pair from the target stack.");
-    const stationaryId = clueStack.find((id) => {
-      const cell = source.items.findIndex((item) => item.id === id);
-      return !isMovingCell(Math.floor(cell / source.cols), cell % source.cols, spec.folds[0]);
-    });
-    if (stationaryId === undefined) throw new Error("Wizard evidence requires a stationary item.");
-    overlapClue = { aboveId: clueStack[0], belowId: clueStack[1], stationaryId };
-  }
   const orientationMatters = spec.difficulty === "Wizard";
   const correctItems = answerFromStack(targetItems, targetId, answerMode);
   const correctOrientations = correctItems.map((id) => orientationMatters ? final.orientations[id] : UPRIGHT);
   if (orientationMatters && !correctItems.some((id, index) => orientationChanged(itemById({ source }, id), correctOrientations[index]))) throw new Error("Wizard requires a visibly transformed answer item.");
-  const core: CoreRound = { difficulty: spec.difficulty, answerMode, orientationMatters, correctOrientations, source, folds: spec.folds.map((fold) => ({ ...fold })), foldSteps: steps, hiddenFoldIndex: spec.difficulty === "Wizard" ? 0 : null, overlapClue, targetId, correctItems };
+  const core: CoreRound = { difficulty: spec.difficulty, answerMode, orientationMatters, correctOrientations, source, folds: spec.folds.map((fold) => ({ ...fold })), foldSteps: steps, targetId, correctItems };
   const round: Round = { ...core, ...buildOptions(core, spec.correctIndex, spec.distractorSalt), correctIndex: spec.correctIndex };
   const errors = validateRound(round);
   if (errors.length) throw new Error(`Invalid folded-items round: ${errors.join("; ")}`);
@@ -377,17 +348,13 @@ export function validateRound(round: Round): string[] {
     if (!expected.some((id, index) => orientationChanged(itemById(round, id), expectedOrientations[index] ?? UPRIGHT))) errors.push("Wizard requires a visibly transformed answer item.");
     const orientationTrap = round.options.some((option, index) => round.optionKinds[index] === "orientation" && patternsEqual(option, expected) && key(option, round.optionOrientations?.[index]) !== key(expected, expectedOrientations));
     if (!orientationTrap) errors.push("Wizard requires a visible orientation-only misconception with the same items and layer order.");
-    if (round.hiddenFoldIndex !== 0 || !round.overlapClue) errors.push("Wizard hides the first fold and supplies ordered and stationary evidence.");
-    if (round.overlapClue && expected.some((id) => id === round.overlapClue!.aboveId || id === round.overlapClue!.belowId)) errors.push("Wizard evidence must not expose a target overlap.");
-    const matches = matchingFirstFolds(round);
-    if (matches.length !== 1 || foldInstructionKey(matches[0]) !== foldInstructionKey(round.folds[0])) errors.push("Wizard evidence must identify exactly one legal first fold.");
-  } else if (round.hiddenFoldIndex !== null || round.overlapClue !== null) errors.push("Shown-fold levels must not contain hidden-fold evidence.");
+  }
   return errors;
 }
 export function roundFingerprint(round: Round): string {
   const identity = (id: number) => appearanceKey(itemById(round, id));
   const final = round.foldSteps.at(-1)!.after;
-  return JSON.stringify({ dimensions: [round.source.rows, round.source.cols], source: round.source.items.map(appearanceKey), target: identity(round.targetId), mode: round.answerMode, orientationMatters: round.orientationMatters, orientations: round.orientationMatters ? final.stacks.map((stack) => stack.map((id) => visualItemKey(itemById(round, id), final.orientations[id]))) : undefined, effect: final.stacks.map((stack) => round.answerMode === "group" ? stack.map(identity).sort() : stack.map(identity)), hidden: round.hiddenFoldIndex, evidence: round.overlapClue ? [identity(round.overlapClue.aboveId), identity(round.overlapClue.belowId), identity(round.overlapClue.stationaryId)] : null });
+  return JSON.stringify({ dimensions: [round.source.rows, round.source.cols], source: round.source.items.map(appearanceKey), target: identity(round.targetId), mode: round.answerMode, orientationMatters: round.orientationMatters, orientations: round.orientationMatters ? final.stacks.map((stack) => stack.map((id) => visualItemKey(itemById(round, id), final.orientations[id]))) : undefined, effect: final.stacks.map((stack) => round.answerMode === "group" ? stack.map(identity).sort() : stack.map(identity)) });
 }
 export function buildAuthoredFoldedItemsRounds(specs: readonly AuthoredFoldedItemsRoundSpec[], label = "Folded Items"): readonly Round[] {
   const fingerprints = new Set<string>();

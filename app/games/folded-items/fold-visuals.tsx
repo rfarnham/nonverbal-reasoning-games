@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState, type CSSProperties, type Ref } from "react";
 import {
   describeAnswer,
-  describeItem,
   foldDirectionLabel,
   initialPaper,
   itemById,
@@ -218,7 +217,7 @@ function FoldArc({ instruction }: { instruction: FoldInstruction }) {
 }
 
 export function FoldCue({ round, step }: { round: Round; step: FoldStep }) {
-  return <div className={styles.foldCue}>
+  return <div className={styles.foldCue} role="img" aria-label={`Fold ${step.index + 1}. ${foldDirectionLabel(step.instruction)}`}>
     <PaperFoldView round={round} step={step} progress={.18} guide />
     <div className={styles.foldSense}><FoldArc instruction={step.instruction} /><strong>{step.sense === "over" ? "Over" : "Under"}</strong></div>
     <span className={styles.foldDirection}>{foldDirectionLabel(step.instruction)}</span>
@@ -237,20 +236,9 @@ export function FoldSequence({ round, compact = false, reveal = false }: {
     <div className={styles.foldInstructions}>
       {round.foldSteps.map((step, index) => <div className={styles.foldCard} key={index}>
         <span className={styles.stepLabel}>Fold {index + 1}</span>
-        {round.hiddenFoldIndex === index && !reveal ? <div className={styles.unknownFold}
-          role="img" aria-label="Find the hidden first fold. It may fold up, down, left, or right, over or under, along any grid line. Use the two clues.">
-          <strong>?</strong><span>↑ ↓ ← →</span><small>Over or under</small><small>Any grid line</small>
-        </div> : <FoldCue round={round} step={step} />}
+        <FoldCue round={round} step={step} />
       </div>)}
     </div>
-    {round.overlapClue && !reveal ? <div className={styles.overlapClue}>
-      <span className={styles.stepLabel}>After fold 1 · symbols shown upright</span>
-      <span className={styles.cluePair} role="img" aria-label={`${describeItem(round, round.overlapClue.aboveId)} is directly above ${describeItem(round, round.overlapClue.belowId)}.`}>
-        <span>Top</span><ItemToken item={itemById(round, round.overlapClue.aboveId)} />
-        <span aria-hidden="true">↓</span><ItemToken item={itemById(round, round.overlapClue.belowId)} /><span>Bottom</span>
-      </span>
-      <span className={styles.stationaryClue} role="img" aria-label={`${describeItem(round, round.overlapClue.stationaryId)} stays in its original place after fold one.`}><ItemToken item={itemById(round, round.overlapClue.stationaryId)} /> stays in place</span>
-    </div> : null}
     {reveal ? <div className={styles.revealedPaper}>
       <span className={styles.stepLabel}>Folded</span>
       <PaperDiagram round={round} paper={round.foldSteps[round.foldSteps.length - 1].after} target label="Finished folded paper with the target stack highlighted." />
