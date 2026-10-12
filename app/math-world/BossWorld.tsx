@@ -3,15 +3,22 @@
 import { useEffect, useRef, useState } from "react";
 import type { BossChallenge } from "./boss-challenges.ts";
 import { printBossWorkbook } from "./boss-workbook.ts";
-import { canOpenWorld, type WorldProgress } from "./engine.ts";
+import { type WorldProgress } from "./engine.ts";
 import { WORLD_DEFINITIONS } from "./world-data.ts";
 import { WorldNavigation } from "./WorldNavigation";
 import { StormArtwork } from "./StormArtwork";
+import { CalmPassageArtwork } from "./CalmPassageArtwork";
+import StormAnswerSheet from "./StormAnswerSheet";
+import { bossAttempt, hasSubmittedBoss, type BossProgress } from "./boss-progress.ts";
 import styles from "./math-world.module.css";
 
-export function BossWorld({ challenge, progress, qaUnlocked, onChooseWorld, onChooseBoss }: Readonly<{
+export function BossWorld({ challenge, progress, bossProgress, qaUnlocked, onChooseWorld, onChooseBoss, canNavigate, onBossAnswer, onSubmitBoss }: Readonly<{
   challenge: BossChallenge;
   progress: WorldProgress;
+  bossProgress: BossProgress;
+  canNavigate: (id: string) => boolean;
+  onBossAnswer: (index: number, answer: number) => void;
+  onSubmitBoss: () => void;
   qaUnlocked: boolean;
   onChooseWorld: (worldId: string) => void;
   onChooseBoss: (challenge: BossChallenge) => void;
@@ -22,6 +29,7 @@ export function BossWorld({ challenge, progress, qaUnlocked, onChooseWorld, onCh
   const [printing, setPrinting] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
   const onward = WORLD_DEFINITIONS.find(world => world.number === Math.min(challenge.afterWorld + 1, WORLD_DEFINITIONS.length));
+  const submitted = hasSubmittedBoss(bossProgress, challenge.id);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -46,11 +54,11 @@ export function BossWorld({ challenge, progress, qaUnlocked, onChooseWorld, onCh
   }
 
   return <main className={styles.worldShell} data-boss-id={challenge.id}>
-    <WorldNavigation selectedId={challenge.id} progress={progress} qaUnlocked={qaUnlocked} busy={printing}
-      onChooseWorld={onChooseWorld} onChooseBoss={onChooseBoss} />
+    <WorldNavigation selectedId={challenge.id} progress={progress} bossProgress={bossProgress} qaUnlocked={qaUnlocked} busy={printing}
+      canNavigate={canNavigate} onChooseWorld={onChooseWorld} onChooseBoss={onChooseBoss} />
     {qaUnlocked && <div className={`${styles.testNotice} ${styles.bossTestNotice}`} role="status"><strong>Test mode · all paths open</strong><span>Both storm challenges are available.</span></div>}
     <section className={styles.bossPlaceholder} aria-labelledby="boss-title">
-      <StormArtwork className={styles.bossStormArtwork} />
+      {submitted ? <CalmPassageArtwork className={styles.bossStormArtwork} /> : <StormArtwork className={styles.bossStormArtwork} />}
       <p className={styles.kicker}>After World {challenge.afterWorld} · Storm challenge</p>
       <h1 id="boss-title" ref={headingRef} tabIndex={-1}>{challenge.title}</h1>
       <p className={styles.bossTestDetails}>Math Kangaroo {challenge.year} · Grades 1–2 · {challenge.questionCount} questions</p>
@@ -63,9 +71,9 @@ export function BossWorld({ challenge, progress, qaUnlocked, onChooseWorld, onCh
       </button>
       <p className={styles.srOnly} role="status">{printing ? `Preparing all ${challenge.questionCount} questions from the ${challenge.year} test…` : ""}</p>
       {printError && <p className={styles.bossPrintError} role="alert">{printError}</p>}
-      <div className={styles.bossComingSoon}><strong>Take on the storm, one question at a time</strong><p>{challenge.afterWorld === WORLD_DEFINITIONS.length ? "Beyond this storm lies an uncharted horizon. " : "This storm guards the crossing to the next archipelago. "}Answer entry is coming later. For now, print the whole test and work through it on paper.</p></div>
+      <StormAnswerSheet challenge={challenge} attempt={bossAttempt(bossProgress, challenge.id)} onAnswer={onBossAnswer} onSubmit={onSubmitBoss} />
       {onward && <button type="button" className={styles.primaryButton}
-        disabled={printing || !canOpenWorld(progress, onward.id, qaUnlocked)} onClick={() => onChooseWorld(onward.id)}>
+        disabled={printing || !canNavigate(onward.id)} onClick={() => onChooseWorld(onward.id)}>
         {challenge.afterWorld < WORLD_DEFINITIONS.length ? `Continue to World ${onward.number}` : `Back to World ${onward.number}`} <span aria-hidden="true">→</span>
       </button>}
     </section>

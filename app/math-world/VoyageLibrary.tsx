@@ -14,6 +14,8 @@ type VoyageLibraryProps = {
   disabled: boolean;
   onContinueStory?: (opener: HTMLButtonElement) => void;
   continueStoryLabel?: string;
+  continueStoryLocked?: boolean;
+  continueStoryHint?: string;
 };
 
 function TomeIcon({ guide = false }: { guide?: boolean }) {
@@ -148,7 +150,7 @@ function LibraryDialog({ panel, pages, glossary, onClose }: {
 }
 
 /** Read-only companions to the globe. Story callbacks never advance the voyage. */
-export function VoyageLibrary({ pages, glossary, panel, onPanelChange, disabled, onContinueStory, continueStoryLabel }: VoyageLibraryProps) {
+export function VoyageLibrary({ pages, glossary, panel, onPanelChange, disabled, onContinueStory, continueStoryLabel, continueStoryLocked, continueStoryHint }: VoyageLibraryProps) {
   const storyButtonRef = useRef<HTMLButtonElement>(null);
   const glossaryButtonRef = useRef<HTMLButtonElement>(null);
   const previousPanel = useRef(panel);
@@ -202,9 +204,11 @@ export function VoyageLibrary({ pages, glossary, panel, onPanelChange, disabled,
   return <>
     <aside className={styles.rail} aria-label="Voyage library">
       {onContinueStory && <button type="button" className={`${styles.libraryButton} ${styles.voyageButton}`} disabled={disabled}
-        onClick={event => onContinueStory(event.currentTarget)} aria-haspopup="dialog" data-voyage-continue="true">
+        onClick={event => { if (!continueStoryLocked) onContinueStory(event.currentTarget); }} aria-disabled={continueStoryLocked || disabled}
+        aria-describedby={continueStoryHint ? "voyage-next-requirement" : undefined} aria-haspopup="dialog" data-voyage-continue="true">
         <TomeIcon /><span>{continueStoryLabel ?? "Continue the story"}</span>
       </button>}
+      {continueStoryHint && <p id="voyage-next-requirement" className={styles.requirement}>{continueStoryHint}</p>}
       <button ref={storyButtonRef} type="button" className={`${styles.libraryButton} ${styles.storyButton}`} disabled={disabled}
         onClick={() => openPanel("story")} aria-haspopup="dialog" aria-expanded={panel === "story"}>
         <TomeIcon /><span>Story so far</span>

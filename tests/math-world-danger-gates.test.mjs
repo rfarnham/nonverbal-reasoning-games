@@ -3,7 +3,8 @@ import test from "node:test";
 import { createInitialProgress } from "../app/math-world/engine.ts";
 import { WORLD_DEFINITIONS } from "../app/math-world/world-data.ts";
 import { BOSS_CHALLENGES } from "../app/math-world/boss-challenges.ts";
-import { DANGERS, canNavigateDestination, dangerAfterWorld, nextDueDanger } from "../app/math-world/danger-definitions.ts";
+import { createBossProgress, setBossAnswer, submitBossAnswers } from "../app/math-world/boss-progress.ts";
+import { DANGERS, canNavigateDestination, dangerAfterWorld, hasCrossedDanger, nextDueDanger, nextDueBoss, nextRequiredEncounter } from "../app/math-world/danger-definitions.ts";
 import { acknowledgeDangerBriefing, createDangerState, ensureDangerPacket, startDangerPacket } from "../app/math-world/danger-engine.ts";
 const state = createDangerState("gate-player");
 const world = number => WORLD_DEFINITIONS.find(candidate => candidate.number === number);
@@ -14,6 +15,15 @@ function completeEmptyDanger(before, number) {
   const id = dangerAfterWorld(number).id;
   const prepared = ensureDangerPacket(before, { dangerId: id, afterWorldNumber: number });
   return startDangerPacket(acknowledgeDangerBriefing(prepared, id), id);
+}
+function dangersThrough(number) {
+  return DANGERS.filter(danger => danger.afterWorld <= number).reduce((before, danger) => completeEmptyDanger(before, danger.afterWorld), state);
+}
+function bossesThrough(number) {
+  return BOSS_CHALLENGES.filter(boss => boss.afterWorld <= number).reduce((before, boss) => {
+    for (let index = 0; index < 24; index++) before = setBossAnswer(before, boss.id, index, 0);
+    return submitBossAnswers(before, boss.id, "2026-10-12T12:00:00.000Z");
+  }, createBossProgress("gate-player"));
 }
 
 test("16 encounters occur after every two archipelagos with known-only QA bypass", () => {
@@ -46,33 +56,69 @@ test("a prepared or printed packet cannot by itself open its crossing or a futur
   assert.equal(canNavigateDestination(finishedThrough(1), prepared, id), false);
 });
 
-test("legacy earned progress stays accessible and old incomplete dangers do not trap the next crossing", () => {
-  const legacy = finishedThrough(8);
-  for (let number = 1; number <= 8; number++) assert.equal(canNavigateDestination(legacy, state, world(number).id), true);
-  assert.equal(canNavigateDestination(legacy, state, dangerAfterWorld(8).id), true);
-  assert.equal(nextDueDanger(legacy, state)?.id, dangerAfterWorld(8).id);
-  assert.equal(canNavigateDestination(legacy, state, world(9).id), false);
-  const after = completeEmptyDanger(state, 8);
-  assert.equal(canNavigateDestination(legacy, after, world(9).id), true);
-  assert.equal(after.packets[dangerAfterWorld(2).id], undefined);
+test("old earned work is preserved but does not bypass unfinished crossings", () => {
+  const legacy = finishedThrough(8), before = structuredClone(legacy);
+  for (let number = 1; number <= 8; number++) assert.equal(canNavigateDestination(legacy, state, world(number).id), number <= 2);
+  assert.equal(canNavigateDestination(legacy, state, dangerAfterWorld(8).id), false);
+  assert.equal(nextDueDanger(legacy, state)?.id, dangerAfterWorld(2).id);
+  const after = completeEmptyDanger(state, 2);
+  assert.equal(canNavigateDestination(legacy, after, world(3).id), true);
+  assert.equal(canNavigateDestination(legacy, after, world(5).id), false);
+  assert.equal(nextDueDanger(legacy, after)?.id, dangerAfterWorld(4).id);
+  assert.equal(canNavigateDestination(legacy, dangersThrough(8), world(9).id), true);
+  assert.deepEqual(legacy, before);
 });
 
-test("already attempted next world is earned access; selectedWorldId without work is not", () => {
+test("attempted and completed later stops cannot clear a danger or unlock their world", () => {
   const progress = finishedThrough(2);
   const attempted = { ...progress, stopAttempts: { [world(3).stopIds[0]]: { questionIndex: 0, phase: "answering", selectedIndex: null, firstTryCorrect: {}, solvedQuestionIds: [] } } };
-  assert.equal(canNavigateDestination(attempted, state, world(3).id), true);
-  assert.equal(nextDueDanger(attempted, state), undefined);
-  assert.equal(canNavigateDestination({ ...progress, selectedWorldId: world(3).id }, state, world(3).id), false);
+  for (const saved of [attempted, finishedThrough(3), { ...progress, selectedWorldId: world(3).id }]) {
+    assert.equal(canNavigateDestination(saved, state, world(3).id), false);
+    assert.equal(hasCrossedDanger(saved, state, dangerAfterWorld(2)), false);
+    assert.equal(nextDueDanger(saved, state)?.id, dangerAfterWorld(2).id);
+  }
 });
 
-test("both boss milestones require their danger until genuinely crossed, preserving all earlier earned worlds", () => {
+test("boss milestones require all previous dangers and storms, including their own crossing", () => {
   for (const boss of BOSS_CHALLENGES) {
-    const progress = finishedThrough(boss.afterWorld);
-    assert.equal(canNavigateDestination(progress, state, boss.id), false);
-    assert.equal(canNavigateDestination(progress, state, dangerAfterWorld(boss.afterWorld).id), true);
-    assert.equal(canNavigateDestination(progress, completeEmptyDanger(state, boss.afterWorld), boss.id), true);
-    assert.equal(canNavigateDestination(finishedThrough(boss.afterWorld - 1), completeEmptyDanger(state, boss.afterWorld), boss.id), false);
+    const progress = finishedThrough(boss.afterWorld), priorBosses = bossesThrough(boss.afterWorld - 1);
+    assert.equal(canNavigateDestination(progress, state, boss.id, false, priorBosses), false);
+    assert.equal(canNavigateDestination(progress, dangersThrough(boss.afterWorld - 2), dangerAfterWorld(boss.afterWorld).id, false, priorBosses), true);
+    assert.equal(canNavigateDestination(progress, dangersThrough(boss.afterWorld - 2), boss.id, false, priorBosses), false);
+    assert.equal(canNavigateDestination(progress, dangersThrough(boss.afterWorld), boss.id, false, priorBosses), true);
+    assert.equal(canNavigateDestination(finishedThrough(boss.afterWorld - 1), dangersThrough(boss.afterWorld), boss.id, false, priorBosses), false);
   }
-  const legacy = finishedThrough(17);
-  assert.equal(canNavigateDestination(legacy, state, BOSS_CHALLENGES[0].id), true);
+  assert.equal(canNavigateDestination(finishedThrough(32), dangersThrough(32), "boss-2026"), false, "the first storm cannot be skipped");
+});
+
+test("world17 and subsequent dangers stay gated until the first storm workbook is submitted", () => {
+  const progress = finishedThrough(32), cleared = dangersThrough(16), submitted = bossesThrough(16);
+  assert.equal(canNavigateDestination(progress, cleared, world(17).id), false);
+  assert.equal(canNavigateDestination(progress, cleared, "danger-18"), false);
+  assert.equal(nextDueDanger(progress, cleared), undefined);
+  assert.equal(nextDueBoss(progress, cleared)?.id, "boss-2025");
+  assert.equal(nextRequiredEncounter(progress, cleared)?.id, "boss-2025");
+  assert.equal(canNavigateDestination(progress, cleared, world(17).id, false, submitted), true);
+  assert.equal(canNavigateDestination(progress, cleared, "danger-18", false, submitted), true);
+  assert.equal(nextDueDanger(progress, cleared, submitted)?.id, "danger-18");
+  assert.equal(nextRequiredEncounter(progress, dangersThrough(32), submitted)?.id, "boss-2026");
+  assert.equal(nextRequiredEncounter(progress, dangersThrough(32), bossesThrough(32)), undefined);
+});
+
+
+test("stale later attempts never substitute for incomplete prerequisite archipelagos", () => {
+  const attempt = { questionIndex: 0, phase: "answering", selectedIndex: null, firstTryCorrect: {}, solvedQuestionIds: [] };
+  for (const number of [2, 5, 17, 32]) {
+    const progress = {
+      ...finishedThrough(number - 1),
+      selectedWorldId: world(number).id,
+      activeStopId: world(number).stopIds[0],
+      stopAttempts: { [world(number).stopIds[0]]: attempt },
+    };
+    const saved = { ...progress, completedStopIds: progress.completedStopIds.filter(id => id !== world(1).stopIds[0]) };
+    const before = structuredClone(saved);
+    assert.equal(canNavigateDestination(saved, dangersThrough(32), world(number).id, false, bossesThrough(32)), false);
+    assert.equal(canNavigateDestination(progress, dangersThrough(32), world(number).id, false, bossesThrough(32)), true);
+    assert.deepEqual(saved, before, "blocking a stale route preserves all saved work");
+  }
 });

@@ -5,6 +5,7 @@ import { getBossStormStages, bossStormStageLabel } from "./boss-storm-state.ts";
 import { canOpenWorld, type WorldProgress } from "./engine.ts";
 import { WORLD_DEFINITIONS, WORLD_MODE, type WorldDefinition } from "./world-data.ts";
 import { dangerAfterWorld, type DangerDefinition } from "./danger-definitions.ts";
+import { hasSubmittedBoss, type BossProgress } from "./boss-progress.ts";
 import styles from "./math-world.module.css";
 
 type Destination = Readonly<{ kind: "danger"; danger: DangerDefinition }> | Readonly<{ kind: "world"; world: WorldDefinition }> | Readonly<{ kind: "boss"; challenge: BossChallenge }>;
@@ -16,17 +17,18 @@ const destinations: readonly Destination[] = WORLD_DEFINITIONS.flatMap((world): 
 
 const destinationId = (destination: Destination) => destination.kind === "world" ? destination.world.id : destination.kind === "danger" ? destination.danger.id : destination.challenge.id;
 
-export function WorldNavigation({ selectedId, progress, qaUnlocked, busy = false, onChooseWorld, onChooseBoss, onChooseDanger, canNavigate }: Readonly<{
+export function WorldNavigation({ selectedId, progress, bossProgress, qaUnlocked, busy = false, onChooseWorld, onChooseBoss, onChooseDanger, canNavigate }: Readonly<{
   onChooseDanger?: (danger: DangerDefinition) => void;
   canNavigate?: (id: string) => boolean;
   selectedId: string;
   progress: WorldProgress;
+  bossProgress?: BossProgress;
   qaUnlocked: boolean;
   busy?: boolean;
   onChooseWorld: (worldId: string) => void;
   onChooseBoss: (challenge: BossChallenge) => void;
 }>) {
-  const stormStages = getBossStormStages(progress, qaUnlocked, selectedId);
+  const stormStages = getBossStormStages(progress, qaUnlocked, selectedId, bossProgress);
   const index = destinations.findIndex(destination => destinationId(destination) === selectedId);
   const current = destinations[index];
   const previous = destinations[index - 1];
@@ -52,7 +54,7 @@ export function WorldNavigation({ selectedId, progress, qaUnlocked, busy = false
             const unlocked = available(destination);
             if (destination.kind === "danger") return <option key={destination.danger.id} value={destination.danger.id} disabled={!unlocked}>◇ {destination.danger.title} · After World {destination.danger.afterWorld}{!unlocked ? " · Locked" : ""}</option>;
             if (destination.kind === "boss") return <option key={destination.challenge.id} value={destination.challenge.id} disabled={!unlocked}>
-              ◉ {destination.challenge.title} · After World {destination.challenge.afterWorld}{!unlocked ? ` · ${stormStages[destination.challenge.id] > 0 ? bossStormStageLabel(stormStages[destination.challenge.id]) + " · " : ""}Locked` : ""}
+              ◉ {destination.challenge.title} · After World {destination.challenge.afterWorld}{bossProgress && hasSubmittedBoss(bossProgress, destination.challenge.id) ? " · Safe passage" : !unlocked ? ` · ${stormStages[destination.challenge.id] > 0 ? bossStormStageLabel(stormStages[destination.challenge.id]) + " · " : ""}Locked` : ""}
             </option>;
             const candidate = destination.world;
             const finished = candidate.stopIds.every(id => progress.completedStopIds.includes(id));

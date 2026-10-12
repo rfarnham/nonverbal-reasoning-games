@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { BOSS_CHALLENGES, canOpenBoss } from "../app/math-world/boss-challenges.ts";
 import { completedTeachingWorldCount, getBossStormStages, bossStormStageLabel } from "../app/math-world/boss-storm-state.ts";
+import { createBossProgress, setBossAnswer, submitBossAnswers } from "../app/math-world/boss-progress.ts";
 import { createInitialProgress } from "../app/math-world/engine.ts";
 import { WORLD_DEFINITIONS, WORLD_MODE } from "../app/math-world/world-data.ts";
 
@@ -34,10 +35,26 @@ test("only contiguous fully completed teaching worlds drive storm weather", { sk
 
 test("QA and active storm presentation never write completion or widen navigation access", { skip: !spiral }, () => {
   const progress = through(0), before = structuredClone(progress);
-  assert.deepEqual(getBossStormStages(progress, true), { "boss-2025": 1, "boss-2026": 1 });
-  assert.deepEqual(getBossStormStages(progress, false, "boss-2025"), { "boss-2025": 1, "boss-2026": 0 });
+  assert.deepEqual(getBossStormStages(progress, true), { "boss-2025": 0, "boss-2026": 0 });
+  assert.deepEqual(getBossStormStages(progress, true, "boss-2025"), { "boss-2025": 1, "boss-2026": 0 });
+  assert.deepEqual(getBossStormStages(progress, false, "boss-2025"), { "boss-2025": 0, "boss-2026": 0 });
   assert.deepEqual(getBossStormStages(progress, false, "unknown"), { "boss-2025": 0, "boss-2026": 0 });
   assert.deepEqual(progress, before);
   assert.equal(canOpenBoss(progress, BOSS_CHALLENGES[0]), false);
   assert.deepEqual([0, .34, .68, 1].map(bossStormStageLabel), ["Storm ahead", "Storm gathering", "Storm strengthening", "Hurricane"]);
+});
+
+
+test("submission clears a storm independently of score, including active and QA views", { skip: !spiral }, () => {
+  const progress = through(32);
+  let bosses = createBossProgress("storm-weather-reader");
+  for (const boss of BOSS_CHALLENGES) {
+    for (let index = 0; index < 24; index++) bosses = setBossAnswer(bosses, boss.id, index, index % 5);
+    assert.equal(getBossStormStages(progress, false, boss.id, bosses)[boss.id], 1, "draft answers do not clear weather");
+    bosses = submitBossAnswers(bosses, boss.id, "2026-10-12T12:00:00.000Z");
+    for (const qa of [false, true]) {
+      assert.equal(getBossStormStages(progress, qa, boss.id, bosses)[boss.id], 0);
+    }
+  }
+  assert.deepEqual(getBossStormStages(progress, true, "boss-2026", bosses), { "boss-2025": 0, "boss-2026": 0 });
 });

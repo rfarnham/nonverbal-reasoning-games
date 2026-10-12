@@ -16,8 +16,11 @@ import { dangerAfterWorld, dangerById, dangerSceneryStages, hasCrossedDanger, ty
 import { DANGER_STORIES } from "./danger-content.ts";
 import { BOSS_STORIES } from "./boss-story-content.ts";
 import { VoyageLibrary, type ReadingPanel } from "./VoyageLibrary";
-import { storySoFar, ORIGINAL_VOYAGE_GLOSSARY, VOYAGE_GLOSSARY } from "./voyage-reading.ts";
+import { ORIGINAL_VOYAGE_GLOSSARY, VOYAGE_GLOSSARY } from "./voyage-reading.ts";
 import { dangerPacketQuestions, dangerPacketAccuracy, type DangerState, type DangerPacket } from "./danger-engine.ts";
+import { bossAttempt, hasSubmittedBoss, type BossProgress } from "./boss-progress.ts";
+import StormAnswerSheet from "./StormAnswerSheet";
+import { availableStorySoFar, canReadVoyageChapter, eligibleStoryProgress, nextAvailableVoyageChapter, unlockedVoyageChapters } from "./voyage-access.ts";
 import styles from "./globe.module.css";
 
 type Props = {
@@ -28,6 +31,7 @@ type Props = {
   avatarStopId: string | null; onChooseWorld: (id: string) => void; onChooseBoss: (boss: BossChallenge) => void;
   onOpenStop: (id: string) => void; onInspectStop: (id: string) => void; onExportQa: () => void;
   storyProgress: WorldStoryProgress; onStoryProgress: (next: WorldStoryProgress) => void;
+  bossProgress: BossProgress; onBossAnswer: (index: number, answer: number) => void; onSubmitBoss: () => void;
 };
 
 export function GlobeAdventure(props: Props) {
@@ -72,10 +76,18 @@ export function GlobeAdventure(props: Props) {
   const chapterPage = chapterStage && chapterStage !== "shattering" ? FIRST_WORLD_STORY[chapterStage] : null;
   const bookPage = world.number === 1 && story !== null ? (story === 0 ? FIRST_WORLD_STORY.book1 : FIRST_WORLD_STORY.book2) : null;
   const voyageAvailable = props.storyProgress.ending === "complete";
-  const voyageChapter = voyageAvailable ? VOYAGE_CHAPTERS.find(chapter => chapter.id === voyageReading?.id) : undefined;
-  const islandChapter = VOYAGE_CHAPTERS.find(chapter => chapter.shardWorld === world.number);
-  const nextChapter = nextVoyageChapter(props.storyProgress);
-  const collectedShards = useMemo(() => recoveredShardWorlds(props.storyProgress), [props.storyProgress]);
+  const earnedStory = useMemo(() => eligibleStoryProgress(props.storyProgress, progress, props.dangerState, props.bossProgress), [props.storyProgress, progress, props.dangerState, props.bossProgress]);
+  const unlockedChapters = unlockedVoyageChapters(props.storyProgress, progress, props.dangerState, props.bossProgress);
+  const voyageChapter = unlockedChapters.find(chapter => chapter.id === voyageReading?.id);
+  const islandChapter = unlockedChapters.find(chapter => chapter.shardWorld === world.number);
+  const nextChapter = nextAvailableVoyageChapter(props.storyProgress, progress, props.dangerState, props.bossProgress);
+  const waitingChapter = nextVoyageChapter(earnedStory);
+  const storyLocked = !!waitingChapter && !nextChapter;
+  const collectedShards = useMemo(() => recoveredShardWorlds(earnedStory), [earnedStory]);
+  const stormSubmitted = !!boss && hasSubmittedBoss(props.bossProgress, boss.id);
+  const followingChapter = voyageChapter ? voyageReading?.replaying
+    ? unlockedChapters[unlockedChapters.findIndex(chapter => chapter.id === voyageChapter.id) + 1]
+    : nextAvailableVoyageChapter(markVoyageChapterRead(props.storyProgress, voyageChapter.id), progress, props.dangerState, props.bossProgress) : undefined;
   const narrativeReading = dangerBriefing || bossBriefing || (!!danger && revisitDanger) || !!chapterStage || story !== null || !!voyageChapter;
   const reading = narrativeReading || library !== null;
   useEffect(() => {
@@ -104,12 +116,12 @@ export function GlobeAdventure(props: Props) {
     setVoyageReading(null);
   }
   function continueVoyage() {
-    if (!voyageChapter) return;
+    if (!voyageChapter || !canReadVoyageChapter(props.storyProgress, progress, props.dangerState, props.bossProgress, voyageChapter.id)) return;
     const nextStory = markVoyageChapterRead(props.storyProgress, voyageChapter.id);
     props.onStoryProgress(nextStory);
     const next = !voyageReading?.fromBook ? voyageReading?.replaying
-      ? VOYAGE_CHAPTERS[VOYAGE_CHAPTERS.findIndex(chapter => chapter.id === voyageChapter.id) + 1]
-      : nextVoyageChapter(nextStory) : undefined;
+      ? unlockedChapters[unlockedChapters.findIndex(chapter => chapter.id === voyageChapter.id) + 1]
+      : nextAvailableVoyageChapter(nextStory, progress, props.dangerState, props.bossProgress) : undefined;
     if (next) setVoyageReading({ id: next.id, fromBook: false, replaying: voyageReading?.replaying });
     else closeVoyage();
   }
@@ -129,7 +141,7 @@ export function GlobeAdventure(props: Props) {
     finally { printingRef.current = false; if (mounted.current) setPrinting(false); }
   }
   return <main className={styles.adventure} data-world-id={boss || danger ? undefined : world.id} data-danger-id={danger?.id} data-boss-id={boss?.id}>
-    <WorldNavigation selectedId={destinationId} progress={progress} qaUnlocked={qaUnlocked} busy={busy || printing || reading}
+    <WorldNavigation selectedId={destinationId} progress={progress} bossProgress={props.bossProgress} qaUnlocked={qaUnlocked} busy={busy || printing || reading}
       canNavigate={props.canNavigate} onChooseDanger={danger => boardRef.current?.sailTo(danger.id)} onChooseWorld={id => boardRef.current?.sailTo(id)} onChooseBoss={boss => boardRef.current?.sailTo(boss.id)} />
     <header className={styles.destinationHeader}>
       <div><p className={styles.kicker}>{danger ? `After World ${danger.afterWorld} · Danger crossing` : boss ? `After World ${boss.afterWorld} · Storm challenge` : `World ${world.number} · ${world.concept} ${world.spiral}`}</p>
@@ -145,7 +157,7 @@ export function GlobeAdventure(props: Props) {
     {!boss && !danger && <div className={styles.progressRow}><span>{completedCount} / {stops.length} stops explored</span><progress aria-label={`${world.title} completion`} max={stops.length} value={completedCount} /><span>{questions} questions · Untimed</span></div>}
     {checkpoint && !boss && !danger && <div className={styles.completion} role="status"><span aria-hidden="true">✓</span><div><strong>{complete ? "Archipelago complete!" : `${checkpoint.shortLabel} complete!`}</strong><p>{QUESTIONS_BY_STOP.get(checkpoint.id)?.length} questions solved · {stopFirstTryAccuracy(progress.stopAttempts[checkpoint.id], QUESTIONS_BY_STOP.get(checkpoint.id) ?? [])}% first-try accuracy</p></div></div>}
     <div className={styles.mapAndLibrary}>
-    <GlobeBoard ref={boardRef} danger={danger} dangerStages={dangerSceneryStages(progress, props.dangerState, qaUnlocked, destinationId)} canNavigate={props.canNavigate} onOpenDanger={props.onOpenDanger} dangerReady={!!packet?.briefingRead} dangerComplete={!!packet?.completedAt} world={world} boss={boss} progress={progress} qaUnlocked={qaUnlocked}
+    <GlobeBoard ref={boardRef} danger={danger} dangerStages={dangerSceneryStages(progress, props.dangerState, qaUnlocked, destinationId, props.bossProgress)} canNavigate={props.canNavigate} onOpenDanger={props.onOpenDanger} dangerReady={!!packet?.briefingRead} dangerComplete={!!packet?.completedAt} dangerEmpty={packet?.questionIds.length === 0} world={world} boss={boss} progress={progress} bossProgress={props.bossProgress} qaUnlocked={qaUnlocked}
       initialOverview={initialOverview} restingStopId={props.avatarStopId ?? progress.checkpointStopId}
       onNavigate={navigate} onOpenStop={props.onOpenStop} onInspectStop={props.onInspectStop} onBusyChange={onBusyChange}
       interactionLocked={reading} storyScene={chapterStage === "shattering"} onStorySceneEnd={continueChapter}
@@ -157,29 +169,33 @@ export function GlobeAdventure(props: Props) {
         if (world.number === 1) setStory(index);
         else if (voyageAvailable && islandChapter) setVoyageReading({ id: islandChapter.id, fromBook: true });
       }} />
-    <VoyageLibrary pages={storySoFar(props.storyProgress, props.dangerState)} glossary={voyageAvailable ? VOYAGE_GLOSSARY : ORIGINAL_VOYAGE_GLOSSARY}
+    <VoyageLibrary pages={availableStorySoFar(props.storyProgress, progress, props.dangerState, props.bossProgress)} glossary={voyageAvailable ? VOYAGE_GLOSSARY : ORIGINAL_VOYAGE_GLOSSARY}
       panel={library} onPanelChange={setLibrary} disabled={printing || busy || narrativeReading}
-      continueStoryLabel={nextChapter ? props.storyProgress.readChapters?.length ? "Continue the story" : "The shard voyage" : "Revisit the voyage"}
+      continueStoryLabel={storyLocked ? "Next chapter locked" : nextChapter ? earnedStory.readChapters?.length ? "Continue the story" : "The shard voyage" : "Revisit the voyage"}
+      continueStoryLocked={storyLocked}
+      continueStoryHint={storyLocked ? `Finish World ${waitingChapter!.worldNumber} and its required crossings to continue.` : undefined}
       onContinueStory={voyageAvailable ? opener => {
-        const chapter = nextChapter ?? VOYAGE_CHAPTERS[0];
+        if (storyLocked) return;
+        const chapter = nextChapter ?? unlockedChapters[0];
+        if (!chapter) return;
         storyOpener.current = opener;
         setVoyageReading({ id: chapter.id, fromBook: false, replaying: !nextChapter });
       } : undefined} />
     </div>
     {!danger && <section className={styles.actions} aria-label="World actions" inert={reading}>
-      <div><strong>{boss ? "A full test awaits" : complete ? "Every trail explored" : "Your next discovery"}</strong><p>{boss ? "Print the test and work through it with pencil and paper." : complete ? "Your boat is ready for the next adventure." : "Choose a stop on the globe, or explore the list below."}</p></div>
+      <div><strong>{boss ? stormSubmitted ? "Safe course charted" : "A full test awaits" : complete ? "Every trail explored" : "Your next discovery"}</strong><p>{boss ? stormSubmitted ? "Your workbook answers are submitted. The crossing is clear." : "Solve the workbook, then submit your answers below to chart a safe course." : complete ? "Your boat is ready for the next adventure." : "Choose a stop on the globe, or explore the list below."}</p></div>
       {boss ? nextWorld && <button className={styles.primary} disabled={busy || printing || !props.canNavigate(nextWorld.id)} onClick={() => boardRef.current?.sailTo(nextWorld.id)}>{boss.afterWorld === WORLD_DEFINITIONS.length ? `Back to World ${nextWorld.number}` : `Continue to World ${nextWorld.number}`} →</button>
         : complete && nextDanger && !hasCrossedDanger(progress, props.dangerState, nextDanger) ? <button className={styles.primary} disabled={busy || printing || !props.canNavigate(nextDanger.id)} onClick={() => boardRef.current?.sailTo(nextDanger.id)}>Sail to {nextDanger.title} →</button>
-        : complete && nextBoss ? <button className={styles.primary} disabled={busy || printing || !props.canNavigate(nextBoss.id)} onClick={() => boardRef.current?.sailTo(nextBoss.id)}>Sail into the {nextBoss.year} storm →</button>
+        : complete && nextBoss && !hasSubmittedBoss(props.bossProgress, nextBoss.id) ? <button className={styles.primary} disabled={busy || printing || !props.canNavigate(nextBoss.id)} onClick={() => boardRef.current?.sailTo(nextBoss.id)}>Sail into the {nextBoss.year} storm →</button>
           : complete && nextWorld ? <button className={styles.primary} disabled={busy || printing || !props.canNavigate(nextWorld.id)} onClick={() => boardRef.current?.sailTo(nextWorld.id)}>Sail to {nextWorld.title} →</button>
             : <button className={styles.primary} disabled={busy || printing || !nextStopId} onClick={() => nextStopId && boardRef.current?.openStop(nextStopId)}>{completedCount ? "Continue adventure" : "Let’s explore"} →</button>}
     </section>}
     {danger && <section className={styles.actions} aria-label="Danger actions" inert={reading}>
-      <div><strong>{packet?.completedAt ? "Safe passage!" : packet ? `${packet.questionIds.length} questions · One crossing` : "Get your review packet ready"}</strong><p>{packet?.completedAt ? packet.questionIds.length ? `${dangerPacketAccuracy(packet)}% first-try accuracy. Every question solved; your ship can sail on.` : "No puzzles are waiting for review. The passage is clear." : packet ? packet.questionIds.length ? "Work on paper, then enter your answers at the crossing." : "There are no missed questions waiting for this crossing." : "Print your packet before entering the crossing. It will stay the same when you return."}</p></div>
-      {packet?.completedAt ? <button className={styles.primary} disabled={busy || printing} onClick={() => { const id = nextBoss?.id ?? nextWorld?.id; if (id) boardRef.current?.sailTo(id); }}>Sail onward →</button> : packet ? <button className={styles.primary} disabled={busy || printing} onClick={props.onOpenDanger}>{packet.questionIds.length ? packet.startedAt ? "Resume crossing" : "Enter danger crossing" : "Sail through safely"} →</button> : null}
+      <div><strong>{packet?.completedAt ? "Safe passage!" : packet ? `${packet.questionIds.length} questions · One crossing` : "Get your review packet ready"}</strong><p>{packet?.completedAt ? packet.questionIds.length ? `${dangerPacketAccuracy(packet)}% first-try accuracy. Every question solved; your ship can sail on.` : "No puzzles are waiting for review. The passage is clear." : packet ? packet.questionIds.length ? "Solve the packet on paper, then submit each answer at the crossing to chart a safe course." : "There are no questions waiting for review. Submit your voyage log to confirm a clear course." : "Print your packet before entering the crossing. It will stay the same when you return."}</p></div>
+      {packet?.completedAt ? <button className={styles.primary} disabled={busy || printing} onClick={() => { const id = nextBoss?.id ?? nextWorld?.id; if (id) boardRef.current?.sailTo(id); }}>Sail onward →</button> : packet ? <button className={styles.primary} disabled={busy || printing} onClick={props.onOpenDanger}>{packet.questionIds.length ? packet.startedAt ? "Resume crossing" : "Enter danger crossing" : "Submit voyage log"} →</button> : null}
       <button className={styles.exportButton} disabled={busy || printing} onClick={() => setRevisitDanger(true)}>Read about this danger</button>
     </section>}
-    {!danger && (boss ? <section className={styles.bossNote}><strong>Take on the storm, one question at a time</strong><p>{boss.afterWorld === WORLD_DEFINITIONS.length ? "Beyond this storm lies an uncharted horizon. " : "This storm guards the crossing to the next archipelago. "}Work through the whole test on paper. Answer entry is coming later; for now, you can print and continue exploring.</p></section>
+    {!danger && (boss ? <div inert={reading}><StormAnswerSheet key={boss.id} challenge={boss} attempt={bossAttempt(props.bossProgress, boss.id)} onAnswer={props.onBossAnswer} onSubmit={props.onSubmitBoss} /></div>
       : <details className={styles.directory} inert={reading}><summary>Explore the island stops</summary><ol>{stops.map((stop, index) => {
         const done = progress.completedStopIds.includes(stop.id); const available = canOpenRequiredStop(progress, stop.id, qaUnlocked);
         return <li key={stop.id}><button type="button" disabled={!available || busy} aria-current={nextStopId === stop.id ? "step" : undefined} onClick={() => done && !qaUnlocked ? props.onInspectStop(stop.id) : boardRef.current?.openStop(stop.id)}><span>{done ? "✓" : index + 1}</span><strong>{stop.shortLabel}</strong><small>{QUESTIONS_BY_STOP.get(stop.id)?.length} questions · {done ? qaUnlocked ? "Replay" : "Completed" : available ? "Explore" : "Locked"}</small></button></li>;
@@ -196,6 +212,6 @@ export function GlobeAdventure(props: Props) {
       actionLabel={chapterStage === "intro" ? "Begin exploring" : chapterStage === "fracture" ? "Watch the sky" : "I’ll help find the shards"} />}
     {!chapterPage && bookPage && <StoryPage key={bookPage.id} page={bookPage} onContinue={closeBook} actionLabel="Back to the map" />}
     {voyageChapter && <StoryPage key={voyageChapter.id} page={voyageChapter} onContinue={continueVoyage} onClose={closeVoyage}
-      actionLabel={voyageReading?.fromBook ? "Back to the map" : voyageChapter.id === VOYAGE_CHAPTERS.at(-1)?.id ? "Keep the light" : "Read on"} />}
+      actionLabel={voyageChapter.id === VOYAGE_CHAPTERS.at(-1)?.id ? "Keep the light" : voyageReading?.fromBook || !followingChapter ? "Back to the map" : "Read on"} />}
   </main>;
 }

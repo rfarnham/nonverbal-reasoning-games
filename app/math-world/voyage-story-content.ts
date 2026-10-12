@@ -1,6 +1,6 @@
 import type { StoryPageContent } from "./story-content.ts";
 
-/** Optional fiction follows its own reading order, independently of practice. */
+/** Optional fiction follows the voyage's completed archipelagos and passages. */
 export type VoyageChapter = Readonly<StoryPageContent & {
   worldNumber: number;
   /** The summit shard recovered in this chapter; absent from the two finales. */
@@ -196,7 +196,7 @@ export const VOYAGE_CHAPTERS: readonly VoyageChapter[] = [
     title: "Shelter from the turning storm",
     paragraphs: [
       "Basalt columns rise like dark organ pipes. You recover the summit shard beneath a stone arch, then return to the harbor as cloud bands curl across the sea. A hurricane is gathering beyond the islands.",
-      "The harbor keepers secure your boat and bring everyone into shelter. You fasten the shard chest below deck. No one has to sail into the storm. When it passes, you help your hosts mend a sail and continue the voyage with every shard safe.",
+      "From shelter, you and your crew have charted a safe course around the storm. The harbor keepers help ready your boat, and you fasten the shard chest below deck. Beyond the cloud bands, a clear passage leads onward. You thank your hosts and continue the voyage with every shard safe.",
     ],
     illustration: "wind",
   },
@@ -388,7 +388,7 @@ export const VOYAGE_CHAPTERS: readonly VoyageChapter[] = [
     title: "The final blue light",
     paragraphs: [
       "Rock bridges join the basalt towers. At the highest summit, you recover the final shard. All thirty-two pieces now rest safely in the chest. Across the sea, another hurricane gathers, turning the distant clouds into a great spiral.",
-      "You return to the sheltered gathering harbor. Islanders secure the ships and wait with you until the storm passes. Then the scientist opens the crystal cradle. The voyage to gather the shards is complete; the Tideheart is ready to become whole.",
+      "With a safe course charted around the hurricane, you return to the sheltered gathering harbor. Islanders secure the ships while the scientist opens the crystal cradle. The voyage to gather the shards is complete; the Tideheart is ready to become whole.",
     ],
     illustration: "appeal",
   },

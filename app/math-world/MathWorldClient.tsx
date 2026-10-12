@@ -51,8 +51,9 @@ import { WorldMap } from "./WorldMap";
 import { BossWorld } from "./BossWorld";
 import { GlobeAdventure } from "./GlobeAdventure";
 import { bossById, type BossChallenge } from "./boss-challenges.ts";
+import { bossStorageKey, createBossProgress, mergeBossProgress, readBossProgress, writeBossProgress, setBossAnswer, submitBossAnswers, type BossProgress } from "./boss-progress.ts";
 import { createStoryProgress, pendingFirstWorldEnding, readStoryProgress, writeStoryProgress, type WorldStoryProgress } from "./story-progress.ts";
-import { dangerById, nextDueDanger, canNavigateDestination, type DangerDefinition } from "./danger-definitions.ts";
+import { dangerById, nextRequiredEncounter, canNavigateDestination, type DangerDefinition } from "./danger-definitions.ts";
 import { createDangerState, recordDangerMiss, ensureDangerPacket, acknowledgeDangerBriefing, startDangerPacket, answerDangerQuestion, allowDangerRetry, advanceDangerQuestion, dangerPacketQuestions, type DangerState } from "./danger-engine.ts";
 import { readDangerIdentity, readDangerState, writeDangerState, claimLegacyDangerMisses } from "./danger-storage.ts";
 import styles from "./math-world.module.css";
@@ -73,6 +74,38 @@ function stopById(stopId: string | null): MathStop | null {
   return REQUIRED_STOPS.find(({ id }) => id === stopId) ?? null;
 }
 
+/** Repair only route pointers. Earned math work and unfinished answers stay intact. */
+function accessibleRoute(progress: WorldProgress, dangers: DangerState, bosses: BossProgress, qa: boolean,
+  requestedDangerId: string | null, requestedBossId: string | null, requestedWorldId = progress.selectedWorldId,
+): Readonly<{ progress: WorldProgress; danger: DangerDefinition | null; boss: BossChallenge | null }> {
+  const allowed = (id: string) => canNavigateDestination(progress, dangers, id, qa, bosses);
+  const requestedDanger = dangerById(requestedDangerId);
+  const requestedBoss = bossById(requestedBossId);
+  let danger = requestedDanger && allowed(requestedDanger.id) ? requestedDanger : null;
+  let boss = !danger && requestedBoss && allowed(requestedBoss.id) ? requestedBoss : null;
+  const activeWorld = progress.activeStopId ? worldForStop(progress.activeStopId) : undefined;
+  const activeLocked = Boolean(progress.activeStopId && (!activeWorld || !allowed(activeWorld.id)));
+  const requestedWorldAllowed = allowed(requestedWorldId);
+  const invalidEncounter = Boolean((requestedDangerId && !danger) || (requestedBossId && !boss && !danger));
+  if (!danger && !boss && (invalidEncounter || !requestedWorldAllowed || activeLocked)) {
+    const due = nextRequiredEncounter(progress, dangers, bosses);
+    danger = dangerById(due?.id) ?? null;
+    boss = due && !danger ? bossById(due.id) ?? null : null;
+  }
+  const worldId = requestedWorldAllowed ? requestedWorldId
+    : [...WORLD_DEFINITIONS].reverse().find(world => allowed(world.id))?.id ?? WORLD_DEFINITIONS[0].id;
+  let routed = progress.selectedWorldId === worldId ? progress : selectWorld(progress, worldId, qa);
+  if (activeLocked) routed = { ...routed, activeStopId: null, checkpointStopId: null };
+  return { progress: routed, danger, boss };
+}
+
+function replaceDestinationUrl(worldId: string, danger: DangerDefinition | null, boss: BossChallenge | null) {
+  const url = new URL(window.location.href);
+  if (danger) url.searchParams.set("danger", danger.id); else url.searchParams.delete("danger");
+  if (boss) url.searchParams.set("boss", boss.id); else url.searchParams.delete("boss");
+  window.history.replaceState({ ...window.history.state, mathWorldId: worldId }, "", url);
+}
+
 function questionNeedsOpenCard(question: WorldQuestion): boolean {
   return (
     question.presentation === "source-card" ||
@@ -91,6 +124,28 @@ export default function MathWorldClient() {
   const [selectedBoss, setSelectedBoss] = useState<BossChallenge | null>(null);
   const [selectedDanger, setSelectedDanger] = useState<DangerDefinition | null>(null);
   const [dangerSaveFailed, setDangerSaveFailed] = useState(false);
+  const [bossSaveFailed, setBossSaveFailed] = useState(false);
+  const [bossProgress, setBossProgress] = useState<BossProgress>(() => createBossProgress("device-guest"));
+  const bossRef = useRef(bossProgress);
+  const saveBoss = useCallback((next: BossProgress) => {
+    bossRef.current = next;
+    setBossProgress(next);
+    setBossSaveFailed(!writeBossProgress(next));
+  }, []);
+  const refreshBosses = useCallback(() => {
+    const current = bossRef.current;
+    const next = mergeBossProgress(current, readBossProgress(current.profileId, current.qa));
+    bossRef.current = next;
+    setBossProgress(next);
+    return next;
+  }, []);
+  const loadBosses = useCallback((qa: boolean) => {
+    const next = readBossProgress(readDangerIdentity().profileId, qa);
+    bossRef.current = next;
+    setBossProgress(next);
+    setBossSaveFailed(false);
+    return next;
+  }, []);
   const [dangerPlaying, setDangerPlaying] = useState(false);
   const [dangerState, setDangerState] = useState<DangerState>(() => createDangerState("device-guest"));
   const dangerRef = useRef(dangerState);
@@ -106,7 +161,7 @@ export default function MathWorldClient() {
     saveDanger(next);
     return next;
   }, [saveDanger]);
-  const canNavigate = (id: string) => canNavigateDestination(progress, dangerState, id, qaUnlocked);
+  const canNavigate = (id: string) => canNavigateDestination(progress, dangerState, id, qaUnlocked, bossProgress);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [inspectedStopId, setInspectedStopId] = useState<string | null>(null);
   const [lastVisitedStopId, setLastVisitedStopId] = useState<string | null>(null);
@@ -125,25 +180,21 @@ export default function MathWorldClient() {
       const playtestMode = readWorldPlaytestMode() || new URLSearchParams(window.location.search).get("qa") === "1";
       const savedProgress = readWorldProgress(playtestMode);
       const savedDangers = loadDangers(savedProgress, playtestMode);
-      const requestedDanger = dangerById(new URLSearchParams(window.location.search).get("danger"));
-      const initialDanger = requestedDanger && canNavigateDestination(savedProgress, savedDangers, requestedDanger.id, playtestMode) ? requestedDanger : !playtestMode && !canNavigateDestination(savedProgress, savedDangers, savedProgress.selectedWorldId) ? nextDueDanger(savedProgress, savedDangers) ?? null : null;
-      setSelectedDanger(initialDanger ?? null);
-      const requestedBoss = bossById(new URLSearchParams(window.location.search).get("boss"));
-      const initialBoss = !initialDanger && requestedBoss && canNavigateDestination(savedProgress, savedDangers, requestedBoss.id, playtestMode) ? requestedBoss : null;
+      const savedBosses = loadBosses(playtestMode);
+      const params = new URLSearchParams(window.location.search);
+      const initial = accessibleRoute(savedProgress, savedDangers, savedBosses, playtestMode, params.get("danger"), params.get("boss"));
+      setSelectedDanger(initial.danger);
+      setSelectedBoss(initial.boss);
       setQaUnlocked(playtestMode);
-      setProgress(savedProgress);
+      setProgress(initial.progress);
       setStoryProgress(readStoryProgress(playtestMode));
-      setSelectedBoss(initialBoss);
-      const initialUrl = new URL(window.location.href);
-      if (!initialDanger) initialUrl.searchParams.delete("danger"); else initialUrl.searchParams.set("danger", initialDanger.id);
-      if (!initialBoss) initialUrl.searchParams.delete("boss");
-      window.history.replaceState({ ...window.history.state, mathWorldId: savedProgress.selectedWorldId }, "", initialUrl);
+      replaceDestinationUrl(initial.progress.selectedWorldId, initial.danger, initial.boss);
       setSoundEnabled(readSoundPreference());
       setHydrated(true);
       window.scrollTo({ top: 0, behavior: "auto" });
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [loadDangers]);
+  }, [loadDangers, loadBosses]);
 
   useEffect(() => {
     if (hydrated) writeWorldProgress(progress, qaUnlocked);
@@ -157,19 +208,23 @@ export default function MathWorldClient() {
       const identity = readDangerIdentity();
       if (next !== qaUnlocked || identity.profileId !== dangerRef.current.profileId) {
         const loaded = loadDangers(nextProgress, next);
-        const due = !next && !canNavigateDestination(nextProgress, loaded, nextProgress.selectedWorldId) ? nextDueDanger(nextProgress, loaded) : undefined;
-        setSelectedDanger(due ?? null); setDangerPlaying(false);
-        const dangerUrl = new URL(window.location.href); if (due) dangerUrl.searchParams.set("danger", due.id); else dangerUrl.searchParams.delete("danger");
-        window.history.replaceState(window.history.state, "", dangerUrl);
+        const bosses = loadBosses(next);
+        const route = accessibleRoute(nextProgress, loaded, bosses, next, null, null);
+        setSelectedDanger(route.danger);
+        setSelectedBoss(route.boss);
+        setDangerPlaying(false);
+        replaceDestinationUrl(route.progress.selectedWorldId, route.danger, route.boss);
         setQaUnlocked(next);
-        setProgress(nextProgress);
+        setProgress(route.progress);
         setStoryProgress(readStoryProgress(next));
         setInspectedStopId(null);
         setLastVisitedStopId(null);
         setQaOpen(false);
         setZoomed(false);
+        return;
       }
-      if (selectedBoss && !canNavigateDestination(nextProgress, dangerRef.current, selectedBoss.id, next)) {
+      refreshBosses();
+      if (selectedBoss && !canNavigateDestination(nextProgress, dangerRef.current, selectedBoss.id, next, bossRef.current)) {
         setSelectedBoss(null);
         const url = new URL(window.location.href);
         url.searchParams.delete("boss");
@@ -177,7 +232,8 @@ export default function MathWorldClient() {
       }
     };
     const onStorage = (event: StorageEvent) => {
-      if (event.key === null || event.key === "spatial-gym:progression") syncProfile();
+      if (event.key === null || event.key === "spatial-gym:progression"
+        || event.key === bossStorageKey(bossRef.current.profileId, bossRef.current.qa)) syncProfile();
     };
     window.addEventListener("storage", onStorage);
     window.addEventListener("focus", syncProfile);
@@ -185,7 +241,7 @@ export default function MathWorldClient() {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("focus", syncProfile);
     };
-  }, [hydrated, qaUnlocked, progress, selectedBoss, loadDangers]);
+  }, [hydrated, qaUnlocked, progress, selectedBoss, loadDangers, loadBosses, refreshBosses]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -193,55 +249,49 @@ export default function MathWorldClient() {
       const params = new URLSearchParams(window.location.search);
       const nextQa = readWorldPlaytestMode() || params.get("qa") === "1";
       const nextProgress = nextQa !== qaUnlocked ? readWorldProgress(nextQa) : progress;
-      const nextDangers = nextQa !== qaUnlocked ? loadDangers(nextProgress, nextQa) : dangerRef.current;
+      const identityChanged = readDangerIdentity().profileId !== dangerRef.current.profileId;
+      const changed = nextQa !== qaUnlocked || identityChanged;
+      const nextDangers = changed ? loadDangers(nextProgress, nextQa) : dangerRef.current;
+      const nextBosses = changed ? loadBosses(nextQa) : bossRef.current;
       setDangerPlaying(false);
-      if (nextQa !== qaUnlocked) {
+      if (changed) {
         setQaUnlocked(nextQa);
-        setProgress(nextProgress);
         setStoryProgress(readStoryProgress(nextQa));
       }
       // Browser history must not skip the newly completed chapter's ending.
       // Do not pull established players in later worlds back to World 1.
       if (nextQa === qaUnlocked && pendingFirstWorldEnding(storyProgress, nextProgress)) {
-        const url = new URL(window.location.href);
-        url.searchParams.delete("boss");
-        window.history.replaceState({ ...window.history.state, mathWorldId: nextProgress.selectedWorldId }, "", url);
-        setSelectedBoss(null); setSelectedDanger(null);
-        url.searchParams.delete("danger");
-        window.history.replaceState(window.history.state, "", url);
+        replaceDestinationUrl(nextProgress.selectedWorldId, null, null);
+        setSelectedBoss(null);
+        setSelectedDanger(null);
+        if (changed) setProgress(nextProgress);
         return;
       }
-      const requestedDanger = dangerById(params.get("danger"));
-      const allowedDanger = requestedDanger && canNavigateDestination(nextProgress, nextDangers, requestedDanger.id, nextQa) ? requestedDanger : null;
-      setSelectedDanger(allowedDanger ?? null);
-      const requestedBossId = params.get("boss");
-      const requestedBoss = bossById(requestedBossId);
-      const allowedBoss = !allowedDanger && requestedBoss && canNavigateDestination(nextProgress, nextDangers, requestedBoss.id, nextQa) ? requestedBoss : null;
-      setSelectedBoss(allowedBoss);
+      const worldId = typeof event.state?.mathWorldId === "string" ? event.state.mathWorldId : nextProgress.selectedWorldId;
+      const route = accessibleRoute(nextProgress, nextDangers, nextBosses, nextQa, params.get("danger"), params.get("boss"), worldId);
+      setSelectedDanger(route.danger);
+      setSelectedBoss(route.boss);
+      setProgress(route.progress);
       setInspectedStopId(null);
       setLastVisitedStopId(null);
       setQaOpen(false);
       setZoomed(false);
-      if (!allowedDanger) { const url = new URL(window.location.href); url.searchParams.delete("danger"); window.history.replaceState(window.history.state, "", url); }
-      if (!allowedBoss && !allowedDanger) {
-        const url = new URL(window.location.href);
-        url.searchParams.delete("boss");
-        const worldId = event.state?.mathWorldId;
-        if (!requestedBossId && typeof worldId === "string" && canNavigateDestination(nextProgress, nextDangers, worldId, nextQa)) {
-          setProgress(current => current.selectedWorldId === worldId ? current : selectWorld(current, worldId, nextQa));
-        }
-        window.history.replaceState(window.history.state, "", url);
-      }
+      replaceDestinationUrl(route.progress.selectedWorldId, route.danger, route.boss);
       window.scrollTo({ top: 0, behavior: "auto" });
     };
     window.addEventListener("popstate", restoreDestination);
     return () => window.removeEventListener("popstate", restoreDestination);
-  }, [hydrated, progress, qaUnlocked, storyProgress, loadDangers]);
+  }, [hydrated, progress, qaUnlocked, storyProgress, loadDangers, loadBosses]);
 
   const dangerPacket = selectedDanger ? dangerState.packets[selectedDanger.id] : undefined;
   const activeDanger = selectedDanger && dangerPlaying && dangerPacket?.startedAt && !dangerPacket.completedAt ? selectedDanger : null;
-  const activeStop = useMemo(() => activeDanger ? { ...REQUIRED_STOPS[0], id: `${activeDanger.id}:review`, label: "Danger crossing", shortLabel: "Danger crossing" }
-    : selectedBoss || selectedDanger ? null : stopById(progress.activeStopId), [activeDanger, selectedBoss, selectedDanger, progress.activeStopId]);
+  const activeStop = useMemo(() => {
+    if (activeDanger) return { ...REQUIRED_STOPS[0], id: `${activeDanger.id}:review`, label: "Danger crossing", shortLabel: "Danger crossing" };
+    if (selectedBoss || selectedDanger) return null;
+    const stop = stopById(progress.activeStopId);
+    const world = stop ? worldForStop(stop.id) : undefined;
+    return stop && world && canNavigateDestination(progress, dangerState, world.id, qaUnlocked, bossProgress) ? stop : null;
+  }, [activeDanger, selectedBoss, selectedDanger, progress, dangerState, qaUnlocked, bossProgress]);
   const selectedWorld = (activeStop ? worldForStop(activeStop.id) : undefined)
     ?? WORLD_DEFINITIONS.find(({ id }) => id === progress.selectedWorldId)
     ?? WORLD_DEFINITIONS[0];
@@ -398,6 +448,18 @@ export default function MathWorldClient() {
     resetViewport();
   }
 
+  function answerBoss(questionIndex: number, answer: number) {
+    const current = refreshBosses();
+    if (!selectedBoss || !canNavigateDestination(progress, dangerRef.current, selectedBoss.id, qaUnlocked, current)) return;
+    saveBoss(setBossAnswer(current, selectedBoss.id, questionIndex, answer));
+  }
+
+  function submitBoss() {
+    const current = refreshBosses();
+    if (!selectedBoss || !canNavigateDestination(progress, dangerRef.current, selectedBoss.id, qaUnlocked, current)) return;
+    saveBoss(submitBossAnswers(current, selectedBoss.id));
+  }
+
   function chooseDanger(danger: DangerDefinition) {
     if (pendingFirstWorldEnding(storyProgress, progress) || !canNavigate(danger.id)) return;
     const url = new URL(window.location.href); url.searchParams.delete("boss"); url.searchParams.set("danger", danger.id);
@@ -523,16 +585,19 @@ export default function MathWorldClient() {
       </header>
 
       {dangerSaveFailed && <p role="alert" className={styles.testNotice}>This browser could not save your review progress. Keep this tab open to retain the current packet.</p>}
+      {bossSaveFailed && <p role="alert" className={styles.testNotice}>This browser could not save your storm workbook answers. Keep this tab open to retain them.</p>}
       {!activeStop && WORLD_MODE === "spiral-preview" ? (
-        <GlobeAdventure key={qaUnlocked ? "playtest-globe" : "adventure-globe"}
+        <GlobeAdventure key={`${bossProgress.profileId}:${qaUnlocked ? "playtest-globe" : "adventure-globe"}`}
           danger={selectedDanger} dangerState={dangerState} onChooseDanger={chooseDanger} canNavigate={canNavigate} onPrepareDanger={prepareDanger} onOpenDanger={openDanger}
           world={selectedWorld} boss={selectedBoss} progress={progress} qaUnlocked={qaUnlocked}
+          bossProgress={bossProgress} onBossAnswer={answerBoss} onSubmitBoss={submitBoss}
           storyProgress={storyProgress} onStoryProgress={saveStoryProgress}
           avatarStopId={lastVisitedStopId} onChooseWorld={chooseWorld} onChooseBoss={chooseBoss}
           onOpenStop={openStop} onInspectStop={setInspectedStopId} onExportQa={downloadQaArchive} />
       ) : selectedBoss ? (
-        <BossWorld key={`${qaUnlocked ? "playtest" : "adventure"}:${selectedBoss.id}`}
+        <BossWorld key={`${bossProgress.profileId}:${qaUnlocked ? "playtest" : "adventure"}:${selectedBoss.id}`}
           challenge={selectedBoss} progress={progress} qaUnlocked={qaUnlocked}
+          bossProgress={bossProgress} onBossAnswer={answerBoss} onSubmitBoss={submitBoss} canNavigate={canNavigate}
           onChooseWorld={chooseWorld} onChooseBoss={chooseBoss} />
       ) : activeStop && question && attempt ? (
         <main className={styles.courseShell}>
@@ -643,7 +708,7 @@ export default function MathWorldClient() {
                     className={styles.primaryButton}
                     onClick={goToNextQuestion}
                   >
-                    {attempt.questionIndex === questions.length - 1 ? "Finish stop" : "Next question"}
+                    {attempt.questionIndex === questions.length - 1 ? activeDanger ? "Submit workbook answers" : "Finish stop" : "Next question"}
                     <span aria-hidden="true">→</span>
                   </button>
                 </div>

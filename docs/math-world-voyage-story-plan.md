@@ -1,13 +1,14 @@
 # Oceania shard voyage — authoring plan
 
-Updated: 2026-10-12. Status: implemented and validated for release.
+Updated: 2026-10-12. Status: progress-gated continuation implemented and validated for release.
 
 ## Scope and continuity
 
 The voyage is an optional side story for Counting Coast. Math Kangaroo practice
-remains the main activity. The story's only teaching purpose is introducing a
-small amount of maritime and mythological vocabulary through the existing
-glossary.
+remains the main activity. Completing the existing learning route unlocks the
+next part of the voyage. The brief encounters explain workbook work as charting
+a safe course, while the longer fiction introduces a small amount of maritime
+and mythological vocabulary through the existing glossary.
 
 The existing welcome, two first-world books, sundering, shard flight, and appeal
 remain unchanged. A student who has completed the first archipelago sees the
@@ -22,22 +23,36 @@ that it can protect the islands from a distance.
 
 There are exactly thirty-two shards, one per archipelago summit. Chapters
 01–32 each recover their own summit shard in the prose. The two final chapters
-recover no additional shards. No shard is stolen, lost, or tied to a correct
-answer, score, test, printed packet, or redemption outcome.
+recover no additional shards. No shard is stolen or lost. Recovery chapters
+become available after the corresponding archipelago and its prerequisite
+stops are complete; reading the chapter records the recovery.
 
 ## Reading contract
 
 - The first archipelago keeps its two original books.
 - Archipelagos 2–32 have one optional voyage book each.
-- The new chapters form a single ordered manuscript available through an
-  explicit **Continue story** control, independently of math progression.
+- The new chapters form a single ordered manuscript. The next chapter unlocks
+  only after its archipelago's required stops and all earlier passages are
+  complete. Map books, continuation, and story history obey the same gates.
+- Chapters 16 and 32 additionally wait for their corresponding hurricane
+  workbook to be submitted. The reforging and ascent wait for the final
+  hurricane and all thirty-two shard recoveries, in that order.
+- A locked continuation names the required archipelago and crossings;
+  reading ahead or reopening an old reading save cannot bypass that stop.
 - Reading, skipping, closing, or rereading story pages never changes curriculum
   access, question state, accuracy, mistakes, workbooks, or earned progress.
-- Shard acknowledgements describe the fiction's reading progress; they are not
-  puzzle rewards or requirements for practice.
-- Hurricanes in chapters 16 and 32 are narrative weather. Characters take
-  shelter and wait. Assessments and their packets remain separate activities;
-  completing one does not defeat a storm or power the Tideheart.
+- Shard acknowledgements record the available fiction's reading progress.
+  They cannot substitute for completed learning stops or unlock practice.
+- Storms and dangers block the passage until their workbook answers are entered
+  and submitted in the game. Printing or reading a briefing never clears them.
+  Danger answers keep the existing question-by-question checking and retry
+  flow; hurricane answer sheets save all 24 A–E choices and require an explicit
+  full-workbook submission. Submission records the answers without inventing a
+  grade or imposing an accuracy threshold. A danger with no review questions
+  requires an explicit **Submit voyage log** action, with no empty workbook.
+- The in-game explanation is charting a safe course through or around the
+  obstacle. The characters need not wait for weather to disappear, and workbook
+  answers do not power the Tideheart. No question content or scoring changes.
 - Each chapter has two short paragraphs. Major plot turns occur at a few ports;
   the other visits provide scenery, small acts of kindness, and breathing room.
 - There are no new reading-comprehension checks, vocabulary quizzes, combat
@@ -88,7 +103,7 @@ varies the landscapes while keeping the original summit landing sites.
 | 13 | Mangroves and tidal channels | Overhear the guild admit its sabotage and toll motive; quietly recover the summit shard. |
 | 14 | Golden woods | Help an instrument maker carry branches; recover the shard above the clearing. |
 | 15 | Terraces and mountain springs | Share a farmer's load of seedlings; recover the ridge's summit shard. |
-| 16 | Basalt columns and stone arches | Recover the shard; shelter from the midpoint hurricane and resume with every shard safe. |
+| 16 | Basalt columns and stone arches | After the midpoint hurricane workbook, recover the shard and follow the charted course around the storm. |
 | 17 | Turquoise bays and limestone | Help a Siren move her welcome lantern away from rocks; recover the summit shard. |
 | 18 | Crystal lakes and snowy peaks | Help a bellkeeper raise a polished bell; recover the shard above the lake. |
 | 19 | Blossom terraces and fruit groves | Rescue Mara, who leaves the guild after seeing storm damage; recover the orchard summit shard. |
@@ -104,7 +119,7 @@ varies the landscapes while keeping the original summit landing sites.
 | 29 | Marsh islands and reed lagoons | Help a reed-boat builder; recover the summit shard; promise future news from the sky. |
 | 30 | Crimson forests and pine clearings | Share a family picnic; recover the shard; remember the everyday life the computer protects. |
 | 31 | Alpine meadows and stepped valleys | Recover the shard; friends gather, the scientist prepares a crystal cradle, and Mara spots guild ships. |
-| 32 | Rock bridges and basalt towers | Recover the final shard; shelter from the final hurricane; prepare to make the computer whole. |
+| 32 | Rock bridges and basalt towers | After the final hurricane workbook, recover the last shard and follow the charted course to the gathering harbor. |
 | Reforging | The sheltered gathering harbor | Fit all thirty-two shards together aboard the ship; its signals return; Mara warns of approaching saboteurs and islanders provide an escort. |
 | Ascent | Sea, clouds, and space | The celestial sails carry the player and Tideheart beyond the guild's reach; the computer continues protecting every coast. |
 
@@ -148,14 +163,20 @@ Illustration kinds are `chart`, `beacon`, `wind`, `sails`, `reforging`, and
 Content checks should establish ordered unique IDs, exactly one recovery for
 each summit, no additional finale shards, short two-paragraph chapters,
 glossary grounding and concise definitions. Integration checks should establish
-that independent story reading, map book access, history, resume, and shard
-display never change practice state, and that the existing first-world opening
-and saved student progress stay intact.
+that continuation, map books, history, resume, and shard display respect the
+same completed-stop prerequisites. Earlier saves that read ahead must not expose
+locked chapters or future shards. Reading must never change practice state,
+and the existing first-world opening and saved student progress stay intact.
+Workbook checks should confirm that merely printing or closing a briefing does
+not clear a storm or danger, and that submitting the required answers opens the
+next passage without changing the existing scoring or retry rules.
 
-Release validation passed: `npm run check` (lint, types, static export, 1,106
+Release validation passed: `npm run check` (lint, types, static export, 1,125
 JavaScript tests with eight existing skips, 174 adaptive-core tests, and ten
-search tests) and six Chromium story checks. Browser coverage includes all
-34 chapters, saved progress and reloads, the unchanged opening, optional books,
-glossary layouts at 390/620/820/1200px, keyboard focus, paused scenery, and reduced
-motion changes during both finales. These browser checks use the supported
-static map fallback on the GPU-less runner; the new story illustrations are SVG.
+search tests) plus twelve Chromium browser scenarios. Coverage includes the
+unchanged opening, locked continuation and map books, completed-stop unlocking,
+legacy read-ahead saves, all 34 earned chapters, phone layouts, reduced motion,
+actual workbook printing, partial answer reloads, deliberate storm and danger
+submission, direct-link repair, and two-tab storm submission preservation.
+Browser checks use the supported static map fallback on the GPU-less runner;
+the story illustrations are SVG.

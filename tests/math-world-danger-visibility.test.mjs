@@ -3,6 +3,7 @@ import test from "node:test";
 import { createInitialProgress } from "../app/math-world/engine.ts";
 import { WORLD_DEFINITIONS, WORLD_QUESTIONS, QUESTIONS_BY_STOP } from "../app/math-world/world-data.ts";
 import { BOSS_CHALLENGES } from "../app/math-world/boss-challenges.ts";
+import { createBossProgress, setBossAnswer, submitBossAnswers } from "../app/math-world/boss-progress.ts";
 import { DANGERS, canNavigateDestination, dangerAfterWorld, dangerSceneryStages } from "../app/math-world/danger-definitions.ts";
 import { createDangerReveal, DANGER_REVEAL_SECONDS } from "../app/math-world/danger-reveal.ts";
 import { createSceneryClock } from "../app/math-world/scenery-clock.ts";
@@ -19,8 +20,8 @@ const finishedThrough = number => ({
   ...createInitialProgress(),
   completedStopIds: WORLD_DEFINITIONS.filter(candidate => candidate.number <= number).flatMap(candidate => candidate.stopIds),
 });
-function assertVisible(progress, dangerState, expectedId, qa = false, activeId) {
-  const stages = dangerSceneryStages(progress, dangerState, qa, activeId);
+function assertVisible(progress, dangerState, expectedId, qa = false, activeId, bossState) {
+  const stages = dangerSceneryStages(progress, dangerState, qa, activeId, bossState);
   assert.deepEqual(Object.keys(stages).sort(), DANGERS.map(danger => danger.id).sort(), "every reserved crossing has an explicit stage");
   assert.deepEqual(Object.entries(stages).filter(([, stage]) => stage > 0).map(([id]) => id), expectedId ? [expectedId] : []);
   for (const [id, stage] of Object.entries(stages)) assert.equal(stage, id === expectedId ? 1 : 0, "relevance supplies targets; animation belongs to the scenery clock");
@@ -31,19 +32,30 @@ function completedEmptyPacket(before, number) {
   return startDangerPacket(acknowledgeDangerBriefing(prepared, danger.id), danger.id, NOW);
 }
 
-test("each of the 33 teaching completion boundaries reveals only the immediately relevant crossing", () => {
+function dangersThrough(number) {
+  return DANGERS.filter(danger => danger.afterWorld <= number).reduce((before, danger) => completedEmptyPacket(before, danger.afterWorld), state);
+}
+function bossesThrough(number) {
+  return BOSS_CHALLENGES.filter(boss => boss.afterWorld <= number).reduce((before, boss) => {
+    for (let index = 0; index < 24; index++) before = setBossAnswer(before, boss.id, index, 0);
+    return submitBossAnswers(before, boss.id, NOW);
+  }, createBossProgress("visibility-reader"));
+}
+
+test("each teaching boundary reveals only the next uncompleted reachable crossing", () => {
   for (let number = 0; number <= 32; number++) {
     const progress = finishedThrough(number);
     const expected = number > 0 && number % 2 === 0 ? dangerAfterWorld(number).id : undefined;
-    assertVisible(progress, state, expected);
-    // QA on an ordinary map does not paint every unlocked encounter at once.
-    assertVisible(progress, state, expected, true, world(Math.min(32, number + 1)).id);
-    assertVisible(progress, state, expected, true);
+    const dangers = dangersThrough(number % 2 === 0 ? number - 2 : number - 1);
+    const bosses = bossesThrough(number - 1);
+    assertVisible(progress, dangers, expected, false, undefined, bosses);
+    assertVisible(progress, dangers, expected, true, world(Math.min(32, number + 1)).id, bosses);
   }
 });
 
 test("the final stop must be completed, not merely entered or answered, before its danger gathers", () => {
   for (const danger of DANGERS) {
+    const dangers = dangersThrough(danger.afterWorld - 2), bosses = bossesThrough(danger.afterWorld - 1);
     const finalStop = world(danger.afterWorld).stopIds.at(-1);
     const questions = QUESTIONS_BY_STOP.get(finalStop);
     const incomplete = {
@@ -61,44 +73,38 @@ test("the final stop must be completed, not merely entered or answered, before i
           solvedQuestionIds: phase === "correct" ? questions.map(question => question.id) : questions.slice(0, -1).map(question => question.id),
         } },
       };
-      assertVisible(progress, state, undefined);
+      assertVisible(progress, dangers, undefined, false, undefined, bosses);
     }
-    assertVisible({ ...incomplete, activeStopId: null, checkpointStopId: finalStop, completedStopIds: finishedThrough(danger.afterWorld).completedStopIds }, state, danger.id);
+    assertVisible({ ...incomplete, completedStopIds: finishedThrough(danger.afterWorld).completedStopIds }, dangers, danger.id, false, undefined, bosses);
   }
 });
 
-test("a stale selected world, future URL or historical danger selection cannot summon normal-mode scenery", () => {
+test("stale destinations and later earned work never hide an outstanding earlier danger", () => {
   const progress = { ...finishedThrough(8), selectedWorldId: world(31).id };
-  for (const danger of DANGERS) assertVisible(progress, state, dangerAfterWorld(8).id, false, danger.id);
-  for (const id of ["unknown-danger", "danger-99", BOSS_CHALLENGES[0].id, world(32).id]) assertVisible(progress, state, dangerAfterWorld(8).id, false, id);
-  assertVisible({ ...createInitialProgress(), selectedWorldId: world(32).id }, state, undefined, false, dangerAfterWorld(32).id);
-});
-
-test("earned work beyond an old crossing hides it even if it never had a review packet", () => {
+  for (const danger of DANGERS) assertVisible(progress, state, "danger-02", false, danger.id);
+  assertVisible({ ...createInitialProgress(), selectedWorldId: world(32).id }, state, undefined, false, "danger-32");
   for (const danger of DANGERS.filter(candidate => candidate.afterWorld < 32)) {
+    const prior = dangersThrough(danger.afterWorld - 2), bosses = bossesThrough(danger.afterWorld - 1);
     const nextStop = world(danger.afterWorld + 1).stopIds[0];
     const completed = finishedThrough(danger.afterWorld);
-    assertVisible({ ...completed, stopAttempts: { [nextStop]: freshAttempt() } }, state, undefined);
-    assertVisible({ ...completed, completedStopIds: [...completed.completedStopIds, nextStop] }, state, undefined);
+    assertVisible({ ...completed, stopAttempts: { [nextStop]: freshAttempt() } }, prior, danger.id, false, undefined, bosses);
+    assertVisible({ ...completed, completedStopIds: [...completed.completedStopIds, nextStop] }, prior, danger.id, false, undefined, bosses);
   }
-  assertVisible(finishedThrough(30), state, dangerAfterWorld(30).id);
 });
 
-test("sparse or out-of-order earned clears do not expose a future or obsolete danger", () => {
-  const sparse = {
-    ...createInitialProgress(),
-    completedStopIds: [2, 8, 16, 32].flatMap(number => world(number).stopIds),
-  };
+test("sparse or out-of-order work does not expose a future crossing", () => {
+  const sparse = { ...createInitialProgress(), completedStopIds: [2, 8, 16, 32].flatMap(number => world(number).stopIds) };
   assertVisible(sparse, state, undefined);
   const missingEarlyStop = {
     ...finishedThrough(16),
     completedStopIds: finishedThrough(16).completedStopIds.filter(id => id !== world(3).stopIds[0]),
   };
-  assertVisible(missingEarlyStop, state, undefined);
-  assertVisible({ ...missingEarlyStop, completedStopIds: [...missingEarlyStop.completedStopIds, world(3).stopIds[0]] }, state, dangerAfterWorld(16).id);
+  assertVisible(missingEarlyStop, state, "danger-02", false);
+  assertVisible(missingEarlyStop, dangersThrough(2), undefined);
+  assertVisible({ ...missingEarlyStop, completedStopIds: [...missingEarlyStop.completedStopIds, world(3).stopIds[0]] }, dangersThrough(2), "danger-04");
 });
 
-test("a legacy mistake backlog follows present voyage relevance rather than reviving historical crossings", () => {
+test("importing an old mistake does not grant a crossing or skip its submission", () => {
   const original = WORLD_QUESTIONS.find(question => question.worldId === world(1).id);
   const progress = {
     ...finishedThrough(20),
@@ -106,10 +112,10 @@ test("a legacy mistake backlog follows present voyage relevance rather than revi
   };
   const imported = importLegacyDangerMisses(state, progress, NOW);
   assert.equal(imported.misses.length, 1);
-  assertVisible(progress, imported, dangerAfterWorld(20).id);
-  const preparedOld = ensureDangerPacket(imported, { dangerId: "danger-02", afterWorldNumber: 2, now: NOW });
-  assert.ok(preparedOld.packets["danger-02"].questionIds.length > 0);
-  assertVisible(progress, preparedOld, dangerAfterWorld(20).id, false, "danger-02");
+  assertVisible(progress, imported, "danger-02");
+  const prepared = ensureDangerPacket(imported, { dangerId: "danger-02", afterWorldNumber: 2, now: NOW });
+  assert.ok(prepared.packets["danger-02"].questionIds.length > 0);
+  assertVisible(progress, prepared, "danger-02");
 });
 
 test("briefing, print preparation and answering retain a relevant danger; completing it removes the threat", () => {
@@ -139,32 +145,27 @@ test("briefing, print preparation and answering retain a relevant danger; comple
   assertVisible(finishedThrough(4), dangerState, "danger-04");
 });
 
-test("empty clear passages disappear and both boss boundaries reveal only their own pending danger", () => {
+test("submitted empty passages disappear; prior storms still block later danger scenery", () => {
   for (const danger of DANGERS) {
-    const completed = completedEmptyPacket(state, danger.afterWorld);
+    const completed = dangersThrough(danger.afterWorld), bosses = bossesThrough(danger.afterWorld - 1);
     assert.ok(completed.packets[danger.id].completedAt);
-    assertVisible(finishedThrough(danger.afterWorld), completed, undefined);
+    assertVisible(finishedThrough(danger.afterWorld), completed, undefined, false, undefined, bosses);
   }
-  for (const boss of BOSS_CHALLENGES) {
-    const progress = finishedThrough(boss.afterWorld);
-    const danger = dangerAfterWorld(boss.afterWorld);
-    assertVisible(progress, state, danger.id, false, boss.id);
-    assertVisible(progress, state, danger.id, true, boss.id);
-    assertVisible(progress, completedEmptyPacket(state, boss.afterWorld), undefined, false, boss.id);
-  }
+  assertVisible(finishedThrough(18), dangersThrough(16), undefined);
+  assertVisible(finishedThrough(18), dangersThrough(16), "danger-18", false, undefined, bossesThrough(16));
 });
 
-test("QA preserves every destination's access while showing only an explicitly selected danger preview", () => {
+test("QA previews only explicitly selected unfinished dangers and cannot revive a completed one", () => {
   const initial = createInitialProgress();
   for (const danger of DANGERS) {
     assert.equal(canNavigateDestination(initial, state, danger.id, true), true);
     assertVisible(initial, state, danger.id, true, danger.id);
     assertVisible(finishedThrough(8), state, danger.id, true, danger.id);
-    assertVisible(finishedThrough(danger.afterWorld), completedEmptyPacket(state, danger.afterWorld), danger.id, true, danger.id);
+    assertVisible(finishedThrough(danger.afterWorld), dangersThrough(danger.afterWorld), undefined, true, danger.id, bossesThrough(danger.afterWorld));
   }
   for (const activeId of [undefined, "unknown-danger", "danger-99", world(1).id, BOSS_CHALLENGES[0].id]) {
     assertVisible(initial, state, undefined, true, activeId);
-    assertVisible(finishedThrough(8), state, "danger-08", true, activeId);
+    assertVisible(finishedThrough(8), state, "danger-02", true, activeId);
   }
 });
 
