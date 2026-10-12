@@ -566,14 +566,21 @@ function JourneyBoard({
   const completedOnBoard = board.nodes.filter(({ id }) => cleared.has(id)).length;
   const currentBoardLevel = trailNode?.journeyLevel ?? "wizard-2";
   const reachedLevel = reachedJourneyLevel(profile, journey);
-  const nextAddition = journey.boards
+  const pendingAdditions = journey.boards
     .filter(({ journeyLevel }) =>
       JOURNEY_LEVELS.indexOf(journeyLevel) <= JOURNEY_LEVELS.indexOf(reachedLevel),
     )
     .flatMap(({ nodes }) => nodes)
-    .find((node) =>
+    .filter((node) =>
       node.kind === "normal" && node.catalogAddition && !cleared.has(node.id),
     );
+  const nextAddition = pendingAdditions[0];
+  const earlierAdditionCount = pendingAdditions.filter((node) =>
+    JOURNEY_LEVELS.indexOf(node.journeyLevel) < JOURNEY_LEVELS.indexOf(reachedLevel),
+  ).length;
+  const targetTrailAdditionCount = pendingAdditions.filter((node) =>
+    node.journeyLevel === nextAddition?.journeyLevel,
+  ).length;
   const additionTitle = nextAddition?.kind === "normal"
     ? journey.gameSnapshot.find(({ slug }) => slug === nextAddition.gameSlug)?.title
     : undefined;
@@ -641,13 +648,16 @@ function JourneyBoard({
       {nextAddition && !testingMode ? (
         <section className={styles.catalogUpdate} aria-labelledby="journey-update-title">
           <div>
-            <h2 id="journey-update-title">New game on your trail</h2>
+            <h2 id="journey-update-title">Your trails have new stops</h2>
             <p>
-              {additionTitle ?? "A new game"} has joined your Journey. Clear its new{" "}
-              {journeyLevelLabel(nextAddition.journeyLevel)} stop
-              {nextAddition.journeyLevel !== reachedLevel
-                ? ` before continuing ${journeyLevelLabel(reachedLevel)}.`
-                : " to complete this trail."}
+              Every trail now includes every game. Clear{" "}
+              {earlierAdditionCount > 0
+                ? `${earlierAdditionCount} new ${earlierAdditionCount === 1 ? "stop" : "stops"} on earlier trails before continuing ${journeyLevelLabel(reachedLevel)}.`
+                : `${targetTrailAdditionCount} new ${targetTrailAdditionCount === 1 ? "stop" : "stops"} on ${journeyLevelLabel(nextAddition.journeyLevel)} to complete this trail.`}
+            </p>
+            <p>
+              Next: {additionTitle ?? "the new stop"} on{" "}
+              {journeyLevelLabel(nextAddition.journeyLevel)}.
               {" "}Your cleared stops and XP are saved.
             </p>
             {activeAttempt && activeAttempt.stopId !== nextAddition.id ? (
@@ -859,7 +869,7 @@ function JourneyBoard({
                       blockedByActiveAttempt ||
                       (isCleared && !isActive && !testingMode)
                     }
-                    aria-label={`${label}. ${isAddition ? "New game stop. " : ""}${detail}`}
+                    aria-label={`${label}. ${isAddition ? "New stop. " : ""}${detail}`}
                     aria-current={isTrailPosition ? "step" : undefined}
                     onClick={() => onLaunch(node)}
                     ref={isTrailPosition ? trailButtonRef : undefined}
@@ -890,7 +900,7 @@ function JourneyBoard({
                   </button>
                   <span className={styles.nodeCopy}>
                     {isAddition && !isCleared ? (
-                      <span className={styles.newStopBadge}>New game</span>
+                      <span className={styles.newStopBadge}>New stop</span>
                     ) : null}
                     <strong>{label}</strong>
                     <span>{detail}</span>

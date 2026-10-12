@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  CURRENT_JOURNEY_PLAN_VERSION,
   JOURNEY_LEVELS,
   PROGRESSION_STORAGE_KEY,
   addAttemptActiveTime,
@@ -11,6 +12,7 @@ import {
   beginAttemptRedemption,
   beginCulminationSection,
   buildJourneyPlan,
+  buildJourneyPlanForVersion,
   buildLegacyJourneyPlan,
   buildPlayerJourney,
   canPlayerAccessJourneyNode,
@@ -57,6 +59,13 @@ const extraPiece = {
 };
 const originalCatalog = [...games, review];
 const expandedCatalog = [...games, extraPiece, review];
+const fullCatalog = [
+  ...games,
+  extraPiece,
+  { slug: "game-10", title: "Game 10" },
+  { slug: "game-11", title: "Game 11" },
+  review,
+];
 
 function createProfile(id = "julia", snapshot = originalCatalog) {
   return createPlayerProfile({
@@ -79,6 +88,15 @@ function withClearedNodes(profile, nodes) {
 
 function juniorProfile() {
   const profile = createProfile();
+  const journey = buildPlayerJourney(profile);
+  return withClearedNodes(profile, [
+    ...journey.boards[0].nodes,
+    ...journey.boards[1].nodes.slice(0, 2),
+  ]);
+}
+
+function cappedJuniorProfile() {
+  const profile = { ...createProfile("julia", fullCatalog), journeyPlanVersion: 2 };
   const journey = buildPlayerJourney(profile);
   return withClearedNodes(profile, [
     ...journey.boards[0].nodes,
@@ -206,7 +224,7 @@ test("catalog additions use each board's canonical bank and extend culminations 
     assert.deepEqual(
       board.nodes.slice(0, -2),
       originalBoard.nodes.slice(0, -1),
-      "Rotating eight-game windows, Turbo, and review stops must retain their IDs and order",
+      "Original ordinary, Turbo, and review stops must retain their IDs and order",
     );
     assert.equal(catchUp.id, `${JOURNEY_LEVELS[index]}:catch-up:extra-piece`);
     assert.equal(catchUp.catalogAddition, true);
@@ -332,8 +350,11 @@ test("a redeemed catch-up with insufficient first-attempt accuracy remains requi
   assert.equal(canPlayerAccessJourneyNode(profile, journey, nextIncompleteJourneyNode(juniorProfile()).id), false);
 });
 
-test("catalog reconciliation waits for active answering, feedback, redemption, and summary states", () => {
-  const profile = juniorProfile();
+for (const [profileKind, profile] of [
+  ["current", juniorProfile()],
+  ["legacy capped", cappedJuniorProfile()],
+]) {
+test(`${profileKind} catalog reconciliation waits for active answering, feedback, redemption, and summary states`, () => {
   const journey = buildPlayerJourney(profile);
   // Continue at the next ordinary node after two already-cleared Junior stops.
   const node = journey.boards[1].nodes[3];
@@ -376,6 +397,7 @@ test("catalog reconciliation waits for active answering, feedback, redemption, a
   assert.equal(nextIncompleteJourneyNode(upgraded).id, "starter:catch-up:extra-piece");
   assert.ok(upgraded.clearedStopIds.includes(node.id));
 });
+}
 
 test("an active culmination retains its original section list until it finishes", () => {
   const profile = createProfile("culmination-player", [games[0], review]);
@@ -492,17 +514,156 @@ for (const [label, journeyAdditions] of [
 }
 
 test("new profiles already containing the full catalog never gain redundant catch-up stops", () => {
-  const profile = createProfile("full-catalog-student", expandedCatalog);
+  const profile = createProfile("full-catalog-student", fullCatalog);
   const initialJourney = buildPlayerJourney(profile);
+  assert.equal(profile.journeyPlanVersion, CURRENT_JOURNEY_PLAN_VERSION);
   assert.deepEqual(profile.journeyAdditions ?? [], []);
   assert.equal(initialJourney.boards.some(({ nodes }) => nodes.some(({ catalogAddition }) => catalogAddition)), false);
   assert.ok(initialJourney.boards.every(({ nodes }) => nodes.at(-1).gameSlugs.includes(extraPiece.slug)));
+  for (const board of initialJourney.boards) {
+    assert.deepEqual(
+      board.nodes.filter(({ kind }) => kind === "normal").map(({ gameSlug }) => gameSlug),
+      fullCatalog.filter(({ role }) => role !== "review").map(({ slug }) => slug),
+    );
+  }
 
-  for (const catalog of [expandedCatalog, expandedCatalog.toReversed()]) {
+  for (const catalog of [fullCatalog, fullCatalog.toReversed()]) {
     assert.strictEqual(upgradePlayerProfileJourneyPlan(profile, catalog, 2), profile);
   }
   const reloaded = roundTrip(profile);
-  assert.strictEqual(upgradePlayerProfileJourneyPlan(reloaded, expandedCatalog, 3), reloaded);
+  assert.strictEqual(upgradePlayerProfileJourneyPlan(reloaded, fullCatalog, 3), reloaded);
   assert.deepEqual(reloaded.journeyAdditions ?? [], []);
   assert.deepEqual(buildPlayerJourney(reloaded), initialJourney);
+});
+
+test("legacy full-catalog profiles recover omitted ordinary games on every board while preserving old stops and XP", () => {
+  const original = cappedJuniorProfile();
+  const originalCopy = structuredClone(original);
+  const baseline = buildPlayerJourney(original);
+  const juniorNext = nextIncompleteJourneyNode(original);
+  assert.equal(original.gameSnapshot.some(({ slug }) => slug === extraPiece.slug), true);
+  assert.equal(baseline.boards[0].nodes.some((node) => node.kind === "normal" && node.gameSlug === extraPiece.slug), false);
+
+  let profile = upgradePlayerProfileJourneyPlan(original, fullCatalog, 2);
+  assert.equal(profile.journeyPlanVersion, 2);
+  assert.equal(profile.journeyCoverageVersion, 1);
+  assert.deepEqual(profile.journeyAdditions ?? [], []);
+  assert.deepEqual(original, originalCopy);
+  assert.deepEqual(profile.gameSnapshot, original.gameSnapshot);
+  assert.deepEqual(profile.clearedStopIds, original.clearedStopIds);
+  assert.deepEqual(profile.xpAwards, original.xpAwards);
+  assert.deepEqual(profile.awardedStopIds, original.awardedStopIds);
+  assert.equal(profileXpTotal(profile), 425);
+  const journey = buildPlayerJourney(profile);
+  assert.equal(nextIncompleteJourneyNode(profile).id, "starter:catch-up:extra-piece");
+  assert.equal(canPlayerAccessJourneyNode(profile, journey, juniorNext.id), false);
+  for (const [index, board] of journey.boards.entries()) {
+    const oldBoard = baseline.boards[index];
+    const originalSlugs = oldBoard.nodes.filter(({ kind }) => kind === "normal").map(({ gameSlug }) => gameSlug);
+    const allSlugs = fullCatalog.filter(({ role }) => role !== "review").map(({ slug }) => slug);
+    const omittedSlugs = allSlugs.filter((slug) => !originalSlugs.includes(slug));
+    assert.deepEqual(board.nodes.slice(0, oldBoard.nodes.length - 1), oldBoard.nodes.slice(0, -1));
+    assert.deepEqual(
+      board.nodes.filter(({ catalogAddition }) => catalogAddition).map(({ id }) => id),
+      omittedSlugs.map((slug) => `${board.journeyLevel}:catch-up:${slug}`),
+    );
+    assert.deepEqual(board.nodes.filter(({ kind }) => kind === "normal").map(({ gameSlug }) => gameSlug).toSorted(), allSlugs.toSorted());
+    assert.deepEqual(board.nodes.at(-1).gameSlugs, oldBoard.nodes.at(-1).gameSlugs);
+    assert.deepEqual(board.nodes.at(-1).sections, oldBoard.nodes.at(-1).sections);
+    assert.equal(board.nodes.at(-1).id, oldBoard.nodes.at(-1).id);
+  }
+  profile = roundTrip(profile);
+  assert.equal(profile.journeyCoverageVersion, 1);
+  assert.deepEqual(buildPlayerJourney(profile), journey);
+  assert.strictEqual(upgradePlayerProfileJourneyPlan(profile, fullCatalog.toReversed(), 3), profile);
+  assert.strictEqual(upgradePlayerProfileJourneyPlan(profile, [games[0], review], 4), profile);
+
+  const catchUp = nextIncompleteJourneyNode(profile);
+  const attempt = finishQuestions(normalAttempt(catchUp, "omitted-extra-piece"));
+  const settled = settleProgressionAttempt(upsertProfileAttempt(profile, attempt), attempt, journey, 800);
+  assert.equal(settled.settlement.xpAwarded, 25);
+  assert.equal(profileXpTotal(settled.profile), 450);
+  const loaded = roundTrip(settled.profile);
+  assert.strictEqual(settleProgressionAttempt(loaded, loaded.attempts[attempt.id], journey, 900).profile, loaded);
+  profile = closeAttemptSummary(loaded, attempt.id, 1_000);
+  assert.equal(nextIncompleteJourneyNode(profile).id, "starter:catch-up:game-10");
+  assert.equal(canPlayerAccessJourneyNode(profile, journey, juniorNext.id), false);
+  assert.deepEqual(profile.xpAwards.slice(0, -1), original.xpAwards);
+  assert.equal(profile.xpAwards.filter(({ stopId }) => stopId === catchUp.id).length, 1);
+});
+
+test("coverage repair retains previously appended game stops and their clear ledger across further catalog growth", () => {
+  const addedBeforeCoverage = { slug: "previous-addition", title: "Previous Addition", contentVersion: "previous-v1", role: "game" };
+  const original = {
+    ...cappedJuniorProfile(),
+    journeyAdditions: [addedBeforeCoverage],
+  };
+  const previousJourney = buildPlayerJourney(original);
+  const oldAddition = previousJourney.boards[0].nodes.find(({ gameSlug }) => gameSlug === addedBeforeCoverage.slug);
+  const earned = {
+    ...original,
+    clearedStopIds: [...original.clearedStopIds, oldAddition.id],
+    awardedStopIds: [...original.awardedStopIds, oldAddition.id],
+    xpAwards: [...original.xpAwards, { stopId: oldAddition.id, amount: oldAddition.xp }],
+  };
+  const recovered = upgradePlayerProfileJourneyPlan(earned, fullCatalog, 2);
+  assert.equal(recovered.journeyCoverageVersion, 1);
+  assert.deepEqual(recovered.journeyAdditions, earned.journeyAdditions);
+  assert.deepEqual(recovered.clearedStopIds, earned.clearedStopIds);
+  assert.deepEqual(recovered.xpAwards, earned.xpAwards);
+  for (const [index, board] of buildPlayerJourney(recovered).boards.entries()) {
+    const expectedIds = previousJourney.boards[index].nodes.map(({ id }) => id);
+    assert.deepEqual(board.nodes.filter(({ id }) => expectedIds.includes(id)).map(({ id }) => id), expectedIds);
+    assert.equal(board.nodes.filter((node) => node.kind === "normal" && node.gameSlug === addedBeforeCoverage.slug).length, 1);
+  }
+
+  const laterGame = { slug: "next-addition", title: "Next Addition" };
+  const expanded = upgradePlayerProfileJourneyPlan(roundTrip(recovered), [...fullCatalog.toReversed(), laterGame], 3);
+  assert.deepEqual(expanded.journeyAdditions.map(({ slug }) => slug), [addedBeforeCoverage.slug, laterGame.slug]);
+  assert.deepEqual(expanded.xpAwards, earned.xpAwards);
+  for (const board of buildPlayerJourney(expanded).boards) {
+    const normalSlugs = board.nodes.filter(({ kind }) => kind === "normal").map(({ gameSlug }) => gameSlug);
+    assert.equal(normalSlugs.length, 13);
+    assert.equal(new Set(normalSlugs).size, normalSlugs.length);
+    assert.deepEqual(board.nodes.slice(-3, -1).map(({ gameSlug }) => gameSlug), [addedBeforeCoverage.slug, laterGame.slug]);
+  }
+  assert.deepEqual(roundTrip(expanded), expanded);
+  assert.strictEqual(upgradePlayerProfileJourneyPlan(expanded, [review, games[0]], 4), expanded);
+});
+
+test("a capped full-catalog culmination finishes unchanged before ordinary coverage is repaired", () => {
+  const profile = { ...createProfile("legacy-culmination", fullCatalog), journeyPlanVersion: 2 };
+  const journey = buildJourneyPlanForVersion(profile.gameSnapshot, 2);
+  const node = journey.boards[0].nodes.at(-1);
+  const ready = withClearedNodes(profile, journey.boards[0].nodes.slice(0, -1));
+  let attempt = createCulminationProgressionAttempt({
+    id: "legacy-full-catalog-culmination",
+    node,
+    missedQuestions: [],
+    questionPools: fullCatalog.filter(({ role }) => role !== "review").map(({ slug }) => ({
+      gameSlug: slug,
+      approachableQuestion: campaignQuestions(slug, "starter")[0],
+      campaignQuestions: campaignQuestions(slug, "starter"),
+      currentContentVersion: "campaign-v1",
+      currentGeneratorVersion: "generator-v1",
+    })),
+    nowMs: 100,
+  });
+  attempt = beginCulminationSection(attempt, 110);
+  attempt = recordQuestionAttempt(attempt, { correct: true, answerToken: "choice-1", nowMs: 120 });
+  attempt = advanceAttemptQuestion(attempt, 130);
+  const active = roundTrip(upsertProfileAttempt(ready, attempt));
+  assert.equal(active.journeyCoverageVersion, undefined);
+  assert.strictEqual(upgradePlayerProfileJourneyPlan(active, fullCatalog, 200), active);
+  assert.deepEqual(active.attempts[attempt.id], attempt);
+  assert.deepEqual(buildPlayerJourney(active), journey);
+  attempt = finishQuestions(active.attempts[attempt.id], Number.POSITIVE_INFINITY);
+  const settled = settleProgressionAttempt(upsertProfileAttempt(active, attempt), attempt, journey, 800);
+  assert.strictEqual(upgradePlayerProfileJourneyPlan(settled.profile, fullCatalog, 900), settled.profile);
+  const upgraded = upgradePlayerProfileJourneyPlan(closeAttemptSummary(settled.profile, attempt.id, 1_000), fullCatalog, 1_100);
+  assert.equal(upgraded.journeyCoverageVersion, 1);
+  assert.ok(upgraded.clearedStopIds.includes(node.id));
+  assert.equal(profileXpTotal(upgraded), 325);
+  assert.equal(nextIncompleteJourneyNode(upgraded).id, "starter:catch-up:extra-piece");
+  assert.deepEqual(roundTrip(upgraded), upgraded);
 });

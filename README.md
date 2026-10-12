@@ -19,13 +19,14 @@ The secondary **Journey** path snapshots all current canonical games across
 seven boards: Starter, Junior I–II, Expert I–II,
 and Wizard I–II. It includes local player profiles, animal avatars, saved stop
 progress, Turbo Time, redemption, level challenges, collectible XP, and two
-Math Kangaroo spatial-review stops on every board from Junior I onward. Each
-board's eight ordinary stops rotate through larger game collections,
-and each level challenge covers every snapshotted game. Existing profiles keep
-their original trail and earned progress when games are added. New games join
-as clearly labeled 12-question stops before each board's level challenge;
-players return to any required earlier stop before continuing their current
-board. An unfinished saved stop finishes before the update is applied. The game
+Math Kangaroo spatial-review stops on every board from Junior I onward. Every
+board has a 12-question ordinary stop for every canonical game, four Turbo
+stops, and a level challenge covering every snapshotted game. There is no
+eight-game cap. Existing profiles keep their original trail and earned
+progress: new games and games omitted from older trails gain clearly labeled
+catch-up stops before each board's level challenge. Players return to all
+required earlier stops before continuing their current board. An unfinished
+saved stop finishes before the update is applied. The game
 shelf remains available for standalone Campaign and Infinite play; shelf rounds
 never alter Journey progress.
 

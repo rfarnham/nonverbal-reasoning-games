@@ -68,7 +68,7 @@ const ROUND_PHASES: readonly AttemptRoundPhase[] = [
   "solved",
 ];
 const ATTEMPT_KINDS = ["normal", "review", "turbo", "culmination"] as const;
-const LEGACY_SCHEMA_VERSIONS = [0, 1, 2, 3] as const;
+const LEGACY_SCHEMA_VERSIONS = [0, 1, 2, 3, 4] as const;
 
 function isSupportedSchemaVersion(value: unknown): boolean {
   return (
@@ -523,8 +523,8 @@ function parseJourneyPlanVersion(
   value: unknown,
   sourceSchemaVersion: number,
 ): JourneyPlanVersion {
-  if (value === 1 || value === CURRENT_JOURNEY_PLAN_VERSION) return value;
-  return sourceSchemaVersion <= 2 ? 1 : CURRENT_JOURNEY_PLAN_VERSION;
+  if (value === 1 || value === 2 || value === CURRENT_JOURNEY_PLAN_VERSION) return value;
+  return sourceSchemaVersion <= 2 ? 1 : sourceSchemaVersion <= 4 ? 2 : CURRENT_JOURNEY_PLAN_VERSION;
 }
 
 function parseXpAwards(
@@ -589,6 +589,9 @@ function parseProfile(
   // stable IDs are real stops in the profile's persisted plan.
   const rawAdditions = profile?.journeyAdditions;
   if (rawAdditions !== undefined && !Array.isArray(rawAdditions)) return undefined;
+  const journeyCoverageVersion = profile?.journeyCoverageVersion;
+  if (journeyCoverageVersion !== undefined &&
+      (journeyCoverageVersion !== 1 || journeyPlanVersion !== 2)) return undefined;
   let journey: JourneyPlan;
   let journeyAdditions: readonly JourneyGame[] | undefined;
   try {
@@ -596,6 +599,7 @@ function parseProfile(
       gameSnapshot,
       journeyPlanVersion,
       (rawAdditions ?? []) as readonly JourneyGame[],
+      journeyCoverageVersion,
     );
     if (rawAdditions !== undefined) {
       journeyAdditions = journey.gameSnapshot.filter(
@@ -727,6 +731,7 @@ function parseProfile(
     journeyPlanVersion,
     gameSnapshot,
     ...(journeyAdditions === undefined ? {} : { journeyAdditions }),
+    ...(journeyCoverageVersion === undefined ? {} : { journeyCoverageVersion }),
     clearedStopIds,
     xpAwards,
     awardedStopIds,

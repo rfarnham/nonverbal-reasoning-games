@@ -12,11 +12,19 @@ import { journeyReviews } from "../../lib/journey-reviews.ts";
 import {
   PROGRESSION_STORAGE_KEY,
   addPlayerProfile,
+  advanceAttemptQuestion,
+  buildJourneyPlanForVersion,
   buildPlayerJourney,
+  closeAttemptSummary,
+  createNormalProgressionAttempt,
   createPlayerProfile,
   createProgressionState,
+  journeyQuestionReferences,
   nextIncompleteJourneyNode,
+  recordQuestionAttempt,
   saveProgressionState,
+  settleProgressionAttempt,
+  upsertProfileAttempt,
 } from "../../lib/progression/index.ts";
 import { discoverGamePackages } from "../../scripts/generate-game-registry.mjs";
 
@@ -33,16 +41,24 @@ let server, browser, origin, fixture;
 
 async function juliaFixture() {
   const packages = await discoverGamePackages();
-  const snapshot = await Promise.all(packages.filter(({ slug }) => slug !== "extra-piece")
+  const discovered = await Promise.all(packages
     .map(async ({ slug, catalogFile }) => {
       const { progressionMetadata } = await import(pathToFileURL(resolve(dirname(catalogFile), "progression-metadata.ts")).href);
+      const source = await readFile(catalogFile, "utf8");
+      const title = source.match(/\btitle:\s*"([^"]+)"/)?.[1];
+      const shelfOrder = Number(source.match(/\bshelfOrder:\s*(\d+)/)?.[1] ?? Number.MAX_SAFE_INTEGER);
+      assert.ok(title, `${slug} has a catalog title for the legacy fixture`);
       return {
         slug,
-        title: slug.split("-").map(word => word[0].toUpperCase() + word.slice(1)).join(" "),
+        title,
+        shelfOrder,
         role: "game",
         ...progressionMetadata,
       };
     }));
+  const snapshot = discovered
+    .sort((left, right) => left.shelfOrder - right.shelfOrder || left.title.localeCompare(right.title) || left.slug.localeCompare(right.slug))
+    .map(({ shelfOrder, ...game }) => { void shelfOrder; return game; });
   snapshot.push(...journeyReviews.map(({ slug, title, journeyContentVersion }) => ({
     slug, title, role: "review", journeyContentVersion,
   })));
@@ -50,7 +66,11 @@ async function juliaFixture() {
     id: "browser-julia-catalog-update", name: "Julia", avatarId: "hedgehog",
     gameSnapshot: snapshot, nowMs: 1,
   });
-  const journey = buildPlayerJourney(profile);
+  profile = { ...profile, journeyPlanVersion: 2, journeyCoverageVersion: undefined };
+  const journey = buildJourneyPlanForVersion(snapshot, 2);
+  const starterGames = new Set(journey.boards[0].nodes.filter(({ kind }) => kind === "normal").map(({ gameSlug }) => gameSlug));
+  const missingStarterGames = snapshot.filter(({ slug, role }) => role === "game" && !starterGames.has(slug));
+  assert.ok(missingStarterGames.some(({ slug }) => slug === "extra-piece"), "Legacy membership included Extra Piece without teaching it on Starter");
   const clearedNodes = [...journey.boards[0].nodes, ...journey.boards[1].nodes.slice(0, 2)];
   profile = {
     ...profile,
@@ -58,13 +78,45 @@ async function juliaFixture() {
     awardedStopIds: clearedNodes.map(({ id }) => id),
     xpAwards: clearedNodes.map(({ id, xp }) => ({ stopId: id, amount: xp })),
   };
-  const forwardNode = nextIncompleteJourneyNode(profile);
+  const forwardNode = nextIncompleteJourneyNode(profile, journey);
   const forwardTitle = snapshot.find(({ slug }) => slug === forwardNode.gameSlug).title;
   let value;
   assert.equal(saveProgressionState(addPlayerProfile(createProgressionState(), profile), {
     getItem: () => null, setItem: (_, encoded) => { value = encoded; },
   }), true);
-  return { value, profile, forwardNode, forwardLabel: `Turbo Time · ${forwardTitle}` };
+  return { value, profile, missingStarterGames, forwardNode, forwardLabel: `Turbo Time · ${forwardTitle}` };
+}
+
+// Advance setup prerequisites through the real attempt engine so the browser
+// can verify each gate, then exercise the final Extra Piece stop end to end.
+async function finishAddedStop(profile, node) {
+  const { progressionAdapter } = await import(new URL(`../../app/games/${node.gameSlug}/progression-adapter.ts`, import.meta.url));
+  let attempt = createNormalProgressionAttempt({
+    id: `browser-prerequisite-${node.id}`,
+    node,
+    journeyQuestions: journeyQuestionReferences(progressionAdapter, node.journeyLevel, {
+      collectionId: node.collectionId, questionOffset: node.questionOffset, questionCount: node.questionCount,
+    }),
+    nowMs: 100,
+  });
+  profile = upsertProfileAttempt(profile, attempt);
+  while (attempt.currentRoundIndex !== null) {
+    attempt = recordQuestionAttempt(attempt, { correct: true, nowMs: 200 + attempt.currentRoundIndex });
+    attempt = advanceAttemptQuestion(attempt, 300 + attempt.currentRoundIndex);
+  }
+  profile = upsertProfileAttempt(profile, attempt);
+  profile = settleProgressionAttempt(profile, attempt, buildPlayerJourney(profile), 400).profile;
+  return closeAttemptSummary(profile, attempt.id, 500);
+}
+
+async function replaceSavedProfile(page, profile) {
+  let value;
+  assert.equal(saveProgressionState(addPlayerProfile(createProgressionState(), profile), {
+    getItem: () => null, setItem: (_, encoded) => { value = encoded; },
+  }), true);
+  await page.evaluate(({ key, value }) => localStorage.setItem(key, value), { key: PROGRESSION_STORAGE_KEY, value });
+  await page.reload();
+  await page.getByRole("heading", { name: "Junior I", exact: true }).waitFor();
 }
 
 before(async () => {
@@ -138,21 +190,37 @@ async function assertFits(page, label) {
   }
 }
 
-test("Julia visits Extra Piece on Starter, resumes the canonical stop, and returns to her earned Junior I trail", async () => {
+test("Julia completes all missing Starter stops from a full legacy catalog before resuming Junior I", async () => {
   const { context, page, errors } = await open();
   try {
     const initial = await savedProfile(page);
     assert.deepEqual(initial.gameSnapshot, fixture.profile.gameSnapshot);
-    assert.deepEqual(initial.journeyAdditions.map(({ slug }) => slug), ["extra-piece"]);
+    assert.deepEqual(initial.journeyAdditions ?? [], [], "Existing membership is not mistaken for a newly discovered game");
+    assert.equal(initial.journeyCoverageVersion, 1);
     assert.deepEqual(initial.clearedStopIds, fixture.profile.clearedStopIds);
     assert.deepEqual(initial.xpAwards, fixture.profile.xpAwards);
     assert.equal(await page.getByRole("button", { name: "Junior I", exact: true }).isEnabled(), true);
     assert.equal(await page.getByRole("button", { name: `${fixture.forwardLabel}. Locked`, exact: true }).isDisabled(), true);
-    const update = page.getByRole("region", { name: "New game on your trail", exact: true });
-    assert.match(await update.textContent(), /Extra Piece.*Starter stop before continuing Junior I/);
+    const update = page.getByRole("region", { name: "Your trails have new stops", exact: true });
+    assert.ok((await update.textContent()).includes(`${fixture.missingStarterGames.length} new stops on earlier trails before continuing Junior I`));
     await page.getByRole("button", { name: "Visit Starter trail", exact: true }).click();
     await page.getByRole("heading", { name: "Starter", exact: true }).waitFor();
-    const extraPiece = page.getByRole("button", { name: "Extra Piece. New game stop. 25 XP when cleared", exact: true });
+    const firstMissing = fixture.missingStarterGames[0];
+    await assertFocused(page.getByRole("button", { name: `${firstMissing.title}. New stop. 25 XP when cleared`, exact: true }));
+    assert.equal(await page.getByRole("button", { name: "Extra Piece. New stop. Locked", exact: true }).isDisabled(), true);
+    let setupProfile = initial;
+    let next = nextIncompleteJourneyNode(setupProfile);
+    while (next.gameSlug !== "extra-piece") {
+      assert.equal(next.journeyLevel, "starter");
+      assert.equal(next.catalogAddition, true);
+      setupProfile = await finishAddedStop(setupProfile, next);
+      await replaceSavedProfile(page, setupProfile);
+      assert.equal(await page.getByRole("button", { name: `${fixture.forwardLabel}. Locked`, exact: true }).isDisabled(), true);
+      next = nextIncompleteJourneyNode(setupProfile);
+    }
+    assert.match(await update.textContent(), /Next: Extra Piece on Starter/);
+    await page.getByRole("button", { name: "Visit Starter trail", exact: true }).click();
+    const extraPiece = page.getByRole("button", { name: "Extra Piece. New stop. 25 XP when cleared", exact: true });
     await assertFocused(extraPiece);
     await extraPiece.click();
     await page.waitForURL(new RegExp(`${basePath}/games/extra-piece/\\?progression=`));
@@ -188,13 +256,21 @@ test("Julia visits Extra Piece on Starter, resumes the canonical stop, and retur
     await page.getByRole("button", { name: "Claim 25 XP", exact: true }).click();
     await page.waitForURL(`${origin}${basePath}/journey/`);
     await page.getByRole("heading", { name: "Junior I", exact: true }).waitFor();
+    let completed = await savedProfile(page);
+    while (nextIncompleteJourneyNode(completed).journeyLevel === "starter") {
+      assert.equal(await page.getByRole("button", { name: `${fixture.forwardLabel}. Locked`, exact: true }).isDisabled(), true);
+      completed = await finishAddedStop(completed, nextIncompleteJourneyNode(completed));
+      await replaceSavedProfile(page, completed);
+    }
     assert.equal(await page.getByRole("button", { name: `${fixture.forwardLabel}. 50 XP when cleared`, exact: true }).isEnabled(), true);
-    const completed = await savedProfile(page);
-    assert.deepEqual(new Set(completed.clearedStopIds), new Set([...fixture.profile.clearedStopIds, "starter:catch-up:extra-piece"]));
-    assert.deepEqual(completed.clearedStopIds.filter(id => id !== "starter:catch-up:extra-piece"), fixture.profile.clearedStopIds);
-    assert.deepEqual(completed.xpAwards, [...fixture.profile.xpAwards, { stopId: "starter:catch-up:extra-piece", amount: 25 }]);
+    const catchUpIds = fixture.missingStarterGames.map(({ slug }) => `starter:catch-up:${slug}`);
+    assert.deepEqual(new Set(completed.clearedStopIds), new Set([...fixture.profile.clearedStopIds, ...catchUpIds]));
+    assert.deepEqual(completed.clearedStopIds.filter(id => !catchUpIds.includes(id)), fixture.profile.clearedStopIds);
+    assert.deepEqual(completed.xpAwards.filter(({ stopId }) => !catchUpIds.includes(stopId)), fixture.profile.xpAwards);
+    assert.deepEqual(new Set(completed.xpAwards.filter(({ stopId }) => catchUpIds.includes(stopId)).map(({ stopId, amount }) => `${stopId}:${amount}`)), new Set(catchUpIds.map(id => `${id}:25`)));
     assert.equal(completed.activeAttemptId, null);
     assert.equal(completed.missedQuestions.length, 1);
+    assert.equal((await update.textContent()).includes("before continuing Junior I"), false, "The earlier-trail requirement disappears after all gaps are cleared");
     await page.reload();
     await page.getByRole("heading", { name: "Junior I", exact: true }).waitFor();
     assert.deepEqual((await savedProfile(page)).xpAwards, completed.xpAwards);
@@ -213,7 +289,8 @@ test("catalog update navigation and new stops fit 820px, 620px, and 390px screen
       await assertFits(page, `${width}px current trail`);
       await page.screenshot({ path: resolve(shots, `junior-catch-up-${width}.png`), fullPage: true });
       await page.getByRole("button", { name: "Visit Starter trail", exact: true }).click();
-      await assertFocused(page.getByRole("button", { name: "Extra Piece. New game stop. 25 XP when cleared", exact: true }));
+      await assertFocused(page.getByRole("button", { name: `${fixture.missingStarterGames[0].title}. New stop. 25 XP when cleared`, exact: true }));
+      assert.equal(await page.getByRole("button", { name: "Extra Piece. New stop. Locked", exact: true }).isDisabled(), true);
       await assertFits(page, `${width}px catch-up trail`);
       await page.screenshot({ path: resolve(shots, `starter-catch-up-${width}.png`), fullPage: true });
     }

@@ -1,9 +1,10 @@
 import {
-  JOURNEY_GAMES_PER_BOARD,
+  LEGACY_JOURNEY_GAMES_PER_BOARD,
   JOURNEY_LEVELS,
   REVIEW_CULMINATION_QUESTIONS,
   REVIEW_QUESTIONS_PER_STOP,
   TURBO_ACTIVE_TIME_MS,
+  TURBO_STOPS_PER_BOARD,
   XP_PER_STOP,
   XP_PER_JOURNEY_STOP,
   firstJourneyLevelForDifficulty,
@@ -121,9 +122,9 @@ function reviewProvider(
 /**
  * Creates one deterministic board without knowing any provider slug.
  *
- * Starter preserves the original `(normal, normal, turbo) × 4` cadence.
- * Junior and above place a generic review stop after each half of that path:
- * `(N,N,T) × 2, review, (N,N,T) × 2, review, culmination`.
+ * Current boards teach every canonical game, split into four groups with a
+ * Turbo stop after each. Junior and above add a review after groups two and four.
+ * Version two remains frozen so saved stops can be reconstructed exactly.
  *
  * Node IDs use a semantic kind ordinal, not their visual position, so later
  * cadence changes do not renumber unrelated stops.
@@ -131,6 +132,7 @@ function reviewProvider(
 export function buildJourneyBoard(
   level: JourneyLevel | ProgressionLevel,
   games: readonly JourneyGame[],
+  version: 2 | 3 = 3,
 ): JourneyBoard {
   const journeyLevel = normalizedJourneyLevel(level);
   const boardIndex = JOURNEY_LEVELS.indexOf(journeyLevel);
@@ -150,16 +152,17 @@ export function buildJourneyBoard(
   }
   const difficulty = journeyLevelDifficulty(journeyLevel);
   const xp = XP_PER_JOURNEY_STOP[journeyLevel];
-  // Keep saved plans with up to eight games byte-for-byte stable. Larger
-  // snapshots rotate through the complete catalog without lengthening boards.
+  // This window belongs only to frozen v2 profiles, never a new journey.
   const gameOffset =
-    coreGames.length > JOURNEY_GAMES_PER_BOARD
-      ? boardIndex * JOURNEY_GAMES_PER_BOARD
+    coreGames.length > LEGACY_JOURNEY_GAMES_PER_BOARD
+      ? boardIndex * LEGACY_JOURNEY_GAMES_PER_BOARD
       : 0;
-  const ordinaryGames = Array.from(
-    { length: JOURNEY_GAMES_PER_BOARD },
-    (_, index) => coreGames[(gameOffset + index) % coreGames.length]!,
-  );
+  const ordinaryGames = version === 2
+    ? Array.from(
+        { length: LEGACY_JOURNEY_GAMES_PER_BOARD },
+        (_, index) => coreGames[(gameOffset + index) % coreGames.length]!,
+      )
+    : coreGames;
   const useSecondTurboGame =
     journeyLevel === "junior-1" ||
     journeyLevel === "expert-2" ||
@@ -169,16 +172,12 @@ export function buildJourneyBoard(
   let turboOrdinal = 0;
   let reviewOrdinal = 0;
 
-  for (
-    let pairStart = 0;
-    pairStart < ordinaryGames.length;
-    pairStart += 2
-  ) {
-    const pairIndex = pairStart / 2;
-    const first = ordinaryGames[pairStart]!;
-    const second = ordinaryGames[pairStart + 1]!;
+  for (let groupIndex = 0; groupIndex < TURBO_STOPS_PER_BOARD; groupIndex += 1) {
+    const start = Math.ceil(groupIndex * ordinaryGames.length / TURBO_STOPS_PER_BOARD);
+    const end = Math.ceil((groupIndex + 1) * ordinaryGames.length / TURBO_STOPS_PER_BOARD);
+    const group = ordinaryGames.slice(start, end);
 
-    for (const game of [first, second]) {
+    for (const game of group) {
       nodes.push({
         id: nodeId(journeyLevel, "normal", normalOrdinal, game.slug),
         kind: "normal",
@@ -194,7 +193,10 @@ export function buildJourneyBoard(
       normalOrdinal += 1;
     }
 
-    const turboGame = useSecondTurboGame ? second : first;
+    const turboGame = version === 3 && coreGames.length > LEGACY_JOURNEY_GAMES_PER_BOARD
+      ? coreGames[(boardIndex * TURBO_STOPS_PER_BOARD + groupIndex) % coreGames.length]!
+      : (group[useSecondTurboGame ? 1 : 0] ?? group[0] ??
+        coreGames[(boardIndex + groupIndex) % coreGames.length]!);
     nodes.push({
       id: nodeId(journeyLevel, "turbo", turboOrdinal, turboGame.slug),
       kind: "turbo",
@@ -207,7 +209,7 @@ export function buildJourneyBoard(
     });
     turboOrdinal += 1;
 
-    const finishesBoardHalf = pairIndex === 1 || pairIndex === 3;
+    const finishesBoardHalf = groupIndex === 1 || groupIndex === 3;
     if (
       journeyLevel !== "starter" &&
       reviewGame &&
@@ -276,6 +278,7 @@ export function buildJourneyBoard(
 
 export function buildJourneyPlan(
   gameSnapshot: readonly JourneyGame[],
+  version: 2 | 3 = 3,
 ): JourneyPlan {
   const games = validateGameSnapshot(gameSnapshot);
   if (!reviewProvider(games)) {
@@ -286,7 +289,7 @@ export function buildJourneyPlan(
   return {
     gameSnapshot: games,
     boards: JOURNEY_LEVELS.map((level) =>
-      buildJourneyBoard(level, games),
+      buildJourneyBoard(level, games, version),
     ),
   };
 }
@@ -301,7 +304,7 @@ export function buildLegacyJourneyPlan(
 ): JourneyPlan {
   const games = validateGameSnapshot(gameSnapshot)
     .filter(({ role }) => role === "game")
-    .slice(0, JOURNEY_GAMES_PER_BOARD);
+    .slice(0, LEGACY_JOURNEY_GAMES_PER_BOARD);
   const legacyLevels: readonly ProgressionLevel[] = [
     "starter",
     "junior",
@@ -311,7 +314,7 @@ export function buildLegacyJourneyPlan(
   const boards = legacyLevels.map((level, boardIndex): JourneyBoard => {
     const journeyLevel = firstJourneyLevelForDifficulty(level);
     const ordinaryGames = Array.from(
-      { length: JOURNEY_GAMES_PER_BOARD },
+      { length: LEGACY_JOURNEY_GAMES_PER_BOARD },
       (_, index) => games[index % games.length]!,
     );
     const nodes: JourneyNode[] = [];
@@ -378,16 +381,20 @@ export function buildJourneyPlanForVersion(
   gameSnapshot: readonly JourneyGame[],
   version: JourneyPlanVersion,
   additions: readonly JourneyGame[] = [],
+  coverageVersion?: 1,
 ): JourneyPlan {
   const original = version === 1
     ? buildLegacyJourneyPlan(gameSnapshot)
-    : buildJourneyPlan(gameSnapshot);
-  if (!additions.length) return original;
+    : buildJourneyPlan(gameSnapshot, version);
+  if (coverageVersion !== undefined && (coverageVersion !== 1 || version !== 2)) {
+    throw new Error("Coverage repair requires a version-two Journey plan.");
+  }
+  if (!additions.length && !coverageVersion) return original;
   if (version === 1 || additions.some(({ role }) => role === "review")) {
     throw new Error("Catalog additions require the current Journey plan and canonical games.");
   }
   // Validate the combined membership, including duplicate slugs, but never
-  // rebuild the ordinary-game window from this expanded set.
+  // rebuild the original ordinary stops from this expanded set.
   const games = validateGameSnapshot([...original.gameSnapshot, ...additions]);
   const addedGames = games.filter(({ slug }) =>
     additions.some((game) => game.slug.trim() === slug),
@@ -399,7 +406,13 @@ export function buildJourneyPlanForVersion(
       if (culmination.kind !== "culmination") {
         throw new Error("A Journey board must end in a culmination.");
       }
-      const extraNodes: JourneyNode[] = addedGames.map((game, index) => ({
+      const covered = new Set(board.nodes.flatMap((node) =>
+        node.kind === "normal" ? [node.gameSlug] : [],
+      ));
+      const missingOriginalGames = coverageVersion
+        ? canonicalGames(original.gameSnapshot).filter(({ slug }) => !covered.has(slug))
+        : [];
+      const extraNodes: JourneyNode[] = [...missingOriginalGames, ...addedGames].map((game, index) => ({
         id: `${board.journeyLevel}:catch-up:${game.slug}`,
         kind: "normal",
         catalogAddition: true,
@@ -417,7 +430,7 @@ export function buildJourneyPlanForVersion(
         ...extraNodes,
         {
           ...culmination,
-          position: culmination.position + addedGames.length,
+          position: culmination.position + extraNodes.length,
           sections: [
             ...culmination.sections.filter(({ selection }) => selection === "mistakes"),
             ...addedGames.map(({ slug }) => ({
@@ -441,12 +454,13 @@ export function buildJourneyPlanForVersion(
 
 /** Reconstruct a profile's original trail plus its append-only catalog updates. */
 export function buildPlayerJourney(
-  profile: Pick<PlayerProfile, "gameSnapshot" | "journeyPlanVersion" | "journeyAdditions">,
+  profile: Pick<PlayerProfile, "gameSnapshot" | "journeyPlanVersion" | "journeyAdditions" | "journeyCoverageVersion">,
 ): JourneyPlan {
   return buildJourneyPlanForVersion(
     profile.gameSnapshot,
     profile.journeyPlanVersion,
     profile.journeyAdditions,
+    profile.journeyCoverageVersion,
   );
 }
 

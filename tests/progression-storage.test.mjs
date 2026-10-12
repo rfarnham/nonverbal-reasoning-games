@@ -9,6 +9,8 @@ import {
   beginCulminationSection,
   buildLegacyJourneyPlan,
   buildJourneyPlan,
+  buildJourneyPlanForVersion,
+  buildPlayerJourney,
   createCulminationProgressionAttempt,
   createNormalProgressionAttempt,
   createPlayerProfile,
@@ -112,7 +114,7 @@ test("versioned storage round-trips exact in-progress answer and section state",
   assert.equal(resumed.rounds[0].lastAnswerToken, "choice-2");
 });
 
-test("larger game snapshots retain rotating stops and active attempts after reload", () => {
+test("larger game snapshots retain complete boards and active attempts after reload", () => {
   const fullCatalog = Array.from({ length: 11 }, (_, index) => ({
     slug: `game-${index + 1}`,
     title: `Game ${index + 1}`,
@@ -152,6 +154,64 @@ test("larger game snapshots retain rotating stops and active attempts after relo
   assert.deepEqual(buildJourneyPlan(loaded.gameSnapshot), journey);
   assert.equal(loaded.activeAttemptId, attempt.id);
   assert.deepEqual(loaded.attempts[attempt.id], attempt);
+});
+
+test("schema-three and schema-four profiles without a plan marker resume their frozen rotating trail", () => {
+  const fullCatalog = [
+    ...games,
+    ...Array.from({ length: 3 }, (_, index) => ({ slug: `game-${index + 9}`, title: `Game ${index + 9}` })),
+    reviewGame,
+  ];
+  const journey = buildJourneyPlanForVersion(fullCatalog, 2);
+  const node = journey.boards[1].nodes.find((candidate) => candidate.kind === "normal" && candidate.gameSlug === "game-11");
+  assert.ok(node);
+  let attempt = createNormalProgressionAttempt({
+    id: "old-plan-without-marker",
+    node,
+    campaignQuestions: questions(node.gameSlug, node.level),
+    nowMs: 2,
+  });
+  attempt = recordQuestionAttempt(attempt, { correct: false, answerToken: "choice-3", nowMs: 3 });
+  const previousIds = previousJourneyNodeIds(journey, node.id);
+  const profile = {
+    ...createPlayerProfile({
+      id: "unversioned-full-catalog",
+      name: "Julia",
+      avatarId: "hedgehog",
+      gameSnapshot: fullCatalog,
+      nowMs: 1,
+    }),
+    clearedStopIds: previousIds,
+    awardedStopIds: previousIds,
+    xpAwards: journey.boards.flatMap(({ nodes }) => nodes)
+      .filter(({ id }) => previousIds.includes(id))
+      .map(({ id, xp }) => ({ stopId: id, amount: xp })),
+    attempts: { [attempt.id]: attempt },
+    activeAttemptId: attempt.id,
+  };
+  delete profile.journeyPlanVersion;
+
+  for (const schemaVersion of [3, 4]) {
+    const diagnostic = decodeProgressionStateDiagnostic(JSON.stringify({
+      schemaVersion,
+      activeProfileId: profile.id,
+      profiles: [{
+        ...profile,
+        attempts: { [attempt.id]: { ...attempt, schemaVersion } },
+      }],
+    }));
+    assert.equal(diagnostic.status, "migrated");
+    const loaded = diagnostic.state.profiles[0];
+    assert.equal(loaded.journeyPlanVersion, 2);
+    assert.equal(loaded.journeyCoverageVersion, undefined);
+    assert.deepEqual(buildPlayerJourney(loaded), journey);
+    assert.deepEqual(loaded.attempts[attempt.id], attempt);
+    assert.deepEqual(loaded.xpAwards, profile.xpAwards);
+    assert.strictEqual(upgradePlayerProfileJourneyPlan(loaded, fullCatalog, 4), loaded);
+    const storage = memoryStorage();
+    assert.equal(saveProgressionState(diagnostic.state, storage), true);
+    assert.deepEqual(loadProgressionStateDiagnostic(storage).state, diagnostic.state);
+  }
 });
 
 test("storage retains locked-position attempts only for the exact test profile", () => {
