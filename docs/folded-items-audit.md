@@ -82,19 +82,20 @@ The dedicated checks are:
   checkpoint/redemption, Infinite promotion and combo, Journey reload/award
   behavior, native keyboard exclusions, wrong-answer non-disclosure at every
   level in both motion preferences, normal fold motion, sound persistence,
-  and 390/620/820px layouts.
+  and 390/620/820px layouts. A native-click regression keeps both animated folds
+  in the phone viewport across consecutive rounds.
 
 Local verification on October 12, 2026:
 
 - Seven UI boundary/feedback/migration tests passed.
-- All seven dedicated browser scenarios passed against the GitHub Pages static
-  export in installed Chrome. The initial run passed six scenarios; the seventh
-  passed after updating its SVG-cell selector to the revised renderer.
+- All eight dedicated browser scenarios passed against the final GitHub Pages
+  static export in installed Chrome, including the latest Journey integration.
 - Browser checks covered normal and reduced motion, 390/620/820px layouts,
   keyboard and pointer answering, hidden Wizard evidence, all 25 distinct shape
   glyphs, a Journey reload during incorrect feedback, completed-round reload,
   immutable first-attempt history, redemption, and a single XP claim.
-- Full `npm run check` passed: lint, TypeScript, Pages export, 1,151 JavaScript
-  tests (8 existing skips), 174 Python tests, and 10 search-build tests. A final
-  Pages export also verifies the unchanged production build configuration.
+- Full `npm run check` passed after integrating the latest `main`: lint,
+  TypeScript, Pages export, 1,165 JavaScript tests (8 existing skips), 174 Python
+  tests, and 10 search-build tests, using the unchanged production build
+  configuration.
 - Production deployment is verified separately by the delivery task.
