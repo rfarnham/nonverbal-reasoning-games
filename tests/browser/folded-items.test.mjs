@@ -77,6 +77,7 @@ async function assertExplicitFolds(page, round) {
   const clue = page.getByRole('region', { name: 'Labeled paper and folds', exact: true });
   for (const [index, instruction] of round.folds.entries()) {
     const cue = clue.getByRole('img', { name: `Fold ${index + 1}. ${foldDirectionLabel(instruction)}`, exact: true });
+    await cue.waitFor({ state: 'visible' });
     assert.equal(await cue.count(), 1, `Fold ${index + 1} is specified exactly once.`);
     assert.equal(await cue.isVisible(), true, `Fold ${index + 1} remains visible.`);
     assert.ok((await cue.textContent()).includes(foldDirectionLabel(instruction)));

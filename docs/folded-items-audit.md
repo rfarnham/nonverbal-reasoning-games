@@ -98,7 +98,7 @@ The dedicated checks are:
 - `tests/folded-items-ui.test.mjs`: actual runtime recovery from generator
   exhaustion, immutable historical-review eligibility, nonspoiling feedback,
   answer-independent Wizard feedback, and safe version-one/two/three reference recovery
-  to version-three content. The actual TSX renderer is also exercised
+  to version-four content. The actual TSX renderer is also exercised
   for unmarked alphanumeric glyphs, Wizard transforms, upright earlier tiers,
   and perceptible orientation-only traps.
 - `tests/browser/folded-items.test.mjs`: first-attempt immutability, history focus,
@@ -112,4 +112,8 @@ The dedicated checks are:
 
 The specified-fold follow-up passes all 20 focused engine/Journey tests,
 including 1,600 generated puzzles, and all 11 UI/renderer/migration tests.
-Full repository, browser, and production verification are pending the final build.
+All nine browser scenarios pass against the final export, including both visible
+Wizard fold cues, nonspoiling mirror-trap retries, historical review, and phone
+layouts. Full `npm run check` passes: lint, TypeScript, static export, 1,180
+JavaScript tests (eight existing skips), 174 Python tests, and ten search-build
+tests. Production verification follows the Pages deployment for this release.
