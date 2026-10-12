@@ -14,6 +14,7 @@ import {
   beginCulminationSection,
   buildLegacyJourneyPlan,
   buildJourneyPlan,
+  buildJourneyPlanForVersion,
   buildPlayerJourney,
   canPlayerAccessJourneyNode,
   closeAttemptSummary,
@@ -192,7 +193,7 @@ test("journey construction snapshots all core games and review content immutably
   assert.equal(
     partialJourney.boards[0].nodes.filter(({ kind }) => kind === "normal")
       .length,
-    8,
+    7,
   );
   assert.equal(
     partialJourney.boards[0].nodes.at(-1).gameSlugs.length,
@@ -225,7 +226,7 @@ test("journey construction snapshots all core games and review content immutably
   assert.equal(journey.gameSnapshot[0].slug, "game-1");
 });
 
-test("larger Journey snapshots rotate eight ordinary games and culminate with every game", () => {
+test("every new Journey board teaches every snapshotted game once without an eight-game cap", () => {
   const fullCatalog = Array.from({ length: 11 }, (_, index) => ({
     slug: `game-${index + 1}`,
     title: `Game ${index + 1}`,
@@ -235,22 +236,15 @@ test("larger Journey snapshots rotate eight ordinary games and culminate with ev
   const journey = buildJourneyPlan([...fullCatalog, reviewGame]);
   assert.equal(journey.gameSnapshot.length, 12);
   assert.deepEqual(journey.boards.map(({ availableXp }) => availableXp), [
-    325, 750, 1500, 3000, 6000, 12000, 24000,
+    400, 900, 1800, 3600, 7200, 14400, 28800,
   ]);
-  const ordinaryCoverage = new Set();
-  const turboCoverage = new Set();
-  for (const [boardIndex, board] of journey.boards.entries()) {
+  for (const board of journey.boards) {
     const normal = board.nodes.filter(({ kind }) => kind === "normal");
-    assert.equal(normal.length, 8);
+    assert.equal(normal.length, fullCatalog.length);
     assert.equal(board.nodes.filter(({ kind }) => kind === "turbo").length, 4);
-    assert.deepEqual(normal.map(({ gameSlug }) => gameSlug),
-      Array.from({ length: 8 }, (_, index) =>
-        fullCatalog[(boardIndex * 8 + index) % fullCatalog.length].slug,
-      ),
-    );
-    for (const { gameSlug } of normal) ordinaryCoverage.add(gameSlug);
+    assert.deepEqual(normal.map(({ gameSlug }) => gameSlug), fullCatalog.map(({ slug }) => slug));
     for (const { gameSlug } of board.nodes.filter(({ kind }) => kind === "turbo")) {
-      turboCoverage.add(gameSlug);
+      assert.ok(fullCatalog.some(({ slug }) => slug === gameSlug));
     }
     const culmination = board.nodes.at(-1);
     assert.deepEqual(culmination.gameSlugs, fullCatalog.map(({ slug }) => slug));
@@ -259,8 +253,47 @@ test("larger Journey snapshots rotate eight ordinary games and culminate with ev
       fullCatalog.length,
     );
   }
-  assert.equal(ordinaryCoverage.size, fullCatalog.length);
-  assert.equal(turboCoverage.size, fullCatalog.length);
+});
+
+test("version-two reconstruction preserves saved eight-game rotating windows", () => {
+  const fullCatalog = Array.from({ length: 11 }, (_, index) => ({
+    slug: `game-${index + 1}`,
+    title: `Game ${index + 1}`,
+  }));
+  const journey = buildJourneyPlanForVersion([...fullCatalog, reviewGame], 2);
+  for (const [boardIndex, board] of journey.boards.entries()) {
+    assert.deepEqual(
+      board.nodes.filter(({ kind }) => kind === "normal").map(({ gameSlug }) => gameSlug),
+      Array.from({ length: 8 }, (_, index) => fullCatalog[(boardIndex * 8 + index) % fullCatalog.length].slug),
+    );
+    assert.deepEqual(board.nodes.at(-1).gameSlugs, fullCatalog.map(({ slug }) => slug));
+  }
+});
+
+test("new Journey boards have complete ordinary coverage and valid fixed Turbo/review cadence at small and large catalog sizes", () => {
+  for (const count of [1, 3, 7, 8, 9, 16]) {
+    const catalog = Array.from({ length: count }, (_, index) => ({
+      slug: `catalog-${index + 1}`,
+      title: `Catalog ${index + 1}`,
+    }));
+    const journey = buildJourneyPlan([...catalog, reviewGame]);
+    for (const board of journey.boards) {
+      const ordinary = board.nodes.filter(({ kind }) => kind === "normal");
+      assert.deepEqual(ordinary.map(({ gameSlug }) => gameSlug), catalog.map(({ slug }) => slug), `${count} games on ${board.journeyLevel}`);
+      assert.equal(board.nodes.filter(({ kind }) => kind === "turbo").length, 4);
+      const reviews = board.nodes.filter(({ kind }) => kind === "review");
+      assert.equal(reviews.length, board.journeyLevel === "starter" ? 0 : 2);
+      for (const node of board.nodes.filter(({ kind }) => kind === "turbo")) {
+        assert.ok(catalog.some(({ slug }) => slug === node.gameSlug));
+      }
+      for (const [index, node] of reviews.entries()) {
+        assert.equal(board.nodes.slice(0, node.position).filter(({ kind }) => kind === "turbo").length, (index + 1) * 2);
+      }
+      assert.equal(board.nodes.at(-1).kind, "culmination");
+      assert.deepEqual(board.nodes.map(({ position }) => position), board.nodes.map((_, index) => index));
+      assert.equal(board.availableXp, board.nodes.reduce((total, { xp }) => total + xp, 0));
+    }
+  }
 });
 
 test("catalog growth preserves original trails and appends new game practice", () => {
@@ -290,7 +323,7 @@ test("catalog growth preserves original trails and appends new game practice", (
     for (const board of before.boards) {
       assert.deepEqual(
         board.nodes.filter(({ kind }) => kind === "normal").map(({ gameSlug }) => gameSlug),
-        Array.from({ length: 8 }, (_, index) => games[index % count].slug),
+        games.slice(0, count).map(({ slug }) => slug),
       );
       const updatedBoard = updatedJourney.boards.find(
         ({ journeyLevel }) => journeyLevel === board.journeyLevel,

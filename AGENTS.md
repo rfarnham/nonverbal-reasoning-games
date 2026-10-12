@@ -295,35 +295,42 @@ Journey is generic:
   membership, stop IDs, cleared stops, question history, or earned XP;
 - teach each later addition in its own 12-question stop before each board's
   culmination, using that board's canonical Campaign or Journey-only bank;
+- repair older trails that omitted an ordinary stop for an already-snapshotted
+  game in the same way; catalog membership alone is not evidence that the game
+  has been taught on that board;
 - require outstanding added stops on previous boards before starting further
   stops on the player's current board, while keeping reached boards viewable
   and clearly linking to the earliest new prerequisite;
 - finish an active saved attempt before applying a catalog update; never
   rewrite its questions, answers, redemption queue, or active practice time;
-- include every discovered canonical game in new profiles; when there are more
-  than eight, rotate an eight-game ordinary-stop window between boards while
-  culmination still covers every snapshotted game;
+- include every discovered canonical game in new profiles and give every game
+  one ordinary stop on every board; there is no eight-game limit or rotating
+  subset, and culmination also covers every snapshotted game;
 - store compact question references and content versions, not rendered rounds.
 
 Each profile advances through seven Journey boards:
 
 `Starter → Junior I → Junior II → Expert I → Expert II → Wizard I → Wizard II`.
 
-Starter contains eight ordinary stops, four **Turbo Time** stops, and one
-culmination. Junior I and above add two Math Kangaroo spatial-review stops, one
-after each half of the ordinary/Turbo path. Their cadence is:
+Starter contains one ordinary stop per canonical game, four **Turbo Time**
+stops, and one culmination. Junior I and above add two Math Kangaroo
+spatial-review stops, one after each half of the ordinary/Turbo path. Spread
+the four Turbo stops across the ordered ordinary path. Board lengths grow
+with the game catalog; every board teaches every game at its own difficulty.
 
-`(ordinary, ordinary, turbo) × 2, spatial review` repeated twice, then
-culmination.
-
-These are the base trails. An existing profile may also have added-game stops
-before its culminations. Each such stop has a stable ID based on its board and
-game, follows the normal clear and redemption rules, and awards that board's XP
-once. Completed culminations remain completed; later culminations include all
+These are the base trails. An existing profile may also have catch-up stops
+before its culminations for new games or games omitted by an older eight-game
+cap. Each such stop has a stable ID based on its board and game, follows the
+normal clear and redemption rules, and awards that board's XP once. Do not
+repeat an ordinary stop already present for that game on the same board.
+Completed culminations remain completed; later culminations include all
 games in the original snapshot and additions. Catalog reconciliation MUST be
 idempotent across reloads, catalog reorderings, and repeated updates, and MUST
 retain additions if the current catalog temporarily omits a game. The map MUST
-label new stops and explain that previous clears and XP are retained.
+label new stops, count outstanding earlier prerequisites, and explain that
+previous clears and XP are retained. A new stop may teach a game the player
+already knows from a different board; copy MUST NOT imply the game itself is
+new to the catalog.
 
 An ordinary stop runs the selected game's 12-question Campaign level for the
 board difficulty. Junior II, Expert II, and Wizard II use separate,
@@ -393,9 +400,11 @@ XP is celebratory, not a gate. Every cleared node on a board awards a constant
 amount, doubling each board: Starter 25, Junior I 50, Junior II 100, Expert I
 200, Expert II 400, Wizard I 800, and Wizard II 1600. Awards MUST be idempotent
 by stop ID and retained in a write-once amount ledger so later balance changes
-cannot rewrite earned XP. Starter’s 13 nodes total 325 XP; each later board has
-15 nodes and totals 750, 1500, 3000, 6000, 12000, and 24000 XP respectively.
-These base totals exclude any later added-game stops on existing profiles.
+cannot rewrite earned XP. With N canonical games, a new Starter board has
+N + 5 nodes and later boards have N + 7 nodes. Multiply each board's node
+count by its constant award to determine available XP. Existing profiles keep
+their earned awards when old trails gain catch-up stops; each added stop earns
+its board's award once.
 Show total XP on the board and pair acquisition with a brief locally
 synthesized jingle when sound is enabled.
 

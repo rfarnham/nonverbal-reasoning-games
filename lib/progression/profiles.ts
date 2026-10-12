@@ -101,7 +101,8 @@ export function createPlayerProfile({
 /**
  * Reconciles an idle profile with the discovered catalog without rebuilding its
  * original trail. Legacy four-board profiles first upgrade to seven boards;
- * new canonical games then join through a separate append-only snapshot.
+ * new canonical games then join through a separate append-only snapshot. Old
+ * rotating trails also gain ordinary stops for games omitted on each board.
  * Every in-flight attempt keeps its saved plan until its summary closes.
  */
 export function upgradePlayerProfileJourneyPlan(
@@ -113,7 +114,7 @@ export function upgradePlayerProfileJourneyPlan(
   // saved plan until it closes. Catalog updates must never invalidate a run.
   if (profile.activeAttemptId !== null) return profile;
   const upgraded = upgradeLegacyPlayerJourney(profile, currentSnapshot, nowMs);
-  if (upgraded.journeyPlanVersion !== CURRENT_JOURNEY_PLAN_VERSION) return upgraded;
+  if (upgraded.journeyPlanVersion === 1) return upgraded;
   const known = new Set([
     ...upgraded.gameSnapshot,
     ...(upgraded.journeyAdditions ?? []),
@@ -121,15 +122,28 @@ export function upgradePlayerProfileJourneyPlan(
   const discovered = currentSnapshot.filter(
     ({ slug, role }) => (role ?? "game") === "game" && !known.has(slug),
   );
-  if (!discovered.length) return upgraded;
-  const updated = {
+  const needsCoverageRepair = upgraded.journeyPlanVersion === 2 &&
+    upgraded.journeyCoverageVersion === undefined &&
+    buildPlayerJourney(upgraded).boards.some((board) =>
+      upgraded.gameSnapshot.some(({ slug, role }) =>
+        (role ?? "game") === "game" && !board.nodes.some((node) =>
+          node.kind === "normal" && node.gameSlug === slug,
+        ),
+      ),
+    );
+  if (!discovered.length && !needsCoverageRepair) return upgraded;
+  const updated: PlayerProfile = {
     ...upgraded,
-    journeyAdditions: [...(upgraded.journeyAdditions ?? []), ...discovered],
+    ...(discovered.length ? {
+      journeyAdditions: [...(upgraded.journeyAdditions ?? []), ...discovered],
+    } : {}),
+    ...(needsCoverageRepair ? { journeyCoverageVersion: 1 as const } : {}),
     updatedAtMs: nowOrCurrent(nowMs),
   };
   // Validate membership before persisting any change, then store normalized
   // metadata without retaining mutable objects from the live catalog.
   const validated = buildPlayerJourney(updated);
+  if (updated.journeyAdditions === undefined) return updated;
   return {
     ...updated,
     journeyAdditions: validated.gameSnapshot.filter(
@@ -143,7 +157,7 @@ function upgradeLegacyPlayerJourney(
   currentSnapshot: readonly JourneyGame[],
   nowMs?: number,
 ): PlayerProfile {
-  if (profile.journeyPlanVersion === CURRENT_JOURNEY_PLAN_VERSION) {
+  if (profile.journeyPlanVersion !== 1) {
     return profile;
   }
   const reviewProvider = currentSnapshot.find(
@@ -156,7 +170,7 @@ function upgradeLegacyPlayerJourney(
   );
   const expandedSnapshot = [...coreSnapshot, reviewProvider];
   const legacyJourney = buildJourneyPlanForVersion(coreSnapshot, 1);
-  const expandedJourney = buildJourneyPlan(expandedSnapshot);
+  const expandedJourney = buildJourneyPlanForVersion(expandedSnapshot, 2);
 
   const stopIdMap = new Map<string, string>();
   for (const legacyBoard of legacyJourney.boards) {
@@ -219,7 +233,7 @@ function upgradeLegacyPlayerJourney(
 
   return {
     ...profile,
-    journeyPlanVersion: CURRENT_JOURNEY_PLAN_VERSION,
+    journeyPlanVersion: 2,
     gameSnapshot: expandedJourney.gameSnapshot,
     clearedStopIds,
     xpAwards,

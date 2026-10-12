@@ -1,6 +1,6 @@
-export const PROGRESSION_SCHEMA_VERSION = 4 as const;
-export const CURRENT_JOURNEY_PLAN_VERSION = 2 as const;
-export type JourneyPlanVersion = 1 | typeof CURRENT_JOURNEY_PLAN_VERSION;
+export const PROGRESSION_SCHEMA_VERSION = 5 as const;
+export const CURRENT_JOURNEY_PLAN_VERSION = 3 as const;
+export type JourneyPlanVersion = 1 | 2 | typeof CURRENT_JOURNEY_PLAN_VERSION;
 
 export const PROGRESSION_LEVELS = [
   "starter",
@@ -123,8 +123,8 @@ export function journeyReviewCollectionId(level: JourneyLevel): string {
   return `review:${level}`;
 }
 
-export const JOURNEY_GAMES_PER_BOARD = 8;
-export const NORMAL_STOPS_PER_BOARD = 8;
+/** Frozen legacy layout size; current boards include every canonical game. */
+export const LEGACY_JOURNEY_GAMES_PER_BOARD = 8;
 export const TURBO_STOPS_PER_BOARD = 4;
 export const REVIEW_STOPS_PER_BOARD = 2;
 export const TURBO_ACTIVE_TIME_MS = 2 * 60 * 1000;
@@ -177,7 +177,7 @@ type JourneyNodeBase = {
 
 export type NormalJourneyNode = JourneyNodeBase & {
   kind: "normal";
-  /** A later catalog addition, taught without rearranging the original trail. */
+  /** New practice added without rearranging an existing trail. */
   catalogAddition?: true;
   gameSlug: string;
   collectionId: string;
@@ -387,6 +387,8 @@ export type PlayerProfile = {
   gameSnapshot: readonly JourneyGame[];
   /** Append-only canonical games discovered after this profile was created. */
   journeyAdditions?: readonly JourneyGame[];
+  /** Opt-in repair for missing ordinary game coverage on frozen v2 trails. */
+  journeyCoverageVersion?: 1;
   clearedStopIds: readonly string[];
   xpAwards: readonly XpAward[];
   /** Legacy idempotency index retained while storage migrates to xpAwards. */
