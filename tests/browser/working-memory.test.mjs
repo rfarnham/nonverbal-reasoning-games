@@ -8,8 +8,9 @@ import { after, before, test } from 'node:test';
 import { chromium } from 'playwright';
 import { SOUND_PREFERENCE_KEY } from '../../lib/game-audio.ts';
 import { decryptSearchBytes, deriveSearchKey, encryptSearchBytes, sha256 } from '../../lib/question-search/crypto.ts';
-import { AUDIO_TASK_IDS, RESEARCH_PROFILE, VISUAL_TASK_IDS, advanceRound, createProgress, finalTrackingPositions, recordFirstAttempt } from '../../app/lab/working-memory/engine.ts';
-import { conditionKey, fresh, normalizeSaved, restore as restoreSaved, selectTaskStates } from '../../app/lab/working-memory/progress.ts';
+import { AUDIO_TASK_IDS, RESEARCH_PROFILE, TASK_IDS, VISUAL_TASK_IDS, advanceRound, createProgress, finalTrackingPositions, recordFirstAttempt } from '../../app/lab/working-memory/engine.ts';
+import { conditionKey, fresh, normalizeSaved, restore as restoreSaved, selectTaskStates, taskTotals } from '../../app/lab/working-memory/progress.ts';
+import { digitTaskForVariant, digitVariantKey, enumerateDigitVariants, normalizeDigitVariant } from '../../app/lab/working-memory/digit-options.ts';
 import { MEMORY_PROGRESS_STORAGE_KEY, memoryAudioContext, memoryContentContext, validateMemoryContent } from '../../app/lab/working-memory/vault.ts';
 
 // Ordinary browser CI exercises the production cryptographic flow with a freshly
@@ -232,7 +233,10 @@ async function saved(page, predicate = value => value !== null, key = fixture.ke
   assert.fail('Encrypted progress did not reach the expected state.');
 }
 async function seedSession(page, session, { legacy = false, inputMode = 'keypad', slow = false } = {}) {
-  const settings = { slow, digitOrder: session.digitOrder ?? 'ascending', inputMode };
+  const settings = {
+    slow, digitOrder: session.digitOrder ?? 'ascending', inputMode: session.digitVariant?.inputMode ?? inputMode,
+    ...(session.profile === RESEARCH_PROFILE ? { digitVariant: session.digitVariant ?? fresh().digitVariant } : {}),
+  };
   const data = session.profile === RESEARCH_PROFILE
     ? normalizeSaved({ ...fresh(), ...settings, session, tasks: session.tasks, sessionCondition: settings })
     : { version: 1, session, tasks: session.tasks, logs: [], redeemed: [], slow, ...(!legacy ? { digitOrder: session.digitOrder ?? 'ascending' } : {}) };
@@ -251,13 +255,33 @@ async function seedSaved(page, data) {
   return restored;
 }
 async function startFocus(page, task) {
-  await page.getByRole('button', { name: `Practice Exercise ${task}`, exact: true }).click();
-  await page.getByRole('heading', { name: `Exercise ${task}`, exact: true }).waitFor();
-  const state = await saved(page, value => value?.session?.focusedTask === task);
+  let selectedTask = task;
+  if (AUDIO_TASK_IDS.includes(task)) {
+    const order = task === 'sort-digits'
+      ? (await page.getByLabel('Recall order', { exact: true }).inputValue()) === 'descending' ? 'descending' : 'ascending'
+      : 'reverse';
+    const inputMode = await page.getByLabel('Answer with', { exact: true }).inputValue();
+    const variant = normalizeDigitVariant({ order, inputMode, keypad: task === 'hidden-digits' ? 'hidden' : 'visible' });
+    await selectDigits(page, variant);
+    selectedTask = digitTaskForVariant(variant);
+    await page.getByRole('button', { name: 'Practice Digits', exact: true }).click();
+    await page.getByRole('heading', { name: 'Digits', exact: true }).waitFor();
+  } else {
+    await page.getByRole('button', { name: `Practice Exercise ${task}`, exact: true }).click();
+    await page.getByRole('heading', { name: `Exercise ${task}`, exact: true }).waitFor();
+  }
+  const state = await saved(page, value => value?.session?.focusedTask === selectedTask);
   assert.equal(state.session.length, 8);
   assert.equal(state.session.cursor, 0);
   assert.equal(state.session.answered, false);
   return state.session.active;
+}
+async function selectDigits(page, variant) {
+  await page.getByLabel('Recall order', { exact: true }).selectOption(variant.order);
+  await page.getByLabel('Answer with', { exact: true }).selectOption(variant.inputMode);
+  const visibility = page.getByLabel('Keypad while listening', { exact: true });
+  if (variant.inputMode === 'keypad') await visibility.selectOption(variant.keypad);
+  else assert.equal(await visibility.count(), 0, 'Spoken answers have no irrelevant keypad option.');
 }
 async function present(page, { replay = false, audio = false } = {}) {
   await page.getByRole('button', { name: replay ? /^Replay sequence/ : audio ? /^(Listen to the sequence|Turn sound on & listen)/ : /^Watch the sequence/ }).click();
@@ -314,8 +338,14 @@ async function assertFits(page, label) {
   }
 }
 async function assertClean({ errors, external }) { assert.deepEqual(errors, []); assert.deepEqual(external, []); }
+function digitTotals(data) {
+  const restored = restoreSaved(data);
+  assert.ok(restored);
+  const totals = taskTotals(restored);
+  return AUDIO_TASK_IDS.reduce((sum, task) => ({ attempts: sum.attempts + totals[task].attempts, correct: sum.correct + totals[task].correct }), { attempts: 0, correct: 0 });
+}
 async function prepareSpeech(page) {
-  await page.getByLabel('Listening answers', { exact: true }).selectOption('spoken');
+  await page.getByLabel('Answer with', { exact: true }).selectOption('spoken');
   await page.getByRole('button', { name: 'Download speech model', exact: true }).click();
   await page.getByRole('status').filter({ hasText: /^Speech model ready$/ }).waitFor();
 }
@@ -415,10 +445,198 @@ test('locked pack discloses no exercises; incorrect password remains locked; unl
     assert.equal(await page.getByRole('button', { name: /^Practice / }).count(), 0);
     assert.equal(await page.getByLabel('Password', { exact: true }).inputValue(), '');
     await unlock(page);
-    assert.equal(await page.getByRole('button', { name: /^Practice Exercise / }).count(), 11);
+    assert.equal(await page.getByRole('button', { name: /^Practice / }).count(), 9);
     await assertNoPlaintext(page);
     await assertClean(opened);
   } finally { releaseManifest(); await context.close(); }
+});
+
+test('one Digits game exposes nine unique saved variants and omits keypad options for spoken answers', { timeout: 60_000 }, async () => {
+  const opened = await open({ width: 390, speech: {} });
+  const { context, page } = opened;
+  try {
+    await unlock(page);
+    assert.equal(await page.getByRole('button', { name: /^Practice / }).count(), 9);
+    assert.equal(await page.getByRole('button', { name: 'Practice Digits', exact: true }).count(), 1);
+    for (const task of AUDIO_TASK_IDS) assert.equal(await page.getByRole('heading', { name: `Exercise ${task}`, exact: true }).count(), 0);
+    const variants = enumerateDigitVariants(), selectedKeys = new Set();
+    assert.equal(variants.length, 9);
+    for (const variant of variants) {
+      await selectDigits(page, variant);
+      if (variant.inputMode === 'spoken' && await page.getByRole('button', { name: 'Download speech model', exact: true }).count()) {
+        await page.getByRole('button', { name: 'Download speech model', exact: true }).click();
+        await page.getByRole('status').filter({ hasText: /^Speech model ready$/ }).waitFor();
+      }
+      const configured = await saved(page, value => value?.digitVariant && digitVariantKey(value.digitVariant) === digitVariantKey(variant));
+      assert.deepEqual(configured.digitVariant, variant);
+      await assertFits(page, 'Digits options on phone');
+      await page.getByRole('button', { name: 'Practice Digits', exact: true }).click();
+      await page.getByRole('heading', { name: 'Digits', exact: true }).waitFor();
+      const state = await saved(page, value => value?.session?.digitVariant && digitVariantKey(value.session.digitVariant) === digitVariantKey(variant));
+      assert.deepEqual(state.session.active.digitVariant, variant);
+      assert.equal(state.session.focusedTask, digitTaskForVariant(variant));
+      assert.equal(state.session.plan.length, 8);
+      assert.ok(state.session.plan.every(task => task === digitTaskForVariant(variant)));
+      selectedKeys.add(digitVariantKey(state.session.digitVariant));
+      await page.getByRole('button', { name: /Save & exit/ }).click();
+      await page.getByRole('button', { name: 'End session', exact: true }).click();
+    }
+    assert.equal(selectedKeys.size, 9, 'Each advertised combination has a distinct playable identity.');
+    for (const order of ['reverse', 'ascending', 'descending']) assert.equal(variants.filter(variant => variant.order === order).length, 3);
+    await selectDigits(page, { order: 'reverse', inputMode: 'keypad', keypad: 'visible' });
+    await page.getByLabel('Answer with', { exact: true }).selectOption('spoken');
+    const fromVisible = await saved(page, value => value?.digitVariant?.inputMode === 'spoken');
+    await selectDigits(page, { order: 'reverse', inputMode: 'keypad', keypad: 'hidden' });
+    await page.getByLabel('Answer with', { exact: true }).selectOption('spoken');
+    const fromHidden = await saved(page, value => value?.digitVariant?.inputMode === 'spoken');
+    assert.deepEqual(fromVisible.digitVariant, fromHidden.digitVariant, 'Keypad history cannot create a second spoken variant.');
+    assert.equal(conditionKey('reverse-digits', fromVisible), conditionKey('hidden-digits', fromHidden));
+    assert.deepEqual(digitTotals(fromHidden), { attempts: 0, correct: 0 });
+    assert.equal(await page.getByLabel('Keypad while listening', { exact: true }).count(), 0);
+    assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 0);
+    await assertLocalSpeech(opened);
+  } finally { await context.close(); }
+});
+
+for (const order of ['ascending', 'descending']) {
+  test(`hidden ${order} Digits withholds keypad labels during listening and scores the selected rule`, { timeout: 45_000 }, async () => {
+    const opened = await open({ width: 390 });
+    const { context, page } = opened;
+    try {
+      await unlock(page);
+      const variant = { order, inputMode: 'keypad', keypad: 'hidden' };
+      await selectDigits(page, variant);
+      await page.getByRole('button', { name: 'Practice Digits', exact: true }).click();
+      const initial = await saved(page, value => value?.session?.active?.digitVariant?.order === order);
+      const round = initial.session.active;
+      assert.deepEqual(round.digitVariant, variant);
+      await page.getByRole('button', { name: /^Listen to the sequence/ }).click();
+      await page.getByRole('status').filter({ hasText: /^Listen$/ }).waitFor();
+      assert.equal(await page.getByRole('button', { name: 'Hidden keypad button', exact: true }).count(), 9);
+      assert.equal(await page.getByRole('button', { name: /^Digit [1-9]$/ }).count(), 0);
+      await page.getByRole('group', { name: orderCueLabels[order], exact: true }).waitFor();
+      await page.getByRole('button', { name: 'Check sequence', exact: true }).waitFor();
+      assert.equal(await page.getByRole('button', { name: /^Digit [1-9]$/ }).count(), 9);
+      const expected = [...round.sequence].sort((a, b) => order === 'ascending' ? a - b : b - a);
+      await enter(page, round, expected);
+      await check(page);
+      const result = await saved(page, value => value?.session?.cursor === 1);
+      assert.equal(result.session.history[0].correct, true);
+      assert.deepEqual(result.session.active.digitVariant, variant);
+      assert.deepEqual(digitTotals(result), { attempts: 1, correct: 1 });
+      await assertClean(opened);
+    } finally { await context.close(); }
+  });
+}
+
+test('listening sessions repeat the chosen Digits variant and mixed sessions retain half listening rounds', { timeout: 30_000 }, async () => {
+  const opened = await open();
+  const { context, page } = opened;
+  try {
+    await unlock(page);
+    const variant = { order: 'ascending', inputMode: 'keypad', keypad: 'hidden' };
+    await selectDigits(page, variant);
+    await page.getByRole('button', { name: 'Listening only', exact: true }).click();
+    await page.getByRole('button', { name: /^Start a session/ }).click();
+    const audio = await saved(page, value => value?.session?.modality === 'audio');
+    assert.equal(audio.session.plan.length, 24);
+    assert.ok(audio.session.plan.every(task => task === digitTaskForVariant(variant)), 'The plan contains the chosen variant without cycling old aliases.');
+    assert.deepEqual(audio.session.digitVariant, variant);
+    await page.getByRole('button', { name: /Save & exit/ }).click();
+    await page.getByRole('button', { name: 'End session', exact: true }).click();
+    await page.getByRole('button', { name: 'Visual + listening', exact: true }).click();
+    await page.getByRole('button', { name: /^Start a session/ }).click();
+    const mixed = await saved(page, value => value?.session?.modality === 'mixed');
+    const auditory = mixed.session.plan.filter(task => AUDIO_TASK_IDS.includes(task));
+    assert.equal(mixed.session.plan.length, 24);
+    assert.equal(auditory.length, 12);
+    assert.ok(auditory.every(task => task === digitTaskForVariant(variant)));
+    assert.equal(mixed.session.plan.filter(task => VISUAL_TASK_IDS.includes(task)).length, 12);
+    assert.deepEqual(mixed.session.digitVariant, variant);
+    assert.deepEqual(digitTotals(mixed), { attempts: 0, correct: 0 });
+    await assertClean(opened);
+  } finally { await context.close(); }
+});
+
+test('a recycled Digits sequence remains a new unredeemed challenge after reload', { timeout: 45_000 }, async () => {
+  const opened = await open();
+  const { context, page } = opened;
+  try {
+    const digitVariant = { order: 'ascending', inputMode: 'keypad', keypad: 'hidden' };
+    const preferences = { ...fresh(), digitVariant, inputMode: 'keypad', digitOrder: 'ascending' };
+    let session = createProgress('browser-digit-cycle', 48, { modality: 'audio', profile: RESEARCH_PROFILE, tasks: selectTaskStates(preferences), digitVariant });
+    for (let index = 0; index < 36; index++) session = advanceRound(recordFirstAttempt(session, session.active, false));
+    const round = session.active;
+    const redeemed = session.history.map(result => result.round.id);
+    assert.ok(session.history.some(result => result.round.fingerprint === round.fingerprint), 'The small load has exhausted its distinct sorting sequences.');
+    assert.equal(redeemed.includes(round.id), false, 'A new occurrence has its own identity.');
+    const data = normalizeSaved({ ...preferences, session, tasks: session.tasks, redeemed, sessionCondition: { slow: false, inputMode: 'keypad', digitOrder: 'ascending', digitVariant } });
+    await seedSaved(page, data);
+    await page.getByRole('button', { name: /^Continue session/ }).click();
+    await page.getByRole('button', { name: 'Check sequence', exact: true }).waitFor();
+    await enter(page, round, [...round.expected].reverse());
+    await check(page, { correct: false });
+    const missed = await saved(page, value => value?.session?.answered);
+    assert.equal(missed.session.cursor, 36);
+    assert.equal(missed.session.history.length, 37);
+    assert.equal(missed.redeemed.includes(round.id), false);
+    await page.reload();
+    await unlock(page);
+    await page.getByRole('button', { name: /^Continue session/ }).click();
+    await page.getByRole('button', { name: 'Replay sequence', exact: true }).waitFor();
+    assert.deepEqual(await saved(page), missed, 'Earlier redemption cannot solve or skip the recycled occurrence.');
+    await assertClean(opened);
+  } finally { await context.close(); }
+});
+
+test('active earlier spoken aliases resume exactly while their histories count once in the Digits family', { timeout: 60_000 }, async () => {
+  const opened = await open({ speech: {} });
+  const { context, page } = opened;
+  try {
+    let earlier = createProgress('browser-old-spoken-reverse', 8, { profile: RESEARCH_PROFILE, focusedTask: 'reverse-digits', tasks: selectTaskStates(fresh()) });
+    earlier = recordFirstAttempt(earlier, earlier.active, true);
+    const oldHiddenTasks = { ...earlier.tasks, 'hidden-digits': { ...earlier.tasks['hidden-digits'], span: 6 } };
+    let session = createProgress('browser-old-spoken-hidden', 8, { profile: RESEARCH_PROFILE, focusedTask: 'hidden-digits', tasks: oldHiddenTasks });
+    session = recordFirstAttempt(session, session.active, true);
+    const oldSettings = { slow: false, inputMode: 'spoken', digitOrder: 'ascending' };
+    const oldData = {
+      version: 2, ...oldSettings, session, tasks: session.tasks, legacyTasks: fresh().legacyTasks,
+      conditions: Object.fromEntries(TASK_IDS.map(task => [conditionKey(task, oldSettings), { ...session.tasks[task] }])),
+      sessionCondition: oldSettings, logs: [], redeemed: [],
+    };
+    await seedSaved(page, oldData);
+    assert.deepEqual(digitTotals(await saved(page)), { attempts: 2, correct: 2 });
+    assert.match(await page.getByRole('article', { name: 'Digits', exact: true }).innerText(), /\bSpan 6\b/, 'The card displays the active legacy alias load.');
+    await page.getByRole('button', { name: 'Progress', exact: true }).click();
+    const legacyRow = page.getByRole('row').filter({ has: page.getByRole('rowheader', { name: 'Digits', exact: true }) });
+    assert.equal(await legacyRow.getByRole('cell').first().textContent(), '6', 'Progress and Continue refer to the same legacy span.');
+    await page.getByRole('button', { name: 'Download speech model', exact: true }).click();
+    await page.getByRole('status').filter({ hasText: /^Speech model ready$/ }).waitFor();
+    await page.getByRole('button', { name: /^Continue session/ }).click();
+    const resumed = await saved(page, value => value?.session?.cursor === 1);
+    assert.deepEqual(resumed.session, advanceRound(session), 'Migration preserves the old plan, IDs, answers, and adaptive state.');
+    assert.equal(resumed.session.digitVariant, undefined);
+    assert.deepEqual(digitTotals(resumed), { attempts: 2, correct: 2 });
+    await assertAutoPresentation(page);
+    await page.getByRole('button', { name: /Save & exit/ }).click();
+    await page.getByRole('button', { name: 'End session', exact: true }).click();
+    const round = await startFocus(page, 'reverse-digits');
+    const canonical = await saved(page, value => !!value?.session?.digitVariant);
+    assert.deepEqual(canonical.session.digitVariant, { order: 'reverse', inputMode: 'spoken', keypad: 'none' });
+    assert.equal(canonical.session.initialTasks[round.task].attempts, 0, 'Two archived trajectories do not become duplicate adaptive attempts.');
+    assert.equal(canonical.session.initialTasks[round.task].balance, 0, 'Conflicting old staircases are not combined into a new calibration.');
+    await presentForSpeech(page);
+    await recordSpeech(page, round.expected);
+    assert.deepEqual(await stopSpeech(page), round.expected);
+    await check(page);
+    const result = await saved(page, value => value?.session?.cursor === 1);
+    assert.deepEqual(digitTotals(result), { attempts: 3, correct: 3 }, 'Each archived attempt and the new canonical attempt is counted once.');
+    assert.equal(result.archivedConditions[conditionKey('reverse-digits', oldSettings)].attempts, 1);
+    assert.equal(result.archivedConditions[conditionKey('hidden-digits', oldSettings)].attempts, 1);
+    assert.equal(result.conditions[conditionKey('hidden-digits', result)].attempts, 1);
+    assert.equal(conditionKey('hidden-digits', result), conditionKey('reverse-digits', result));
+    await assertLocalSpeech(opened);
+  } finally { await context.close(); }
 });
 
 for (const task of VISUAL_TASK_IDS) {
@@ -562,7 +780,7 @@ for (const task of AUDIO_TASK_IDS) {
       if (task === 'hidden-digits') {
         assert.equal(await page.getByRole('button', { name: 'Hidden keypad button', exact: true }).count(), 9);
         assert.equal(await page.getByRole('button', { name: /^Digit [1-9]$/ }).count(), 0);
-      }
+      } else assert.equal(await page.getByRole('button', { name: /^Digit [1-9]$/ }).count(), 9, 'The visible-keypad option retains its labels during listening.');
       await page.getByRole('button', { name: 'Check sequence', exact: true }).waitFor();
       assert.equal(await cue.innerHTML(), genericCue, 'The same order reminder remains during recall.');
       assert.equal(await page.getByRole('button', { name: /^Digit [1-9]$/ }).count(), 9);
@@ -585,7 +803,7 @@ test('Large to small selection keeps a descending order cue and accepts only des
   const { context, page } = opened;
   try {
     await unlock(page);
-    await page.getByLabel('Number order', { exact: true }).selectOption('descending');
+    await page.getByLabel('Recall order', { exact: true }).selectOption('descending');
     const round = await startFocus(page, 'sort-digits');
     const initial = await saved(page);
     assert.equal(initial.digitOrder, 'descending');
@@ -615,12 +833,12 @@ test('Large to small selection keeps a descending order cue and accepts only des
     assert.equal(redeemed.session.active.digitOrder, 'descending');
     assert.equal(await cue.innerHTML(), genericCue, 'The descending rule icon stays generic across rounds.');
     await page.getByRole('button', { name: /Save & exit/ }).click();
-    const numberOrder = page.getByLabel('Number order', { exact: true });
+    const numberOrder = page.getByLabel('Recall order', { exact: true });
     assert.equal(await numberOrder.inputValue(), 'descending');
     assert.equal(await numberOrder.isDisabled(), true, 'A saved session retains its direction until it ends.');
     await page.reload();
     await unlock(page);
-    assert.equal(await page.getByLabel('Number order', { exact: true }).inputValue(), 'descending');
+    assert.equal(await page.getByLabel('Recall order', { exact: true }).inputValue(), 'descending');
     assert.deepEqual(await saved(page), redeemed, 'Reload retains the descending session, original result, and preference.');
     await assertNoPlaintext(page, redeemed);
     await assertClean(opened);
@@ -633,8 +851,8 @@ test('spoken recall requires explicit local setup, hides live text, and confirms
   try {
     await unlock(page);
     assert.deepEqual(await page.evaluate(() => ({ workers: window.__speechTest.workersCreated, microphones: window.__speechTest.microphoneRequests })), { workers: 0, microphones: 0 });
-    await page.getByLabel('Listening answers', { exact: true }).selectOption('spoken');
-    assert.equal(await page.getByRole('button', { name: 'Practice Exercise reverse-digits', exact: true }).isDisabled(), true);
+    await page.getByLabel('Answer with', { exact: true }).selectOption('spoken');
+    assert.equal(await page.getByRole('button', { name: 'Practice Digits', exact: true }).isDisabled(), true);
     assert.equal(await page.getByRole('button', { name: 'Practice Exercise forward', exact: true }).isEnabled(), true, 'Visual exercises remain available without the speech model.');
     assert.deepEqual(await page.evaluate(() => ({ workers: window.__speechTest.workersCreated, microphones: window.__speechTest.microphoneRequests })), { workers: 0, microphones: 0 }, 'Selecting Spoken alone does not load a model or open the microphone.');
     await page.getByRole('button', { name: 'Download speech model', exact: true }).click();
@@ -659,7 +877,8 @@ test('spoken recall requires explicit local setup, hides live text, and confirms
     assert.equal(completed.session.history.length, 1);
     assert.equal(completed.session.history[0].correct, true);
     assert.equal(completed.conditions[conditionKey('reverse-digits', completed.sessionCondition)].attempts, 1);
-    assert.equal(selectTaskStates(completed, { ...completed, inputMode: 'keypad' })['reverse-digits'].attempts, 0);
+    assert.equal(selectTaskStates(completed, { ...completed, inputMode: 'keypad', digitVariant: { ...completed.digitVariant, inputMode: 'keypad', keypad: 'visible' } })['reverse-digits'].attempts, 0);
+    assert.deepEqual(digitTotals(completed), { attempts: 1, correct: 1 }, 'The shared digit condition contributes one attempt to family totals.');
     await assertAutoPresentation(page);
     assert.equal(await page.getByRole('group', { name: 'Recognized answer', exact: true }).count(), 0, 'A confirmed answer is cleared before the next challenge.');
     assert.equal(await page.evaluate(() => window.__speechTest.activeTracks), 0);
@@ -694,7 +913,7 @@ test('uncertain and misheard spoken results can be replaced before any adaptive 
     const completed = await saved(page, value => value?.session?.cursor === 1);
     assert.equal(completed.session.history.length, 1);
     assert.equal(completed.session.history[0].correct, true);
-    assert.equal(completed.tasks['hidden-digits'].attempts, 1);
+    assert.equal(completed.tasks[round.task].attempts, 1);
     assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 3);
     assert.equal(await page.evaluate(() => window.__speechTest.stoppedTracks), 3);
     await assertLocalSpeech(opened);
@@ -795,13 +1014,13 @@ test('microphone denial leaves spoken progress unscored and permits keypad pract
     assert.deepEqual(await saved(page), initial);
     await page.getByRole('button', { name: /Save & exit/ }).click();
     await page.getByRole('button', { name: 'End session', exact: true }).click();
-    await page.getByLabel('Listening answers', { exact: true }).selectOption('keypad');
+    await page.getByLabel('Answer with', { exact: true }).selectOption('keypad');
     const round = await startFocus(page, 'reverse-digits');
     await present(page, { audio: true });
     await enter(page, round);
     await check(page);
     const result = await saved(page, value => value?.session?.cursor === 1);
-    assert.equal(selectTaskStates(result, { ...result, inputMode: 'spoken' })['reverse-digits'].attempts, 0);
+    assert.equal(selectTaskStates(result, { ...result, inputMode: 'spoken', digitVariant: { ...result.digitVariant, inputMode: 'spoken', keypad: 'none' } })['reverse-digits'].attempts, 0);
     assert.equal(result.tasks['reverse-digits'].attempts, 1);
     await assertLocalSpeech(opened);
   } finally { await context.close(); }
@@ -812,17 +1031,17 @@ test('a failed local model download does not request microphone access', { timeo
   const { context, page } = opened;
   try {
     await unlock(page);
-    await page.getByLabel('Listening answers', { exact: true }).selectOption('spoken');
+    await page.getByLabel('Answer with', { exact: true }).selectOption('spoken');
     await page.getByRole('button', { name: 'Download speech model', exact: true }).click();
     await page.getByRole('status').filter({ hasText: /^Could not load local speech/ }).waitFor();
     assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 0);
     assert.equal(await page.evaluate(() => window.__speechTest.workersTerminated), 1);
-    assert.equal(await page.getByRole('button', { name: 'Practice Exercise reverse-digits', exact: true }).isDisabled(), true);
+    assert.equal(await page.getByRole('button', { name: 'Practice Digits', exact: true }).isDisabled(), true);
     const progress = await saved(page);
     assert.equal(progress.session, null);
     assert.equal(selectTaskStates(progress)['reverse-digits'].attempts, 0);
-    await page.getByLabel('Listening answers', { exact: true }).selectOption('keypad');
-    assert.equal(await page.getByRole('button', { name: 'Practice Exercise reverse-digits', exact: true }).isEnabled(), true);
+    await page.getByLabel('Answer with', { exact: true }).selectOption('keypad');
+    assert.equal(await page.getByRole('button', { name: 'Practice Digits', exact: true }).isEnabled(), true);
     await assertLocalSpeech(opened);
   } finally { await context.close(); }
 });
@@ -835,7 +1054,7 @@ test('a failed local worker disables spoken starts and recovers in an unscored a
     await prepareSpeech(page);
     await page.evaluate(() => window.__speechTest.failWorker());
     await page.getByRole('button', { name: 'Download speech model', exact: true }).waitFor();
-    assert.equal(await page.getByRole('button', { name: 'Practice Exercise reverse-digits', exact: true }).isDisabled(), true, 'An idle worker failure invalidates the ready state.');
+    assert.equal(await page.getByRole('button', { name: 'Practice Digits', exact: true }).isDisabled(), true, 'An idle worker failure invalidates the ready state.');
     assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 0);
     await page.getByRole('button', { name: 'Download speech model', exact: true }).click();
     await page.getByRole('status').filter({ hasText: /^Speech model ready$/ }).waitFor();
@@ -861,6 +1080,50 @@ test('a failed local worker disables spoken starts and recovers in an unscored a
     assert.equal(result.tasks['reverse-digits'].attempts, 1);
     assert.equal(await page.evaluate(() => window.__speechTest.workersCreated), 3);
     assert.equal(await page.evaluate(() => window.__speechTest.workersTerminated), 2);
+    await assertLocalSpeech(opened);
+  } finally { await context.close(); }
+});
+
+test('a failed idle speech worker gates a mixed visual-to-Digits transition until explicit recovery', { timeout: 60_000 }, async () => {
+  const opened = await open({ speech: {} });
+  const { context, page } = opened;
+  try {
+    const digitVariant = { order: 'reverse', inputMode: 'spoken', keypad: 'none' };
+    const preferences = { ...fresh(), digitVariant, inputMode: 'spoken' };
+    let session;
+    for (let index = 0; index < 100; index++) {
+      const candidate = createProgress(`browser-idle-worker-transition-${index}`, 24, { modality: 'mixed', profile: RESEARCH_PROFILE, tasks: selectTaskStates(preferences), digitVariant });
+      if (candidate.plan[0] === 'forward') { session = candidate; break; }
+    }
+    assert.ok(session, 'The fixture starts with a visual round followed by Digits.');
+    await seedSession(page, session);
+    await page.getByRole('button', { name: 'Download speech model', exact: true }).click();
+    await page.getByRole('status').filter({ hasText: /^Speech model ready$/ }).waitFor();
+    await page.getByRole('button', { name: /^Continue session/ }).click();
+    await page.getByRole('button', { name: 'Check sequence', exact: true }).waitFor();
+    await page.evaluate(() => window.__speechTest.failWorker());
+    await enter(page, session.active);
+    await page.getByRole('button', { name: 'Check sequence', exact: true }).click();
+    const advanced = await saved(page, value => value?.session?.cursor === 1);
+    const auditory = advanced.session.active;
+    assert.equal(auditory.answerKind, 'ordered-digits');
+    assert.equal(advanced.session.history[0].correct, true);
+    const recovery = page.getByRole('button', { name: 'Download speech model', exact: true });
+    await recovery.waitFor();
+    assert.equal(await page.getByRole('button', { name: /^Listen to the sequence/ }).isDisabled(), true);
+    assert.equal(await page.getByRole('status').filter({ hasText: /^Listen$/ }).count(), 0, 'The next stimulus is not played without its response method.');
+    assert.equal(await page.getByRole('button', { name: 'Record answer', exact: true }).count(), 0);
+    assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 0);
+    assert.equal(advanced.tasks[auditory.task].attempts, 0);
+    await recovery.click();
+    await presentForSpeech(page);
+    await recordSpeech(page, auditory.expected);
+    assert.deepEqual(await stopSpeech(page), auditory.expected);
+    await check(page);
+    const completed = await saved(page, value => value?.session?.cursor === 2);
+    assert.equal(completed.session.history.length, 2);
+    assert.equal(completed.session.history[1].correct, true);
+    assert.deepEqual(digitTotals(completed), { attempts: 1, correct: 1 });
     await assertLocalSpeech(opened);
   } finally { await context.close(); }
 });
@@ -898,7 +1161,7 @@ test('Continue session advances a previously scored save and presents a differen
     const expected = advanceRound(answered);
     assert.notEqual(expected.active.task, answered.active.task);
     const before = await seedSession(page, answered, { legacy: true });
-    assert.equal(await page.getByLabel('Number order', { exact: true }).inputValue(), 'ascending', 'Older saved preferences retain the original ascending default.');
+    assert.equal(restoreSaved(await saved(page)).digitOrder, 'ascending', 'Older sorting preferences retain their original ascending default.');
     await page.getByRole('button', { name: /^Continue session/ }).click();
     const resumed = await saved(page, value => value?.session?.cursor === 1);
     assert.deepEqual(resumed.session, expected);
@@ -1244,38 +1507,39 @@ test('input, presentation speed, and sorting order keep independent adaptive rec
   const opened = await open({ speech: {} });
   const { context, page } = opened;
   try {
-    const initial = fresh();
-    let session = createProgress('browser-condition-banks', 8, { profile: RESEARCH_PROFILE, focusedTask: 'sort-digits', tasks: selectTaskStates(initial) });
+    const initial = { ...fresh(), digitVariant: { order: 'ascending', inputMode: 'keypad', keypad: 'visible' } };
+    let session = createProgress('browser-condition-banks', 8, { profile: RESEARCH_PROFILE, focusedTask: 'sort-digits', tasks: selectTaskStates(initial), digitVariant: initial.digitVariant });
     session = advanceRound(recordFirstAttempt(session, session.active, true));
-    const withSession = normalizeSaved({ ...initial, session, tasks: session.tasks, sessionCondition: { slow: false, inputMode: 'keypad', digitOrder: 'ascending' } });
+    const withSession = normalizeSaved({ ...initial, session, tasks: session.tasks, sessionCondition: { slow: false, inputMode: 'keypad', digitOrder: 'ascending', digitVariant: initial.digitVariant } });
     const data = normalizeSaved({ ...withSession, session: null, sessionCondition: null });
     await seedSaved(page, data);
     const originalConditions = structuredClone(data.conditions);
     assert.equal(selectTaskStates(await saved(page))['sort-digits'].attempts, 1);
-    await page.getByLabel('Listening answers', { exact: true }).selectOption('spoken');
+    await page.getByLabel('Answer with', { exact: true }).selectOption('spoken');
     const spoken = await saved(page, value => value?.inputMode === 'spoken');
     assert.equal(selectTaskStates(spoken)['sort-digits'].attempts, 0);
     await page.getByLabel('Slower presentation', { exact: true }).check();
     const slower = await saved(page, value => value?.slow === true);
     assert.equal(selectTaskStates(slower)['sort-digits'].attempts, 0);
-    await page.getByLabel('Number order', { exact: true }).selectOption('descending');
+    await page.getByLabel('Recall order', { exact: true }).selectOption('descending');
     const descending = await saved(page, value => value?.digitOrder === 'descending');
     assert.equal(selectTaskStates(descending)['sort-digits'].attempts, 0);
-    await page.getByLabel('Listening answers', { exact: true }).selectOption('keypad');
+    await page.getByLabel('Answer with', { exact: true }).selectOption('keypad');
     await page.getByLabel('Slower presentation', { exact: true }).uncheck();
     const descendingKeypad = await saved(page, value => value?.inputMode === 'keypad' && !value?.slow);
     assert.equal(selectTaskStates(descendingKeypad)['sort-digits'].attempts, 0);
-    await page.getByLabel('Number order', { exact: true }).selectOption('ascending');
+    await page.getByLabel('Recall order', { exact: true }).selectOption('ascending');
     const restored = await saved(page, value => value?.digitOrder === 'ascending');
     assert.equal(selectTaskStates(restored)['sort-digits'].attempts, 1);
     for (const state of [spoken, slower, descending, descendingKeypad, restored]) {
       assert.deepEqual(state.conditions, originalConditions, 'Changing a condition cannot copy adaptive history into another bank.');
       assert.deepEqual(state.legacyTasks, data.legacyTasks);
+      assert.deepEqual(state.archivedConditions, {}, 'Changing current options does not create archived history.');
     }
     await startFocus(page, 'sort-digits');
     const resumed = await saved(page, value => !!value?.session?.active);
     assert.equal(resumed.session.initialTasks['sort-digits'].attempts, 1);
-    assert.deepEqual(resumed.sessionCondition, { slow: false, inputMode: 'keypad', digitOrder: 'ascending' });
+    assert.deepEqual(resumed.sessionCondition, { slow: false, inputMode: 'keypad', digitOrder: 'ascending', digitVariant: initial.digitVariant });
     assert.deepEqual(await page.evaluate(() => ({ models: window.__speechTest.workersCreated, microphones: window.__speechTest.microphoneRequests })), { models: 0, microphones: 0 }, 'Selecting Spoken alone cannot download its model or request a microphone.');
     await assertClean(opened);
   } finally { await context.close(); }
@@ -1340,11 +1604,11 @@ test('optional real encrypted pack unlocks and completes an actual neural-audio 
     await page.getByLabel('Password', { exact: true }).fill(process.env.MEMORY_LAB_TEST_PASSWORD);
     await page.getByRole('button', { name: /^Unlock/ }).click();
     await page.getByRole('button', { name: /^Practice / }).first().waitFor();
-    assert.equal(await page.getByRole('button', { name: /^Practice / }).count(), 11);
+    assert.equal(await page.getByRole('button', { name: /^Practice / }).count(), 9);
     await page.screenshot({ path: resolve(shots, 'real-pack-desktop.png'), fullPage: true });
     const manifest = JSON.parse(await readFile(new URL('working-memory/vault/manifest.json', new URL('../../out/', import.meta.url)), 'utf8'));
     const key = await deriveSearchKey(process.env.MEMORY_LAB_TEST_PASSWORD, manifest.encryption);
-    await page.getByRole('button', { name: /^Practice / }).nth(8).click();
+    await page.getByRole('button', { name: 'Practice Digits', exact: true }).click();
     const initial = await saved(page, value => !!value?.session?.active, key);
     const round = initial.session.active;
     assert.equal(round.answerKind, 'ordered-digits');

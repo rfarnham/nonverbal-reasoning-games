@@ -19,6 +19,7 @@ import {
 import {
   TASK_IDS,
   AUDIO_TASK_IDS,
+  VISUAL_TASK_IDS,
   advanceRound,
   createProgress,
   RESEARCH_PROFILE,
@@ -33,7 +34,6 @@ import {
   type MemoryRound,
   type TaskId,
   type SessionModality,
-  type DigitOrder,
 } from "./engine";
 import {
   clearMemoryProgress,
@@ -50,6 +50,13 @@ import OrderCue from "./OrderCue";
 import { fresh, restore, normalizeSaved, selectTaskStates, taskTotals, type Saved, type InputMode } from "./progress";
 import { useLocalSpeech } from "./use-local-speech";
 import { LOCAL_SPEECH_DOWNLOAD_MB } from "./local-digit-recognition";
+import {
+  digitTaskForVariant,
+  digitVariantFromLegacy,
+  normalizeDigitVariant,
+  type DigitRecallOrder,
+  type DigitVariant,
+} from "./digit-options";
 import styles from "./memory.module.css";
 
 type Phase =
@@ -84,6 +91,11 @@ function Shape({ id }: { id: number }) {
   );
 }
 const shapeNames = ["circle", "triangle", "square", "diamond", "cross", "star"];
+
+function describeDigitVariant(variant: DigitVariant): string {
+  const order = variant.order === "reverse" ? "Reverse" : variant.order === "ascending" ? "Small → large" : "Large → small";
+  return `${order} · ${variant.inputMode === "spoken" ? "spoken" : `keypad ${variant.keypad}`}`;
+}
 
 function Header({ children }: { children?: React.ReactNode }) {
   return (
@@ -374,7 +386,7 @@ function MemoryBoard({
       : cell;
   if (target.answerKind === "ordered-digits") {
     const hide =
-      target.task === "hidden-digits" &&
+      (target.digitVariant ? target.digitVariant.keypad === "hidden" : target.task === "hidden-digits") &&
       ["cue", "watch", "hold"].includes(phase);
     return (
       <>
@@ -587,12 +599,24 @@ function UnlockedLab({
   const roundTitleRef = useRef<HTMLDivElement>(null);
   const reviewTrigger = useRef<HTMLButtonElement | null>(null);
   const restoreReviewFocus = useRef(false);
+  const keypadPreference = useRef<"visible" | "hidden">("visible");
   const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
   const session = saved.session;
   const round = session?.active ?? null;
   const current = review ?? round;
   const task = content.tasks.find((item) => item.id === current?.task);
-  const spoken = current?.answerKind === "ordered-digits" && saved.sessionCondition?.inputMode === "spoken";
+  const currentDigitVariant = current?.answerKind === "ordered-digits"
+    ? current.digitVariant ?? digitVariantFromLegacy(current.task, saved.sessionCondition?.inputMode ?? "keypad", current.digitOrder ?? "ascending")
+    : null;
+  const spoken = currentDigitVariant?.inputMode === "spoken";
+  const digitsTask = digitTaskForVariant(saved.digitVariant);
+  const legacyDigitRound = session?.active?.answerKind === "ordered-digits" && !saved.sessionCondition?.digitVariant ? session.active : null;
+  const displayedDigitsTask = legacyDigitRound?.task ?? digitsTask;
+  const displayedDigitVariant = legacyDigitRound
+    ? digitVariantFromLegacy(legacyDigitRound.task, saved.sessionCondition?.inputMode ?? "keypad", legacyDigitRound.digitOrder ?? "ascending")!
+    : saved.digitVariant;
+  const visualTasks = content.tasks.filter((item) => VISUAL_TASK_IDS.includes(item.id as (typeof VISUAL_TASK_IDS)[number]));
+  const games = [...visualTasks.map((item) => ({ id: item.id, title: item.title, task: item.id as TaskId })), { id: "digits", title: "Digits", task: displayedDigitsTask }];
   const selectedTasks = session?.active ? session.tasks : selectTaskStates(saved);
   const totals = taskTotals(saved);
   const listeningReady = audioReady && (saved.inputMode !== "spoken" || speech.ready);
@@ -745,6 +769,12 @@ function UnlockedLab({
     return () => cancelAnimationFrame(frame);
   }, [speech.state, spoken, phase]);
 
+  useEffect(() => {
+    if (!spoken || phase !== "ready" || !speech.ready) return;
+    const frame = requestAnimationFrame(() => actionRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [spoken, phase, speech.ready]);
+
   function primeAudio() {
     narration.current?.prime();
     if (!audio.current) audio.current = createGameAudioContext();
@@ -766,6 +796,10 @@ function UnlockedLab({
     });
   }
   async function present(target: MemoryRound) {
+    if (target.answerKind === "ordered-digits" && savedRef.current.sessionCondition?.inputMode === "spoken" && !speech.ready) {
+      changePhase("ready");
+      return;
+    }
     if (
       target.answerKind === "ordered-digits" &&
       (!soundRef.current || !narration.current)
@@ -856,6 +890,19 @@ function UnlockedLab({
     }
   }
 
+  function changeDigitVariant(patch: Partial<DigitVariant>) {
+    const previous = savedRef.current;
+    if (previous.digitVariant.keypad !== "none") keypadPreference.current = previous.digitVariant.keypad;
+    const options = { ...previous.digitVariant, ...patch };
+    if (options.inputMode === "keypad" && options.keypad === "none") options.keypad = keypadPreference.current;
+    const digitVariant = normalizeDigitVariant(options);
+    persist({
+      ...previous,
+      digitVariant,
+      inputMode: digitVariant.inputMode,
+      digitOrder: digitVariant.order === "reverse" ? previous.digitOrder : digitVariant.order,
+    });
+  }
   function start(focusedTask?: TaskId) {
     const needsListening = focusedTask ? AUDIO_TASK_IDS.includes(focusedTask as (typeof AUDIO_TASK_IDS)[number]) : modality !== "visual";
     if (needsListening && !listeningReady) return;
@@ -870,12 +917,14 @@ function UnlockedLab({
         {
           focusedTask, tasks: selectTaskStates(savedRef.current), modality,
           digitOrder: savedRef.current.digitOrder, profile: RESEARCH_PROFILE,
+          ...(needsListening ? { digitVariant: savedRef.current.digitVariant } : {}),
         },
       );
       persist({ ...savedRef.current, session: next, tasks: next.tasks, redeemed: [], sessionCondition: {
         slow: savedRef.current.slow,
         inputMode: savedRef.current.inputMode,
         digitOrder: savedRef.current.digitOrder,
+        digitVariant: savedRef.current.digitVariant,
       } });
       setPlaying(true);
       setResponse([]);
@@ -894,7 +943,8 @@ function UnlockedLab({
     }
   }
   function presentOrAwaitSound(target: MemoryRound) {
-    if (target.answerKind === "ordered-digits" && !soundRef.current)
+    if (target.answerKind === "ordered-digits" && (!soundRef.current || !audioReady
+      || (savedRef.current.sessionCondition?.inputMode === "spoken" && !speech.ready)))
       changePhase("ready");
     else void present(target);
   }
@@ -1009,8 +1059,11 @@ function UnlockedLab({
               0,
             ),
             slow: savedRef.current.sessionCondition?.slow ?? savedRef.current.slow,
-            inputMode: savedRef.current.sessionCondition?.inputMode ?? "keypad",
+            ...(next.plan.some((id) => AUDIO_TASK_IDS.includes(id as (typeof AUDIO_TASK_IDS)[number]))
+              ? { inputMode: savedRef.current.sessionCondition?.inputMode ?? "keypad" }
+              : {}),
             ...(next.profile ? { profile: next.profile } : {}),
+            ...(next.digitVariant ? { digitVariant: next.digitVariant } : {}),
             ...(next.plan.includes("sort-digits")
               ? { digitOrder: next.digitOrder ?? "ascending" }
               : {}),
@@ -1085,8 +1138,6 @@ function UnlockedLab({
     0,
   );
   const isLive = ["cue", "watch", "hold", "recall"].includes(phase);
-  const displayTask = (id: TaskId) =>
-    content.tasks.find((item) => item.id === id)!;
 
   return (
     <div className={styles.shell}>
@@ -1166,7 +1217,8 @@ function UnlockedLab({
                 <p>
                   Span is the number of items to recall. Scores describe
                   practice in these exercises. The table shows your current
-                  answer, pace, and number-order settings.
+                  game settings. Earlier records remain included in the totals
+                  and session history.
                 </p>
                 <div
                   className={styles.progressDots}
@@ -1195,14 +1247,14 @@ function UnlockedLab({
                       </tr>
                     </thead>
                     <tbody>
-                      {TASK_IDS.map((id) => (
-                        <tr key={id}>
-                          <th scope="row">{displayTask(id).title}</th>
-                          <td>{selectedTasks[id].span}</td>
-                          <td>{selectedTasks[id].attempts}</td>
+                      {games.map((game) => (
+                        <tr key={game.id}>
+                          <th scope="row">{game.title}</th>
+                          <td>{selectedTasks[game.task].span}</td>
+                          <td>{selectedTasks[game.task].attempts}</td>
                           <td>
-                            {selectedTasks[id].attempts
-                              ? `${Math.round((selectedTasks[id].correct / selectedTasks[id].attempts) * 100)}%`
+                            {selectedTasks[game.task].attempts
+                              ? `${Math.round((selectedTasks[game.task].correct / selectedTasks[game.task].attempts) * 100)}%`
                               : "—"}
                           </td>
                         </tr>
@@ -1253,8 +1305,7 @@ function UnlockedLab({
                           {new Date(log.date).toLocaleDateString()}: span{" "}
                           {log.maxSpan} · {log.modality} ·{" "}
                           {log.slow ? "slower" : "standard"}
-                          {log.digitOrder ? ` · ${log.digitOrder}` : ""}
-                          {log.inputMode ? ` · ${log.inputMode}` : ""}
+                          {log.digitVariant ? ` · ${describeDigitVariant(log.digitVariant)}` : `${log.digitOrder ? ` · ${log.digitOrder}` : ""}${log.inputMode ? ` · ${log.inputMode}` : ""}`}
                         </title>
                       </circle>
                     ))}
@@ -1272,8 +1323,7 @@ function UnlockedLab({
                             {log.correct}/{log.rounds} first try ·{" "}
                             {log.modality} ·{" "}
                             {log.slow ? "slower pace" : "standard pace"}
-                            {log.digitOrder ? ` · ${log.digitOrder}` : ""}
-                            {log.inputMode ? ` · ${log.inputMode}` : ""}
+                            {log.digitVariant ? ` · ${describeDigitVariant(log.digitVariant)}` : `${log.digitOrder ? ` · ${log.digitOrder}` : ""}${log.inputMode ? ` · ${log.inputMode}` : ""}`}
                           </span>
                         </li>
                       ))}
@@ -1311,10 +1361,10 @@ function UnlockedLab({
                   {session?.active
                     ? `Round ${session.cursor + 1} of ${session.length}.`
                     : modality === "mixed"
-                      ? "Three visual and three listening exercises."
+                      ? "Visual games alternate with your chosen Digits settings."
                       : modality === "visual"
                         ? "Eight visual exercises."
-                        : "Three listening exercises."}
+                        : "Digits with the settings below."}
                 </p>
               </div>
               <div className={styles.sessionOptions}>
@@ -1375,22 +1425,66 @@ function UnlockedLab({
                   Retry audio
                 </button>
               )}
-              <div className={styles.settingRow}>
-                <label htmlFor="listening-answers">Listening answers</label>
-                <select
-                  id="listening-answers"
-                  className={styles.select}
-                  value={saved.inputMode}
+              <label className={styles.settingRow}>
+                <input
+                  type="checkbox"
+                  checked={saved.slow}
                   disabled={!!session?.active}
-                  onChange={(event) => persist({
-                    ...savedRef.current,
-                    inputMode: event.target.value as InputMode,
-                  })}
-                >
-                  <option value="keypad">Keypad</option>
-                  <option value="spoken">Spoken</option>
-                </select>
+                  onChange={(event) =>
+                    persist({ ...savedRef.current, slow: event.target.checked })
+                  }
+                />{" "}
+                Slower presentation
+              </label>
+
+            </div>
+            <section aria-labelledby="exercise-title">
+              <div className={styles.sectionHeading}>
+                <div>
+                  <h2 id="exercise-title" className={styles.sectionTitle}>
+                    Games
+                  </h2>
+                </div>
+                <p>Eight rounds of one exercise.</p>
               </div>
+              <article className={styles.digitsCard} aria-labelledby="digits-game-title">
+                <div className={styles.digitsHeading}>
+                  <div>
+                    <h3 id="digits-game-title" className={styles.taskTitle}>Digits</h3>
+                    <span className={styles.taskMeta}>Span {selectedTasks[displayedDigitsTask].span} · {describeDigitVariant(displayedDigitVariant)}</span>
+                  </div>
+                  <button className={styles.linkButton} disabled={!!session?.active || !listeningReady} onClick={() => start(digitsTask)} aria-label="Practice Digits">
+                    Practice <span aria-hidden="true">→</span>
+                  </button>
+                </div>
+                {session?.active && !saved.sessionCondition?.digitVariant && (
+                  <p className={styles.privacy}>This saved session keeps its original settings. Choose new Digits settings after it ends.</p>
+                )}
+                <div className={styles.digitOptions}>
+                  <div>
+                    <label htmlFor="digits-recall-order">Recall order</label>
+                    <select id="digits-recall-order" className={styles.select} value={saved.digitVariant.order} disabled={!!session?.active} onChange={(event) => changeDigitVariant({ order: event.target.value as DigitRecallOrder })}>
+                      <option value="reverse">Reverse</option>
+                      <option value="ascending">Small → large</option>
+                      <option value="descending">Large → small</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="digits-answer-with">Answer with</label>
+                    <select id="digits-answer-with" className={styles.select} value={saved.inputMode} disabled={!!session?.active} onChange={(event) => changeDigitVariant({ inputMode: event.target.value as InputMode })}>
+                      <option value="keypad">Keypad</option>
+                      <option value="spoken">Spoken</option>
+                    </select>
+                  </div>
+                  {saved.inputMode === "keypad" && <div>
+                    <label htmlFor="digits-keypad-visibility">Keypad while listening</label>
+                    <select id="digits-keypad-visibility" className={styles.select} value={saved.digitVariant.keypad} disabled={!!session?.active} onChange={(event) => changeDigitVariant({ keypad: event.target.value as "visible" | "hidden" })}>
+                      <option value="visible">Visible</option>
+                      <option value="hidden">Hidden</option>
+                    </select>
+                  </div>}
+                </div>
+                <p className={styles.privacy}>{saved.inputMode === "spoken" ? "Speak your answer without a keypad." : "The keypad is available when you answer."} These settings apply to listening rounds.</p>
               {saved.inputMode === "spoken" && (
                 <div className={styles.speechSetup}>
                   <p className={styles.privacy}>
@@ -1414,45 +1508,9 @@ function UnlockedLab({
                   {speech.message && <p role="status">{speech.message}</p>}
                 </div>
               )}
-              <label className={styles.settingRow}>
-                <input
-                  type="checkbox"
-                  checked={saved.slow}
-                  disabled={!!session?.active}
-                  onChange={(event) =>
-                    persist({ ...savedRef.current, slow: event.target.checked })
-                  }
-                />{" "}
-                Slower presentation
-              </label>
-              <div className={styles.settingRow}>
-                <label htmlFor="number-order">Number order</label>
-                <select
-                  id="number-order"
-                  className={styles.select}
-                  value={saved.digitOrder}
-                  disabled={!!session?.active}
-                  onChange={(event) => persist({
-                    ...savedRef.current,
-                    digitOrder: event.target.value as DigitOrder,
-                  })}
-                >
-                  <option value="ascending">Small → large</option>
-                  <option value="descending">Large → small</option>
-                </select>
-              </div>
-            </div>
-            <section aria-labelledby="exercise-title">
-              <div className={styles.sectionHeading}>
-                <div>
-                  <h2 id="exercise-title" className={styles.sectionTitle}>
-                    Exercises
-                  </h2>
-                </div>
-                <p>Eight rounds of one exercise.</p>
-              </div>
+              </article>
               <div className={styles.taskGrid}>
-                {content.tasks.map((item: MemoryTask) => (
+                {visualTasks.map((item: MemoryTask) => (
                   <article className={styles.taskCard} key={item.id}>
                     <h3 className={styles.taskTitle}>{item.title}</h3>
                     <span className={styles.taskMeta}>
@@ -1602,13 +1660,12 @@ function UnlockedLab({
               aria-label="Session progress"
             />
             <div className={styles.roundTitle} ref={roundTitleRef}>
-              <h1 id="round-title">{task?.title}</h1>
-              <p>{spoken ? "Listen to the digits, then say them in the order shown." : task?.instruction}</p>
-              {current?.answerKind === "ordered-digits" && (
-                <OrderCue mode={current.task === "sort-digits"
-                  ? current.digitOrder ?? "ascending"
-                  : "reverse"} />
-              )}
+              <h1 id="round-title">{currentDigitVariant ? "Digits" : task?.title}</h1>
+              <p>{currentDigitVariant ? `Listen to the digits, then ${spoken ? "say" : "enter"} them in the order shown.` : task?.instruction}</p>
+              {currentDigitVariant && <>
+                <OrderCue mode={currentDigitVariant.order} />
+                <p className={styles.inputNote}>{currentDigitVariant.inputMode === "spoken" ? "Spoken answer" : `Keypad ${currentDigitVariant.keypad} while listening`}</p>
+              </>}
             </div>
             {lastResult && !review && phase !== "wrong" && (
               <p className={styles.lastResult} role="status">
@@ -1634,12 +1691,23 @@ function UnlockedLab({
               <>
                 <h2 className={styles.sectionTitle}>Example</h2>
                 <Example
-                  round={generateRound(round.task, getTaskProfile(round.task, round.profile).initialSpan, "solved-example-v1", undefined, round.digitOrder, round.profile)}
+                  round={generateRound(round.task, getTaskProfile(round.task, round.profile).initialSpan, "solved-example-v1", undefined, round.digitOrder, round.profile, round.digitVariant)}
                 />
+                {spoken && !speech.ready && (
+                  <div className={styles.speechSetup}>
+                    <p>Set up spoken answers before listening to this round.</p>
+                    {speech.supported ? (
+                      <button className={styles.secondaryButton} ref={actionRef} disabled={speech.setup === "loading"} onClick={() => void speech.prepare()}>
+                        {speech.setup === "loading" ? "Loading speech model…" : "Download speech model"}
+                      </button>
+                    ) : <p>Local speech is unavailable in this browser. Save &amp; exit to end this session and choose Keypad.</p>}
+                    {speech.message && <p role="status">{speech.message}</p>}
+                  </div>
+                )}
                 <div className={styles.roundActions}>
                   <button
                     className={styles.button}
-                    ref={actionRef}
+                    ref={spoken && !speech.ready ? undefined : actionRef}
                     disabled={
                       round.answerKind === "ordered-digits" && (!audioReady || (spoken && !speech.ready))
                     }
@@ -1920,7 +1988,7 @@ function UnlockedLab({
               >
                 <summary>Example</summary>
                 <Example
-                  round={generateRound(round.task, getTaskProfile(round.task, round.profile).initialSpan, "solved-example-v1", undefined, round.digitOrder, round.profile)}
+                  round={generateRound(round.task, getTaskProfile(round.task, round.profile).initialSpan, "solved-example-v1", undefined, round.digitOrder, round.profile, round.digitVariant)}
                 />
               </details>
             )}

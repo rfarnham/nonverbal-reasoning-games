@@ -1,4 +1,12 @@
 /** Pure, deterministic mechanics for the standalone working-memory lab. */
+import {
+  digitTaskForVariant,
+  digitVariantKey,
+  isCanonicalDigitVariant,
+  normalizeDigitVariant,
+  type DigitVariant,
+} from "./digit-options.ts";
+
 export const VISUAL_TASK_IDS = [
   "forward", "backward", "rotation", "tracking", "symbols", "locations", "pattern", "split",
 ] as const;
@@ -36,6 +44,8 @@ export interface MemoryRound {
   rotation?: RotationDirection;
   /** Ascending remains implicit to retain existing saved round identities. */
   digitOrder?: DigitOrder;
+  /** Canonical options for new digit-family rounds; absent on all legacy and visual rounds. */
+  digitVariant?: DigitVariant;
   /** Initial cell per marker/symbol. Research binding rounds contain exactly span symbols. */
   positions?: number[];
   /** Swapped marker IDs, applied sequentially to positions. */
@@ -65,6 +75,8 @@ export interface MemoryProgress {
   focusedTask?: TaskId;
   /** The sorting rule for Number Assembly; omitted means ascending. */
   digitOrder?: DigitOrder;
+  /** Absent sessions retain the exact historical three-alias plan and generation path. */
+  digitVariant?: DigitVariant;
   /** Starting adaptive state is retained so stored progress can be replay-validated. */
   initialTasks: TaskStates;
   tasks: TaskStates;
@@ -75,7 +87,7 @@ export interface MemoryProgress {
   answered: boolean;
 }
 
-export interface ProgressOptions { focusedTask?: TaskId; tasks?: TaskStates; modality?: SessionModality; digitOrder?: DigitOrder; profile?: DifficultyProfile }
+export interface ProgressOptions { focusedTask?: TaskId; tasks?: TaskStates; modality?: SessionModality; digitOrder?: DigitOrder; profile?: DifficultyProfile; digitVariant?: DigitVariant }
 
 export interface TaskProfile { minSpan: number; initialSpan: number; maxSpan: number }
 
@@ -198,7 +210,7 @@ export function hasStraightRun(sequence: readonly number[]): boolean {
   return false;
 }
 
-function candidate(task: TaskId, span: number, seed: string, digitOrder: DigitOrder, profile?: DifficultyProfile): MemoryRound {
+function candidate(task: TaskId, span: number, seed: string, digitOrder: DigitOrder, profile?: DifficultyProfile, digitVariant?: DigitVariant, digitSequence?: number[]): MemoryRound {
   const random = randomFor(seed);
   let sequence = shuffled(CELLS, random).slice(0, span);
   let expected = [...sequence];
@@ -253,7 +265,7 @@ function candidate(task: TaskId, span: number, seed: string, digitOrder: DigitOr
     expected = [...sequence];
   }
   if (task === "reverse-digits" || task === "hidden-digits" || task === "sort-digits") {
-    sequence = idSequence(9, span, random).map((id) => id + 1);
+    sequence = digitSequence ? [...digitSequence] : idSequence(9, span, random).map((id) => id + 1);
     expected = task === "sort-digits"
       ? [...sequence].sort((first, second) => digitOrder === "descending" ? second - first : first - second)
       : [...sequence].reverse();
@@ -262,15 +274,19 @@ function candidate(task: TaskId, span: number, seed: string, digitOrder: DigitOr
 
   // A simultaneous set and disjoint swaps have one stable semantic fingerprint.
   const finalPositions = task === "tracking" ? finalTrackingPositions({ positions, moves }) : undefined;
-  const fingerprintParts: unknown[] = [task, sequence, rotation ?? null, positions ?? null, finalPositions ?? null];
+  const canonicalDigits = answerKind === "ordered-digits" ? digitVariant : undefined;
+  const fingerprintParts: unknown[] = canonicalDigits
+    ? ["digits", sequence, canonicalDigits.order, canonicalDigits.inputMode, canonicalDigits.keypad, profile ?? null]
+    : [task, sequence, rotation ?? null, positions ?? null, finalPositions ?? null];
   const descendingDigits = task === "sort-digits" && digitOrder === "descending";
   // Keep ascending's original IDs stable, while distinguishing the new rule.
-  if (descendingDigits) fingerprintParts.push("descending");
-  if (profile !== undefined) fingerprintParts.push(profile);
+  if (!canonicalDigits && descendingDigits) fingerprintParts.push("descending");
+  if (!canonicalDigits && profile !== undefined) fingerprintParts.push(profile);
   const fingerprint = JSON.stringify(fingerprintParts);
   return {
-    version: 1, id: `${task}-${hash(fingerprint).toString(36)}`, task, span, gridSize: 4,
+    version: 1, id: `${canonicalDigits ? "digits" : task}-${hash(fingerprint).toString(36)}`, task, span, gridSize: 4,
     ...(profile ? { profile } : {}),
+    ...(canonicalDigits ? { digitVariant: canonicalDigits } : {}),
     sequence, expected, answerKind,
     ...(rotation ? { rotation } : {}), ...(positions ? { positions } : {}),
     ...(descendingDigits ? { digitOrder: "descending" as const } : {}),
@@ -278,17 +294,57 @@ function candidate(task: TaskId, span: number, seed: string, digitOrder: DigitOr
   };
 }
 
-/** Generation is reproducible and never returns a repeated session fingerprint. */
-export function generateRound(task: TaskId, span: number, seed: Seed, seen: ReadonlySet<string> = new Set(), digitOrder: DigitOrder = "ascending", profile?: DifficultyProfile): MemoryRound {
+const finiteSortPools = new Map<string, readonly MemoryRound[]>();
+
+/** Two distinct digits have only 36 presentations that actually change when sorted. */
+function finiteSortPool(profile: DifficultyProfile | undefined, variant: DigitVariant): readonly MemoryRound[] {
+  const key = `${profile ?? "legacy"}|${digitVariantKey(variant)}`;
+  const existing = finiteSortPools.get(key);
+  if (existing) return existing;
+  const rounds: MemoryRound[] = [];
+  for (let first = 1; first <= 9; first += 1) {
+    for (let second = 1; second <= 9; second += 1) {
+      if (variant.order === "ascending" ? first <= second : first >= second) continue;
+      rounds.push(candidate("sort-digits", 2, "finite-sort-pool", variant.order === "descending" ? "descending" : "ascending", profile, variant, [first, second]));
+    }
+  }
+  finiteSortPools.set(key, rounds);
+  return rounds;
+}
+
+function occurrenceRound(round: MemoryRound, seed: Seed): MemoryRound {
+  if (!round.digitVariant) return round;
+  // An injective seed encoding keeps recycled occurrences distinct for first
+  // attempts and redemption. JSON quoting also makes lone surrogates safe to encode.
+  return {
+    ...round, id: `${round.id}-${encodeURIComponent(JSON.stringify(String(seed)))}`,
+    sequence: [...round.sequence], expected: [...round.expected], digitVariant: { ...round.digitVariant },
+  };
+}
+
+/** No semantic repeats until a finite two-digit sorting pool has been exhausted. */
+export function generateRound(task: TaskId, span: number, seed: Seed, seen: ReadonlySet<string> = new Set(), digitOrder: DigitOrder = "ascending", profile?: DifficultyProfile, digitVariant?: DigitVariant): MemoryRound {
   if (!isTask(task)) throw new TypeError("Unknown memory task.");
   if (!isDigitOrder(digitOrder)) throw new TypeError("Unknown digit order.");
+  const normalized = digitVariant === undefined ? undefined : normalizeDigitVariant(digitVariant);
+  const canonicalDigits = AUDIO_TASK_IDS.includes(task as (typeof AUDIO_TASK_IDS)[number]) ? normalized : undefined;
+  if (canonicalDigits) {
+    task = digitTaskForVariant(canonicalDigits);
+    digitOrder = canonicalDigits.order === "descending" ? "descending" : "ascending";
+  }
   assertSpan(span, task, profile);
+  if (canonicalDigits && task === "sort-digits" && span === 2) {
+    const pool = shuffled(finiteSortPool(profile, canonicalDigits), randomFor(`${String(seed)}:finite-sort-pool`));
+    // Enumerating the complete pool avoids random rejection near saturation.
+    // A full set explicitly starts another cycle at the same fair memory load.
+    return occurrenceRound(pool.find((round) => !seen.has(round.fingerprint)) ?? pool[0], seed);
+  }
   for (let attempt = 0; attempt < GENERATION_ATTEMPTS; attempt += 1) {
-    const round = candidate(task, span, `${String(seed)}:candidate:${attempt}`, digitOrder, profile);
+    const round = candidate(task, span, `${String(seed)}:candidate:${attempt}`, digitOrder, profile, canonicalDigits);
     if ((task === "forward" || task === "backward" || task === "rotation" || task === "split") && hasStraightRun(round.sequence)) continue;
     // Every audio manipulation must change the presented order, including palindromes.
     if (round.answerKind === "ordered-digits" && round.expected.every((digit, index) => digit === round.sequence[index])) continue;
-    if (!seen.has(round.fingerprint)) return round;
+    if (!seen.has(round.fingerprint)) return occurrenceRound(round, seed);
   }
   throw new Error("Could not create a new memory round after 128 attempts.");
 }
@@ -303,19 +359,35 @@ export function isCorrectResponse(round: MemoryRound, response: readonly number[
 }
 
 /** Each block presents every task in the selected pool, with no repeated boundary task. */
-export function createSessionPlan(length: SessionLength, seed: Seed, focusedTask?: TaskId, modality: SessionModality = "mixed"): TaskId[] {
+export function createSessionPlan(length: SessionLength, seed: Seed, focusedTask?: TaskId, modality: SessionModality = "mixed", digitVariant?: DigitVariant): TaskId[] {
   if (!isModality(modality)) throw new TypeError("Unknown session modality.");
+  const normalized = digitVariant === undefined ? undefined : normalizeDigitVariant(digitVariant);
+  const digitTask = normalized ? digitTaskForVariant(normalized) : undefined;
   if (focusedTask !== undefined) {
     if (!isTask(focusedTask) || length !== 8) throw new TypeError("Focused practice contains eight rounds of one known task.");
+    if (digitTask && AUDIO_TASK_IDS.includes(focusedTask as (typeof AUDIO_TASK_IDS)[number]) && focusedTask !== digitTask)
+      throw new TypeError("Focused digit task does not match the selected options.");
     return Array.from({ length }, () => focusedTask);
   }
   if (length !== 24 && length !== 48) throw new RangeError("A balanced session contains 24 or 48 rounds.");
+  if (digitTask && modality === "audio") return Array.from({ length }, () => digitTask);
   const random = randomFor(`${String(seed)}:plan`);
+  if (digitTask && modality === "mixed") {
+    // Keep listening at half the session after folding its duplicate task aliases.
+    const startsWithDigits = random() < 0.5;
+    const result: TaskId[] = [];
+    for (let block = 0; block < length / 6; block += 1) {
+      for (const visual of shuffled<TaskId>(["forward", "rotation", "tracking"], random)) {
+        result.push(...(startsWithDigits ? [digitTask, visual] : [visual, digitTask]));
+      }
+    }
+    return result;
+  }
   const pool = SESSION_TASK_POOLS[modality];
   const result: TaskId[] = [];
   for (let block = 0; block < length / pool.length; block += 1) {
     const tasks: TaskId[] = shuffled<TaskId>(pool, random);
-    if (tasks[0] === result[result.length - 1]) [tasks[0], tasks[1]] = [tasks[1], tasks[0]];
+    if (tasks.length > 1 && tasks[0] === result[result.length - 1]) [tasks[0], tasks[1]] = [tasks[1], tasks[0]];
     result.push(...tasks);
   }
   return result;
@@ -358,17 +430,23 @@ export function createProgress(seed: Seed, length: SessionLength = 24, options: 
   if (options.profile !== undefined && !isProfile(options.profile)) throw new TypeError("Unknown difficulty profile.");
   if (options.tasks && !validateTaskStates(options.tasks, options.profile)) throw new TypeError("Invalid starting adaptive state.");
   if (options.digitOrder !== undefined && !isDigitOrder(options.digitOrder)) throw new TypeError("Unknown digit order.");
+  const requestedVariant = options.digitVariant === undefined ? undefined : normalizeDigitVariant(options.digitVariant);
   const tasks = cloneTasks(options.tasks ?? createTaskStates(options.profile));
   const modality = options.modality ?? "mixed";
-  const plan = createSessionPlan(length, seed, options.focusedTask, modality);
+  const plan = createSessionPlan(length, seed, options.focusedTask, modality, requestedVariant);
+  const digitVariant = plan.some((task) => AUDIO_TASK_IDS.includes(task as (typeof AUDIO_TASK_IDS)[number])) ? requestedVariant : undefined;
+  const digitOrder = requestedVariant
+    ? digitVariant?.order === "descending" ? "descending" : undefined
+    : options.digitOrder;
   const normalizedSeed = String(seed);
   return {
     version: 1, seed: normalizedSeed, length, modality,
     ...(options.profile ? { profile: options.profile } : {}),
     ...(options.focusedTask ? { focusedTask: options.focusedTask } : {}),
-    ...(options.digitOrder === "descending" ? { digitOrder: options.digitOrder } : {}),
+    ...(digitOrder === "descending" ? { digitOrder } : {}),
+    ...(digitVariant ? { digitVariant } : {}),
     initialTasks: cloneTasks(tasks), tasks, plan, cursor: 0, history: [], answered: false,
-    active: generateRound(plan[0], tasks[plan[0]].span, `${normalizedSeed}:round:0`, undefined, options.digitOrder, options.profile),
+    active: generateRound(plan[0], tasks[plan[0]].span, `${normalizedSeed}:round:0`, undefined, digitOrder, options.profile, digitVariant),
   };
 }
 
@@ -410,11 +488,23 @@ export function advanceRound(progress: MemoryProgress): MemoryProgress {
   if (!progress.active || !progress.answered) throw new Error("Commit the active round before continuing.");
   const cursor = progress.cursor + 1;
   const task = progress.plan[cursor];
+  let seen = new Set(progress.history.map((result) => result.round.fingerprint));
+  if (task === "sort-digits" && progress.tasks[task].span === 2 && progress.digitVariant) {
+    const pool = new Set(finiteSortPool(progress.profile, progress.digitVariant).map((round) => round.fingerprint));
+    seen = new Set();
+    for (const result of progress.history) {
+      if (pool.has(result.round.fingerprint)) {
+        seen.add(result.round.fingerprint);
+        if (seen.size === pool.size) seen.clear();
+      }
+    }
+  }
   const active = cursor >= progress.length ? null : generateRound(
     task, progress.tasks[task].span, `${progress.seed}:round:${cursor}`,
-    new Set(progress.history.map((result) => result.round.fingerprint)),
+    seen,
     progress.digitOrder,
     progress.profile,
+    progress.digitVariant,
   );
   return { ...progress, cursor, active, answered: false };
 }
@@ -433,11 +523,15 @@ export function validateProgress(value: unknown): MemoryProgress | null {
     if ((saved.modality !== undefined && !isModality(saved.modality))
       || (saved.focusedTask !== undefined && !isTask(saved.focusedTask))
       || (saved.digitOrder !== undefined && !isDigitOrder(saved.digitOrder))
+      || (saved.digitVariant !== undefined && !isCanonicalDigitVariant(saved.digitVariant))
       || saved.history.length !== saved.cursor + (saved.answered ? 1 : 0)
       || (saved.cursor === saved.length && saved.answered)) return null;
     let replay = createProgress(saved.seed, saved.length, {
-      focusedTask: saved.focusedTask, tasks: saved.initialTasks, modality: saved.modality, digitOrder: saved.digitOrder, profile: saved.profile,
+      focusedTask: saved.focusedTask, tasks: saved.initialTasks, modality: saved.modality, digitOrder: saved.digitOrder, profile: saved.profile, digitVariant: saved.digitVariant,
     });
+    if ((replay.digitVariant === undefined) !== (saved.digitVariant === undefined)
+      || (replay.digitVariant && saved.digitVariant && digitVariantKey(replay.digitVariant) !== digitVariantKey(saved.digitVariant))
+      || (saved.digitVariant && replay.digitOrder !== saved.digitOrder)) return null;
     if (JSON.stringify(replay.plan) !== JSON.stringify(saved.plan)) return null;
     for (let index = 0; index < saved.history.length; index += 1) {
       const result = saved.history[index];

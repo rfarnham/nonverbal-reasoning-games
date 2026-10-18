@@ -12,11 +12,20 @@ clinical service. Exact feature parity and equivalent outcomes are not claimed.
 
 Eight visual exercises cover forward and backward spatial recall, transformed
 locations, moving targets, shape sequences, object-location associations,
-simultaneous patterns, and split visual attention. Three auditory exercises add
-backward digit recall with a visible or hidden keypad, and numerical ordering
-from small to large or large to small.
-Instructions and exercise names belong to the encrypted content bundle rather
-than a duplicate public question bank.
+simultaneous patterns, and split visual attention. One **Digits** game supplies
+the listening exercises, making nine visible games. Its options combine reverse,
+ascending, or descending order with keypad or spoken responses. With keypad
+responses, the keypad can stay visible or be hidden during presentation; it is
+visible for answering. Spoken responses have no keypad. There is no forward
+digit-recall option.
+
+These options produce nine distinct variants at each presentation pace: six
+keypad variants and three spoken variants. Keypad visibility does not create
+duplicate spoken variants. The old Reverse Digits, Hidden Keypad, and Number
+Assembly entries remain internal compatibility aliases, not separate game
+cards. Authored instructions, their legacy names, and recordings remain in the
+existing encrypted bundle; combining the cards does not rebuild the pack or
+change the key.
 
 The requested Cogmed-style experience is a mechanic-specific Lab exception to
 the canonical Campaign/Infinite session contract in `AGENTS.md`. Brief stimulus
@@ -24,10 +33,13 @@ presentation and a retention interval are intrinsic to these memory tasks;
 answering is untimed. The lab has its own adaptive sessions and progress. It
 does not join the generated game catalog or alter Journey progress or XP.
 
-Mixed sessions contain 24 or 48 trials. The default mix balances six core tasks:
-three spatial exercises and all three auditory exercises. Separate visual-only
-and audio-only mixes balance their eight and three exercises respectively.
-Focused practice contains eight trials of one exercise. New sessions use the
+Mixed sessions contain 24 or 48 trials and alternate the selected Digits
+variant with Light Path, Turning Grid, and Moving Lights. Half the rounds are
+listening rounds; the three visual exercises share the other half. Visual-only
+sessions balance all eight visual exercises. Audio-only sessions repeat the
+selected Digits variant, rather than treating its old aliases as different
+games. Focused practice contains eight trials of one game or Digits variant.
+New sessions use the
 `research-v1` difficulty profile: Light Path and Pattern Hold start at three
 items; other exercises start at two. Loads range from two to nine, except
 Hidden Homes, which displays and queries two to six distinct shape–location
@@ -37,12 +49,36 @@ staircase inspired by the published Cogmed research edition's daily 60% target.
 This is not Cogmed's proprietary controller or empirically matched difficulty.
 See [the publication audit and exact practice rules](WORKING_MEMORY_EVIDENCE.md).
 
-Old saved sessions retain their original rounds and two-successes-up /
-one-miss-down staircase. New profiles have fresh adaptive records; earlier
-records remain archived. Standard/slower presentation, keypad/spoken input for
-auditory tasks, and ascending/descending Number Assembly keep separate task
-records. Visual progress is independent of the auditory input preference.
-Replay and review are learning aids, not additional scored attempts.
+There is one finite-pool exception to the repository's no-repeat rule. At a
+two-digit load, ascending or descending sorting has only 36 distinct
+presentations that require changing the order. A 48-round listening-only
+session can exhaust them if load remains at two. Canonical Digits sessions
+therefore enumerate all 36 without repetition, then begin another complete
+cycle. They never increase memory load just to find a new question. A repeated
+presentation retains its semantic fingerprint but receives a distinct,
+deterministic occurrence ID, keeping first-attempt and redemption records
+separate. Older sessions without `digitVariant` retain their original behavior.
+
+Original-profile saved sessions retain their two-successes-up / one-miss-down
+staircase. Earlier research-profile sessions retain their weighted staircase.
+All existing active sessions finish with their original rounds, task mix,
+settings, and first-attempt history. Missing `digitVariant` fields keep the
+saved round identities and generator behavior unchanged.
+
+New sessions keep independent adaptive records for each distinct Digits
+variant and standard/slower pace. Visual records depend on pace, independent
+of the listening options. Digits settings sit inside its own section; pace
+applies to all games. Replay and review are learning aids, not additional
+scored attempts.
+
+Earlier research-condition records are archived with their counts. If exactly
+one attempted old record maps to a new canonical condition, its learned span
+and staircase balance seed that condition, whose new counters start at zero.
+If two attempted spoken reverse records map to the same condition, both
+histories remain archived and the shared condition starts afresh at span two,
+balance zero. Independent learning trajectories are not arbitrarily merged.
+An unplayed record does not create a collision. Original-profile records also
+remain archived, and historical totals count archived and new attempts once.
 
 Save & exit retains an unfinished session. Ending it from the lab keeps
 completed-round totals and adaptive spans, but does not count it as a completed
@@ -60,10 +96,12 @@ removes travel while retaining the same observation time and final state.
 Listening exercises keep a small order diagram visible beside the instructions.
 Reverse order shows three shapes changing positions; numerical sorting uses
 rising or falling bars. These symbols never display digits or the active answer.
-Number order is selected before a session and stays fixed for its numerical
-sorting rounds. Saved sessions retain their chosen order. New sessions keep
-separate adaptive records for each sorting direction; these are practice
-conditions rather than separate ability measures.
+Digits order, response method, and keypad visibility are selected before a
+session and stay fixed for its listening rounds. Saved sessions retain their
+chosen options. Each distinct variant keeps its own adaptive record; these are
+practice conditions rather than separate ability measures. Hiding the keypad
+during numerical sorting is an app extension, not a newly identified Cogmed
+task.
 
 Checking a correct sequence now records the result, advances, and presents the
 next challenge in the same action. There is no intermediate Next or Start
@@ -119,7 +157,7 @@ the repository.
 
 ## Spoken answers
 
-The three auditory exercises offer Keypad and Spoken responses. Spoken mode
+The Digits game offers Keypad and Spoken responses for each order. Spoken mode
 uses Vosk recognition in a local WebAssembly worker, with a bundled small
 English model. **Download speech model** fetches the runtime and weights from
 this site's own origin before microphone use; recordings and inference stay on
@@ -150,7 +188,8 @@ The full extracted reference remains outside the public repository.
 
 - Its eight-module specification and six-module closing prompt disagree.
   This implementation chooses eight original visual exercises and, following
-  the user's explicit audio request, three locally narrated digit exercises.
+  the user's explicit audio request, locally narrated digit exercises. Their
+  three original cards are now one Digits game with distinct options.
   Spoken letter-grid and projected-room tasks are not replicated. These are
   selected mechanics and adaptations rather than the report's exact inventory.
 - Its consecutive-success staircase conflicts with its fractional-level code.

@@ -73,6 +73,12 @@
 .taskTitle { grid-column: 1; display: block; margin: 0; font-size: 1rem; font-weight: 700; line-height: 1.4; }
 .taskMeta { grid-column: 1; display: inline-flex; align-items: center; flex-wrap: wrap; gap: 8px; color: var(--muted); font-size: .78rem; line-height: 1.5; }
 .taskCard > .linkButton { grid-column: 2; grid-row: 1 / span 2; justify-self: end; }
+.digitsCard { margin: 16px 0 8px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.digitsHeading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.digitOptions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 16px 0; }
+.digitOptions > div { display: grid; align-content: start; gap: 7px; min-width: 0; }
+.digitOptions label { font-size: .8rem; font-weight: 650; line-height: 1.6; }
+.inputNote { margin-top: 10px !important; font-size: .8rem !important; }
 .linkButton { min-width: 44px; min-height: 44px; padding: 10px 4px; border: 0; background: none; color: var(--ink); font-size: .85rem; text-decoration: underline; text-underline-offset: 4px; }
 .linkButton:not(:disabled):hover { text-decoration-thickness: 2px; }
 .evidenceNote { margin: 24px 0 0; color: var(--muted); font-size: .8rem; line-height: 1.65; }
@@ -223,6 +229,7 @@
   .sessionCard { flex-direction: column; gap: 16px; }
   .sessionOptions { width: 100%; justify-content: flex-start; }
   .taskGrid { grid-template-columns: minmax(0, 1fr); }
+  .digitOptions { grid-template-columns: minmax(0, 1fr); }
   .taskCard { padding-block: 14px; }
   .sectionHeading { margin-top: 24px; }
   .stats { gap: 12px; }

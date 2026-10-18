@@ -25,10 +25,12 @@ controller constants are attributed to that paper. The author-hosted PDF named
 `TrainingWMChildrenADHD.pdf` is the **2002** paper, as its title and journal header
 show; its filename must not be used to identify it as the 2005 trial.
 
-## Correspondence of the eleven exercises
+## Correspondence of the nine game families
 
 These are comparisons with the research editions above, not a statement about
-every exercise in today's commercial product.
+every exercise in today's commercial product. The interface has eight visual
+games and one Digits game. Its old three auditory cards are options within
+Digits, not three independent game families.
 
 | Memory Lab exercise | Closest published task | Correspondence and differences |
 | --- | --- | --- |
@@ -40,13 +42,49 @@ every exercise in today's commercial product.
 | Hidden Homes | Random Letters / Stabilizer association family | Substantial adaptation: simultaneous shape–location pairs, then shape prompts. Published descriptions use sequential letter–location association. Matching the binding count does not make the tasks identical. |
 | Pattern Hold | No exact counterpart verified in the audited task lists | Extension: simultaneous unordered pattern recall rather than a serial illuminated sequence. |
 | Split Focus | No exact counterpart verified in the audited task lists | Extension: spatial serial recall with alternating sides. |
-| Reverse Digits | Input Module without Lid | Close in keypad mode: reverse spoken digits with keypad visible during presentation. Spoken mode is an extension. |
-| Hidden Keypad | Input Module with Lid | Close in keypad mode: keypad hidden while digits are heard, shown for recall. Spoken mode removes the keypad throughout and is an extension. |
-| Number Assembly | Numbered Grid / Sorter shares numerical ordering | Adaptation: sorts spoken digits using a keypad or speech. The published task requires clicking remembered **spatial locations** in ascending numeric order. Descending order is an additional app condition. |
+| Digits | Input Module with/without Lid; Numbered Grid / Sorter shares numerical ordering | Reverse recall using a keypad, with labels visible or hidden during presentation, is close to the two Input Module task structures. Sorting spoken digits is an adaptation: the published sorting task requires clicking remembered **spatial locations** in ascending numeric order. Descending order, hidden-keypad sorting, and spoken responses are app extensions. |
 
 The current set omits other published tasks, including the projected Data Room
-and Space Cube, and it adds original exercises. Eleven app exercises therefore
-does not mean eleven exact Cogmed counterparts.
+and Space Cube, and it adds original exercises. Nine game families therefore
+does not mean nine exact Cogmed counterparts.
+
+Digits combines three option axes: order (reverse / ascending / descending),
+response (keypad / spoken), and keypad visibility during presentation
+(visible / hidden). Visibility applies only to keypad input. Spoken input
+normalizes it to none, giving `3 × 2 + 3 = 9` distinct variants at each pace,
+rather than twelve variants with duplicated spoken mechanics. Forward digit
+recall is not included. All options affect listening rounds only; the
+presentation-pace setting applies to visual and listening games.
+
+The eleven original task/content identifiers remain compatible with saved
+rounds and the encrypted pack. The historical auditory aliases project as
+follows:
+
+| Historical card / identifier | Digits options |
+| --- | --- |
+| Reverse Digits / `reverse-digits` | Reverse order; keypad visible during presentation, or spoken response |
+| Hidden Keypad / `hidden-digits` | Reverse order; keypad hidden during presentation, or the same spoken reverse variant |
+| Number Assembly / `sort-digits` | Ascending or descending order; originally visible keypad or spoken response |
+
+Hidden-keypad ascending and descending sorting are additional combinations of
+app options. They are not attributed to a canonical Cogmed task. New mixed
+sessions alternate the chosen Digits variant with the three core visual tasks,
+retaining a 50% listening share. Audio-only sessions repeat that variant; legacy
+aliases no longer multiply its selection weight. Existing sessions without a
+`digitVariant` retain their exact original task plan and round identities.
+
+Two-digit sorting has a finite set of nonidentity presentations: choosing two
+distinct digits from 1–9 gives `9 × 8 / 2 = 36` pairs, with exactly one presented
+order per pair requiring a change for a given sorting direction. Thus a
+48-round listening-only session cannot keep every presentation unique if its
+adaptive load stays at two. Canonical Digits generation deterministically
+enumerates the entire 36-item pool before starting a new cycle; each cycle has
+no repeated presentation. It does not force a higher load to escape the pool.
+This is an explicit, necessary finite-pool Lab exception to the repository's
+no-repeat rule, not a claim about Cogmed's sequencing or calibration. Semantic
+fingerprints stay stable across repeats, while deterministic occurrence IDs
+remain unique so first-attempt and redemption histories cannot collide. The
+exception does not change saved sessions without `digitVariant`.
 
 ## New difficulty profile
 
@@ -68,9 +106,7 @@ measurement of equivalent challenge.
 | Hidden Homes | 2 | 2–6 | **Distinct shape–location bindings displayed and subsequently queried once each** |
 | Pattern Hold | 3 | 2–9 | Simultaneously illuminated cells |
 | Split Focus | 2 | 2–9 | Sequential locations |
-| Reverse Digits | 2 | 2–9 | Spoken digits |
-| Hidden Keypad | 2 | 2–9 | Spoken digits |
-| Number Assembly | 2 | 2–9 | Spoken digits to sort |
+| Digits, each distinct variant | 2 | 2–9 | Spoken digits to reverse or sort |
 
 Hidden Homes study time is `max(5, number of bindings)` seconds, multiplied by
 1.5 with Slower presentation. Its two-binding entry round therefore shows two
@@ -109,16 +145,24 @@ without a scored attempt. The application scores only the committed sequence;
 it cannot independently know whether an otherwise valid digit sequence was
 misrecognized.
 
-Adaptive records are separated by standard/slower presentation, by keypad/spoken
-response for the auditory exercises, and by ascending/descending direction for
-Number Assembly. Visual exercises share their record across the auditory-input
-preference. These are practice conditions, not interchangeable ability measures.
-With spoken answers, Reverse Digits and Hidden Keypad both hide the keypad
-throughout and consequently use the same reverse-recall mechanic. Their original
-exercise records remain separate; they are not two distinct spoken task types.
-Changing input method must not make an existing score appear to be an improvement
-under otherwise identical conditions. Earlier records remain archived rather
-than silently seeding a different condition.
+Adaptive records are separated by standard/slower presentation and by each
+distinct Digits variant. Spoken reverse recall has one shared record, because
+there is no keypad whose visibility could distinguish two versions. Visual
+exercises share their record across all listening-option preferences. These are
+practice conditions, not interchangeable ability measures. Changing input
+method must not make an existing score appear to be an improvement under
+otherwise identical conditions.
+
+Original-profile records and earlier research-condition records remain
+archived with their first-attempt counts. For a canonical condition with exactly
+one attempted predecessor, the learned span and staircase balance carry into
+the new record, but its counters start at zero so historical totals are not
+duplicated. If both former spoken reverse aliases were attempted, they represent
+independent adaptive trajectories: archive both and start the common condition
+at span two and balance zero, rather than choosing or averaging them. An
+unplayed predecessor does not force this reset. Older active sessions continue
+their original rules and mix before applying this migration; their existing
+answers and first-attempt histories are not rewritten.
 
 Further calibration needs repeated first-attempt observations for each task and
 condition: entry-round success, recent accuracy, the load reached, and whether
