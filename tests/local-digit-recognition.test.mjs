@@ -125,96 +125,236 @@ test("local setup, PCM scaling, cancellation, and idle worker failure preserve r
   }
 });
 
-test("cold capture setup finishes before opening a microphone and cancellation never opens it later", async () => {
+async function captureHarness(run) {
   const descriptors = new Map();
+  const order = [];
+  const modules = [];
+  const contexts = [];
+  const permissions = [];
+  const worklets = [];
+  const workers = [];
+  const recognizers = [];
+  let inGesture = false;
   function replace(name, value) {
     descriptors.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
     Object.defineProperty(globalThis, name, { configurable: true, writable: true, value });
   }
-  const order = [];
-  const modules = [];
-  const contexts = [];
-  let microphones = 0;
-  let resolveMicrophone;
   class FakeWorker {
+    messages = [];
+    constructor() { workers.push(this); }
     postMessage(message) {
-      if (message.action === "load") queueMicrotask(() => this.onmessage({ data: { event: "load", result: true } }));
+      this.messages.push(message);
+      if (message.action === "load") queueMicrotask(() => this.emit({ event: "load", result: true }));
     }
+    emit(data) { this.onmessage?.({ data }); }
     terminate() {}
   }
   class FakeContext {
-    state = "running";
+    state = "suspended";
     destination = {};
-    audioWorklet = {
-      addModule() {
-        order.push("module");
-        return new Promise((resolve, reject) => modules.push({ resolve, reject }));
-      },
-    };
+    audioWorklet = { addModule() {
+      order.push("module");
+      return new Promise((resolve, reject) => modules.push({ resolve, reject }));
+    } };
     constructor() { contexts.push(this); }
-    resume() { order.push("resume"); return Promise.resolve(); }
+    resume() {
+      order.push("resume");
+      if (!inGesture) return Promise.reject(new Error("A gesture is required"));
+      this.state = "running";
+      return Promise.resolve();
+    }
     createGain() { return { gain: { value: 0 }, connect() {}, disconnect() {} }; }
+    createMediaStreamSource() {
+      return { connect() { order.push("connected"); }, disconnect() { order.push("disconnected"); } };
+    }
     close() { this.state = "closed"; return Promise.resolve(); }
   }
   class FakeWorklet {
-    port = { onmessage: null, close() {} };
-    constructor() { order.push("worklet"); }
+    port = { onmessage: null, close() {}, postMessage: (message) => {
+      if (message.action === "flush") queueMicrotask(() => {
+        this.port.onmessage?.({ data: { type: "samples", samples: new Float32Array([0.5]) } });
+        this.port.onmessage?.({ data: { type: "flushed" } });
+      });
+    } };
+    constructor() { order.push("worklet"); worklets.push(this); }
     connect() {}
     disconnect() {}
   }
   try {
     replace("window", { isSecureContext: true, location: { origin: "https://games.example" } });
     replace("navigator", { mediaDevices: { getUserMedia() {
-      microphones += 1;
       order.push("microphone");
-      return new Promise((resolve) => { resolveMicrophone = resolve; });
+      return new Promise((resolve) => permissions.push({ resolve }));
     } } });
     replace("AudioContext", FakeContext);
     replace("AudioWorkletNode", FakeWorklet);
     replace("Worker", FakeWorker);
-    const recognizer = new LocalDigitRecognizer();
-    await recognizer.prepare();
-    const cancelled = recognizer.start();
-    const cancelledRejection = assert.rejects(cancelled, { name: "AbortError" });
-    await Promise.resolve();
-    assert.equal(modules.length, 1);
-    assert.equal(microphones, 0);
-    recognizer.cancel();
-    modules[0].resolve();
-    await cancelledRejection;
-    assert.equal(microphones, 0);
-    assert.equal(contexts[0].state, "closed");
-
-    const failed = recognizer.start();
-    const failedRejection = assert.rejects(failed, /module unavailable/);
-    await Promise.resolve();
-    modules[1].reject(new Error("module unavailable"));
-    await failedRejection;
-    assert.equal(microphones, 0);
-    assert.equal(contexts[1].state, "closed");
-
-    const latePermission = recognizer.start();
-    const lateRejection = assert.rejects(latePermission, { name: "AbortError" });
-    await Promise.resolve();
-    assert.equal(microphones, 0);
-    modules[2].resolve();
-    await Promise.resolve();
-    assert.deepEqual(order.slice(-4), ["resume", "module", "worklet", "microphone"]);
-    assert.equal(microphones, 1);
-    recognizer.cancel();
-    let tracksStopped = 0;
-    resolveMicrophone({ getTracks() { return [{ stop() { tracksStopped += 1; } }]; } });
-    await lateRejection;
-    assert.equal(tracksStopped, 1);
-    assert.equal(contexts[2].state, "closed");
-    assert.equal(recognizer.recording, false);
-    recognizer.dispose();
+    await run({
+      order, modules, contexts, permissions, worklets, workers,
+      async recognizer() {
+        const recognizer = new LocalDigitRecognizer();
+        recognizers.push(recognizer);
+        await recognizer.prepare();
+        return recognizer;
+      },
+      gesture(callback) { inGesture = true; try { return callback(); } finally { inGesture = false; } },
+      async tick() { await new Promise((resolve) => setImmediate(resolve)); },
+      stream() {
+        const track = { stops: 0, stop() { this.stops += 1; }, addEventListener() {} };
+        return { track, getTracks() { return [track]; }, getAudioTracks() { return [track]; } };
+      },
+    });
   } finally {
+    recognizers.forEach((recognizer) => recognizer.dispose());
     for (const [name, descriptor] of descriptors) {
       if (descriptor) Object.defineProperty(globalThis, name, descriptor);
       else delete globalThis[name];
     }
   }
+}
+
+test("gesture priming opens no microphone or recognizer, and survives cancellation for delayed recall", async () => {
+  await captureHarness(async (h) => {
+    const recognizer = await h.recognizer();
+    h.gesture(() => recognizer.prime());
+    assert.deepEqual(h.order, ["resume", "module"], "resume is invoked synchronously in the gesture");
+    assert.equal(h.workers[0].messages.some((message) => message.action === "create"), false);
+    assert.equal(h.permissions.length, 0);
+    const cancelled = recognizer.start();
+    const rejected = assert.rejects(cancelled, { name: "AbortError" });
+    recognizer.cancel();
+    await rejected; // Cancellation cannot wait for a cold worklet or permission.
+    assert.equal(h.contexts[0].state, "running");
+    h.modules[0].resolve();
+    await h.tick();
+    assert.equal(h.permissions.length, 0, "cancelled startup must not open the microphone later");
+
+    const delayed = recognizer.start(); // No gesture remains at recall time.
+    await h.tick();
+    assert.equal(h.contexts.length, 1);
+    assert.equal(h.modules.length, 1);
+    assert.deepEqual(h.order.slice(-2), ["worklet", "microphone"]);
+    const stream = h.stream();
+    h.permissions[0].resolve(stream);
+    await delayed;
+    assert.equal(recognizer.recording, true);
+    recognizer.cancel();
+    assert.ok(stream.track.stops >= 1);
+    assert.equal(h.contexts[0].state, "running");
+    recognizer.dispose();
+    assert.equal(h.contexts[0].state, "closed");
+  });
+});
+
+test("late microphone permission is stopped, and an unlocked context records again without a new gesture", async () => {
+  await captureHarness(async (h) => {
+    const recognizer = await h.recognizer();
+    h.gesture(() => recognizer.prime());
+    h.modules[0].resolve();
+    const late = recognizer.start();
+    const rejected = assert.rejects(late, { name: "AbortError" });
+    await h.tick();
+    recognizer.cancel();
+    await rejected;
+    const lateStream = h.stream();
+    h.permissions[0].resolve(lateStream);
+    await h.tick();
+    assert.equal(lateStream.track.stops, 1);
+    assert.equal(h.order.includes("connected"), false);
+
+    const recording = recognizer.start();
+    await h.tick();
+    const stream = h.stream();
+    h.permissions[1].resolve(stream);
+    await recording;
+    const worker = h.workers[0];
+    const id = worker.messages.filter((message) => message.action === "create").at(-1).recognizerId;
+    const final = recognizer.stop();
+    await h.tick();
+    assert.equal(h.contexts.length, 1);
+    assert.equal(h.contexts[0].state, "running");
+    assert.ok(stream.track.stops >= 1, "microphone closes before final inference");
+    const messages = worker.messages.filter((message) => message.recognizerId === id);
+    assert.equal(messages.findIndex((message) => message.action === "audioChunk") < messages.findIndex((message) => message.action === "retrieveFinalResult"), true);
+    worker.emit({ event: "finalresult", recognizerId: id, result: segment(["three", "one"]) });
+    assert.deepEqual((await final).digits, [3, 1]);
+    assert.equal(recognizer.recording, false);
+    assert.equal(h.contexts[0].state, "running");
+  });
+});
+
+test("cancelled inference and stale final results cannot become a new recording's answer", async () => {
+  await captureHarness(async (h) => {
+    const recognizer = await h.recognizer();
+    h.gesture(() => recognizer.prime());
+    h.modules[0].resolve();
+    const recording = recognizer.start();
+    await h.tick();
+    h.permissions[0].resolve(h.stream());
+    await recording;
+    const worker = h.workers[0];
+    const oldId = worker.messages.filter((message) => message.action === "create").at(-1).recognizerId;
+    const cancelled = recognizer.stop();
+    const rejected = assert.rejects(cancelled, { name: "AbortError" });
+    await h.tick();
+    recognizer.cancel();
+    await rejected;
+    const next = recognizer.start();
+    await h.tick();
+    h.permissions[1].resolve(h.stream());
+    await next;
+    const id = worker.messages.filter((message) => message.action === "create").at(-1).recognizerId;
+    worker.emit({ event: "finalresult", recognizerId: oldId, result: segment(["nine"]) });
+    const final = recognizer.stop();
+    await h.tick();
+    worker.emit({ event: "finalresult", recognizerId: id, result: segment(["two"]) });
+    assert.deepEqual((await final).digits, [2]);
+  });
+});
+
+test("failed or disposed priming never opens a microphone and can recover on a new gesture", async () => {
+  await captureHarness(async (h) => {
+    const recognizer = await h.recognizer();
+    h.gesture(() => recognizer.prime());
+    const failed = recognizer.start();
+    const rejected = assert.rejects(failed, /module unavailable/);
+    h.modules[0].reject(new Error("module unavailable"));
+    await rejected;
+    assert.equal(h.permissions.length, 0);
+    assert.equal(h.contexts[0].state, "closed");
+    await assert.rejects(recognizer.start(), /module unavailable/, "delayed recall cannot retry activation without a gesture");
+    assert.equal(h.contexts.length, 1);
+    h.gesture(() => recognizer.prime());
+    assert.equal(h.contexts.length, 2);
+    const pending = recognizer.start();
+    const cancelled = assert.rejects(pending, { name: "AbortError" });
+    recognizer.dispose();
+    await cancelled;
+    assert.equal(h.contexts[1].state, "closed");
+    h.modules[1].resolve();
+    await h.tick();
+    assert.equal(h.permissions.length, 0);
+    assert.equal(recognizer.ready, false);
+  });
+});
+
+test("stalled gesture priming is bounded and cannot open a microphone after its deadline", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    await captureHarness(async (h) => {
+      const recognizer = await h.recognizer();
+      h.gesture(() => recognizer.prime());
+      const recording = recognizer.start();
+      const rejected = assert.rejects(recording, /setup took too long/);
+      t.mock.timers.tick(15_000);
+      await rejected;
+      assert.equal(h.contexts[0].state, "closed");
+      assert.equal(h.permissions.length, 0);
+      h.modules[0].resolve();
+      await h.tick();
+      assert.equal(h.permissions.length, 0);
+    });
+  } finally { t.mock.timers.reset(); }
 });
 
 test("local speech assets match the audited sources and fit ordinary static hosting", async () => {

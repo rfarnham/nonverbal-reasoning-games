@@ -10,6 +10,7 @@ const DIGITS: Readonly<Record<string, number>> = Object.freeze({
 });
 const SAMPLE_RATE = 16000;
 const MAX_SECONDS = 45;
+const CAPTURE_SETUP_MS = 15_000;
 
 export interface LocalDigitResult {
   digits: number[];
@@ -47,7 +48,14 @@ interface Recording {
   flush: (() => void) | null;
   resolve: ((value: LocalDigitResult) => void) | null;
   reject: ((error: Error) => void) | null;
+  startReject: ((error: Error) => void) | null;
   finishing: boolean;
+}
+interface CaptureContext {
+  context: AudioContext;
+  module: Promise<void>;
+  ready: Promise<void>;
+  cancelReady: (() => void) | null;
 }
 
 function aborted(): Error {
@@ -87,6 +95,8 @@ export class LocalDigitRecognizer {
   private current: Recording | null = null;
   private generation = 0;
   private sequence = 0;
+  private capture: CaptureContext | null = null;
+  private primeError: Error | null = null;
   private onError?: (error: Error) => void;
 
   constructor(options: { onError?: (error: Error) => void } = {}) {
@@ -95,6 +105,61 @@ export class LocalDigitRecognizer {
 
   get ready(): boolean { return this.prepared; }
   get recording(): boolean { return this.current !== null && !this.current.finishing; }
+
+  /** Unlock Web Audio in a user gesture, without opening the microphone. */
+  prime(): void {
+    if (this.capture?.context.state === "running") return;
+    this.primeError = null;
+    let capture = this.capture;
+    try {
+      if (capture?.context.state === "closed") { this.capture = null; capture = null; }
+      const context = capture?.context ?? new AudioContext();
+      const fresh = !capture;
+      if (!capture) {
+        capture = { context, module: Promise.resolve(), ready: Promise.resolve(), cancelReady: null };
+        this.capture = capture;
+      }
+      // This call must remain before any await: delayed recall has no gesture.
+      const resumed = context.resume();
+      void resumed.catch(() => {});
+      if (fresh) capture.module = context.audioWorklet.addModule(`${SPEECH_ROOT}/digit-capture.worklet.js`);
+      const target = capture;
+      target.cancelReady?.();
+      let timer: ReturnType<typeof setTimeout>;
+      const ready = Promise.race([
+        Promise.all([resumed, target.module]).then(() => {
+          if (this.capture !== target) throw aborted();
+          if (context.state !== "running") throw new Error("Microphone audio is suspended. Restart recording to try again.");
+        }),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error("Microphone setup took too long. Restart recording or use the keypad.")), CAPTURE_SETUP_MS);
+        }),
+        new Promise<never>((_, reject) => { target.cancelReady = () => reject(aborted()); }),
+      ]).finally(() => {
+        clearTimeout(timer);
+        if (target.ready === ready) target.cancelReady = null;
+      });
+      target.ready = ready;
+      // Priming is fire-and-forget from a button. A later start reports failure;
+      // rejected preparation must never become an unhandled promise rejection.
+      void ready.catch((error: unknown) => {
+        if (this.capture !== target || target.ready !== ready) return;
+        this.primeError = error instanceof Error ? error : new Error("Microphone audio could not start.");
+        this.closeCapture();
+        if (this.current?.context === context) this.failRecording(this.primeError);
+      });
+    } catch (error) {
+      this.primeError = error instanceof Error ? error : new Error("Microphone audio could not start.");
+      this.closeCapture();
+    }
+  }
+
+  private closeCapture(): void {
+    const capture = this.capture;
+    this.capture = null;
+    capture?.cancelReady?.();
+    if (capture && capture.context.state !== "closed") void capture.context.close().catch(() => {});
+  }
 
   async prepare(onProgress?: (progress: LocalSpeechProgress) => void): Promise<void> {
     if (this.prepared) { onProgress?.({ phase: "ready", downloadMB: LOCAL_SPEECH_DOWNLOAD_MB }); return; }
@@ -167,7 +232,7 @@ export class LocalDigitRecognizer {
     const current: Recording = {
       id: `digits-${++this.sequence}`, segments: [], samples: 0, stream: null,
       context: null, source: null, worklet: null, gain: null, timer: null,
-      flush: null, resolve: null, reject: null, finishing: false,
+      flush: null, resolve: null, reject: null, startReject: null, finishing: false,
     };
     this.current = current;
     try {
@@ -185,14 +250,16 @@ export class LocalDigitRecognizer {
     const current = this.createRecording();
     const isCurrent = () => this.current === current && generation === this.generation;
     try {
-      // Resume from the recording gesture. Prepare the complete capture graph
-      // before opening the microphone so a cold worklet fetch cannot lose speech.
-      const context = new AudioContext();
+      // prime() normally ran on Listen/OK/Restart. Keep direct recording usable,
+      // but do not retry a failed gesture-time prime from delayed recall.
+      if (!this.capture && !this.primeError) this.prime();
+      const capture = this.capture;
+      if (!capture) throw this.primeError ?? new Error("Restart recording to enable microphone audio.");
+      const context = capture.context;
       current.context = context;
-      await context.resume();
+      await this.waitForStart(current, capture.ready);
       if (!isCurrent()) throw aborted();
-      await context.audioWorklet.addModule(`${SPEECH_ROOT}/digit-capture.worklet.js`);
-      if (!isCurrent()) throw aborted();
+      if (context.state !== "running") throw new Error("Microphone audio is suspended. Restart recording to try again.");
       current.worklet = new AudioWorkletNode(context, "digit-capture", { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
       current.worklet.port.onmessage = (event: MessageEvent<{ type: string; samples?: Float32Array }>) => {
         if (this.current !== current) return;
@@ -205,7 +272,14 @@ export class LocalDigitRecognizer {
       current.worklet.connect(current.gain);
       current.gain.connect(context.destination);
       if (!isCurrent()) throw aborted();
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true }, video: false });
+      // The full graph is ready before permission, preserving the first syllable
+      // on a cold worklet load. Only now can any microphone samples reach ASR.
+      const permission = navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true }, video: false })
+        .then((stream) => {
+          if (!isCurrent()) { stream.getTracks().forEach((track) => track.stop()); throw aborted(); }
+          return stream;
+        });
+      const stream = await this.waitForStart(current, permission);
       if (!isCurrent()) { stream.getTracks().forEach((track) => track.stop()); throw aborted(); }
       current.stream = stream;
       current.source = context.createMediaStreamSource(stream);
@@ -215,11 +289,18 @@ export class LocalDigitRecognizer {
       }, { once: true }));
       current.timer = setTimeout(() => this.failRecording(new Error("Recording stopped after 45 seconds. Record again or use the keypad.")), MAX_SECONDS * 1000);
     } catch (error) {
-      const cancelled = !isCurrent();
+      const cancelled = generation !== this.generation;
       if (this.current === current) this.clearRecording(current);
       if (cancelled) throw aborted();
       throw error;
     }
+  }
+
+  private waitForStart<T>(current: Recording, operation: Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      current.startReject = reject;
+      operation.then(resolve, reject);
+    }).finally(() => { current.startReject = null; });
   }
 
   private sendSamples(current: Recording, samples: Float32Array): void {
@@ -285,7 +366,9 @@ export class LocalDigitRecognizer {
     current.gain?.disconnect();
     if (current.worklet) current.worklet.port.onmessage = null;
     current.worklet?.port.close();
-    if (current.context && current.context.state !== "closed") void current.context.close().catch(() => {});
+    // Keep the gesture-unlocked context for the next automatic recall. Its
+    // per-recording source/worklet/stream are always disconnected and discarded.
+    if (current.context && current.context !== this.capture?.context && current.context.state !== "closed") void current.context.close().catch(() => {});
     current.stream = null;
     current.source = null;
     current.worklet = null;
@@ -306,6 +389,7 @@ export class LocalDigitRecognizer {
     const current = this.current;
     if (!current) return;
     const wasFinishing = current.finishing;
+    current.startReject?.(error);
     current.reject?.(error);
     this.clearRecording(current);
     if (notify && !wasFinishing) this.onError?.(error);
@@ -331,12 +415,15 @@ export class LocalDigitRecognizer {
     this.generation += 1;
     const current = this.current;
     if (!current) return;
+    current.startReject?.(aborted());
     current.reject?.(aborted());
     this.clearRecording(current);
   }
 
   dispose(): void {
     this.cancel();
+    this.closeCapture();
+    this.primeError = null;
     this.failWorker(aborted());
   }
 }

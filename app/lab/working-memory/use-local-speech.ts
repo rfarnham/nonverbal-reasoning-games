@@ -18,8 +18,9 @@ export interface LocalSpeechInput {
   result: LocalDigitResult | null;
   message: string;
   prepare(): Promise<void>;
+  prime(): void;
   record(): Promise<void>;
-  stop(): Promise<void>;
+  stop(): Promise<LocalDigitResult | null>;
   cancel(): void;
 }
 
@@ -128,6 +129,11 @@ export function useLocalSpeech(): LocalSpeechInput {
     }
   }, []);
 
+  const prime = useCallback((): void => {
+    if (!mountedRef.current) return;
+    recognizerRef.current?.prime();
+  }, []);
+
   const record = useCallback(async (): Promise<void> => {
     const recognizer = recognizerRef.current;
     if (!mountedRef.current || !recognizer || (stateRef.current !== "idle" && stateRef.current !== "review")) return;
@@ -157,9 +163,9 @@ export function useLocalSpeech(): LocalSpeechInput {
     }
   }, []);
 
-  const stop = useCallback(async (): Promise<void> => {
+  const stop = useCallback(async (): Promise<LocalDigitResult | null> => {
     const recognizer = recognizerRef.current;
-    if (!mountedRef.current || !recognizer || stateRef.current !== "recording") return;
+    if (!mountedRef.current || !recognizer || stateRef.current !== "recording") return null;
     const generation = ++generationRef.current;
     stateRef.current = "recognizing";
     setState("recognizing");
@@ -167,12 +173,12 @@ export function useLocalSpeech(): LocalSpeechInput {
     setMessage("");
     try {
       const recognized = await recognizer.stop();
-      if (!mountedRef.current || recognizerRef.current !== recognizer || generationRef.current !== generation) return;
+      if (!mountedRef.current || recognizerRef.current !== recognizer || generationRef.current !== generation) return null;
       if (recognized.status !== "recognized" || recognized.digits.length === 0) {
         stateRef.current = "idle";
         setState("idle");
         setMessage(UNCLEAR);
-        return;
+        return null;
       }
       const digits = [...recognized.digits];
       Object.freeze(digits);
@@ -180,16 +186,18 @@ export function useLocalSpeech(): LocalSpeechInput {
       stateRef.current = "review";
       setResult(snapshot);
       setState("review");
+      return snapshot;
     } catch (error) {
-      if (!mountedRef.current || recognizerRef.current !== recognizer || generationRef.current !== generation) return;
+      if (!mountedRef.current || recognizerRef.current !== recognizer || generationRef.current !== generation) return null;
       stateRef.current = "idle";
       setState("idle");
       setResult(null);
       setReady(recognizer.ready);
       if (!recognizer.ready) setSetup("error");
       setMessage(recordingFailure(error));
+      return null;
     }
   }, []);
 
-  return { supported, ready, setup, state, result, message, prepare, record, stop, cancel };
+  return { supported, ready, setup, state, result, message, prepare, prime, record, stop, cancel };
 }

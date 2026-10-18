@@ -138,12 +138,27 @@ supplies a spatial map; entered digits also provide a record of a partial
 answer. Spoken mode removes those supports during recall and introduces speech
 production and recognition. The user's experience motivates offering both, but
 the publications do not establish that speech is harder for every player or
-more beneficial. Spoken responses use local recognition. A recording contains
-no live transcript; recognized digits appear only after recording stops and
-before the player commits the answer. A misrecognition can be recorded again
-without a scored attempt. The application scores only the committed sequence;
-it cannot independently know whether an otherwise valid digit sequence was
-misrecognized.
+more beneficial. Spoken responses use local recognition. Capture starts
+automatically after the sequence and hold interval. OK stops, recognizes, and
+commits in one action; Restart discards the uncommitted recording and begins
+another capture without replaying the sequence or recording a score. Neither
+a live transcript nor recognized digits are shown before commitment. Empty,
+uncertain, and technical recognition failures remain unscored and can be
+restarted.
+
+After a wrong committed spoken answer, feedback shows the recognized submitted
+digits to help inspect a possible misrecognition. The first-attempt miss still
+stands. This display cannot establish whether a valid digit sequence was
+misrecognized or incorrectly recalled. The ordinary Replay sequence learning
+retry remains available and cannot rewrite the original result. Wrong feedback
+in every game indicates a mismatch without displaying the expected answer.
+Solved examples use independent practice questions, and historical review does
+not reveal the full stimulus or answer to an unredeemed miss: for several
+mechanics the stimulus itself exposes the solution. Actual-round solutions
+are available only after first-try success or redemption. Pausing,
+hiding, or locking cancels capture and discards the draft; Continue starts a
+fresh capture automatically if it resumes spoken recall. Priming an audio
+context from a user gesture does not open the microphone during narration.
 
 Adaptive records are separated by standard/slower presentation and by each
 distinct Digits variant. Spoken reverse recall has one shared record, because

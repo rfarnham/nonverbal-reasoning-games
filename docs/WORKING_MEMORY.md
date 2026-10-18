@@ -84,7 +84,9 @@ Save & exit retains an unfinished session. Ending it from the lab keeps
 completed-round totals and adaptive spans, but does not count it as a completed
 session. A presentation interrupted by pause or a hidden tab restarts. Paused
 manual recall retains the response entered so far; spoken recall stops the
-microphone and discards its uncommitted recording for a fresh recording.
+microphone and discards its uncommitted recording. Continue starts a fresh
+capture automatically when resuming spoken recall. Hiding the page or locking
+the lab also cancels the microphone and uncommitted speech.
 
 Board changes have a separate observation interval: a quarter turn travels for
 1.6 seconds and settles for 0.4 seconds. Each moving-circle leg travels for
@@ -106,10 +108,15 @@ task.
 Checking a correct sequence now records the result, advances, and presents the
 next challenge in the same action. There is no intermediate Next or Start
 screen. The last correct result remains in a compact status line. An incorrect
-answer retains its correction and a single Replay sequence action; replay does
-not change its first-attempt record. The last successful submission completes
-the session directly. This is a user-requested exception to the shared shell's
-explicit Next checkpoint. Saved sessions from the earlier flow remain valid.
+answer shows a mismatch without revealing the expected answer, and retains a
+single Replay sequence action. Spoken feedback can also show the submitted
+recognized digits. Replay does not change the first-attempt record. Solved
+examples use independent practice questions, never the active failed question;
+history does not expose the full stimulus or answer to an unredeemed miss.
+Actual-round solutions become available only after first-try success or
+redemption. The last successful submission completes the session directly.
+This is a user-requested exception to the shared shell's explicit Next
+checkpoint. Saved sessions from the earlier flow remain valid.
 If sound is muted when a listening exercise is next, it waits for an explicit
 Turn sound on & listen action rather than changing the saved sound preference.
 Each new presentation brings its instructions and board into view before cues
@@ -164,14 +171,25 @@ this site's own origin before microphone use; recordings and inference stay on
 the device. There is no Web Speech API, cloud speech service, remote recognition
 fallback, or audio upload. Microphone permission is requested for recording.
 
-Record the answer, stop recording, inspect the recognized digits, and then
-check the sequence. The keypad and live transcript are hidden during spoken
-recall. A recognition mistake can be re-recorded before committing, without
-changing the first-attempt record. Empty, uncertain, or failed recognition does
-not count as a memory error. Successful submission keeps the existing one-action
-advance to the next challenge. Keypad remains available when the local speech
-setup or microphone is unavailable. Speech is an additional practice condition,
-not an input method documented for the audited Cogmed training tasks.
+Once local speech is ready, recording starts automatically after the narrated
+sequence and hold interval. The answer controls are **OK** and **Restart**.
+OK stops capture, recognizes locally, and commits the recognized sequence in
+one tap. Restart discards the uncommitted recording and immediately starts a
+fresh capture for the same heard sequence; it does not replay the stimulus or
+record an attempt. The keypad, live transcript, and recognized digits remain
+hidden before commitment. An audio context can be primed from an earlier user
+gesture, but the microphone is not opened during narration.
+
+Only after a wrong committed spoken answer does feedback show the submitted
+recognized digits, so the player can inspect a possible recognition mistake.
+It does not show the expected answer.
+That first-attempt miss remains recorded; the app cannot distinguish a valid
+misrecognition from a memory error. The normal Replay sequence action remains
+available as a learning retry. Empty, uncertain, or failed recognition stays
+unscored and offers Restart. A correct OK submission advances directly to the
+next challenge. Keypad remains available when the local speech setup or
+microphone is unavailable. Speech is an additional practice condition, not an
+input method documented for the audited Cogmed training tasks.
 
 Authored content is password-encrypted. Saved practice progress is encrypted on
 the device and does not require an account, server, or remote analytics. The
