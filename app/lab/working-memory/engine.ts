@@ -16,6 +16,9 @@ export type Seed = string | number;
 export type SessionLength = 8 | 24 | 48;
 export type RotationDirection = "clockwise" | "counterclockwise";
 export type DigitOrder = "ascending" | "descending";
+/** Explicit opt-in: missing profiles always retain the original saved-session rules. */
+export const RESEARCH_PROFILE = "research-v1" as const;
+export type DifficultyProfile = typeof RESEARCH_PROFILE;
 export type AnswerKind = "ordered-cells" | "unordered-cells" | "ordered-symbols" | "ordered-digits";
 export type Swap = [number, number];
 
@@ -25,6 +28,7 @@ export interface MemoryRound {
   task: TaskId;
   span: number;
   gridSize: 4;
+  profile?: DifficultyProfile;
   /** Ordered cells, marker IDs, symbol IDs, or digits 1–9; pattern is a simultaneous set. */
   sequence: number[];
   expected: number[];
@@ -32,7 +36,7 @@ export interface MemoryRound {
   rotation?: RotationDirection;
   /** Ascending remains implicit to retain existing saved round identities. */
   digitOrder?: DigitOrder;
-  /** Initial cell for each marker/symbol ID. Eight tracking markers; six symbols. */
+  /** Initial cell per marker/symbol. Research binding rounds contain exactly span symbols. */
   positions?: number[];
   /** Swapped marker IDs, applied sequentially to positions. */
   moves?: Swap[];
@@ -46,6 +50,8 @@ export interface TaskState {
   successStreak: 0 | 1;
   attempts: number;
   correct: number;
+  /** Research profile's independent, 60%-inspired adaptive evidence; never used by legacy sessions. */
+  balance?: number;
 }
 export type TaskStates = Record<TaskId, TaskState>;
 export interface RoundResult { round: MemoryRound; correct: boolean }
@@ -55,6 +61,7 @@ export interface MemoryProgress {
   seed: string;
   length: SessionLength;
   modality: SessionModality;
+  profile?: DifficultyProfile;
   focusedTask?: TaskId;
   /** The sorting rule for Number Assembly; omitted means ascending. */
   digitOrder?: DigitOrder;
@@ -68,7 +75,9 @@ export interface MemoryProgress {
   answered: boolean;
 }
 
-export interface ProgressOptions { focusedTask?: TaskId; tasks?: TaskStates; modality?: SessionModality; digitOrder?: DigitOrder }
+export interface ProgressOptions { focusedTask?: TaskId; tasks?: TaskStates; modality?: SessionModality; digitOrder?: DigitOrder; profile?: DifficultyProfile }
+
+export interface TaskProfile { minSpan: number; initialSpan: number; maxSpan: number }
 
 const CELLS = Array.from({ length: 16 }, (_, index) => index);
 const MIN_SPAN = 2;
@@ -126,9 +135,33 @@ function isDigitOrder(value: unknown): value is DigitOrder {
   return value === "ascending" || value === "descending";
 }
 
-function assertSpan(span: number): void {
-  if (!Number.isInteger(span) || span < MIN_SPAN || span > MAX_SPAN) {
-    throw new RangeError("Memory span must be an integer from 2 through 9.");
+function isProfile(value: unknown): value is DifficultyProfile {
+  return value === RESEARCH_PROFILE;
+}
+
+/** Numeric starts and limits are conservative app choices, not published Cogmed norms. */
+export function getTaskProfile(task: TaskId, profile?: DifficultyProfile): TaskProfile {
+  if (!isTask(task)) throw new TypeError("Unknown memory task.");
+  if (profile !== undefined && !isProfile(profile)) throw new TypeError("Unknown difficulty profile.");
+  return {
+    minSpan: MIN_SPAN,
+    initialSpan: profile === RESEARCH_PROFILE && task !== "forward" && task !== "pattern" ? 2 : INITIAL_SPAN,
+    maxSpan: profile === RESEARCH_PROFILE && task === "locations" ? 6 : MAX_SPAN,
+  };
+}
+
+/** Study-time choices are presentation settings, not published Cogmed timing norms. */
+export function studyDuration(round: Pick<MemoryRound, "task" | "span" | "profile">, slow = false): number {
+  if (round.task === "locations" && round.profile === RESEARCH_PROFILE)
+    return Math.max(5000, round.span * 1000) * (slow ? 1.5 : 1);
+  const on = slow ? 1200 : 800;
+  return on * Math.max(2, round.task === "locations" ? 4 : round.span * 0.6);
+}
+
+function assertSpan(span: number, task: TaskId, profile?: DifficultyProfile): void {
+  const { minSpan, maxSpan } = getTaskProfile(task, profile);
+  if (!Number.isInteger(span) || span < minSpan || span > maxSpan) {
+    throw new RangeError(`Memory span must be an integer from ${minSpan} through ${maxSpan}.`);
   }
 }
 
@@ -165,7 +198,7 @@ export function hasStraightRun(sequence: readonly number[]): boolean {
   return false;
 }
 
-function candidate(task: TaskId, span: number, seed: string, digitOrder: DigitOrder): MemoryRound {
+function candidate(task: TaskId, span: number, seed: string, digitOrder: DigitOrder, profile?: DifficultyProfile): MemoryRound {
   const random = randomFor(seed);
   let sequence = shuffled(CELLS, random).slice(0, span);
   let expected = [...sequence];
@@ -177,7 +210,7 @@ function candidate(task: TaskId, span: number, seed: string, digitOrder: DigitOr
 
   if (task === "backward") expected.reverse();
   if (task === "rotation") {
-    rotation = random() < 0.5 ? "clockwise" : "counterclockwise";
+    rotation = profile === RESEARCH_PROFILE ? "clockwise" : random() < 0.5 ? "clockwise" : "counterclockwise";
     expected = sequence.map((cell) => rotateCell(cell, rotation!));
   }
   if (task === "tracking") {
@@ -196,8 +229,11 @@ function candidate(task: TaskId, span: number, seed: string, digitOrder: DigitOr
     answerKind = "ordered-symbols";
   }
   if (task === "locations") {
-    positions = shuffled(CELLS, random).slice(0, 6);
-    cues = idSequence(6, span, random);
+    const bindings = profile === RESEARCH_PROFILE ? span : 6;
+    positions = shuffled(CELLS, random).slice(0, bindings);
+    cues = profile === RESEARCH_PROFILE
+      ? shuffled(Array.from({ length: bindings }, (_, id) => id), random)
+      : idSequence(6, span, random);
     sequence = [...cues];
     expected = cues.map((id) => positions![id]);
   }
@@ -230,9 +266,11 @@ function candidate(task: TaskId, span: number, seed: string, digitOrder: DigitOr
   const descendingDigits = task === "sort-digits" && digitOrder === "descending";
   // Keep ascending's original IDs stable, while distinguishing the new rule.
   if (descendingDigits) fingerprintParts.push("descending");
+  if (profile !== undefined) fingerprintParts.push(profile);
   const fingerprint = JSON.stringify(fingerprintParts);
   return {
     version: 1, id: `${task}-${hash(fingerprint).toString(36)}`, task, span, gridSize: 4,
+    ...(profile ? { profile } : {}),
     sequence, expected, answerKind,
     ...(rotation ? { rotation } : {}), ...(positions ? { positions } : {}),
     ...(descendingDigits ? { digitOrder: "descending" as const } : {}),
@@ -241,12 +279,12 @@ function candidate(task: TaskId, span: number, seed: string, digitOrder: DigitOr
 }
 
 /** Generation is reproducible and never returns a repeated session fingerprint. */
-export function generateRound(task: TaskId, span: number, seed: Seed, seen: ReadonlySet<string> = new Set(), digitOrder: DigitOrder = "ascending"): MemoryRound {
+export function generateRound(task: TaskId, span: number, seed: Seed, seen: ReadonlySet<string> = new Set(), digitOrder: DigitOrder = "ascending", profile?: DifficultyProfile): MemoryRound {
   if (!isTask(task)) throw new TypeError("Unknown memory task.");
   if (!isDigitOrder(digitOrder)) throw new TypeError("Unknown digit order.");
-  assertSpan(span);
+  assertSpan(span, task, profile);
   for (let attempt = 0; attempt < GENERATION_ATTEMPTS; attempt += 1) {
-    const round = candidate(task, span, `${String(seed)}:candidate:${attempt}`, digitOrder);
+    const round = candidate(task, span, `${String(seed)}:candidate:${attempt}`, digitOrder, profile);
     if ((task === "forward" || task === "backward" || task === "rotation" || task === "split") && hasStraightRun(round.sequence)) continue;
     // Every audio manipulation must change the presented order, including palindromes.
     if (round.answerKind === "ordered-digits" && round.expected.every((digit, index) => digit === round.sequence[index])) continue;
@@ -283,23 +321,30 @@ export function createSessionPlan(length: SessionLength, seed: Seed, focusedTask
   return result;
 }
 
-export function createTaskStates(): TaskStates {
-  return Object.fromEntries(TASK_IDS.map((task) => [task, { span: INITIAL_SPAN, successStreak: 0, attempts: 0, correct: 0 }])) as TaskStates;
+export function createTaskStates(profile?: DifficultyProfile): TaskStates {
+  return Object.fromEntries(TASK_IDS.map((task) => [task, {
+    span: getTaskProfile(task, profile).initialSpan, successStreak: 0, attempts: 0, correct: 0,
+    ...(profile ? { balance: 0 } : {}),
+  }])) as TaskStates;
 }
 
 function cloneTasks(tasks: TaskStates): TaskStates {
   return Object.fromEntries(TASK_IDS.map((task) => [task, { ...tasks[task] }])) as TaskStates;
 }
 
-function validTasks(value: unknown): value is TaskStates {
+export function validateTaskStates(value: unknown, profile?: DifficultyProfile): value is TaskStates {
+  if (profile !== undefined && !isProfile(profile)) return false;
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const tasks = value as Record<string, unknown>;
   if (Object.keys(tasks).length !== TASK_IDS.length) return false;
   return TASK_IDS.every((task) => {
     const state = tasks[task] as TaskState | undefined;
+    const { minSpan, maxSpan } = getTaskProfile(task, profile);
     return !!state && typeof state === "object" && !Array.isArray(state)
-      && Number.isInteger(state.span) && state.span >= MIN_SPAN && state.span <= MAX_SPAN
-      && (state.successStreak === 0 || state.successStreak === 1)
+      && Number.isInteger(state.span) && state.span >= minSpan && state.span <= maxSpan
+      && (profile === RESEARCH_PROFILE
+        ? state.successStreak === 0 && Number.isInteger(state.balance) && state.balance! >= -4 && state.balance! <= 4
+        : (state.successStreak === 0 || state.successStreak === 1) && state.balance === undefined)
       && Number.isInteger(state.attempts) && state.attempts >= 0 && state.attempts <= MAX_COUNT
       && Number.isInteger(state.correct) && state.correct >= 0 && state.correct <= state.attempts
       && (state.successStreak === 0 || state.correct > 0);
@@ -310,18 +355,20 @@ export function createProgress(seed: Seed, length: SessionLength = 24, options: 
   if ((typeof seed !== "string" && typeof seed !== "number") || String(seed).length > 256 || (typeof seed === "number" && !Number.isFinite(seed))) {
     throw new TypeError("Invalid session seed.");
   }
-  if (options.tasks && !validTasks(options.tasks)) throw new TypeError("Invalid starting adaptive state.");
+  if (options.profile !== undefined && !isProfile(options.profile)) throw new TypeError("Unknown difficulty profile.");
+  if (options.tasks && !validateTaskStates(options.tasks, options.profile)) throw new TypeError("Invalid starting adaptive state.");
   if (options.digitOrder !== undefined && !isDigitOrder(options.digitOrder)) throw new TypeError("Unknown digit order.");
-  const tasks = cloneTasks(options.tasks ?? createTaskStates());
+  const tasks = cloneTasks(options.tasks ?? createTaskStates(options.profile));
   const modality = options.modality ?? "mixed";
   const plan = createSessionPlan(length, seed, options.focusedTask, modality);
   const normalizedSeed = String(seed);
   return {
     version: 1, seed: normalizedSeed, length, modality,
+    ...(options.profile ? { profile: options.profile } : {}),
     ...(options.focusedTask ? { focusedTask: options.focusedTask } : {}),
     ...(options.digitOrder === "descending" ? { digitOrder: options.digitOrder } : {}),
     initialTasks: cloneTasks(tasks), tasks, plan, cursor: 0, history: [], answered: false,
-    active: generateRound(plan[0], tasks[plan[0]].span, `${normalizedSeed}:round:0`, undefined, options.digitOrder),
+    active: generateRound(plan[0], tasks[plan[0]].span, `${normalizedSeed}:round:0`, undefined, options.digitOrder, options.profile),
   };
 }
 
@@ -333,6 +380,22 @@ export function recordFirstAttempt(progress: MemoryProgress, round: MemoryRound,
   if (typeof correct !== "boolean" || JSON.stringify(round) !== JSON.stringify(progress.active)) throw new TypeError("First attempt does not match the active round.");
   const tasks = cloneTasks(progress.tasks);
   const previous = tasks[round.task];
+  if (progress.profile === RESEARCH_PROFILE) {
+    // Henshaw et al. (2022) report an average daily 60% target, but do not
+    // disclose Cogmed's controller. This is our own weighted staircase:
+    // E[credit] = 2p - 3(1-p), which is zero at p=.60. It neither estimates
+    // an individual's ability nor guarantees an observed 60% success rate.
+    let balance = previous.balance! + (correct ? 2 : -3);
+    const adjustment = balance >= 5 ? 1 : balance <= -5 ? -1 : 0;
+    balance -= adjustment * 5;
+    const { minSpan, maxSpan } = getTaskProfile(round.task, progress.profile);
+    tasks[round.task] = {
+      span: Math.max(minSpan, Math.min(maxSpan, previous.span + adjustment)),
+      successStreak: 0, attempts: previous.attempts + 1,
+      correct: previous.correct + (correct ? 1 : 0), balance,
+    };
+    return { ...progress, tasks, answered: true, history: [...progress.history, { round, correct }] };
+  }
   const streak = correct ? previous.successStreak + 1 : 0;
   tasks[round.task] = {
     span: Math.max(MIN_SPAN, Math.min(MAX_SPAN, previous.span + (correct ? (streak === 2 ? 1 : 0) : -1))),
@@ -351,6 +414,7 @@ export function advanceRound(progress: MemoryProgress): MemoryProgress {
     task, progress.tasks[task].span, `${progress.seed}:round:${cursor}`,
     new Set(progress.history.map((result) => result.round.fingerprint)),
     progress.digitOrder,
+    progress.profile,
   );
   return { ...progress, cursor, active, answered: false };
 }
@@ -364,14 +428,15 @@ export function validateProgress(value: unknown): MemoryProgress | null {
       || (saved.length !== 8 && saved.length !== 24 && saved.length !== 48)
       || !Number.isInteger(saved.cursor) || saved.cursor < 0 || saved.cursor > saved.length
       || typeof saved.answered !== "boolean" || !Array.isArray(saved.history) || saved.history.length > saved.length
-      || !validTasks(saved.initialTasks) || !validTasks(saved.tasks)) return null;
+      || (saved.profile !== undefined && !isProfile(saved.profile))
+      || !validateTaskStates(saved.initialTasks, saved.profile) || !validateTaskStates(saved.tasks, saved.profile)) return null;
     if ((saved.modality !== undefined && !isModality(saved.modality))
       || (saved.focusedTask !== undefined && !isTask(saved.focusedTask))
       || (saved.digitOrder !== undefined && !isDigitOrder(saved.digitOrder))
       || saved.history.length !== saved.cursor + (saved.answered ? 1 : 0)
       || (saved.cursor === saved.length && saved.answered)) return null;
     let replay = createProgress(saved.seed, saved.length, {
-      focusedTask: saved.focusedTask, tasks: saved.initialTasks, modality: saved.modality, digitOrder: saved.digitOrder,
+      focusedTask: saved.focusedTask, tasks: saved.initialTasks, modality: saved.modality, digitOrder: saved.digitOrder, profile: saved.profile,
     });
     if (JSON.stringify(replay.plan) !== JSON.stringify(saved.plan)) return null;
     for (let index = 0; index < saved.history.length; index += 1) {

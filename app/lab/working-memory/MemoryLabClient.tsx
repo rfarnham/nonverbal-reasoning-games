@@ -21,17 +21,17 @@ import {
   AUDIO_TASK_IDS,
   advanceRound,
   createProgress,
-  createTaskStates,
+  RESEARCH_PROFILE,
+  getTaskProfile,
+  studyDuration,
   finalTrackingPositions,
   generateRound,
   isCorrectResponse,
   recordFirstAttempt,
   rotateCell,
-  validateProgress,
   type MemoryProgress,
   type MemoryRound,
   type TaskId,
-  type TaskStates,
   type SessionModality,
   type DigitOrder,
 } from "./engine";
@@ -47,6 +47,9 @@ import {
 import { createMemoryNarrator, type MemoryNarrator } from "./narration";
 import { MEMORY_MOTION } from "./motion";
 import OrderCue from "./OrderCue";
+import { fresh, restore, normalizeSaved, selectTaskStates, taskTotals, type Saved, type InputMode } from "./progress";
+import { useLocalSpeech } from "./use-local-speech";
+import { LOCAL_SPEECH_DOWNLOAD_MB } from "./local-digit-recognition";
 import styles from "./memory.module.css";
 
 type Phase =
@@ -58,100 +61,6 @@ type Phase =
   | "correct"
   | "wrong"
   | "paused";
-type Log = {
-  id: string;
-  date: string;
-  rounds: number;
-  correct: number;
-  maxSpan: number;
-  slow: boolean;
-  modality: string;
-  digitOrder?: DigitOrder;
-};
-type Saved = {
-  version: 1;
-  session: MemoryProgress | null;
-  tasks: TaskStates;
-  logs: Log[];
-  redeemed: string[];
-  slow: boolean;
-  digitOrder: DigitOrder;
-};
-const fresh = (): Saved => ({
-  version: 1,
-  session: null,
-  tasks: createTaskStates(),
-  logs: [],
-  redeemed: [],
-  slow: false,
-  digitOrder: "ascending",
-});
-
-function restore(value: unknown): Saved | null {
-  if (!value || typeof value !== "object") return null;
-  const data = value as Saved;
-  try {
-    if (
-      data.version !== 1 ||
-      typeof data.slow !== "boolean" ||
-      (data.digitOrder !== undefined &&
-        data.digitOrder !== "ascending" && data.digitOrder !== "descending") ||
-      !Array.isArray(data.logs) ||
-      data.logs.length > 500 ||
-      !Array.isArray(data.redeemed)
-    )
-      return null;
-    // Reuse the engine's strict adaptive-state validator, including count bounds.
-    createProgress("validate-state", 24, { tasks: data.tasks });
-    const session =
-      data.session === null ? null : validateProgress(data.session);
-    if (data.session !== null && !session) return null;
-    if (session && JSON.stringify(session.tasks) !== JSON.stringify(data.tasks))
-      return null;
-    if (
-      !data.redeemed.every(
-        (id) =>
-          typeof id === "string" &&
-          session?.history.some(
-            (result) => result.round.id === id && !result.correct,
-          ),
-      )
-    )
-      return null;
-    if (
-      !data.logs.every(
-        (log) =>
-          log &&
-          typeof log.id === "string" &&
-          log.id.length <= 256 &&
-          typeof log.date === "string" &&
-          Number.isFinite(Date.parse(log.date)) &&
-          [8, 24, 48].includes(log.rounds) &&
-          Number.isInteger(log.correct) &&
-          log.correct >= 0 &&
-          log.correct <= log.rounds &&
-          Number.isInteger(log.maxSpan) &&
-          log.maxSpan >= 0 &&
-          log.maxSpan <= 9 &&
-          typeof log.slow === "boolean" &&
-          (log.digitOrder === undefined || log.digitOrder === "ascending" || log.digitOrder === "descending") &&
-          typeof log.modality === "string",
-      )
-    )
-      return null;
-    return {
-      version: 1,
-      session,
-      tasks: data.tasks,
-      logs: data.logs,
-      redeemed: data.redeemed,
-      slow: data.slow,
-      digitOrder: data.digitOrder ?? "ascending",
-    };
-  } catch {
-    return null;
-  }
-}
 
 function Shape({ id }: { id: number }) {
   return (
@@ -395,7 +304,7 @@ function Example({ round }: { round: MemoryRound }) {
                 ? "Watch together"
                 : digit
                   ? "Hear these digits"
-                  : "Watch 1 → 2 → 3"}
+                  : "Watch this order"}
           </span>
         </div>
         <span className={styles.exampleArrow} aria-hidden="true">
@@ -406,7 +315,7 @@ function Example({ round }: { round: MemoryRound }) {
           <span className={styles.exampleText}>
             ✓{" "}
             {round.task === "backward"
-              ? "Tap 3 → 2 → 1"
+              ? "Tap in reverse"
               : round.task === "pattern"
                 ? "Select all lit places"
                 : digit
@@ -638,6 +547,8 @@ function UnlockedLab({
   cryptoKey: CryptoKey;
   onLock: () => void;
 }) {
+  const speech = useLocalSpeech();
+  const cancelSpeech = speech.cancel;
   const [saved, setSaved] = useState<Saved>(fresh);
   const savedRef = useRef(saved);
   const [loaded, setLoaded] = useState(false);
@@ -681,13 +592,18 @@ function UnlockedLab({
   const round = session?.active ?? null;
   const current = review ?? round;
   const task = content.tasks.find((item) => item.id === current?.task);
+  const spoken = current?.answerKind === "ordered-digits" && saved.sessionCondition?.inputMode === "spoken";
+  const selectedTasks = session?.active ? session.tasks : selectTaskStates(saved);
+  const totals = taskTotals(saved);
+  const listeningReady = audioReady && (saved.inputMode !== "spoken" || speech.ready);
 
   const changePhase = useCallback((next: Phase) => {
     phaseRef.current = next;
     setPhase(next);
   }, []);
   const persist = useCallback(
-    (next: Saved) => {
+    (value: Saved) => {
+      const next = normalizeSaved(value);
       savedRef.current = next;
       setSaved(next);
       void saveMemoryProgress(cryptoKey, next).catch(() => {
@@ -777,6 +693,7 @@ function UnlockedLab({
   }, [cryptoKey, audioLoadAttempt, changePhase]);
 
   function cancelPlayback() {
+    cancelSpeech();
     playback.current += 1;
     narration.current?.cancel();
     setMotionEnabled(false);
@@ -785,13 +702,18 @@ function UnlockedLab({
   const pause = useCallback(() => {
     if (["cue", "watch", "hold", "recall"].includes(phaseRef.current)) {
       setPausedFrom(phaseRef.current);
+      cancelSpeech();
+      if (savedRef.current.sessionCondition?.inputMode === "spoken" && savedRef.current.session?.active?.answerKind === "ordered-digits") {
+        responseRef.current = [];
+        setResponse([]);
+      }
       playback.current += 1;
       narration.current?.cancel();
       setMotionEnabled(false);
       setFlash(-1);
       changePhase("paused");
     }
-  }, [changePhase]);
+  }, [changePhase, cancelSpeech]);
   useEffect(() => {
     function hidden() {
       if (document.hidden) pause();
@@ -813,6 +735,15 @@ function UnlockedLab({
     });
     return () => cancelAnimationFrame(frame);
   }, [phase, current?.id, playing, review]);
+
+  useEffect(() => {
+    if (!spoken || phase !== "recall") return;
+    const frame = requestAnimationFrame(() => {
+      if (speech.state === "review") actionRef.current?.focus();
+      else if (speech.state === "recording" || speech.state === "idle") firstCell.current?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [speech.state, spoken, phase]);
 
   function primeAudio() {
     narration.current?.prime();
@@ -844,10 +775,11 @@ function UnlockedLab({
       );
       return;
     }
+    cancelSpeech();
     setExampleOpen(false);
     primeAudio();
     const token = ++playback.current;
-    const slow = savedRef.current.slow;
+    const slow = savedRef.current.sessionCondition?.slow ?? savedRef.current.slow;
     const on = slow ? 1200 : 800;
     const gap = slow ? 300 : 200;
     const reducedMotion = window.matchMedia(
@@ -880,10 +812,7 @@ function UnlockedLab({
         }
       } else if (target.task === "locations" || target.task === "pattern") {
         setFlash(-2);
-        await wait(
-          on * Math.max(2, target.task === "locations" ? 4 : target.span * 0.6),
-          token,
-        );
+        await wait(studyDuration(target, slow), token);
         setFlash(-1);
       } else {
         for (let i = 0; i < target.sequence.length; i++) {
@@ -928,6 +857,8 @@ function UnlockedLab({
   }
 
   function start(focusedTask?: TaskId) {
+    const needsListening = focusedTask ? AUDIO_TASK_IDS.includes(focusedTask as (typeof AUDIO_TASK_IDS)[number]) : modality !== "visual";
+    if (needsListening && !listeningReady) return;
     cancelPlayback();
     setReview(null);
     setLastResult(null);
@@ -937,11 +868,15 @@ function UnlockedLab({
         crypto.randomUUID(),
         focusedTask ? 8 : length,
         {
-          focusedTask, tasks: savedRef.current.tasks, modality,
-          digitOrder: savedRef.current.digitOrder,
+          focusedTask, tasks: selectTaskStates(savedRef.current), modality,
+          digitOrder: savedRef.current.digitOrder, profile: RESEARCH_PROFILE,
         },
       );
-      persist({ ...savedRef.current, session: next, redeemed: [] });
+      persist({ ...savedRef.current, session: next, tasks: next.tasks, redeemed: [], sessionCondition: {
+        slow: savedRef.current.slow,
+        inputMode: savedRef.current.inputMode,
+        digitOrder: savedRef.current.digitOrder,
+      } });
       setPlaying(true);
       setResponse([]);
       responseRef.current = [];
@@ -1024,11 +959,15 @@ function UnlockedLab({
     if (
       phaseRef.current !== "recall" ||
       !s?.active ||
-      responseRef.current.length !== s.active.span ||
+      (savedRef.current.sessionCondition?.inputMode === "spoken" && s.active.answerKind === "ordered-digits"
+        ? speech.state !== "review" || speech.result?.status !== "recognized"
+        : responseRef.current.length !== s.active.span) ||
       review
     )
       return;
-    const correct = isCorrectResponse(s.active, responseRef.current);
+    const submitted = savedRef.current.sessionCondition?.inputMode === "spoken" && s.active.answerKind === "ordered-digits"
+      ? speech.result!.digits : responseRef.current;
+    const correct = isCorrectResponse(s.active, submitted);
     // Lock synchronously so double clicks and held keys cannot submit twice.
     changePhase(correct ? "correct" : "wrong");
     setLastResult(null);
@@ -1069,7 +1008,9 @@ function UnlockedLab({
                 .map((item) => item.round.span),
               0,
             ),
-            slow: savedRef.current.slow,
+            slow: savedRef.current.sessionCondition?.slow ?? savedRef.current.slow,
+            inputMode: savedRef.current.sessionCondition?.inputMode ?? "keypad",
+            ...(next.profile ? { profile: next.profile } : {}),
             ...(next.plan.includes("sort-digits")
               ? { digitOrder: next.digitOrder ?? "ascending" }
               : {}),
@@ -1111,7 +1052,8 @@ function UnlockedLab({
       if (
         /^[1-9]$/.test(event.key) &&
         phaseRef.current === "recall" &&
-        savedRef.current.session?.active?.answerKind === "ordered-digits"
+        savedRef.current.session?.active?.answerKind === "ordered-digits" &&
+        savedRef.current.sessionCondition?.inputMode !== "spoken"
       ) {
         event.preventDefault();
         const active = savedRef.current.session.active;
@@ -1121,7 +1063,7 @@ function UnlockedLab({
           setResponse(next);
         }
       }
-      if (event.key === "Backspace" && phaseRef.current === "recall") {
+      if (event.key === "Backspace" && phaseRef.current === "recall" && !(savedRef.current.sessionCondition?.inputMode === "spoken" && savedRef.current.session?.active?.answerKind === "ordered-digits")) {
         event.preventDefault();
         const next = responseRef.current.slice(0, -1);
         responseRef.current = next;
@@ -1135,11 +1077,11 @@ function UnlockedLab({
   const correctCount =
     session?.history.filter((item) => item.correct).length ?? 0;
   const attempts = TASK_IDS.reduce(
-    (sum, id) => sum + saved.tasks[id].attempts,
+    (sum, id) => sum + totals[id].attempts,
     0,
   );
   const totalCorrect = TASK_IDS.reduce(
-    (sum, id) => sum + saved.tasks[id].correct,
+    (sum, id) => sum + totals[id].correct,
     0,
   );
   const isLive = ["cue", "watch", "hold", "recall"].includes(phase);
@@ -1223,7 +1165,8 @@ function UnlockedLab({
 
                 <p>
                   Span is the number of items to recall. Scores describe
-                  practice in these exercises.
+                  practice in these exercises. The table shows your current
+                  answer, pace, and number-order settings.
                 </p>
                 <div
                   className={styles.progressDots}
@@ -1255,11 +1198,11 @@ function UnlockedLab({
                       {TASK_IDS.map((id) => (
                         <tr key={id}>
                           <th scope="row">{displayTask(id).title}</th>
-                          <td>{saved.tasks[id].span}</td>
-                          <td>{saved.tasks[id].attempts}</td>
+                          <td>{selectedTasks[id].span}</td>
+                          <td>{selectedTasks[id].attempts}</td>
                           <td>
-                            {saved.tasks[id].attempts
-                              ? `${Math.round((saved.tasks[id].correct / saved.tasks[id].attempts) * 100)}%`
+                            {selectedTasks[id].attempts
+                              ? `${Math.round((selectedTasks[id].correct / selectedTasks[id].attempts) * 100)}%`
                               : "—"}
                           </td>
                         </tr>
@@ -1311,6 +1254,7 @@ function UnlockedLab({
                           {log.maxSpan} · {log.modality} ·{" "}
                           {log.slow ? "slower" : "standard"}
                           {log.digitOrder ? ` · ${log.digitOrder}` : ""}
+                          {log.inputMode ? ` · ${log.inputMode}` : ""}
                         </title>
                       </circle>
                     ))}
@@ -1329,6 +1273,7 @@ function UnlockedLab({
                             {log.modality} ·{" "}
                             {log.slow ? "slower pace" : "standard pace"}
                             {log.digitOrder ? ` · ${log.digitOrder}` : ""}
+                            {log.inputMode ? ` · ${log.inputMode}` : ""}
                           </span>
                         </li>
                       ))}
@@ -1375,7 +1320,7 @@ function UnlockedLab({
               <div className={styles.sessionOptions}>
                 {session?.active ? (
                   <>
-                    <button className={styles.button} onClick={resume}>
+                    <button className={styles.button} onClick={resume} disabled={saved.sessionCondition?.inputMode === "spoken" && session.plan.some((id) => AUDIO_TASK_IDS.includes(id as (typeof AUDIO_TASK_IDS)[number])) && !speech.ready}>
                       Continue session →
                     </button>
                     <button
@@ -1412,7 +1357,7 @@ function UnlockedLab({
                     </select>
                     <button
                       className={styles.button}
-                      disabled={modality !== "visual" && !audioReady}
+                      disabled={modality !== "visual" && !listeningReady}
                       onClick={() => start()}
                     >
                       Start a session →
@@ -1429,6 +1374,45 @@ function UnlockedLab({
                 >
                   Retry audio
                 </button>
+              )}
+              <div className={styles.settingRow}>
+                <label htmlFor="listening-answers">Listening answers</label>
+                <select
+                  id="listening-answers"
+                  className={styles.select}
+                  value={saved.inputMode}
+                  disabled={!!session?.active}
+                  onChange={(event) => persist({
+                    ...savedRef.current,
+                    inputMode: event.target.value as InputMode,
+                  })}
+                >
+                  <option value="keypad">Keypad</option>
+                  <option value="spoken">Spoken</option>
+                </select>
+              </div>
+              {saved.inputMode === "spoken" && (
+                <div className={styles.speechSetup}>
+                  <p className={styles.privacy}>
+                    Say the digits in English. Recognition runs on this device.
+                    The {LOCAL_SPEECH_DOWNLOAD_MB} MB model is saved for reuse.
+                    Microphone audio stays in this tab and is discarded after recognition.
+                  </p>
+                  {!speech.supported ? (
+                    <p role="status">Local speech is unavailable in this browser. Choose Keypad to listen and answer.</p>
+                  ) : speech.ready ? (
+                    <p role="status">Speech model ready</p>
+                  ) : (
+                    <button
+                      className={styles.secondaryButton}
+                      disabled={speech.setup === "loading"}
+                      onClick={() => void speech.prepare()}
+                    >
+                      {speech.setup === "loading" ? "Loading speech model…" : "Download speech model"}
+                    </button>
+                  )}
+                  {speech.message && <p role="status">{speech.message}</p>}
+                </div>
               )}
               <label className={styles.settingRow}>
                 <input
@@ -1472,7 +1456,7 @@ function UnlockedLab({
                   <article className={styles.taskCard} key={item.id}>
                     <h3 className={styles.taskTitle}>{item.title}</h3>
                     <span className={styles.taskMeta}>
-                      Span {saved.tasks[item.id as TaskId].span}
+                      Span {selectedTasks[item.id as TaskId].span}
                     </span>
                     <button
                       className={styles.linkButton}
@@ -1481,7 +1465,7 @@ function UnlockedLab({
                         (AUDIO_TASK_IDS.includes(
                           item.id as (typeof AUDIO_TASK_IDS)[number],
                         ) &&
-                          !audioReady)
+                          !listeningReady)
                       }
                       onClick={() => start(item.id as TaskId)}
                       aria-label={`Practice ${item.title}`}
@@ -1503,15 +1487,23 @@ function UnlockedLab({
                 <summary>About the practice &amp; research</summary>
                 <p>{content.evidenceNote}</p>
                 <p>
-                  Each exercise starts at span 3. Two consecutive first-try
-                  correct rounds increase its span by one; one miss decreases it
-                  by one, within spans 2–9. Retrying does not change the
-                  recorded result.
+                  New sessions adapt the number of items remembered. Most start
+                  at two items; Light Path and Pattern Hold start at three.
+                  Hidden Homes shows two to six homes, matching its span.
+                  Keypad, spoken answers, pace, and number order keep separate
+                  difficulty records. Retries never change first-try results.
                 </p>
                 <p>
-                  Standard presentation uses 800 ms per item and a 200 ms gap.
-                  Recall is untimed. Slower-presentation sessions are labeled
-                  separately in the history.
+                  Published Cogmed methods describe adaptive span, with some
+                  editions targeting about 60% correct per day. Our progression
+                  rule, starting spans, and presentation times are design choices,
+                  not the proprietary Cogmed algorithm or validated norms.
+                  Previous saved sessions finish with their original settings.
+                  Recall is untimed.
+                </p>
+                <p>
+                  <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC4110412/" target="_blank" rel="noreferrer">Published task descriptions</a>{" · "}
+                  <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9007089/" target="_blank" rel="noreferrer">Training methods and adaptation</a>
                 </p>
                 <ul>
                   {content.sources.map((source) => (
@@ -1611,7 +1603,7 @@ function UnlockedLab({
             />
             <div className={styles.roundTitle} ref={roundTitleRef}>
               <h1 id="round-title">{task?.title}</h1>
-              <p>{task?.instruction}</p>
+              <p>{spoken ? "Listen to the digits, then say them in the order shown." : task?.instruction}</p>
               {current?.answerKind === "ordered-digits" && (
                 <OrderCue mode={current.task === "sort-digits"
                   ? current.digitOrder ?? "ascending"
@@ -1642,14 +1634,14 @@ function UnlockedLab({
               <>
                 <h2 className={styles.sectionTitle}>Example</h2>
                 <Example
-                  round={generateRound(round.task, 3, "solved-example-v1", undefined, round.digitOrder)}
+                  round={generateRound(round.task, getTaskProfile(round.task, round.profile).initialSpan, "solved-example-v1", undefined, round.digitOrder, round.profile)}
                 />
                 <div className={styles.roundActions}>
                   <button
                     className={styles.button}
                     ref={actionRef}
                     disabled={
-                      round.answerKind === "ordered-digits" && !audioReady
+                      round.answerKind === "ordered-digits" && (!audioReady || (spoken && !speech.ready))
                     }
                     onClick={() => {
                       enableListening(round);
@@ -1710,7 +1702,9 @@ function UnlockedLab({
                     <div className={styles.pauseOverlay}>
                       <h2>Paused</h2>
                       <p>
-                        {pausedFrom === "recall"
+                        {spoken && pausedFrom === "recall"
+                          ? "Continue, then record your answer again."
+                          : pausedFrom === "recall"
                           ? "Continue with the choices you already made."
                           : "We’ll show the sequence again from the beginning."}
                       </p>
@@ -1731,6 +1725,49 @@ function UnlockedLab({
                           : "Continue →"}
                       </button>
                     </div>
+                  ) : spoken ? (
+                    phase === "recall" ? (
+                      <div className={styles.spokenRecall}>
+                        {!speech.ready && speech.supported && (
+                          <button className={styles.secondaryButton} disabled={speech.setup === "loading"} onClick={() => void speech.prepare()}>
+                            {speech.setup === "loading" ? "Loading speech model…" : "Download speech model"}
+                          </button>
+                        )}
+                        {speech.state === "review" && speech.result ? (
+                          <>
+                            <div role="group" aria-label="Recognized answer">
+                              <span className={styles.exampleText}>Recognized answer</span>
+                              <div className={styles.responseSlots} role="list" aria-label="Spoken digits">
+                                {speech.result.digits.map((digit, index) => (
+                                  <span className={`${styles.responseSlot} ${styles.filledSlot}`} role="listitem" aria-label={`Digit ${digit}`} key={index}>{digit}</span>
+                                ))}
+                              </div>
+                            </div>
+                            <p className={styles.exampleText}>If this is what you said, check the sequence. Otherwise, record again.</p>
+                            <div className={styles.roundActions}>
+                              <button className={styles.secondaryButton} onClick={() => void speech.record()}>Record again</button>
+                              <button className={styles.button} ref={actionRef} onClick={submit}>Check sequence</button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p className={styles.exampleText} role="status">
+                              {speech.state === "recording" ? "Recording…" : speech.state === "recognizing" ? "Recognizing on this device…" : speech.state === "starting" ? "Opening microphone…" : "Speak your answer, then stop recording."}
+                            </p>
+                            <div className={styles.roundActions}>
+                              {speech.state === "recording" ? (
+                                <button className={styles.button} ref={firstCell} onClick={() => void speech.stop()}>Stop recording</button>
+                              ) : (
+                                <button className={styles.button} ref={firstCell} disabled={!speech.ready || speech.state === "starting" || speech.state === "recognizing"} onClick={() => void speech.record()}>
+                                  {speech.message ? "Record again" : "Record answer"}
+                                </button>
+                              )}
+                            </div>
+                          </>
+                        )}
+                        {speech.message && <p className={styles.exampleText} role="status">{speech.message}</p>}
+                      </div>
+                    ) : null
                   ) : (
                     <MemoryBoard
                       key={round.id}
@@ -1745,7 +1782,7 @@ function UnlockedLab({
                       answer={answer}
                     />
                   )}
-                  <div
+                  {!spoken && <div
                     className={styles.responseSlots}
                     aria-label={`${response.length} of ${round.span} places entered`}
                   >
@@ -1767,8 +1804,8 @@ function UnlockedLab({
                         )}
                       </span>
                     ))}
-                  </div>
-                  {phase === "recall" && (
+                  </div>}
+                  {phase === "recall" && !spoken && (
                     <div className={styles.roundActions}>
                       <button
                         className={styles.secondaryButton}
@@ -1883,7 +1920,7 @@ function UnlockedLab({
               >
                 <summary>Example</summary>
                 <Example
-                  round={generateRound(round.task, 3, "solved-example-v1", undefined, round.digitOrder)}
+                  round={generateRound(round.task, getTaskProfile(round.task, round.profile).initialSpan, "solved-example-v1", undefined, round.digitOrder, round.profile)}
                 />
               </details>
             )}

@@ -15,6 +15,7 @@ const eslintConfig = defineConfig([
     "tmp/**",
     "work/**",
     "public/question-search/ocr/**",
+    "public/models/speech/vosk-worker-v0.0.8.js",
     "next-env.d.ts",
   ]),
 ]);

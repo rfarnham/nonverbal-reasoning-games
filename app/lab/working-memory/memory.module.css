@@ -180,6 +180,9 @@
 .settings { padding: 12px 0; border-bottom: 1px solid var(--line); }
 .settingRow { display: flex; align-items: center; justify-content: flex-start; gap: 12px; min-height: 44px; padding: 12px 0; font-size: .85rem; line-height: 1.6; }
 .settingRow + .settingRow { border-top: 1px solid var(--line); }
+.speechSetup { padding: 0 0 16px; font-size: .85rem; line-height: 1.6; }
+.speechSetup .privacy { display: block; max-width: 600px; margin: 0 0 12px; }
+.spokenRecall { max-width: 600px; margin: 28px auto; }
 .settingRow input[type="checkbox"] { flex-shrink: 0; width: 20px; height: 20px; accent-color: var(--ink); }
 .pauseOverlay { display: grid; align-content: center; justify-items: center; gap: 16px; padding: 24px 0; }
 .pauseOverlay h2 { margin: 0; font-size: 1.6rem; font-weight: 700; }

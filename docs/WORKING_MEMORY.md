@@ -27,17 +27,28 @@ does not join the generated game catalog or alter Journey progress or XP.
 Mixed sessions contain 24 or 48 trials. The default mix balances six core tasks:
 three spatial exercises and all three auditory exercises. Separate visual-only
 and audio-only mixes balance their eight and three exercises respectively.
-Focused practice contains eight trials of one exercise. Each exercise starts at
-span 3 and adapts independently within spans 2–9: two consecutive first-attempt
-successes increase span by one; a first-attempt miss decreases it by one and
-resets the success streak. Replay and review are learning aids, not additional
-scored attempts. This is an explicit practice rule, not a reconstruction of
-Cogmed's proprietary adaptation or a calibrated ability estimate.
+Focused practice contains eight trials of one exercise. New sessions use the
+`research-v1` difficulty profile: Light Path and Pattern Hold start at three
+items; other exercises start at two. Loads range from two to nine, except
+Hidden Homes, which displays and queries two to six distinct shape–location
+bindings. Hidden Homes allows at least five seconds to study those pairs.
+Difficulty adapts independently for each task using an app-defined weighted
+staircase inspired by the published Cogmed research edition's daily 60% target.
+This is not Cogmed's proprietary controller or empirically matched difficulty.
+See [the publication audit and exact practice rules](WORKING_MEMORY_EVIDENCE.md).
+
+Old saved sessions retain their original rounds and two-successes-up /
+one-miss-down staircase. New profiles have fresh adaptive records; earlier
+records remain archived. Standard/slower presentation, keypad/spoken input for
+auditory tasks, and ascending/descending Number Assembly keep separate task
+records. Visual progress is independent of the auditory input preference.
+Replay and review are learning aids, not additional scored attempts.
 
 Save & exit retains an unfinished session. Ending it from the lab keeps
 completed-round totals and adaptive spans, but does not count it as a completed
-session. A presentation interrupted by pause or a hidden tab restarts; a paused
-recall retains the response entered so far.
+session. A presentation interrupted by pause or a hidden tab restarts. Paused
+manual recall retains the response entered so far; spoken recall stops the
+microphone and discards its uncommitted recording for a fresh recording.
 
 Board changes have a separate observation interval: a quarter turn travels for
 1.6 seconds and settles for 0.4 seconds. Each moving-circle leg travels for
@@ -50,9 +61,9 @@ Listening exercises keep a small order diagram visible beside the instructions.
 Reverse order shows three shapes changing positions; numerical sorting uses
 rising or falling bars. These symbols never display digits or the active answer.
 Number order is selected before a session and stays fixed for its numerical
-sorting rounds. Existing sessions retain ascending order. Descending sessions
-use the same adaptive exercise record, with the condition retained in session
-history; these are practice conditions rather than separate ability measures.
+sorting rounds. Saved sessions retain their chosen order. New sessions keep
+separate adaptive records for each sorting direction; these are practice
+conditions rather than separate ability measures.
 
 Checking a correct sequence now records the result, advances, and presents the
 next challenge in the same action. There is no intermediate Next or Start
@@ -94,16 +105,35 @@ manifest, and replaces only the expected encrypted files.
 
 Auditory digits use bundled recordings generated offline with the suite's
 pinned Kokoro narrator and voice. The recordings are encrypted with the content;
-playback uses the shared local audio player. No model downloads, speech-service
-calls, or device-dependent browser text-to-speech run during practice. Modality
-and slower presentation are identified as practice conditions; raw spans and
-accuracy are not interchangeable clinical measurements across conditions.
+playback uses the shared local audio player. Narration needs no model download,
+speech-service call, or device-dependent browser text-to-speech. Optional spoken
+answers use a separate, explicitly downloaded local recognizer described below.
+Modality and slower presentation are identified as practice conditions; raw
+spans and accuracy are not interchangeable measurements across conditions.
 See the [spoken-digit provenance notice](../public/working-memory/NOTICE.md)
 for the exact model revision, voice, generation settings, and licensing.
 Digits are inferred together in continuous speech, then extracted at word-safe
 boundaries with quiet padding and boundary fades. Higher-bitrate recordings
 replace isolated full-stop utterances; plaintext source recordings stay outside
 the repository.
+
+## Spoken answers
+
+The three auditory exercises offer Keypad and Spoken responses. Spoken mode
+uses Vosk recognition in a local WebAssembly worker, with a bundled small
+English model. **Download speech model** fetches the runtime and weights from
+this site's own origin before microphone use; recordings and inference stay on
+the device. There is no Web Speech API, cloud speech service, remote recognition
+fallback, or audio upload. Microphone permission is requested for recording.
+
+Record the answer, stop recording, inspect the recognized digits, and then
+check the sequence. The keypad and live transcript are hidden during spoken
+recall. A recognition mistake can be re-recorded before committing, without
+changing the first-attempt record. Empty, uncertain, or failed recognition does
+not count as a memory error. Successful submission keeps the existing one-action
+advance to the next challenge. Keypad remains available when the local speech
+setup or microphone is unavailable. Speech is an additional practice condition,
+not an input method documented for the audited Cogmed training tasks.
 
 Authored content is password-encrypted. Saved practice progress is encrypted on
 the device and does not require an account, server, or remote analytics. The
@@ -179,6 +209,14 @@ third YouTube link contains the same footage or that current versions retain
 the same layouts.
 
 ## Independent sources and evidence limits
+
+The [publication audit](WORKING_MEMORY_EVIDENCE.md) records each primary source,
+research edition, concrete task claim, implementation action, and missing
+parameter. It also maps every exercise to its nearest published counterpart and
+identifies the original extensions. It distinguishes research-backed mechanics
+from app-chosen starting loads, timings, and adaptive constants. These changes
+ground the design in published methods; they do not establish equivalent Cogmed
+difficulty.
 
 - [Cogmed's current training overview](https://www.cogmed.com/training) describes
   adaptive exercises, coaching, and a baseline five-week program with flexible

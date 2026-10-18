@@ -5,6 +5,7 @@ import {
   AUDIO_TASK_IDS,
   VISUAL_TASK_IDS,
   SESSION_TASK_POOLS,
+  RESEARCH_PROFILE,
   activeRound,
   advanceRound,
   createProgress,
@@ -12,11 +13,14 @@ import {
   createTaskStates,
   finalTrackingPositions,
   generateRound,
+  getTaskProfile,
   hasStraightRun,
   isCorrectResponse,
   recordFirstAttempt,
   rotateCell,
+  studyDuration,
   validateProgress,
+  validateTaskStates,
 } from "../app/lab/working-memory/engine.ts";
 
 const CELL_TASKS = new Set(["forward", "backward", "rotation", "pattern", "split"]);
@@ -412,4 +416,166 @@ test("audio reverse tasks preserve repeated digits and numeric sorting keeps eve
     assert.throws(() => recordFirstAttempt(answered, answered.active, true));
     assert.equal(answered.history[0].correct, false);
   }
+});
+
+test("research task profiles use independent conservative starts and bound the actual binding load", () => {
+  const states = createTaskStates(RESEARCH_PROFILE);
+  assert.ok(validateTaskStates(states, RESEARCH_PROFILE));
+  assert.ok(!validateTaskStates(states));
+  assert.ok(!validateTaskStates(createTaskStates(), RESEARCH_PROFILE));
+  for (const task of TASK_IDS) {
+    const profile = getTaskProfile(task, RESEARCH_PROFILE);
+    assert.deepEqual(profile, {
+      minSpan: 2,
+      initialSpan: task === "forward" || task === "pattern" ? 3 : 2,
+      maxSpan: task === "locations" ? 6 : 9,
+    });
+    assert.deepEqual(states[task], { span: profile.initialSpan, successStreak: 0, attempts: 0, correct: 0, balance: 0 });
+    assert.deepEqual(getTaskProfile(task), { minSpan: 2, initialSpan: 3, maxSpan: 9 });
+    assert.deepEqual(createTaskStates()[task], { span: 3, successStreak: 0, attempts: 0, correct: 0 });
+  }
+  assert.throws(() => createTaskStates("unknown"));
+  assert.throws(() => createProgress("mixing-banks", 24, { profile: RESEARCH_PROFILE, tasks: createTaskStates() }));
+  assert.throws(() => createProgress("mixing-banks", 24, { tasks: states }));
+  assert.throws(() => generateRound("locations", 7, "too-many-bindings", undefined, "ascending", RESEARCH_PROFILE));
+  assert.throws(() => generateRound("forward", 3, "invalid", undefined, "ascending", "unknown"));
+  assert.ok(!validateTaskStates(states, "unknown"));
+});
+
+test("400 research-profile seeds at every supported task load preserve the declared response mechanics", () => {
+  for (const task of TASK_IDS) {
+    const { minSpan, maxSpan } = getTaskProfile(task, RESEARCH_PROFILE);
+    for (let span = minSpan; span <= maxSpan; span += 1) {
+      for (let seed = 0; seed < 400; seed += 1) {
+        const digitOrder = seed % 2 ? "descending" : "ascending";
+        const round = generateRound(task, span, `research-${seed}`, undefined, digitOrder, RESEARCH_PROFILE);
+        assert.deepEqual(round, generateRound(task, span, `research-${seed}`, undefined, digitOrder, RESEARCH_PROFILE));
+        assert.equal(round.profile, RESEARCH_PROFILE);
+        assert.equal(round.span, span);
+        assert.equal(round.sequence.length, span);
+        assert.deepEqual(round.expected, independentExpected(round));
+        assert.ok(isCorrectResponse(round, round.expected));
+        assert.ok(!isCorrectResponse(round, round.expected.slice(1)));
+        if (task === "rotation") assert.equal(round.rotation, "clockwise");
+        if (task === "locations") {
+          assert.equal(round.positions.length, span);
+          assert.equal(new Set(round.positions).size, span);
+          assert.equal(new Set(round.cues).size, span);
+          assert.deepEqual([...round.cues].sort(), Array.from({ length: span }, (_, index) => index));
+          assert.deepEqual(round.sequence, round.cues);
+          assert.deepEqual(round.expected, round.cues.map((id) => round.positions[id]));
+          assert.notEqual(round.fingerprint, generateRound(task, span, `research-${seed}`, undefined, digitOrder).fingerprint);
+        }
+      }
+    }
+  }
+});
+
+test("research weighted evidence has zero drift at three successes and two misses without changing first attempts", () => {
+  const tasks = createTaskStates(RESEARCH_PROFILE);
+  tasks.forward.span = 5;
+  let progress = createProgress("weighted-evidence", 8, { profile: RESEARCH_PROFILE, focusedTask: "forward", tasks });
+  const expectedBalances = [2, 4, 1, -2, 0];
+  const expectedSpans = [5, 5, 6, 6, 5];
+  const outcomes = [true, true, true, false, false];
+  for (let index = 0; index < outcomes.length; index += 1) {
+    const before = structuredClone(progress);
+    const answered = recordFirstAttempt(progress, progress.active, outcomes[index]);
+    assert.deepEqual(progress, before);
+    assert.equal(answered.tasks.forward.balance, expectedBalances[index]);
+    assert.equal(answered.tasks.forward.span, expectedSpans[index]);
+    assert.equal(answered.tasks.forward.successStreak, 0);
+    assert.equal(answered.history[index].correct, outcomes[index]);
+    assert.equal(answered.tasks.forward.attempts, index + 1);
+    assert.throws(() => recordFirstAttempt(answered, answered.active, !outcomes[index]));
+    assert.deepEqual(answered.tasks.backward, tasks.backward);
+    assert.deepEqual(validateProgress(structuredClone(answered)), answered);
+    progress = advanceRound(answered);
+  }
+  assert.equal(progress.tasks.forward.correct, 3);
+  assert.deepEqual(progress.initialTasks, tasks);
+});
+
+test("research adaptation clamps task-specific bounds and fresh conditions do not inherit another bank", () => {
+  for (const task of TASK_IDS) {
+    const { minSpan, maxSpan } = getTaskProfile(task, RESEARCH_PROFILE);
+    for (const [span, correct] of [[minSpan, false], [maxSpan, true]]) {
+      const tasks = createTaskStates(RESEARCH_PROFILE);
+      tasks[task].span = span;
+      let progress = createProgress(`research-bounds-${task}-${span}`, 8, { profile: RESEARCH_PROFILE, focusedTask: task, tasks });
+      while (progress.active) {
+        const answered = recordFirstAttempt(progress, progress.active, correct);
+        assert.equal(answered.tasks[task].span, span);
+        assert.ok(answered.tasks[task].balance >= -4 && answered.tasks[task].balance <= 4);
+        assert.deepEqual(validateProgress(structuredClone(answered)), answered);
+        progress = advanceRound(answered);
+      }
+      assert.deepEqual(validateProgress(structuredClone(progress)), progress);
+      const otherCondition = createProgress(`new-condition-${task}`, 8, { profile: RESEARCH_PROFILE, focusedTask: task });
+      assert.deepEqual(otherCondition.tasks, createTaskStates(RESEARCH_PROFILE));
+      assert.equal(otherCondition.tasks[task].attempts, 0);
+    }
+  }
+});
+
+test("research sessions replay-validate every transition and reject incompatible profile or adaptive evidence", () => {
+  for (const options of [{ modality: "visual" }, { modality: "audio" }, { digitOrder: "descending" }, { focusedTask: "locations" }]) {
+    let progress = createProgress("research-resume", options.focusedTask ? 8 : 24, { ...options, profile: RESEARCH_PROFILE });
+    const seen = new Set();
+    while (progress.active) {
+      assert.deepEqual(validateProgress(structuredClone(progress)), progress);
+      assert.ok(!seen.has(progress.active.fingerprint));
+      seen.add(progress.active.fingerprint);
+      const answered = recordFirstAttempt(progress, progress.active, progress.cursor % 3 !== 0);
+      assert.deepEqual(validateProgress(structuredClone(answered)), answered);
+      progress = advanceRound(answered);
+    }
+    assert.deepEqual(validateProgress(structuredClone(progress)), progress);
+    for (const mutate of [
+      (value) => { delete value.profile; },
+      (value) => { value.profile = "unknown"; },
+      (value) => { value.initialTasks.forward.balance = 5; },
+      (value) => { delete value.initialTasks.forward.balance; },
+      (value) => { value.initialTasks.forward.successStreak = 1; },
+      (value) => { value.tasks.forward.balance = value.tasks.forward.balance === 0 ? 1 : 0; },
+      (value) => { delete value.history[0].round.profile; },
+      (value) => { value.tasks.locations.span = 7; },
+    ]) {
+      const invalid = structuredClone(progress);
+      mutate(invalid);
+      assert.equal(validateProgress(invalid), null);
+    }
+  }
+});
+
+test("research binding study time scales with encoded items while original sessions keep their timing and identity", () => {
+  const original = {
+    version: 1, id: "locations-q5cwje", task: "locations", span: 2, gridSize: 4,
+    sequence: [1, 5], expected: [4, 8], answerKind: "ordered-cells",
+    positions: [12, 4, 10, 6, 7, 8], cues: [1, 5],
+    fingerprint: '["locations",[1,5],null,[12,4,10,6,7,8],null]',
+  };
+  assert.deepEqual(generateRound("locations", 2, "legacy-binding-profile"), original);
+  assert.equal(studyDuration(original), 3200);
+  assert.equal(studyDuration(original, true), 4800);
+  for (let span = 2; span <= 6; span += 1) {
+    const round = generateRound("locations", span, "research-study", undefined, "ascending", RESEARCH_PROFILE);
+    assert.equal(studyDuration(round), Math.max(5000, span * 1000));
+    assert.equal(studyDuration(round, true), Math.max(5000, span * 1000) * 1.5);
+  }
+  for (let span = 2; span <= 9; span += 1) {
+    const originalPattern = generateRound("pattern", span, "pattern-study");
+    const researchPattern = generateRound("pattern", span, "pattern-study", undefined, "ascending", RESEARCH_PROFILE);
+    assert.equal(studyDuration(originalPattern), studyDuration(researchPattern));
+    assert.equal(studyDuration(originalPattern, true), studyDuration(researchPattern, true));
+  }
+  let legacy = createProgress("legacy-profile-preservation", 8, { focusedTask: "locations" });
+  while (legacy.active) {
+    assert.equal("profile" in legacy, false);
+    assert.equal("profile" in legacy.active, false);
+    assert.equal(legacy.active.positions.length, 6);
+    assert.deepEqual(validateProgress(structuredClone(legacy)), legacy);
+    legacy = advanceRound(recordFirstAttempt(legacy, legacy.active, true));
+  }
+  assert.equal("profile" in legacy, false);
 });

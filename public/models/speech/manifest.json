@@ -1,0 +1,37 @@
+{
+  "formatVersion": 1,
+  "model": {
+    "name": "vosk-model-small-en-us-0.15",
+    "license": "Apache-2.0",
+    "source": "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip",
+    "sourceSha256": "30f26242c4eb449f948e42cb302dd7a686cb29a3423a8367f99ff41780942498"
+  },
+  "runtime": {
+    "name": "vosk-browser",
+    "version": "0.0.8",
+    "license": "Apache-2.0",
+    "source": "https://registry.npmjs.org/vosk-browser/-/vosk-browser-0.0.8.tgz",
+    "sourceSha256": "fd16fc7e64c935d7a79cf07c8f67d84232b6485376a59144af8a234979a9a4b4",
+    "modifications": [
+      "Extracted embedded worker as same-origin static file",
+      "Final flush event named finalresult to distinguish streaming endpoints"
+    ]
+  },
+  "assets": [
+    {
+      "file": "vosk-model-small-en-us-0.15.tar.gz",
+      "bytes": 41116551,
+      "sha256": "4c8865f897d41694cef6ff0070ca7601a64b98b4c6075052c9294e6eac524e07"
+    },
+    {
+      "file": "vosk-worker-v0.0.8.js",
+      "bytes": 4330789,
+      "sha256": "88fea635bbcd6dcd563e1e1b80f8278b3411fc03b1a2d822e432916901a5bf6d"
+    },
+    {
+      "file": "digit-capture.worklet.js",
+      "bytes": 1802,
+      "sha256": "3eb858c3c285a6e569a7623845d09e12619e60835fc3d45f1b34105a5a1057e6"
+    }
+  ]
+}

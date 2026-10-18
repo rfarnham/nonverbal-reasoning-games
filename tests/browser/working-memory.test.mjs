@@ -8,7 +8,8 @@ import { after, before, test } from 'node:test';
 import { chromium } from 'playwright';
 import { SOUND_PREFERENCE_KEY } from '../../lib/game-audio.ts';
 import { decryptSearchBytes, deriveSearchKey, encryptSearchBytes, sha256 } from '../../lib/question-search/crypto.ts';
-import { AUDIO_TASK_IDS, VISUAL_TASK_IDS, advanceRound, createProgress, finalTrackingPositions, recordFirstAttempt } from '../../app/lab/working-memory/engine.ts';
+import { AUDIO_TASK_IDS, RESEARCH_PROFILE, VISUAL_TASK_IDS, advanceRound, createProgress, finalTrackingPositions, recordFirstAttempt } from '../../app/lab/working-memory/engine.ts';
+import { conditionKey, fresh, normalizeSaved, restore as restoreSaved, selectTaskStates } from '../../app/lab/working-memory/progress.ts';
 import { MEMORY_PROGRESS_STORAGE_KEY, memoryAudioContext, memoryContentContext, validateMemoryContent } from '../../app/lab/working-memory/vault.ts';
 
 // Ordinary browser CI exercises the production cryptographic flow with a freshly
@@ -81,13 +82,17 @@ after(async () => {
   if (server) await new Promise(done => server.close(done));
 });
 
-async function open({ width = 1200, height = 900, touch = false, reducedMotion = 'reduce', realPack = false, holdManifest } = {}) {
+async function open({ width = 1200, height = 900, touch = false, reducedMotion = 'reduce', realPack = false, holdManifest, speech } = {}) {
   const context = await browser.newContext({ viewport: { width, height }, hasTouch: touch, reducedMotion });
-  const page = await context.newPage(), errors = [], external = [];
+  if (speech) await installSpeechMock(context, speech);
+  const page = await context.newPage(), errors = [], external = [], requests = [];
   page.setDefaultTimeout(20_000);
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
-  page.on('request', request => { if (!request.url().startsWith(origin) && !request.url().startsWith('data:') && !request.url().startsWith('blob:') && request.url() !== canonicalFavicon) external.push(request.url()); });
+  page.on('request', request => {
+    requests.push({ method: request.method(), url: request.url() });
+    if (!request.url().startsWith(origin) && !request.url().startsWith('data:') && !request.url().startsWith('blob:') && request.url() !== canonicalFavicon) external.push(request.url());
+  });
   // The shared site's metadata uses its absolute production icon. Serve that
   // existing first-party asset locally during an isolated static-export test.
   await page.route(canonicalFavicon, async intercepted => intercepted.fulfill({ contentType: 'image/svg+xml', body: await readFile(new URL('favicon.svg', new URL('../../public/', import.meta.url))) }));
@@ -105,7 +110,102 @@ async function open({ width = 1200, height = 900, touch = false, reducedMotion =
   });
   await page.goto(origin + route);
   await page.getByLabel('Password', { exact: true }).waitFor();
-  return { context, page, errors, external };
+  return { context, page, errors, external, requests };
+}
+// These cases exercise the real microphone/worklet lifecycle with a local tone
+// stream and replace only the recognizer worker. Actual model inference has its
+// own integration test; no browser fixture claims to recognize human speech.
+async function installSpeechMock(context, options) {
+  await context.addInitScript(config => {
+    const NativeWorker = window.Worker;
+    const NativeAudioContext = window.AudioContext;
+    const heldFinals = [];
+    const words = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+    const state = {
+      microphoneRequests: 0, activeTracks: 0, stoppedTracks: 0, nativeSpeechRequests: 0,
+      workersCreated: 0, workersTerminated: 0, messages: [], results: [], modelUrls: [],
+      holdFinal: Boolean(config.holdFinal),
+      queue(digits, settings = {}) { this.results.push({ digits, confidence: 0.99, ...settings }); },
+      releaseFinals() { heldFinals.splice(0).forEach(deliver => deliver()); },
+      failWorker: () => undefined,
+    };
+    window.__speechTest = state;
+    const nativeSpeech = class {
+      constructor() { state.nativeSpeechRequests++; throw new Error('Native speech services are forbidden in this test.'); }
+    };
+    window.SpeechRecognition = nativeSpeech;
+    window.webkitSpeechRecognition = nativeSpeech;
+    Object.defineProperty(navigator.mediaDevices, 'getUserMedia', { configurable: true, value: async () => {
+      state.microphoneRequests++;
+      if (config.denyMicrophone) throw new DOMException('Synthetic microphone denial', 'NotAllowedError');
+      const source = new NativeAudioContext();
+      const oscillator = source.createOscillator(), gain = source.createGain(), destination = source.createMediaStreamDestination();
+      gain.gain.value = 0.1;
+      oscillator.connect(gain).connect(destination);
+      oscillator.start();
+      await source.resume();
+      for (const track of destination.stream.getTracks()) {
+        state.activeTracks++;
+        const stop = track.stop.bind(track);
+        let stopped = false;
+        track.stop = () => {
+          if (!stopped) {
+            stopped = true;
+            state.activeTracks--;
+            state.stoppedTracks++;
+            oscillator.stop();
+            void source.close();
+          }
+          stop();
+        };
+      }
+      return destination.stream;
+    } });
+    function segment(response) {
+      const tokens = response.text === undefined ? response.digits.map(digit => words[digit]) : response.text.split(/\s+/).filter(Boolean);
+      return { text: tokens.join(' '), result: tokens.map((word, index) => ({ word, conf: response.confidence, start: index * 0.25, end: index * 0.25 + 0.2 })) };
+    }
+    window.Worker = class extends EventTarget {
+      constructor(url, workerOptions) {
+        super();
+        const address = new URL(String(url), location.href);
+        if (!address.pathname.endsWith('/models/speech/vosk-worker-v0.0.8.js')) return new NativeWorker(url, workerOptions);
+        if (address.origin !== location.origin) throw new Error('Recognizer worker left this origin.');
+        this.responses = new Map();
+        this.endpointSent = new Set();
+        this.onmessage = null;
+        this.terminated = false;
+        state.failWorker = () => this.emit({ event: 'error', error: 'Synthetic local worker failure' });
+        state.workersCreated++;
+      }
+      emit(data) {
+        if (this.terminated) return;
+        const event = new MessageEvent('message', { data });
+        this.onmessage?.(event);
+        this.dispatchEvent(event);
+      }
+      postMessage(message) {
+        state.messages.push({ ...message, ...(message.data instanceof Float32Array ? { data: { length: message.data.length } } : {}) });
+        if (message.action === 'load') {
+          state.modelUrls.push(message.modelUrl);
+          setTimeout(() => this.emit({ event: 'load', result: !config.loadFailure }), 0);
+        } else if (message.action === 'create') this.responses.set(message.recognizerId, state.results.shift() ?? { digits: [], confidence: 0.99 });
+        else if (message.action === 'audioChunk') {
+          const response = this.responses.get(message.recognizerId);
+          if (response?.endpoint && !this.endpointSent.has(message.recognizerId)) {
+            this.endpointSent.add(message.recognizerId);
+            setTimeout(() => this.emit({ event: 'result', recognizerId: message.recognizerId, result: segment(response) }), 0);
+          }
+        } else if (message.action === 'retrieveFinalResult') {
+          const response = this.responses.get(message.recognizerId) ?? { digits: [], confidence: 0.99 };
+          const deliver = () => this.emit({ event: 'finalresult', recognizerId: message.recognizerId, result: response.endpoint ? { text: '', result: [] } : segment(response) });
+          if (state.holdFinal) heldFinals.push(deliver);
+          else setTimeout(deliver, 0);
+        }
+      }
+      terminate() { if (!this.terminated) state.workersTerminated++; this.terminated = true; }
+    };
+  }, options);
 }
 async function unlock(page, password = fixture.password) {
   await page.getByLabel('Password', { exact: true }).fill(password);
@@ -131,8 +231,14 @@ async function saved(page, predicate = value => value !== null, key = fixture.ke
   }
   assert.fail('Encrypted progress did not reach the expected state.');
 }
-async function seedSession(page, session, { legacy = false } = {}) {
-  const data = { version: 1, session, tasks: session.tasks, logs: [], redeemed: [], slow: false, ...(!legacy ? { digitOrder: session.digitOrder ?? 'ascending' } : {}) };
+async function seedSession(page, session, { legacy = false, inputMode = 'keypad', slow = false } = {}) {
+  const settings = { slow, digitOrder: session.digitOrder ?? 'ascending', inputMode };
+  const data = session.profile === RESEARCH_PROFILE
+    ? normalizeSaved({ ...fresh(), ...settings, session, tasks: session.tasks, sessionCondition: settings })
+    : { version: 1, session, tasks: session.tasks, logs: [], redeemed: [], slow, ...(!legacy ? { digitOrder: session.digitOrder ?? 'ascending' } : {}) };
+  return seedSaved(page, data);
+}
+async function seedSaved(page, data) {
   const encrypted = await encryptSearchBytes(new TextEncoder().encode(JSON.stringify(data)), fixture.key, progressContext);
   await page.evaluate(({ key, ciphertext }) => {
     localStorage.setItem(key, JSON.stringify({ version: 1, ciphertext }));
@@ -141,8 +247,7 @@ async function seedSession(page, session, { legacy = false } = {}) {
   await page.getByLabel('Password', { exact: true }).waitFor();
   await unlock(page);
   const restored = await saved(page);
-  if (legacy) assert.deepEqual({ ...restored, digitOrder: 'ascending' }, { ...data, digitOrder: 'ascending' }, 'Legacy encrypted progress remains valid with the original default order.');
-  else assert.deepEqual(restored, data, 'Resume fixtures use valid encrypted production progress.');
+  assert.deepEqual(restoreSaved(restored), restoreSaved(data), 'Encrypted fixtures retain their exact session and condition records through migration.');
   return restored;
 }
 async function startFocus(page, task) {
@@ -193,7 +298,7 @@ async function assertAutoPresentation(page) {
 }
 async function assertNoPlaintext(page, state) {
   const stored = await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage }, cookie: document.cookie }));
-  for (const secret of [fixture.password, fixture.content.title, fixture.content.intro, fixture.content.sources[0].title, state?.session?.seed, '"sequence"', '"expected"']) {
+  for (const secret of [fixture.password, fixture.content.title, fixture.content.intro, fixture.content.sources[0].title, state?.session?.seed, '"sequence"', '"expected"', '"transcript"', '"digits"']) {
     if (secret) assert.equal(stored.includes(secret), false, 'Private content, seed, and credentials stay out of plaintext browser storage.');
   }
 }
@@ -209,6 +314,50 @@ async function assertFits(page, label) {
   }
 }
 async function assertClean({ errors, external }) { assert.deepEqual(errors, []); assert.deepEqual(external, []); }
+async function prepareSpeech(page) {
+  await page.getByLabel('Listening answers', { exact: true }).selectOption('spoken');
+  await page.getByRole('button', { name: 'Download speech model', exact: true }).click();
+  await page.getByRole('status').filter({ hasText: /^Speech model ready$/ }).waitFor();
+}
+async function presentForSpeech(page) {
+  await page.getByRole('button', { name: /^(Listen to the sequence|Turn sound on & listen)/ }).click();
+  await page.getByRole('button', { name: 'Record answer', exact: true }).waitFor();
+  assert.equal(await page.getByRole('group', { name: 'Digit keypad', exact: true }).count(), 0);
+  assert.equal(await page.getByRole('button', { name: /^Digit [1-9]$/ }).count(), 0);
+  assert.equal(await page.getByLabel(/^\d+ of \d+ places entered$/).count(), 0, 'Spoken recall has no visual answer slots.');
+}
+async function recordSpeech(page, digits, settings = {}, { again = false } = {}) {
+  const previous = await page.evaluate(({ digits, settings }) => {
+    window.__speechTest.queue(digits, settings);
+    return window.__speechTest.messages.filter(message => message.action === 'audioChunk').length;
+  }, { digits, settings });
+  await page.getByRole('button', { name: again ? 'Record again' : 'Record answer', exact: true }).click();
+  await page.getByRole('button', { name: 'Stop recording', exact: true }).waitFor();
+  await page.waitForFunction(count => window.__speechTest.messages.filter(message => message.action === 'audioChunk').length > count, previous);
+}
+async function stopSpeech(page) {
+  await page.getByRole('button', { name: 'Stop recording', exact: true }).click();
+  const review = page.getByRole('group', { name: 'Recognized answer', exact: true });
+  await review.waitFor();
+  assert.equal(await page.evaluate(() => window.__speechTest.activeTracks), 0, 'Microphone tracks stop before the recognition review.');
+  return (await review.getByRole('listitem').allTextContents()).map(text => Number(text.trim()));
+}
+async function assertLocalSpeech(opened) {
+  const state = await opened.page.evaluate(() => ({
+    nativeSpeechRequests: window.__speechTest.nativeSpeechRequests,
+    modelUrls: window.__speechTest.modelUrls,
+    messages: window.__speechTest.messages,
+  }));
+  assert.equal(state.nativeSpeechRequests, 0, 'No browser speech service is used.');
+  assert.ok(state.modelUrls.every(url => new URL(url).origin === origin), 'The speech model stays on the page origin.');
+  assert.ok(opened.requests.every(request => request.method === 'GET' || request.method === 'HEAD'), 'Microphone audio is never posted to a server.');
+  const expectedGrammar = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', '[unk]'];
+  for (const message of state.messages.filter(message => message.action === 'create')) {
+    assert.deepEqual(JSON.parse(message.grammar), expectedGrammar, 'Every recording uses the full digit vocabulary, independent of the challenge answer.');
+    for (const key of ['expected', 'sequence', 'answer', 'hints']) assert.equal(Object.hasOwn(message, key), false);
+  }
+  await assertClean(opened);
+}
 
 async function motionFrames(board, markerIndex) {
   return board.evaluate((element, index) => new Promise(resolve => {
@@ -296,6 +445,36 @@ for (const task of VISUAL_TASK_IDS) {
     } finally { await context.close(); }
   });
 }
+
+test('Hidden Homes changes the visible encoding load with its research-profile span', { timeout: 60_000 }, async () => {
+  const encodedCounts = [];
+  for (const span of [2, 5]) {
+    const opened = await open();
+    const { context, page } = opened;
+    try {
+      const tasks = selectTaskStates(fresh());
+      tasks.locations.span = span;
+      const session = createProgress(`browser-binding-load-${span}`, 8, { profile: RESEARCH_PROFILE, focusedTask: 'locations', tasks });
+      await seedSession(page, session);
+      await page.getByRole('button', { name: /^Continue session/ }).click();
+      await page.getByRole('status').filter({ hasText: /^Watch$/ }).waitFor();
+      const board = page.getByLabel('Four by four memory board', { exact: true });
+      const count = await board.locator('svg').count();
+      encodedCounts.push(count);
+      assert.equal(count, span, 'The study display contains exactly the bindings that define this load.');
+      assert.equal(await page.getByRole('button', { name: 'Check sequence', exact: true }).count(), 0);
+      await page.getByRole('button', { name: 'Check sequence', exact: true }).waitFor();
+      assert.equal(await board.locator('svg').count(), 0, 'Shape locations are hidden during recall.');
+      await enter(page, session.active);
+      await check(page);
+      const result = await saved(page, value => value?.session?.cursor === 1);
+      assert.equal(result.session.history[0].correct, true);
+      assert.equal(result.tasks.locations.attempts, 1);
+      await assertClean(opened);
+    } finally { await context.close(); }
+  }
+  assert.deepEqual(encodedCounts, [2, 5]);
+});
 
 for (const { task, width } of [{ task: 'rotation', width: 1200 }, { task: 'rotation', width: 390 }, { task: 'tracking', width: 1200 }]) {
   test(`${task}${width === 390 ? ' phone' : ''}: smooth travel is visible, interruption replays safely, and final targets score correctly`, { timeout: 60_000 }, async () => {
@@ -448,6 +627,244 @@ test('Large to small selection keeps a descending order cue and accepts only des
   } finally { await context.close(); }
 });
 
+test('spoken recall requires explicit local setup, hides live text, and confirms one immutable attempt', { timeout: 60_000 }, async () => {
+  const opened = await open({ width: 390, speech: {} });
+  const { context, page } = opened;
+  try {
+    await unlock(page);
+    assert.deepEqual(await page.evaluate(() => ({ workers: window.__speechTest.workersCreated, microphones: window.__speechTest.microphoneRequests })), { workers: 0, microphones: 0 });
+    await page.getByLabel('Listening answers', { exact: true }).selectOption('spoken');
+    assert.equal(await page.getByRole('button', { name: 'Practice Exercise reverse-digits', exact: true }).isDisabled(), true);
+    assert.equal(await page.getByRole('button', { name: 'Practice Exercise forward', exact: true }).isEnabled(), true, 'Visual exercises remain available without the speech model.');
+    assert.deepEqual(await page.evaluate(() => ({ workers: window.__speechTest.workersCreated, microphones: window.__speechTest.microphoneRequests })), { workers: 0, microphones: 0 }, 'Selecting Spoken alone does not load a model or open the microphone.');
+    await page.getByRole('button', { name: 'Download speech model', exact: true }).click();
+    await page.getByRole('status').filter({ hasText: /^Speech model ready$/ }).waitFor();
+    assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 0, 'Model preparation does not request microphone access.');
+    const round = await startFocus(page, 'reverse-digits');
+    const initial = await saved(page);
+    await presentForSpeech(page);
+    assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 0, 'Listening to the stimulus does not activate recording.');
+    await recordSpeech(page, round.expected, { endpoint: true });
+    assert.equal(await page.getByRole('group', { name: 'Recognized answer', exact: true }).count(), 0, 'Endpoint recognition cannot display a live transcript during recall.');
+    assert.equal(await page.getByRole('button', { name: 'Check sequence', exact: true }).count(), 0);
+    await page.keyboard.press('1');
+    assert.equal(await page.getByRole('group', { name: 'Digit keypad', exact: true }).count(), 0);
+    assert.deepEqual(await saved(page), initial);
+    assert.deepEqual(await stopSpeech(page), round.expected, 'An endpoint result followed by an empty final flush is retained once.');
+    assert.deepEqual(await saved(page), initial, 'Recognition alone does not score the participant.');
+    await assertFits(page, 'spoken phone recognition review');
+    await page.screenshot({ path: resolve(shots, 'spoken-review-phone.png'), fullPage: true });
+    await page.getByRole('button', { name: 'Check sequence', exact: true }).dblclick({ delay: 25 });
+    const completed = await saved(page, value => value?.session?.cursor === 1);
+    assert.equal(completed.session.history.length, 1);
+    assert.equal(completed.session.history[0].correct, true);
+    assert.equal(completed.conditions[conditionKey('reverse-digits', completed.sessionCondition)].attempts, 1);
+    assert.equal(selectTaskStates(completed, { ...completed, inputMode: 'keypad' })['reverse-digits'].attempts, 0);
+    await assertAutoPresentation(page);
+    assert.equal(await page.getByRole('group', { name: 'Recognized answer', exact: true }).count(), 0, 'A confirmed answer is cleared before the next challenge.');
+    assert.equal(await page.evaluate(() => window.__speechTest.activeTracks), 0);
+    await assertNoPlaintext(page, completed);
+    await assertLocalSpeech(opened);
+  } finally { await context.close(); }
+});
+
+test('uncertain and misheard spoken results can be replaced before any adaptive score is committed', { timeout: 60_000 }, async () => {
+  const opened = await open({ speech: {} });
+  const { context, page } = opened;
+  try {
+    await unlock(page);
+    await prepareSpeech(page);
+    const round = await startFocus(page, 'hidden-digits');
+    const initial = await saved(page);
+    await presentForSpeech(page);
+    await recordSpeech(page, round.expected, { confidence: 0.2 });
+    await page.getByRole('button', { name: 'Stop recording', exact: true }).click();
+    await page.getByRole('status').filter({ hasText: /^Could not recognize a clear digit sequence/ }).waitFor();
+    assert.equal(await page.evaluate(() => window.__speechTest.activeTracks), 0);
+    assert.equal(await page.getByRole('button', { name: 'Check sequence', exact: true }).count(), 0);
+    assert.deepEqual(await saved(page), initial, 'Low-confidence recognition does not become a failed memory attempt.');
+    const misheard = [...round.expected]; misheard[0] = misheard[0] % 9 + 1;
+    await recordSpeech(page, misheard, {}, { again: true });
+    assert.deepEqual(await stopSpeech(page), misheard);
+    assert.deepEqual(await saved(page), initial, 'An unconfirmed transcript cannot change the first-try record.');
+    await recordSpeech(page, round.expected, {}, { again: true });
+    assert.deepEqual(await stopSpeech(page), round.expected);
+    assert.deepEqual(await saved(page), initial);
+    await check(page);
+    const completed = await saved(page, value => value?.session?.cursor === 1);
+    assert.equal(completed.session.history.length, 1);
+    assert.equal(completed.session.history[0].correct, true);
+    assert.equal(completed.tasks['hidden-digits'].attempts, 1);
+    assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 3);
+    assert.equal(await page.evaluate(() => window.__speechTest.stoppedTracks), 3);
+    await assertLocalSpeech(opened);
+  } finally { await context.close(); }
+});
+
+test('a confirmed spoken answer with the wrong length is recorded as a memory miss', { timeout: 45_000 }, async () => {
+  const opened = await open({ speech: {} });
+  const { context, page } = opened;
+  try {
+    await unlock(page);
+    await prepareSpeech(page);
+    const round = await startFocus(page, 'reverse-digits');
+    await presentForSpeech(page);
+    const shorter = round.expected.slice(0, -1);
+    await recordSpeech(page, shorter);
+    assert.deepEqual(await stopSpeech(page), shorter);
+    assert.equal(await page.getByRole('button', { name: 'Check sequence', exact: true }).isEnabled(), true);
+    await check(page, { correct: false });
+    const result = await saved(page, value => value?.session?.answered);
+    assert.equal(result.session.cursor, 0);
+    assert.equal(result.session.history.length, 1);
+    assert.equal(result.session.history[0].correct, false);
+    assert.equal(result.tasks['reverse-digits'].attempts, 1);
+    assert.equal(result.tasks['reverse-digits'].correct, 0);
+    assert.equal(result.tasks['reverse-digits'].balance, -3);
+    await page.getByRole('button', { name: 'Replay sequence', exact: true }).waitFor();
+    await assertLocalSpeech(opened);
+  } finally { await context.close(); }
+});
+
+test('pause, hiding, and locking stop the microphone and ignore a late local recognition result', { timeout: 60_000 }, async () => {
+  const opened = await open({ speech: {} });
+  const { context, page } = opened;
+  try {
+    await unlock(page);
+    await prepareSpeech(page);
+    const round = await startFocus(page, 'reverse-digits');
+    const initial = await saved(page);
+    await presentForSpeech(page);
+    for (const interruption of ['pause', 'hidden']) {
+      await recordSpeech(page, round.expected);
+      if (interruption === 'pause') await page.keyboard.press('Escape');
+      else await page.evaluate(() => {
+        Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      await page.getByRole('heading', { name: 'Paused', exact: true }).waitFor();
+      assert.equal(await page.evaluate(() => window.__speechTest.activeTracks), 0);
+      assert.deepEqual(await saved(page), initial);
+      if (interruption === 'hidden') await page.evaluate(() => {
+        Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      await page.getByRole('button', { name: /^Continue →$/ }).click();
+      await page.getByRole('button', { name: 'Record answer', exact: true }).waitFor();
+    }
+    await page.evaluate(() => { window.__speechTest.holdFinal = true; });
+    await recordSpeech(page, round.expected);
+    const finalRequests = await page.evaluate(() => window.__speechTest.messages.filter(message => message.action === 'retrieveFinalResult').length);
+    await page.getByRole('button', { name: 'Stop recording', exact: true }).click();
+    await page.waitForFunction(previous => window.__speechTest.messages.filter(message => message.action === 'retrieveFinalResult').length > previous, finalRequests);
+    assert.equal(await page.evaluate(() => window.__speechTest.activeTracks), 0);
+    await page.keyboard.press('Escape');
+    await page.getByRole('heading', { name: 'Paused', exact: true }).waitFor();
+    await page.evaluate(() => window.__speechTest.releaseFinals());
+    assert.equal(await page.getByRole('group', { name: 'Recognized answer', exact: true }).count(), 0);
+    assert.deepEqual(await saved(page), initial, 'A result delivered after cancellation cannot commit or reveal an answer.');
+    await page.getByRole('button', { name: /^Continue →$/ }).click();
+    await recordSpeech(page, round.expected);
+    await page.getByRole('button', { name: /^Lock/ }).click();
+    await page.getByLabel('Password', { exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => window.__speechTest.activeTracks), 0);
+    assert.equal(await page.evaluate(() => window.__speechTest.stoppedTracks), 4);
+    assert.equal(await page.evaluate(() => window.__speechTest.workersTerminated), 1);
+    assert.deepEqual(await saved(page), initial);
+    await unlock(page);
+    assert.equal(await page.evaluate(() => window.__speechTest.workersCreated), 1, 'Unlock does not reload the speech model without a new explicit request.');
+    assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 4);
+    await page.getByRole('button', { name: 'Download speech model', exact: true }).waitFor();
+    await assertLocalSpeech(opened);
+  } finally { await context.close(); }
+});
+
+test('microphone denial leaves spoken progress unscored and permits keypad practice', { timeout: 45_000 }, async () => {
+  const opened = await open({ speech: { denyMicrophone: true } });
+  const { context, page } = opened;
+  try {
+    await unlock(page);
+    await prepareSpeech(page);
+    await startFocus(page, 'reverse-digits');
+    const initial = await saved(page);
+    await presentForSpeech(page);
+    await page.getByRole('button', { name: 'Record answer', exact: true }).click();
+    await page.getByRole('button', { name: 'Record again', exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => window.__speechTest.activeTracks), 0);
+    assert.equal(await page.getByRole('button', { name: 'Check sequence', exact: true }).count(), 0);
+    assert.deepEqual(await saved(page), initial);
+    await page.getByRole('button', { name: /Save & exit/ }).click();
+    await page.getByRole('button', { name: 'End session', exact: true }).click();
+    await page.getByLabel('Listening answers', { exact: true }).selectOption('keypad');
+    const round = await startFocus(page, 'reverse-digits');
+    await present(page, { audio: true });
+    await enter(page, round);
+    await check(page);
+    const result = await saved(page, value => value?.session?.cursor === 1);
+    assert.equal(selectTaskStates(result, { ...result, inputMode: 'spoken' })['reverse-digits'].attempts, 0);
+    assert.equal(result.tasks['reverse-digits'].attempts, 1);
+    await assertLocalSpeech(opened);
+  } finally { await context.close(); }
+});
+
+test('a failed local model download does not request microphone access', { timeout: 30_000 }, async () => {
+  const opened = await open({ speech: { loadFailure: true } });
+  const { context, page } = opened;
+  try {
+    await unlock(page);
+    await page.getByLabel('Listening answers', { exact: true }).selectOption('spoken');
+    await page.getByRole('button', { name: 'Download speech model', exact: true }).click();
+    await page.getByRole('status').filter({ hasText: /^Could not load local speech/ }).waitFor();
+    assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 0);
+    assert.equal(await page.evaluate(() => window.__speechTest.workersTerminated), 1);
+    assert.equal(await page.getByRole('button', { name: 'Practice Exercise reverse-digits', exact: true }).isDisabled(), true);
+    const progress = await saved(page);
+    assert.equal(progress.session, null);
+    assert.equal(selectTaskStates(progress)['reverse-digits'].attempts, 0);
+    await page.getByLabel('Listening answers', { exact: true }).selectOption('keypad');
+    assert.equal(await page.getByRole('button', { name: 'Practice Exercise reverse-digits', exact: true }).isEnabled(), true);
+    await assertLocalSpeech(opened);
+  } finally { await context.close(); }
+});
+
+test('a failed local worker disables spoken starts and recovers in an unscored active round', { timeout: 45_000 }, async () => {
+  const opened = await open({ speech: {} });
+  const { context, page } = opened;
+  try {
+    await unlock(page);
+    await prepareSpeech(page);
+    await page.evaluate(() => window.__speechTest.failWorker());
+    await page.getByRole('button', { name: 'Download speech model', exact: true }).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Practice Exercise reverse-digits', exact: true }).isDisabled(), true, 'An idle worker failure invalidates the ready state.');
+    assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 0);
+    await page.getByRole('button', { name: 'Download speech model', exact: true }).click();
+    await page.getByRole('status').filter({ hasText: /^Speech model ready$/ }).waitFor();
+    const round = await startFocus(page, 'reverse-digits');
+    const initial = await saved(page);
+    await presentForSpeech(page);
+    await recordSpeech(page, round.expected);
+    await page.evaluate(() => window.__speechTest.failWorker());
+    const recovery = page.getByRole('button', { name: 'Download speech model', exact: true });
+    await recovery.waitFor();
+    assert.equal(await page.evaluate(() => window.__speechTest.activeTracks), 0, 'A failed recognizer stops the active microphone.');
+    assert.equal(await page.getByRole('button', { name: 'Record again', exact: true }).isDisabled(), true);
+    assert.equal(await page.getByRole('group', { name: 'Recognized answer', exact: true }).count(), 0);
+    assert.deepEqual(await saved(page), initial);
+    await recovery.click();
+    await page.getByRole('button', { name: 'Record answer', exact: true }).waitFor();
+    await recordSpeech(page, round.expected);
+    assert.deepEqual(await stopSpeech(page), round.expected);
+    await check(page);
+    const result = await saved(page, value => value?.session?.cursor === 1);
+    assert.equal(result.session.history.length, 1);
+    assert.equal(result.session.history[0].correct, true);
+    assert.equal(result.tasks['reverse-digits'].attempts, 1);
+    assert.equal(await page.evaluate(() => window.__speechTest.workersCreated), 3);
+    assert.equal(await page.evaluate(() => window.__speechTest.workersTerminated), 2);
+    await assertLocalSpeech(opened);
+  } finally { await context.close(); }
+});
+
 test('double-clicking Check sequence commits once and cannot answer during the next presentation', { timeout: 45_000 }, async () => {
   const opened = await open();
   const { context, page } = opened;
@@ -495,6 +912,8 @@ test('Continue session advances a previously scored save and presents a differen
     const completed = await saved(page, value => value?.session?.cursor === 2);
     assert.equal(completed.session.history.length, 2);
     assert.equal(completed.tasks[expected.active.task].attempts, 1);
+    assert.equal(completed.legacyTasks[expected.active.task].attempts, 1);
+    assert.deepEqual(completed.conditions, {}, 'Legacy answers do not populate the new difficulty-profile banks.');
     await assertClean(opened);
   } finally { await context.close(); }
 });
@@ -652,7 +1071,9 @@ test('wrong response, replay, hard reload, history, and retry retain the first-t
     const missed = await saved(page, value => value?.session?.answered);
     await page.screenshot({ path: resolve(shots, 'wrong-tablet.png'), fullPage: true });
     assert.equal(missed.session.history[0].correct, false);
-    assert.equal(missed.tasks.forward.span, 2);
+    assert.equal(missed.session.profile, RESEARCH_PROFILE);
+    assert.equal(missed.tasks.forward.span, 3, 'The research profile does not lower load after a single miss.');
+    assert.equal(missed.tasks.forward.balance, -3);
     await assertNoPlaintext(page, missed);
     await page.reload();
     await page.getByLabel('Password', { exact: true }).waitFor();
@@ -819,6 +1240,47 @@ test('mixed sessions retain Sound off at a visual-to-listening transition until 
   } finally { await context.close(); }
 });
 
+test('input, presentation speed, and sorting order keep independent adaptive records', { timeout: 30_000 }, async () => {
+  const opened = await open({ speech: {} });
+  const { context, page } = opened;
+  try {
+    const initial = fresh();
+    let session = createProgress('browser-condition-banks', 8, { profile: RESEARCH_PROFILE, focusedTask: 'sort-digits', tasks: selectTaskStates(initial) });
+    session = advanceRound(recordFirstAttempt(session, session.active, true));
+    const withSession = normalizeSaved({ ...initial, session, tasks: session.tasks, sessionCondition: { slow: false, inputMode: 'keypad', digitOrder: 'ascending' } });
+    const data = normalizeSaved({ ...withSession, session: null, sessionCondition: null });
+    await seedSaved(page, data);
+    const originalConditions = structuredClone(data.conditions);
+    assert.equal(selectTaskStates(await saved(page))['sort-digits'].attempts, 1);
+    await page.getByLabel('Listening answers', { exact: true }).selectOption('spoken');
+    const spoken = await saved(page, value => value?.inputMode === 'spoken');
+    assert.equal(selectTaskStates(spoken)['sort-digits'].attempts, 0);
+    await page.getByLabel('Slower presentation', { exact: true }).check();
+    const slower = await saved(page, value => value?.slow === true);
+    assert.equal(selectTaskStates(slower)['sort-digits'].attempts, 0);
+    await page.getByLabel('Number order', { exact: true }).selectOption('descending');
+    const descending = await saved(page, value => value?.digitOrder === 'descending');
+    assert.equal(selectTaskStates(descending)['sort-digits'].attempts, 0);
+    await page.getByLabel('Listening answers', { exact: true }).selectOption('keypad');
+    await page.getByLabel('Slower presentation', { exact: true }).uncheck();
+    const descendingKeypad = await saved(page, value => value?.inputMode === 'keypad' && !value?.slow);
+    assert.equal(selectTaskStates(descendingKeypad)['sort-digits'].attempts, 0);
+    await page.getByLabel('Number order', { exact: true }).selectOption('ascending');
+    const restored = await saved(page, value => value?.digitOrder === 'ascending');
+    assert.equal(selectTaskStates(restored)['sort-digits'].attempts, 1);
+    for (const state of [spoken, slower, descending, descendingKeypad, restored]) {
+      assert.deepEqual(state.conditions, originalConditions, 'Changing a condition cannot copy adaptive history into another bank.');
+      assert.deepEqual(state.legacyTasks, data.legacyTasks);
+    }
+    await startFocus(page, 'sort-digits');
+    const resumed = await saved(page, value => !!value?.session?.active);
+    assert.equal(resumed.session.initialTasks['sort-digits'].attempts, 1);
+    assert.deepEqual(resumed.sessionCondition, { slow: false, inputMode: 'keypad', digitOrder: 'ascending' });
+    assert.deepEqual(await page.evaluate(() => ({ models: window.__speechTest.workersCreated, microphones: window.__speechTest.microphoneRequests })), { models: 0, microphones: 0 }, 'Selecting Spoken alone cannot download its model or request a microphone.');
+    await assertClean(opened);
+  } finally { await context.close(); }
+});
+
 test('ending an unfinished session preserves adaptive records and enables another exercise', { timeout: 30_000 }, async () => {
   const opened = await open();
   const { context, page } = opened;
@@ -834,6 +1296,8 @@ test('ending an unfinished session preserves adaptive records and enables anothe
     await page.getByRole('button', { name: 'End session', exact: true }).click();
     const ended = await saved(page, value => value?.session === null);
     assert.deepEqual(ended.tasks, before.tasks);
+    assert.equal(ended.conditions[conditionKey('forward', ended)].attempts, 1);
+    assert.equal(selectTaskStates(ended).forward.attempts, 1);
     assert.deepEqual(ended.logs, before.logs, 'A partial session does not count as completed.');
     assert.equal(ended.tasks.forward.attempts, 1);
     assert.equal(ended.tasks.forward.correct, 1);
