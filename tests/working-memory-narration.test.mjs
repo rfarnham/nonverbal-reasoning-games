@@ -44,7 +44,8 @@ test("neural digit vocabulary pins the suite voice and contains no exercise cont
   assert.deepEqual(Object.keys(MEMORY_DIGIT_NARRATION.clips), ["1", "2", "3", "4", "5", "6", "7", "8", "9"]);
   for (const [id, clip] of Object.entries(MEMORY_DIGIT_NARRATION.clips)) {
     assert.equal(clip.src, `/working-memory/audio/digit-${id}.mp3`);
-    assert.equal(clip.minimumVisualMs, 800);
+    assert.ok(clip.minimumVisualMs >= 800);
+    assert.ok(clip.minimumVisualMs >= clip.audioDurationMs, "A complete word must fit inside its visual window.");
     assert.equal(clip.lingerMs, 200);
   }
 });

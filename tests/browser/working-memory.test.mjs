@@ -8,7 +8,7 @@ import { after, before, test } from 'node:test';
 import { chromium } from 'playwright';
 import { SOUND_PREFERENCE_KEY } from '../../lib/game-audio.ts';
 import { decryptSearchBytes, deriveSearchKey, encryptSearchBytes, sha256 } from '../../lib/question-search/crypto.ts';
-import { AUDIO_TASK_IDS, VISUAL_TASK_IDS, advanceRound, createProgress, recordFirstAttempt } from '../../app/lab/working-memory/engine.ts';
+import { AUDIO_TASK_IDS, VISUAL_TASK_IDS, advanceRound, createProgress, finalTrackingPositions, recordFirstAttempt } from '../../app/lab/working-memory/engine.ts';
 import { MEMORY_PROGRESS_STORAGE_KEY, memoryAudioContext, memoryContentContext, validateMemoryContent } from '../../app/lab/working-memory/vault.ts';
 
 // Ordinary browser CI exercises the production cryptographic flow with a freshly
@@ -19,6 +19,11 @@ const root = resolve(fileURLToPath(new URL('../../out/', import.meta.url)));
 const shots = resolve(fileURLToPath(new URL('../../outputs/working-memory/', import.meta.url)));
 const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.txt': 'text/x-component', '.json': 'application/json', '.woff2': 'font/woff2', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg' };
 const shapes = ['circle', 'triangle', 'square', 'diamond', 'cross', 'star'];
+const orderCueLabels = {
+  reverse: 'Recall in reverse order, from last to first.',
+  ascending: 'Recall in ascending order, from the smallest number to the largest.',
+  descending: 'Recall in descending order, from the largest number to the smallest.',
+};
 const progressContext = 'working-memory/v1/device-progress';
 const canonicalFavicon = 'https://rfarnham.github.io/nonverbal-reasoning-games/favicon.svg';
 let server, browser, origin, fixture;
@@ -76,8 +81,8 @@ after(async () => {
   if (server) await new Promise(done => server.close(done));
 });
 
-async function open({ width = 1200, height = 900, touch = false, realPack = false, holdManifest } = {}) {
-  const context = await browser.newContext({ viewport: { width, height }, hasTouch: touch, reducedMotion: 'reduce' });
+async function open({ width = 1200, height = 900, touch = false, reducedMotion = 'reduce', realPack = false, holdManifest } = {}) {
+  const context = await browser.newContext({ viewport: { width, height }, hasTouch: touch, reducedMotion });
   const page = await context.newPage(), errors = [], external = [];
   page.setDefaultTimeout(20_000);
   page.on('pageerror', error => errors.push(error.message));
@@ -126,8 +131,8 @@ async function saved(page, predicate = value => value !== null, key = fixture.ke
   }
   assert.fail('Encrypted progress did not reach the expected state.');
 }
-async function seedSession(page, session) {
-  const data = { version: 1, session, tasks: session.tasks, logs: [], redeemed: [], slow: false };
+async function seedSession(page, session, { legacy = false } = {}) {
+  const data = { version: 1, session, tasks: session.tasks, logs: [], redeemed: [], slow: false, ...(!legacy ? { digitOrder: session.digitOrder ?? 'ascending' } : {}) };
   const encrypted = await encryptSearchBytes(new TextEncoder().encode(JSON.stringify(data)), fixture.key, progressContext);
   await page.evaluate(({ key, ciphertext }) => {
     localStorage.setItem(key, JSON.stringify({ version: 1, ciphertext }));
@@ -135,8 +140,10 @@ async function seedSession(page, session) {
   await page.reload();
   await page.getByLabel('Password', { exact: true }).waitFor();
   await unlock(page);
-  assert.deepEqual(await saved(page), data, 'Resume fixtures use valid encrypted production progress.');
-  return data;
+  const restored = await saved(page);
+  if (legacy) assert.deepEqual({ ...restored, digitOrder: 'ascending' }, { ...data, digitOrder: 'ascending' }, 'Legacy encrypted progress remains valid with the original default order.');
+  else assert.deepEqual(restored, data, 'Resume fixtures use valid encrypted production progress.');
+  return restored;
 }
 async function startFocus(page, task) {
   await page.getByRole('button', { name: `Practice Exercise ${task}`, exact: true }).click();
@@ -203,6 +210,40 @@ async function assertFits(page, label) {
 }
 async function assertClean({ errors, external }) { assert.deepEqual(errors, []); assert.deepEqual(external, []); }
 
+async function motionFrames(board, markerIndex) {
+  return board.evaluate((element, index) => new Promise(resolve => {
+    const frames = [], start = performance.now();
+    function sample(now) {
+      const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform);
+      const target = index === undefined ? element : element.querySelectorAll('button')[index];
+      const box = target.getBoundingClientRect();
+      frames.push({ angle: Math.atan2(matrix.b, matrix.a) * 180 / Math.PI, x: box.x + box.width / 2, y: box.y + box.height / 2 });
+      if (now - start < 900) requestAnimationFrame(sample);
+      else resolve(frames);
+    }
+    requestAnimationFrame(sample);
+  }), markerIndex);
+}
+async function assertTrackingCenters(board, positions) {
+  const geometry = await board.evaluate(element => {
+    const box = element.getBoundingClientRect();
+    return {
+      box: { x: box.x, y: box.y, width: box.width, height: box.height },
+      centers: [...element.querySelectorAll('button')].map(marker => {
+        const rect = marker.getBoundingClientRect();
+        return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+      }),
+    };
+  });
+  assert.equal(geometry.centers.length, positions.length);
+  positions.forEach((cell, id) => {
+    const expectedX = geometry.box.x + (cell % 4 + 0.5) * geometry.box.width / 4;
+    const expectedY = geometry.box.y + (Math.floor(cell / 4) + 0.5) * geometry.box.height / 4;
+    assert.ok(Math.abs(geometry.centers[id].x - expectedX) < 3, `Marker ${id} ends in the expected column.`);
+    assert.ok(Math.abs(geometry.centers[id].y - expectedY) < 3, `Marker ${id} ends in the expected row.`);
+  });
+}
+
 test('locked pack discloses no exercises; incorrect password remains locked; unlock can be cancelled', async () => {
   let releaseManifest;
   const held = new Promise(resolve => { releaseManifest = resolve; });
@@ -256,6 +297,71 @@ for (const task of VISUAL_TASK_IDS) {
   });
 }
 
+for (const { task, width } of [{ task: 'rotation', width: 1200 }, { task: 'rotation', width: 390 }, { task: 'tracking', width: 1200 }]) {
+  test(`${task}${width === 390 ? ' phone' : ''}: smooth travel is visible, interruption replays safely, and final targets score correctly`, { timeout: 60_000 }, async () => {
+    const opened = await open({ width, height: width === 390 ? 844 : 900, reducedMotion: 'no-preference' });
+    const { context, page } = opened;
+    try {
+      await unlock(page);
+      const round = await startFocus(page, task);
+      const initial = await saved(page);
+      const board = page.getByLabel(task === 'rotation' ? 'Four by four memory board' : 'Moving targets on a four by four board', { exact: true });
+      await page.getByRole('button', { name: /^Watch the sequence/ }).click();
+      await page.getByRole('status').filter({ hasText: task === 'rotation' ? /^Quarter turn/ : /^Follow the circles$/ }).waitFor();
+      const frames = await motionFrames(board, task === 'tracking' ? round.moves[0][0] : undefined);
+      if (task === 'rotation') {
+        const intermediate = frames.filter(frame => Math.abs(frame.angle) > 1 && Math.abs(frame.angle) < 89);
+        assert.ok(intermediate.length >= 3, 'The board visibly passes through intermediate angles instead of jumping a quarter turn.');
+        assert.ok(new Set(intermediate.map(frame => Math.round(frame.angle))).size >= 3, 'Several different intermediate turn angles are rendered.');
+        const [boardBox, phaseBox, slotsBox] = await Promise.all([
+          board.boundingBox(),
+          page.getByRole('status').filter({ hasText: /^Quarter turn/ }).boundingBox(),
+          page.getByLabel(`0 of ${round.span} places entered`, { exact: true }).boundingBox(),
+        ]);
+        assert.ok(boardBox && phaseBox && slotsBox, 'The turn, phase label, and response slots remain in the layout.');
+        assert.ok(boardBox.y >= phaseBox.y + phaseBox.height - 1, 'An intermediate turn stays below its phase instruction.');
+        assert.ok(boardBox.y + boardBox.height <= slotsBox.y + 1, 'An intermediate turn stays above the response slots.');
+        assert.ok(boardBox.x >= 0 && boardBox.x + boardBox.width <= width + 1, 'An intermediate turn remains within the viewport width.');
+      } else {
+        const traveled = frames.filter(frame => Math.hypot(frame.x - frames[0].x, frame.y - frames[0].y) > 2);
+        assert.ok(traveled.length >= 3, 'The moving marker leaves its starting position during observation.');
+        assert.ok(new Set(traveled.map(frame => `${Math.round(frame.x)},${Math.round(frame.y)}`)).size >= 3, 'The marker follows a visible path through intermediate positions.');
+      }
+      assert.equal(await page.getByRole('button', { name: 'Check sequence', exact: true }).count(), 0, 'Recall remains locked during travel.');
+      await page.screenshot({ path: resolve(shots, `${task}-smooth${width === 390 ? '-phone' : ''}.png`), fullPage: false });
+      await page.keyboard.press('Escape');
+      await page.getByRole('heading', { name: 'Paused', exact: true }).waitFor();
+      assert.deepEqual(await saved(page), initial, 'Interrupting movement never scores or advances the round.');
+      await page.getByRole('button', { name: /^Continue →$/ }).click();
+      await page.getByRole('status').filter({ hasText: /^Watch$/ }).waitFor();
+      if (task === 'rotation') {
+        const angle = await board.evaluate(element => {
+          const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform);
+          return Math.atan2(matrix.b, matrix.a) * 180 / Math.PI;
+        });
+        assert.ok(Math.abs(angle) < 0.5, 'An interrupted turn replays from its original orientation.');
+      } else await assertTrackingCenters(board, round.positions);
+      await page.getByRole('button', { name: 'Check sequence', exact: true }).waitFor();
+      if (width === 390) await assertFits(page, 'rotated phone recall');
+      if (task === 'rotation') {
+        const angle = await board.evaluate(element => {
+          const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform);
+          return Math.atan2(matrix.b, matrix.a) * 180 / Math.PI;
+        });
+        const expectedAngle = round.rotation === 'clockwise' ? 90 : -90;
+        assert.ok(Math.abs(angle - expectedAngle) < 0.5, 'The complete turn reaches its exact intended orientation.');
+      } else await assertTrackingCenters(board, finalTrackingPositions(round));
+      await enter(page, round);
+      await check(page);
+      const result = await saved(page, value => value?.session?.cursor === 1);
+      assert.equal(result.session.history.length, 1);
+      assert.equal(result.session.history[0].correct, true);
+      assert.equal(result.tasks[task].attempts, 1);
+      await assertClean(opened);
+    } finally { await context.close(); }
+  });
+}
+
 for (const task of AUDIO_TASK_IDS) {
   test(`${task}: encrypted audio presents digits without answer cues and supports keyboard recall`, { timeout: 60_000 }, async () => {
     const opened = await open({ width: 390 });
@@ -264,9 +370,14 @@ for (const task of AUDIO_TASK_IDS) {
       await unlock(page);
       if (task === 'reverse-digits') await page.getByRole('button', { name: 'Sound on', exact: true }).click();
       const round = await startFocus(page, task);
+      const cue = page.getByRole('group', { name: orderCueLabels[task === 'sort-digits' ? 'ascending' : 'reverse'], exact: true });
+      await cue.waitFor();
+      const genericCue = await cue.innerHTML();
+      assert.doesNotMatch(await cue.textContent(), /\d/, 'The order icon adds no printed digits to the auditory memory task.');
       const listen = page.getByRole('button', { name: /^(Listen to the sequence|Turn sound on & listen)/ });
       await listen.click();
       await page.getByRole('status').filter({ hasText: /^Listen$/ }).waitFor();
+      assert.equal(await cue.innerHTML(), genericCue, 'The order reminder stays visible and unchanged during audio presentation.');
       assert.equal(await page.getByRole('button', { name: 'Sound on', exact: true }).getAttribute('aria-pressed'), 'true');
       assert.equal(await page.getByRole('button', { name: 'Check sequence', exact: true }).count(), 0);
       if (task === 'hidden-digits') {
@@ -274,6 +385,7 @@ for (const task of AUDIO_TASK_IDS) {
         assert.equal(await page.getByRole('button', { name: /^Digit [1-9]$/ }).count(), 0);
       }
       await page.getByRole('button', { name: 'Check sequence', exact: true }).waitFor();
+      assert.equal(await cue.innerHTML(), genericCue, 'The same order reminder remains during recall.');
       assert.equal(await page.getByRole('button', { name: /^Digit [1-9]$/ }).count(), 9);
       await assertFits(page, `${task} phone recall`);
       for (const value of round.expected) await page.keyboard.press(String(value));
@@ -281,11 +393,60 @@ for (const task of AUDIO_TASK_IDS) {
       const result = await saved(page, value => value?.session?.cursor === 1);
       assert.equal(result.session.history[0].correct, true);
       assert.equal(result.tasks[task].attempts, 1);
+      assert.notEqual(result.session.active.id, round.id);
+      assert.equal(await cue.innerHTML(), genericCue, 'The icon shows a fixed rule example across different challenges, without adopting an active sequence or answer.');
       await assertNoPlaintext(page, result);
       await assertClean(opened);
     } finally { await context.close(); }
   });
 }
+
+test('Large to small selection keeps a descending order cue and accepts only descending recall', { timeout: 60_000 }, async () => {
+  const opened = await open({ width: 390 });
+  const { context, page } = opened;
+  try {
+    await unlock(page);
+    await page.getByLabel('Number order', { exact: true }).selectOption('descending');
+    const round = await startFocus(page, 'sort-digits');
+    const initial = await saved(page);
+    assert.equal(initial.digitOrder, 'descending');
+    assert.equal(initial.session.digitOrder, 'descending');
+    assert.equal(round.digitOrder, 'descending');
+    const descending = [...round.sequence].sort((first, second) => second - first);
+    const ascending = [...descending].reverse();
+    assert.notDeepEqual(descending, ascending, 'The exercise distinguishes ascending and descending answers.');
+    const cue = page.getByRole('group', { name: orderCueLabels.descending, exact: true });
+    await cue.waitFor();
+    const genericCue = await cue.innerHTML();
+    assert.doesNotMatch(await cue.textContent(), /\d/, 'The descending icon adds no competing printed digits.');
+    await present(page, { audio: true });
+    assert.equal(await cue.innerHTML(), genericCue);
+    await assertFits(page, 'descending phone recall');
+    await enter(page, round, ascending);
+    await check(page, { correct: false });
+    const missed = await saved(page, value => value?.session?.answered);
+    assert.equal(missed.session.history[0].correct, false, 'An ascending answer does not satisfy a descending challenge.');
+    await present(page, { replay: true });
+    await enter(page, round, descending);
+    await check(page);
+    const redeemed = await saved(page, value => value?.session?.cursor === 1 && value?.redeemed.includes(round.id));
+    assert.equal(redeemed.session.history.length, 1);
+    assert.equal(redeemed.session.history[0].correct, false, 'Correct descending replay preserves the original first-try result.');
+    assert.deepEqual(redeemed.tasks, missed.tasks);
+    assert.equal(redeemed.session.active.digitOrder, 'descending');
+    assert.equal(await cue.innerHTML(), genericCue, 'The descending rule icon stays generic across rounds.');
+    await page.getByRole('button', { name: /Save & exit/ }).click();
+    const numberOrder = page.getByLabel('Number order', { exact: true });
+    assert.equal(await numberOrder.inputValue(), 'descending');
+    assert.equal(await numberOrder.isDisabled(), true, 'A saved session retains its direction until it ends.');
+    await page.reload();
+    await unlock(page);
+    assert.equal(await page.getByLabel('Number order', { exact: true }).inputValue(), 'descending');
+    assert.deepEqual(await saved(page), redeemed, 'Reload retains the descending session, original result, and preference.');
+    await assertNoPlaintext(page, redeemed);
+    await assertClean(opened);
+  } finally { await context.close(); }
+});
 
 test('double-clicking Check sequence commits once and cannot answer during the next presentation', { timeout: 45_000 }, async () => {
   const opened = await open();
@@ -319,7 +480,8 @@ test('Continue session advances a previously scored save and presents a differen
     const answered = recordFirstAttempt(session, session.active, true);
     const expected = advanceRound(answered);
     assert.notEqual(expected.active.task, answered.active.task);
-    const before = await seedSession(page, answered);
+    const before = await seedSession(page, answered, { legacy: true });
+    assert.equal(await page.getByLabel('Number order', { exact: true }).inputValue(), 'ascending', 'Older saved preferences retain the original ascending default.');
     await page.getByRole('button', { name: /^Continue session/ }).click();
     const resumed = await saved(page, value => value?.session?.cursor === 1);
     assert.deepEqual(resumed.session, expected);

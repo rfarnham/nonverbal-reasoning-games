@@ -108,7 +108,14 @@
 .roundStage { position: relative; margin-top: 16px; padding: 8px 0 16px; text-align: center; }
 .phaseLabel { min-height: 24px; margin: 0 0 8px; color: var(--muted); font-size: .85rem; font-weight: 650; line-height: 1.5; }
 .boardWrap { display: grid; place-items: center; width: min(440px, 100%); margin: 8px auto 12px; padding: 16px; }
-.board { position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; width: 100%; aspect-ratio: 1; transition: transform 900ms cubic-bezier(.2,.75,.25,1); }
+/* Reserve the complete diagonal and the corner mark before a turn begins. */
+.rotationWrap { --rotation-side: min(408px, calc((100vw - 52px) / 1.414214), max(206px, calc((100svh - 280px) / 1.414214))); grid-template-rows: calc(var(--rotation-side) * 1.414214 + 48px); width: 100%; max-width: none; padding: 0; }
+.board { position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; width: 100%; aspect-ratio: 1; transition: opacity 220ms ease-out; }
+.rotationBoard { width: var(--rotation-side); }
+.boardSetup { animation: boardReveal 220ms ease-out 100ms both; transition: none; }
+@keyframes boardReveal { from { opacity: 0; } to { opacity: 1; } }
+.boardMotion { transition: opacity 220ms ease-out, transform var(--turn-duration) cubic-bezier(.45,0,.25,1); }
+.boardMotion .cellContent { transition: transform var(--turn-duration) cubic-bezier(.45,0,.25,1); }
 .cell { position: relative; display: grid; place-items: center; width: 100%; min-width: 0; min-height: 44px; aspect-ratio: 1; padding: 0; border: 1px solid var(--control-line); border-radius: 5px; background: #eeece4; color: var(--muted); font-size: clamp(1rem, 3vw, 1.5rem); font-weight: 650; transition: background 120ms, border-color 120ms; }
 .cell:disabled { opacity: 1; }
 .cell:not(:disabled):hover { border-color: var(--ink); background: #e0e4dc; }
@@ -119,7 +126,8 @@
 .boardCorner { position: absolute; top: -16px; left: -16px; width: 10px; height: 10px; border-radius: 50%; background: var(--ink); }
 .splitBoard { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .splitBoard::after { content: ""; position: absolute; top: -7px; bottom: -7px; left: 50%; width: 1px; border-left: 1px dashed var(--muted); transform: translateX(-50%); pointer-events: none; }
-.marker { position: absolute; display: grid; place-items: center; width: 20%; aspect-ratio: 1; border: 2px solid var(--control-line); border-radius: 50%; background: #eeece4; color: var(--ink); font-size: 1.2rem; font-weight: 750; transition: left 450ms cubic-bezier(.2,.75,.25,1), top 450ms cubic-bezier(.2,.75,.25,1), background 120ms; }
+.marker { position: absolute; top: 0; left: 0; display: grid; place-items: center; width: 20%; aspect-ratio: 1; border: 2px solid var(--control-line); border-radius: 50%; background: #eeece4; color: var(--ink); font-size: 1.2rem; font-weight: 750; transition: background 120ms; }
+.markerMotion { transition: transform var(--marker-duration) cubic-bezier(.45,0,.25,1), background 120ms; }
 .markerActive { border-color: #106952; background: var(--accent); color: var(--panel); }
 .marker.selected { border-color: var(--accent); background: #d5eee8; color: #145d4e; }
 .symbolPalette { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; margin: 16px 0 0; }
@@ -228,6 +236,7 @@
   .roundStage { margin-top: 12px; }
   .boardWrap { max-width: 370px; margin-block: 8px 12px; padding: 14px 8px; }
   .board { gap: 7px; }
+  .rotationWrap { --rotation-side: min(408px, calc((100vw - 28px) / 1.414214), max(206px, calc((100svh - 280px) / 1.414214))); max-width: none; padding: 0; }
   .boardCorner { top: -11px; left: -6px; width: 7px; height: 7px; }
   .cellOrder { top: 4px; right: 5px; width: 17px; height: 17px; font-size: .6rem; }
   .splitBoard { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }

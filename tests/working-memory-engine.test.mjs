@@ -24,7 +24,7 @@ const ORDERED_CELL_TASKS = new Set(["forward", "backward", "rotation", "split"])
 
 function independentExpected(round) {
   if (round.task === "backward" || round.task === "reverse-digits" || round.task === "hidden-digits") return [...round.sequence].reverse();
-  if (round.task === "sort-digits") return [...round.sequence].sort((first, second) => first - second);
+  if (round.task === "sort-digits") return [...round.sequence].sort((first, second) => round.digitOrder === "descending" ? second - first : first - second);
   if (round.task === "rotation") {
     return round.sequence.map((cell) => {
       const row = Math.floor(cell / 4);
@@ -218,7 +218,7 @@ test("adaptation remains within span bounds and can carry independent task state
 });
 
 test("stored progress round-trips at every observation, answered, and completed state", () => {
-  for (const options of [{}, { modality: "visual" }, { modality: "audio" }, { focusedTask: "tracking" }, { focusedTask: "sort-digits", modality: "audio" }]) {
+  for (const options of [{}, { modality: "visual" }, { modality: "audio" }, { focusedTask: "tracking" }, { focusedTask: "sort-digits", modality: "audio" }, { digitOrder: "descending" }, { focusedTask: "sort-digits", digitOrder: "descending" }]) {
     let progress = createProgress("resume", options.focusedTask ? 8 : 24, options);
     for (;;) {
       assert.deepEqual(validateProgress(JSON.parse(JSON.stringify(progress))), progress);
@@ -236,6 +236,7 @@ test("storage validation rejects stale rounds, inconsistent first attempts, plan
   const mutations = [
     (value) => { value.version = 2; },
     (value) => { value.modality = "unknown"; },
+    (value) => { value.digitOrder = "unknown"; },
     (value) => { value.modality = "visual"; },
     (value) => { value.cursor = 4; },
     (value) => { value.cursor = -1; },
@@ -263,9 +264,130 @@ test("storage validation rejects stale rounds, inconsistent first attempts, plan
   for (const value of [null, true, [], {}, "{}", { version: 1, history: [] }]) assert.equal(validateProgress(value), null);
   assert.throws(() => createProgress(Infinity));
   assert.throws(() => createProgress("x".repeat(257)));
+  assert.throws(() => createProgress("bad-order", 24, { digitOrder: "unknown" }));
+  assert.throws(() => generateRound("sort-digits", 3, "bad-order", undefined, "unknown"));
   const withoutModality = structuredClone(progress);
   delete withoutModality.modality;
   assert.deepEqual(validateProgress(withoutModality), progress);
+});
+
+test("legacy ascending rounds and saved progress retain their original identities", () => {
+  // These rounds were captured before a selectable sorting direction existed.
+  const legacyRound = {
+    version: 1, id: "sort-digits-czpc76", task: "sort-digits", span: 5, gridSize: 4,
+    sequence: [4, 9, 5, 9, 6], expected: [4, 5, 6, 9, 9], answerKind: "ordered-digits",
+    fingerprint: '["sort-digits",[4,9,5,9,6],null,null,null]',
+  };
+  assert.deepEqual(generateRound("sort-digits", 5, "legacy-digit-direction"), legacyRound);
+  assert.deepEqual(generateRound("sort-digits", 5, "legacy-digit-direction", undefined, "ascending"), legacyRound);
+  const legacySession = {
+    version: 1, seed: "legacy-digit-direction", length: 8, modality: "audio", focusedTask: "sort-digits",
+    initialTasks: createTaskStates(),
+    tasks: { ...createTaskStates(), "sort-digits": { span: 2, successStreak: 1, attempts: 3, correct: 2 } },
+    plan: Array(8).fill("sort-digits"), cursor: 3, answered: false,
+    history: [
+      {
+        round: {
+          version: 1, id: "sort-digits-1xfo8ey", task: "sort-digits", span: 3, gridSize: 4,
+          sequence: [3, 9, 5], expected: [3, 5, 9], answerKind: "ordered-digits",
+          fingerprint: '["sort-digits",[3,9,5],null,null,null]',
+        }, correct: true,
+      },
+      {
+        round: {
+          version: 1, id: "sort-digits-98mxn7", task: "sort-digits", span: 3, gridSize: 4,
+          sequence: [6, 3, 7], expected: [3, 6, 7], answerKind: "ordered-digits",
+          fingerprint: '["sort-digits",[6,3,7],null,null,null]',
+        }, correct: false,
+      },
+      {
+        round: {
+          version: 1, id: "sort-digits-zkopvv", task: "sort-digits", span: 2, gridSize: 4,
+          sequence: [8, 6], expected: [6, 8], answerKind: "ordered-digits",
+          fingerprint: '["sort-digits",[8,6],null,null,null]',
+        }, correct: true,
+      },
+    ],
+    active: {
+      version: 1, id: "sort-digits-r5apvo", task: "sort-digits", span: 2, gridSize: 4,
+      sequence: [8, 1], expected: [1, 8], answerKind: "ordered-digits",
+      fingerprint: '["sort-digits",[8,1],null,null,null]',
+    },
+  };
+  assert.deepEqual(validateProgress(legacySession), legacySession);
+  const progressed = advanceRound(recordFirstAttempt(legacySession, legacySession.active, true));
+  assert.deepEqual(validateProgress(progressed), progressed);
+  assert.equal("digitOrder" in progressed, false);
+  assert.ok(progressed.history.every(({ round }) => !("digitOrder" in round)));
+  assert.deepEqual(
+    createProgress("explicit-ascending", 8, { focusedTask: "sort-digits", digitOrder: "ascending" }),
+    createProgress("explicit-ascending", 8, { focusedTask: "sort-digits" }),
+  );
+});
+
+test("descending number assembly is deterministic, retains repeated digits, and rejects the opposite order", () => {
+  let hasRepeatedDigits = false;
+  for (let span = 2; span <= 9; span += 1) {
+    for (let seed = 0; seed < 200; seed += 1) {
+      const round = generateRound("sort-digits", span, `descending-${seed}`, undefined, "descending");
+      assert.deepEqual(round, generateRound("sort-digits", span, `descending-${seed}`, undefined, "descending"));
+      assert.equal(round.digitOrder, "descending");
+      assert.deepEqual(round.expected, independentExpected(round));
+      assert.deepEqual([...round.expected].sort(), [...round.sequence].sort());
+      assert.notDeepEqual(round.expected, round.sequence);
+      assert.ok(isCorrectResponse(round, round.expected));
+      assert.ok(!isCorrectResponse(round, [...round.expected].reverse()));
+      if (new Set(round.sequence).size < span) {
+        hasRepeatedDigits = true;
+        assert.ok(!isCorrectResponse(round, [...new Set(round.expected)]));
+      }
+      const ascending = generateRound("sort-digits", span, `descending-${seed}`);
+      assert.notEqual(ascending.fingerprint, round.fingerprint);
+      assert.notEqual(ascending.id, round.id);
+      const next = generateRound("sort-digits", span, `descending-${seed}`, new Set([round.fingerprint]), "descending");
+      assert.notEqual(next.fingerprint, round.fingerprint);
+    }
+  }
+  assert.ok(hasRepeatedDigits);
+  // Sorting preference does not modify the presentation of other exercises.
+  for (const task of TASK_IDS.filter((task) => task !== "sort-digits")) {
+    assert.deepEqual(generateRound(task, 4, "unrelated-order", undefined, "descending"), generateRound(task, 4, "unrelated-order"));
+  }
+});
+
+test("descending sessions preserve the selected rule through adaptation, resume, and completion", () => {
+  for (const options of [{ modality: "mixed" }, { modality: "audio" }, { focusedTask: "sort-digits" }]) {
+    let progress = createProgress("descending-session", options.focusedTask ? 8 : 24, { ...options, digitOrder: "descending" });
+    let sortedRounds = 0;
+    const seen = new Set();
+    while (progress.active) {
+      const round = progress.active;
+      assert.equal(progress.digitOrder, "descending");
+      assert.ok(!seen.has(round.fingerprint));
+      seen.add(round.fingerprint);
+      if (round.task === "sort-digits") {
+        sortedRounds += 1;
+        assert.equal(round.digitOrder, "descending");
+        assert.deepEqual(round.expected, [...round.sequence].sort((first, second) => second - first));
+      } else assert.equal("digitOrder" in round, false);
+      assert.deepEqual(validateProgress(structuredClone(progress)), progress);
+      const answered = recordFirstAttempt(progress, round, progress.cursor % 3 !== 0);
+      assert.deepEqual(validateProgress(structuredClone(answered)), answered);
+      progress = advanceRound(answered);
+    }
+    assert.ok(sortedRounds > 0);
+    assert.deepEqual(validateProgress(structuredClone(progress)), progress);
+    for (const mutate of [
+      (value) => { delete value.digitOrder; },
+      (value) => { value.digitOrder = "ascending"; },
+      (value) => { value.history.find(({ round }) => round.task === "sort-digits").round.expected.reverse(); },
+      (value) => { delete value.history.find(({ round }) => round.task === "sort-digits").round.digitOrder; },
+    ]) {
+      const invalid = structuredClone(progress);
+      mutate(invalid);
+      assert.equal(validateProgress(invalid), null);
+    }
+  }
 });
 
 test("audio reverse tasks preserve repeated digits and numeric sorting keeps every occurrence", () => {

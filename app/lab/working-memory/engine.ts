@@ -15,6 +15,7 @@ export const SESSION_TASK_POOLS = {
 export type Seed = string | number;
 export type SessionLength = 8 | 24 | 48;
 export type RotationDirection = "clockwise" | "counterclockwise";
+export type DigitOrder = "ascending" | "descending";
 export type AnswerKind = "ordered-cells" | "unordered-cells" | "ordered-symbols" | "ordered-digits";
 export type Swap = [number, number];
 
@@ -29,6 +30,8 @@ export interface MemoryRound {
   expected: number[];
   answerKind: AnswerKind;
   rotation?: RotationDirection;
+  /** Ascending remains implicit to retain existing saved round identities. */
+  digitOrder?: DigitOrder;
   /** Initial cell for each marker/symbol ID. Eight tracking markers; six symbols. */
   positions?: number[];
   /** Swapped marker IDs, applied sequentially to positions. */
@@ -53,6 +56,8 @@ export interface MemoryProgress {
   length: SessionLength;
   modality: SessionModality;
   focusedTask?: TaskId;
+  /** The sorting rule for Number Assembly; omitted means ascending. */
+  digitOrder?: DigitOrder;
   /** Starting adaptive state is retained so stored progress can be replay-validated. */
   initialTasks: TaskStates;
   tasks: TaskStates;
@@ -63,7 +68,7 @@ export interface MemoryProgress {
   answered: boolean;
 }
 
-export interface ProgressOptions { focusedTask?: TaskId; tasks?: TaskStates; modality?: SessionModality }
+export interface ProgressOptions { focusedTask?: TaskId; tasks?: TaskStates; modality?: SessionModality; digitOrder?: DigitOrder }
 
 const CELLS = Array.from({ length: 16 }, (_, index) => index);
 const MIN_SPAN = 2;
@@ -117,6 +122,10 @@ function isModality(value: unknown): value is SessionModality {
   return value === "visual" || value === "audio" || value === "mixed";
 }
 
+function isDigitOrder(value: unknown): value is DigitOrder {
+  return value === "ascending" || value === "descending";
+}
+
 function assertSpan(span: number): void {
   if (!Number.isInteger(span) || span < MIN_SPAN || span > MAX_SPAN) {
     throw new RangeError("Memory span must be an integer from 2 through 9.");
@@ -156,7 +165,7 @@ export function hasStraightRun(sequence: readonly number[]): boolean {
   return false;
 }
 
-function candidate(task: TaskId, span: number, seed: string): MemoryRound {
+function candidate(task: TaskId, span: number, seed: string, digitOrder: DigitOrder): MemoryRound {
   const random = randomFor(seed);
   let sequence = shuffled(CELLS, random).slice(0, span);
   let expected = [...sequence];
@@ -209,27 +218,35 @@ function candidate(task: TaskId, span: number, seed: string): MemoryRound {
   }
   if (task === "reverse-digits" || task === "hidden-digits" || task === "sort-digits") {
     sequence = idSequence(9, span, random).map((id) => id + 1);
-    expected = task === "sort-digits" ? [...sequence].sort((first, second) => first - second) : [...sequence].reverse();
+    expected = task === "sort-digits"
+      ? [...sequence].sort((first, second) => digitOrder === "descending" ? second - first : first - second)
+      : [...sequence].reverse();
     answerKind = "ordered-digits";
   }
 
   // A simultaneous set and disjoint swaps have one stable semantic fingerprint.
   const finalPositions = task === "tracking" ? finalTrackingPositions({ positions, moves }) : undefined;
-  const fingerprint = JSON.stringify([task, sequence, rotation ?? null, positions ?? null, finalPositions ?? null]);
+  const fingerprintParts: unknown[] = [task, sequence, rotation ?? null, positions ?? null, finalPositions ?? null];
+  const descendingDigits = task === "sort-digits" && digitOrder === "descending";
+  // Keep ascending's original IDs stable, while distinguishing the new rule.
+  if (descendingDigits) fingerprintParts.push("descending");
+  const fingerprint = JSON.stringify(fingerprintParts);
   return {
     version: 1, id: `${task}-${hash(fingerprint).toString(36)}`, task, span, gridSize: 4,
     sequence, expected, answerKind,
     ...(rotation ? { rotation } : {}), ...(positions ? { positions } : {}),
+    ...(descendingDigits ? { digitOrder: "descending" as const } : {}),
     ...(moves ? { moves } : {}), ...(cues ? { cues } : {}), fingerprint,
   };
 }
 
 /** Generation is reproducible and never returns a repeated session fingerprint. */
-export function generateRound(task: TaskId, span: number, seed: Seed, seen: ReadonlySet<string> = new Set()): MemoryRound {
+export function generateRound(task: TaskId, span: number, seed: Seed, seen: ReadonlySet<string> = new Set(), digitOrder: DigitOrder = "ascending"): MemoryRound {
   if (!isTask(task)) throw new TypeError("Unknown memory task.");
+  if (!isDigitOrder(digitOrder)) throw new TypeError("Unknown digit order.");
   assertSpan(span);
   for (let attempt = 0; attempt < GENERATION_ATTEMPTS; attempt += 1) {
-    const round = candidate(task, span, `${String(seed)}:candidate:${attempt}`);
+    const round = candidate(task, span, `${String(seed)}:candidate:${attempt}`, digitOrder);
     if ((task === "forward" || task === "backward" || task === "rotation" || task === "split") && hasStraightRun(round.sequence)) continue;
     // Every audio manipulation must change the presented order, including palindromes.
     if (round.answerKind === "ordered-digits" && round.expected.every((digit, index) => digit === round.sequence[index])) continue;
@@ -294,6 +311,7 @@ export function createProgress(seed: Seed, length: SessionLength = 24, options: 
     throw new TypeError("Invalid session seed.");
   }
   if (options.tasks && !validTasks(options.tasks)) throw new TypeError("Invalid starting adaptive state.");
+  if (options.digitOrder !== undefined && !isDigitOrder(options.digitOrder)) throw new TypeError("Unknown digit order.");
   const tasks = cloneTasks(options.tasks ?? createTaskStates());
   const modality = options.modality ?? "mixed";
   const plan = createSessionPlan(length, seed, options.focusedTask, modality);
@@ -301,8 +319,9 @@ export function createProgress(seed: Seed, length: SessionLength = 24, options: 
   return {
     version: 1, seed: normalizedSeed, length, modality,
     ...(options.focusedTask ? { focusedTask: options.focusedTask } : {}),
+    ...(options.digitOrder === "descending" ? { digitOrder: options.digitOrder } : {}),
     initialTasks: cloneTasks(tasks), tasks, plan, cursor: 0, history: [], answered: false,
-    active: generateRound(plan[0], tasks[plan[0]].span, `${normalizedSeed}:round:0`),
+    active: generateRound(plan[0], tasks[plan[0]].span, `${normalizedSeed}:round:0`, undefined, options.digitOrder),
   };
 }
 
@@ -331,6 +350,7 @@ export function advanceRound(progress: MemoryProgress): MemoryProgress {
   const active = cursor >= progress.length ? null : generateRound(
     task, progress.tasks[task].span, `${progress.seed}:round:${cursor}`,
     new Set(progress.history.map((result) => result.round.fingerprint)),
+    progress.digitOrder,
   );
   return { ...progress, cursor, active, answered: false };
 }
@@ -347,9 +367,12 @@ export function validateProgress(value: unknown): MemoryProgress | null {
       || !validTasks(saved.initialTasks) || !validTasks(saved.tasks)) return null;
     if ((saved.modality !== undefined && !isModality(saved.modality))
       || (saved.focusedTask !== undefined && !isTask(saved.focusedTask))
+      || (saved.digitOrder !== undefined && !isDigitOrder(saved.digitOrder))
       || saved.history.length !== saved.cursor + (saved.answered ? 1 : 0)
       || (saved.cursor === saved.length && saved.answered)) return null;
-    let replay = createProgress(saved.seed, saved.length, { focusedTask: saved.focusedTask, tasks: saved.initialTasks, modality: saved.modality });
+    let replay = createProgress(saved.seed, saved.length, {
+      focusedTask: saved.focusedTask, tasks: saved.initialTasks, modality: saved.modality, digitOrder: saved.digitOrder,
+    });
     if (JSON.stringify(replay.plan) !== JSON.stringify(saved.plan)) return null;
     for (let index = 0; index < saved.history.length; index += 1) {
       const result = saved.history[index];

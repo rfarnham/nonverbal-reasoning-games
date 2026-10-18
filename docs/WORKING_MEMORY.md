@@ -13,7 +13,8 @@ clinical service. Exact feature parity and equivalent outcomes are not claimed.
 Eight visual exercises cover forward and backward spatial recall, transformed
 locations, moving targets, shape sequences, object-location associations,
 simultaneous patterns, and split visual attention. Three auditory exercises add
-backward digit recall with a visible or hidden keypad, and numerical ordering.
+backward digit recall with a visible or hidden keypad, and numerical ordering
+from small to large or large to small.
 Instructions and exercise names belong to the encrypted content bundle rather
 than a duplicate public question bank.
 
@@ -38,6 +39,21 @@ completed-round totals and adaptive spans, but does not count it as a completed
 session. A presentation interrupted by pause or a hidden tab restarts; a paused
 recall retains the response entered so far.
 
+Board changes have a separate observation interval: a quarter turn travels for
+1.6 seconds and settles for 0.4 seconds. Each moving-circle leg travels for
+0.95 seconds and settles for 0.22 seconds; swaps still use an empty place so
+identical circles do not cross ambiguously. Setup resets do not animate, and
+input remains unavailable until every change has settled. Reduced motion
+removes travel while retaining the same observation time and final state.
+
+Listening exercises keep a small order diagram visible beside the instructions.
+Reverse order shows three shapes changing positions; numerical sorting uses
+rising or falling bars. These symbols never display digits or the active answer.
+Number order is selected before a session and stays fixed for its numerical
+sorting rounds. Existing sessions retain ascending order. Descending sessions
+use the same adaptive exercise record, with the condition retained in session
+history; these are practice conditions rather than separate ability measures.
+
 Checking a correct sequence now records the result, advances, and presents the
 next challenge in the same action. There is no intermediate Next or Start
 screen. The last correct result remains in a compact status line. An incorrect
@@ -58,8 +74,9 @@ stickers, icon cards, and repeated stage labels. Statistics sit behind Progress.
 Opening examples and optional in-round examples remain because this standalone
 app has no adult facilitator supplying the instructions. A separate reviewer
 checks the revised screens before release, following the workflow's independent
-review and revision principle. The encrypted pack and its key do not change, so
-existing encrypted device progress remains readable.
+review and revision principle. Content and recordings remain encrypted. Audio
+and instruction updates retain the existing key, so encrypted device progress
+remains readable.
 
 To rebuild the encrypted pack, keep source JSON and generated digit MP3s outside
 the repository, then run `node scripts/encrypt-working-memory.mjs --source
@@ -67,6 +84,13 @@ the repository, then run `node scripts/encrypt-working-memory.mjs --source
 /private/password.txt`. The builder validates and replaces only its own pack
 files. Rebuilding changes the salt and key, so existing device progress requires
 migration or will be unreadable under the new pack. Never commit private inputs.
+
+To update recordings while preserving progress, use
+`node scripts/refresh-working-memory-audio.mjs --audio-directory /private/digits
+--password-file /private/password.txt`. Its optional `--source /private/content.json`
+also replaces validated authored content without rotating the key. The updater
+authenticates the existing pack, verifies replacement audio against the narration
+manifest, and replaces only the expected encrypted files.
 
 Auditory digits use bundled recordings generated offline with the suite's
 pinned Kokoro narrator and voice. The recordings are encrypted with the content;
@@ -76,6 +100,10 @@ and slower presentation are identified as practice conditions; raw spans and
 accuracy are not interchangeable clinical measurements across conditions.
 See the [spoken-digit provenance notice](../public/working-memory/NOTICE.md)
 for the exact model revision, voice, generation settings, and licensing.
+Digits are inferred together in continuous speech, then extracted at word-safe
+boundaries with quiet padding and boundary fades. Higher-bitrate recordings
+replace isolated full-stop utterances; plaintext source recordings stay outside
+the repository.
 
 Authored content is password-encrypted. Saved practice progress is encrypted on
 the device and does not require an account, server, or remote analytics. The

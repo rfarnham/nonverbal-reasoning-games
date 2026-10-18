@@ -8,92 +8,170 @@
     "format": "mp3"
   },
   "postprocess": {
-    "trimEdgeSilence": true,
-    "ffmpegAudioFilter": "silenceremove=start_periods=1:start_duration=0.04:start_threshold=-50dB:start_silence=0.08:detection=rms,areverse,silenceremove=start_periods=1:start_duration=0.04:start_threshold=-50dB:start_silence=0.08:detection=rms,areverse",
+    "trimEdgeSilence": false,
+    "boundaryWindowMs": 20,
+    "maximumBoundaryRmsDbfs": -52,
+    "boundaryRmsMeasurement": "before-shared-peak-adjustment",
+    "paddingMs": 35,
+    "boundaryFadeMs": 5,
     "ffmpegAudioCodec": "libmp3lame",
-    "audioBitrateKbps": 48
+    "audioBitrateKbps": 160
   },
   "cues": {
     "1": {
       "caption": "1",
-      "speechText": "one.",
+      "speechText": "one",
       "file": "digit-1.mp3",
-      "audioDurationMs": 600,
+      "audioDurationMs": 768,
       "minVisualMs": 800,
       "lingerMs": 200,
-      "sha256": "0e3ab99e0a3462a228010206dd5a14665311357723d9ed04895dbe092d0c3694"
+      "sha256": "84f98ce6412850b29c09eabf14b0bdddf956c053ac096819f44feeba2c41cb03",
+      "sourceTokenIndex": 3,
+      "sourceStartSample": 43779,
+      "sourceEndSample": 59092,
+      "boundaryRmsDbfs": [
+        -70.91,
+        -77.23
+      ]
     },
     "2": {
       "caption": "2",
-      "speechText": "two.",
+      "speechText": "two",
       "file": "digit-2.mp3",
-      "audioDurationMs": 600,
+      "audioDurationMs": 504,
       "minVisualMs": 800,
       "lingerMs": 200,
-      "sha256": "ae47f6ac7f762a82e78a03b99bbd32282995c4296d5c2e9fc055a9e99fa3eca1"
+      "sha256": "417b31be6dbb51d837e2cd58ca09d775c0d00af21997548f2be3ee74e6e1f072",
+      "sourceTokenIndex": 4,
+      "sourceStartSample": 59092,
+      "sourceEndSample": 68233,
+      "boundaryRmsDbfs": [
+        -77.23,
+        -55.4
+      ]
     },
     "3": {
       "caption": "3",
-      "speechText": "three.",
+      "speechText": "three",
       "file": "digit-3.mp3",
-      "audioDurationMs": 672,
+      "audioDurationMs": 768,
       "minVisualMs": 800,
       "lingerMs": 200,
-      "sha256": "4d4c59837746f5a7e36cbdd4d82ca78496cec8d6cec8b9013967cf7af6c658b9"
+      "sha256": "4683d1ac86c40d899a74acb732314a9de4f229daf01039d28ded01e9615431c7",
+      "sourceTokenIndex": 5,
+      "sourceStartSample": 68233,
+      "sourceEndSample": 83297,
+      "boundaryRmsDbfs": [
+        -55.4,
+        -71.43
+      ]
     },
     "4": {
       "caption": "4",
-      "speechText": "four.",
+      "speechText": "four",
       "file": "digit-4.mp3",
-      "audioDurationMs": 624,
+      "audioDurationMs": 672,
       "minVisualMs": 800,
       "lingerMs": 200,
-      "sha256": "ccc6c6237e1a77eefa6f061653aed766398c8a4328c99f706b9140846d102ff9"
+      "sha256": "f085141d0f07c45cdc4dd699cf12c3675000dbac5ed5591df94feef9030df122",
+      "sourceTokenIndex": 6,
+      "sourceStartSample": 83297,
+      "sourceEndSample": 96068,
+      "boundaryRmsDbfs": [
+        -71.43,
+        -56.57
+      ]
     },
     "5": {
       "caption": "5",
-      "speechText": "five.",
+      "speechText": "five",
       "file": "digit-5.mp3",
-      "audioDurationMs": 696,
+      "audioDurationMs": 672,
       "minVisualMs": 800,
       "lingerMs": 200,
-      "sha256": "a938e7b9c19ef656ec93dd97c3179acd49e0ce310f5d5e798af5100730ef98a2"
+      "sha256": "072df16ac7698ac57fc02a652cd5e2d78369d238a8ebf588c9e9494d40393f00",
+      "sourceTokenIndex": 7,
+      "sourceStartSample": 96068,
+      "sourceEndSample": 109247,
+      "boundaryRmsDbfs": [
+        -56.57,
+        -59.64
+      ]
     },
     "6": {
       "caption": "6",
-      "speechText": "six.",
+      "speechText": "six",
       "file": "digit-6.mp3",
-      "audioDurationMs": 696,
+      "audioDurationMs": 816,
       "minVisualMs": 800,
       "lingerMs": 200,
-      "sha256": "87a3e6020da2c010bb752e20559dcbf1cc02f2541104d365cf555864e683a4e0"
+      "sha256": "386f2a4ec15e100820e84f0628c31beedd3d570fd8acc41eaaa5d127662b520f",
+      "sourceTokenIndex": 8,
+      "sourceStartSample": 109247,
+      "sourceEndSample": 125967,
+      "boundaryRmsDbfs": [
+        -59.64,
+        -77.22
+      ]
     },
     "7": {
       "caption": "7",
-      "speechText": "seven.",
+      "speechText": "seven",
       "file": "digit-7.mp3",
-      "audioDurationMs": 648,
+      "audioDurationMs": 768,
       "minVisualMs": 800,
       "lingerMs": 200,
-      "sha256": "4a1865944b7bfdde91d981d1cc50b5a55f5c4ebcd832326853a050bbf908538b"
+      "sha256": "ffc515eabfff2d42ab667fbbbee6a9115df13abce891149f7afa9cae76406c59",
+      "sourceTokenIndex": 9,
+      "sourceStartSample": 125967,
+      "sourceEndSample": 141564,
+      "boundaryRmsDbfs": [
+        -77.22,
+        -79.67
+      ]
     },
     "8": {
       "caption": "8",
-      "speechText": "eight.",
+      "speechText": "eight",
       "file": "digit-8.mp3",
-      "audioDurationMs": 600,
+      "audioDurationMs": 576,
       "minVisualMs": 800,
       "lingerMs": 200,
-      "sha256": "abf340e13ee1128c631b8d0dde99cccd51a417eff8346df7971cf73760caf782"
+      "sha256": "a99a6b12ed000bfb8b5525f35ada735aa7c0e07b5fefa03d5a428bcebb1fcf56",
+      "sourceTokenIndex": 10,
+      "sourceStartSample": 141564,
+      "sourceEndSample": 152382,
+      "boundaryRmsDbfs": [
+        -79.67,
+        -72.65
+      ]
     },
     "9": {
       "caption": "9",
-      "speechText": "nine.",
+      "speechText": "nine",
       "file": "digit-9.mp3",
-      "audioDurationMs": 648,
+      "audioDurationMs": 792,
       "minVisualMs": 800,
       "lingerMs": 200,
-      "sha256": "c1374dc032aff963ed42ef5b8229c3bd497955c1038642c5b5ce3ae7bcb52178"
+      "sha256": "ba2d7c49e9de627c7e4612d0c2b35c5feb6ecd7c067a55f53076a2fcc51fd930",
+      "sourceTokenIndex": 11,
+      "sourceStartSample": 152382,
+      "sourceEndSample": 167990,
+      "boundaryRmsDbfs": [
+        -72.65,
+        -73.98
+      ]
     }
+  },
+  "generation": {
+    "method": "single-context-interior-word-extraction",
+    "package": "kokoro==0.9.4",
+    "seed": 0,
+    "cpuThreads": 2,
+    "sourceText": "seven... eight... nine... one... two... three... four... five... six... seven... eight... nine... one... two... three.",
+    "sourcePhonemes": "sˈɛvən... ˈAt... nˈIn... wˈʌn... tˈu... θɹˈi... fˈɔɹ... fˈIv... sˈɪks... sˈɛvən... ˈAt... nˈIn... wˈʌn... tˈu... θɹˈi.",
+    "sourceSha256": "2625bab90c0ee761af28b6c845f4ed01ad8eb2eb90bbc55e898ad7b9cc8bd6be",
+    "sourceDurationMs": 9350,
+    "sourcePeakDbfs": -3
   }
 }

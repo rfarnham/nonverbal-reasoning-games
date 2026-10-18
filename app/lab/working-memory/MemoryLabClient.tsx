@@ -6,6 +6,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type FormEvent,
   type RefObject,
 } from "react";
@@ -32,6 +33,7 @@ import {
   type TaskId,
   type TaskStates,
   type SessionModality,
+  type DigitOrder,
 } from "./engine";
 import {
   clearMemoryProgress,
@@ -43,6 +45,8 @@ import {
   type MemoryTask,
 } from "./vault";
 import { createMemoryNarrator, type MemoryNarrator } from "./narration";
+import { MEMORY_MOTION } from "./motion";
+import OrderCue from "./OrderCue";
 import styles from "./memory.module.css";
 
 type Phase =
@@ -62,6 +66,7 @@ type Log = {
   maxSpan: number;
   slow: boolean;
   modality: string;
+  digitOrder?: DigitOrder;
 };
 type Saved = {
   version: 1;
@@ -70,6 +75,7 @@ type Saved = {
   logs: Log[];
   redeemed: string[];
   slow: boolean;
+  digitOrder: DigitOrder;
 };
 const fresh = (): Saved => ({
   version: 1,
@@ -78,6 +84,7 @@ const fresh = (): Saved => ({
   logs: [],
   redeemed: [],
   slow: false,
+  digitOrder: "ascending",
 });
 
 function restore(value: unknown): Saved | null {
@@ -87,6 +94,8 @@ function restore(value: unknown): Saved | null {
     if (
       data.version !== 1 ||
       typeof data.slow !== "boolean" ||
+      (data.digitOrder !== undefined &&
+        data.digitOrder !== "ascending" && data.digitOrder !== "descending") ||
       !Array.isArray(data.logs) ||
       data.logs.length > 500 ||
       !Array.isArray(data.redeemed)
@@ -125,6 +134,7 @@ function restore(value: unknown): Saved | null {
           log.maxSpan >= 0 &&
           log.maxSpan <= 9 &&
           typeof log.slow === "boolean" &&
+          (log.digitOrder === undefined || log.digitOrder === "ascending" || log.digitOrder === "descending") &&
           typeof log.modality === "string",
       )
     )
@@ -136,6 +146,7 @@ function restore(value: unknown): Saved | null {
       logs: data.logs,
       redeemed: data.redeemed,
       slow: data.slow,
+      digitOrder: data.digitOrder ?? "ascending",
     };
   } catch {
     return null;
@@ -400,7 +411,9 @@ function Example({ round }: { round: MemoryRound }) {
                 ? "Select all lit places"
                 : digit
                   ? round.task === "sort-digits"
-                    ? "Smallest → largest"
+                    ? round.digitOrder === "descending"
+                      ? "Largest → smallest"
+                      : "Smallest → largest"
                     : "Enter in reverse"
                   : "Tap in this order"}
           </span>
@@ -425,6 +438,7 @@ function MemoryBoard({
   flash,
   positions,
   rotated,
+  motionEnabled,
   response,
   firstCell,
   answer,
@@ -434,11 +448,17 @@ function MemoryBoard({
   flash: number;
   positions: number[];
   rotated: boolean;
+  motionEnabled: boolean;
   response: number[];
   firstCell: RefObject<HTMLButtonElement | null>;
   answer: (value: number) => void;
 }) {
   const turn = target.rotation === "clockwise" ? 90 : -90;
+  const boardClass = `${styles.board} ${target.task === "rotation" ? styles.rotationBoard : ""} ${phase === "cue" ? styles.boardSetup : ""} ${motionEnabled ? styles.boardMotion : ""}`;
+  const motionStyle = {
+    "--turn-duration": `${MEMORY_MOTION.turn}ms`,
+    "--marker-duration": `${MEMORY_MOTION.marker}ms`,
+  } as CSSProperties;
   const physical = (cell: number) =>
     target.task === "rotation" && rotated
       ? rotateCell(cell, target.rotation!)
@@ -501,7 +521,8 @@ function MemoryBoard({
     return (
       <div className={styles.boardWrap}>
         <div
-          className={styles.board}
+          className={boardClass}
+          style={motionStyle}
           aria-label="Moving targets on a four by four board"
         >
           {Array.from({ length: 16 }, (_, cell) => (
@@ -511,10 +532,10 @@ function MemoryBoard({
             (cell, id) => (
               <button
                 ref={id === 0 ? firstCell : undefined}
-                className={`${styles.marker} ${phase === "watch" && target.sequence[flash] === id ? styles.markerActive : ""} ${response.includes(cell) ? styles.selected : ""}`}
+                className={`${styles.marker} ${motionEnabled ? styles.markerMotion : ""} ${phase === "watch" && target.sequence[flash] === id ? styles.markerActive : ""} ${response.includes(cell) ? styles.selected : ""}`}
                 style={{
-                  left: `${(cell % 4) * 25 + 2.5}%`,
-                  top: `${Math.floor(cell / 4) * 25 + 2.5}%`,
+                  // A cell step is 125% of the marker's 20%-board width.
+                  transform: `translate3d(${(cell % 4) * 125 + 12.5}%, ${Math.floor(cell / 4) * 125 + 12.5}%, 0)`,
                 }}
                 key={id}
                 disabled={phase !== "recall"}
@@ -536,10 +557,11 @@ function MemoryBoard({
       </div>
     );
   return (
-    <div className={styles.boardWrap}>
+    <div className={`${styles.boardWrap} ${target.task === "rotation" ? styles.rotationWrap : ""}`}>
       <div
-        className={`${styles.board} ${target.task === "split" ? styles.splitBoard : ""}`}
+        className={`${boardClass} ${target.task === "split" ? styles.splitBoard : ""}`}
         style={{
+          ...motionStyle,
           transform:
             target.task === "rotation" && rotated
               ? `rotate(${turn}deg)`
@@ -575,6 +597,7 @@ function MemoryBoard({
               onClick={() => answer(actual)}
             >
               <span
+                className={styles.cellContent}
                 style={{
                   display: "inline-flex",
                   transform:
@@ -632,6 +655,7 @@ function UnlockedLab({
   const [flash, setFlash] = useState(-1);
   const [rotated, setRotated] = useState(false);
   const [positions, setPositions] = useState<number[]>([]);
+  const [motionEnabled, setMotionEnabled] = useState(false);
   const [response, setResponse] = useState<number[]>([]);
   const responseRef = useRef<number[]>([]);
   const phaseRef = useRef<Phase>(phase);
@@ -755,6 +779,7 @@ function UnlockedLab({
   function cancelPlayback() {
     playback.current += 1;
     narration.current?.cancel();
+    setMotionEnabled(false);
     setFlash(-1);
   }
   const pause = useCallback(() => {
@@ -762,6 +787,7 @@ function UnlockedLab({
       setPausedFrom(phaseRef.current);
       playback.current += 1;
       narration.current?.cancel();
+      setMotionEnabled(false);
       setFlash(-1);
       changePhase("paused");
     }
@@ -824,8 +850,12 @@ function UnlockedLab({
     const slow = savedRef.current.slow;
     const on = slow ? 1200 : 800;
     const gap = slow ? 300 : 200;
+    const reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
     setResponse([]);
     responseRef.current = [];
+    setMotionEnabled(false);
     setRotated(false);
     setPositions(target.positions ? [...target.positions] : []);
     setFlash(-1);
@@ -865,9 +895,13 @@ function UnlockedLab({
       }
       changePhase("hold");
       if (target.task === "rotation") {
+        setMotionEnabled(!reducedMotion);
+        await wait(MEMORY_MOTION.prelude, token);
         setRotated(true);
-        await wait(1000, token);
+        await wait(MEMORY_MOTION.turn + MEMORY_MOTION.turnSettle, token);
       } else if (target.task === "tracking") {
+        setMotionEnabled(!reducedMotion);
+        await wait(MEMORY_MOTION.prelude, token);
         const moving = [...target.positions!];
         for (const [a, b] of target.moves!) {
           const old = moving[a];
@@ -878,13 +912,13 @@ function UnlockedLab({
           // Move through an empty place so identical circles never cross ambiguously.
           moving[a] = empty;
           setPositions([...moving]);
-          await wait(500, token);
+          await wait(MEMORY_MOTION.marker + MEMORY_MOTION.markerSettle, token);
           moving[b] = old;
           setPositions([...moving]);
-          await wait(500, token);
+          await wait(MEMORY_MOTION.marker + MEMORY_MOTION.markerSettle, token);
           moving[a] = destination;
           setPositions([...moving]);
-          await wait(500, token);
+          await wait(MEMORY_MOTION.marker + MEMORY_MOTION.markerSettle, token);
         }
       } else await wait(800, token);
       changePhase("recall");
@@ -902,7 +936,10 @@ function UnlockedLab({
       const next = createProgress(
         crypto.randomUUID(),
         focusedTask ? 8 : length,
-        { focusedTask, tasks: savedRef.current.tasks, modality },
+        {
+          focusedTask, tasks: savedRef.current.tasks, modality,
+          digitOrder: savedRef.current.digitOrder,
+        },
       );
       persist({ ...savedRef.current, session: next, redeemed: [] });
       setPlaying(true);
@@ -1033,6 +1070,9 @@ function UnlockedLab({
               0,
             ),
             slow: savedRef.current.slow,
+            ...(next.plan.includes("sort-digits")
+              ? { digitOrder: next.digitOrder ?? "ascending" }
+              : {}),
             modality: next.focusedTask
               ? AUDIO_TASK_IDS.includes(
                   next.focusedTask as (typeof AUDIO_TASK_IDS)[number],
@@ -1270,6 +1310,7 @@ function UnlockedLab({
                           {new Date(log.date).toLocaleDateString()}: span{" "}
                           {log.maxSpan} · {log.modality} ·{" "}
                           {log.slow ? "slower" : "standard"}
+                          {log.digitOrder ? ` · ${log.digitOrder}` : ""}
                         </title>
                       </circle>
                     ))}
@@ -1287,6 +1328,7 @@ function UnlockedLab({
                             {log.correct}/{log.rounds} first try ·{" "}
                             {log.modality} ·{" "}
                             {log.slow ? "slower pace" : "standard pace"}
+                            {log.digitOrder ? ` · ${log.digitOrder}` : ""}
                           </span>
                         </li>
                       ))}
@@ -1399,6 +1441,22 @@ function UnlockedLab({
                 />{" "}
                 Slower presentation
               </label>
+              <div className={styles.settingRow}>
+                <label htmlFor="number-order">Number order</label>
+                <select
+                  id="number-order"
+                  className={styles.select}
+                  value={saved.digitOrder}
+                  disabled={!!session?.active}
+                  onChange={(event) => persist({
+                    ...savedRef.current,
+                    digitOrder: event.target.value as DigitOrder,
+                  })}
+                >
+                  <option value="ascending">Small → large</option>
+                  <option value="descending">Large → small</option>
+                </select>
+              </div>
             </div>
             <section aria-labelledby="exercise-title">
               <div className={styles.sectionHeading}>
@@ -1554,6 +1612,11 @@ function UnlockedLab({
             <div className={styles.roundTitle} ref={roundTitleRef}>
               <h1 id="round-title">{task?.title}</h1>
               <p>{task?.instruction}</p>
+              {current?.answerKind === "ordered-digits" && (
+                <OrderCue mode={current.task === "sort-digits"
+                  ? current.digitOrder ?? "ascending"
+                  : "reverse"} />
+              )}
             </div>
             {lastResult && !review && phase !== "wrong" && (
               <p className={styles.lastResult} role="status">
@@ -1579,7 +1642,7 @@ function UnlockedLab({
               <>
                 <h2 className={styles.sectionTitle}>Example</h2>
                 <Example
-                  round={generateRound(round.task, 3, "solved-example-v1")}
+                  round={generateRound(round.task, 3, "solved-example-v1", undefined, round.digitOrder)}
                 />
                 <div className={styles.roundActions}>
                   <button
@@ -1670,11 +1733,13 @@ function UnlockedLab({
                     </div>
                   ) : (
                     <MemoryBoard
+                      key={round.id}
                       target={round}
                       phase={phase}
                       flash={flash}
                       positions={positions}
                       rotated={rotated}
+                      motionEnabled={motionEnabled}
                       response={response}
                       firstCell={firstCell}
                       answer={answer}
@@ -1818,7 +1883,7 @@ function UnlockedLab({
               >
                 <summary>Example</summary>
                 <Example
-                  round={generateRound(round.task, 3, "solved-example-v1")}
+                  round={generateRound(round.task, 3, "solved-example-v1", undefined, round.digitOrder)}
                 />
               </details>
             )}
