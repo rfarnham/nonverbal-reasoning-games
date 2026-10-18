@@ -183,37 +183,41 @@ export class LocalDigitRecognizer {
   async start(): Promise<void> {
     const generation = this.generation;
     const current = this.createRecording();
+    const isCurrent = () => this.current === current && generation === this.generation;
     try {
-      // Resume synchronously from the recording gesture, before permission awaits.
-      current.context = new AudioContext();
-      const resumed = current.context.resume();
-      // Permission can outlive a failed resume; attach a handler immediately.
-      void resumed.catch(() => {});
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true }, video: false });
-      if (this.current !== current || generation !== this.generation) { stream.getTracks().forEach((track) => track.stop()); throw aborted(); }
-      current.stream = stream;
-      await resumed;
-      await current.context.audioWorklet.addModule(`${SPEECH_ROOT}/digit-capture.worklet.js`);
-      if (this.current !== current || generation !== this.generation) throw aborted();
-      current.worklet = new AudioWorkletNode(current.context, "digit-capture", { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
+      // Resume from the recording gesture. Prepare the complete capture graph
+      // before opening the microphone so a cold worklet fetch cannot lose speech.
+      const context = new AudioContext();
+      current.context = context;
+      await context.resume();
+      if (!isCurrent()) throw aborted();
+      await context.audioWorklet.addModule(`${SPEECH_ROOT}/digit-capture.worklet.js`);
+      if (!isCurrent()) throw aborted();
+      current.worklet = new AudioWorkletNode(context, "digit-capture", { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
       current.worklet.port.onmessage = (event: MessageEvent<{ type: string; samples?: Float32Array }>) => {
         if (this.current !== current) return;
         if (event.data.type === "flushed") { current.flush?.(); current.flush = null; return; }
         const samples = event.data.samples;
         if (event.data.type === "samples" && samples instanceof Float32Array) this.sendSamples(current, samples);
       };
-      current.source = current.context.createMediaStreamSource(stream);
-      current.gain = current.context.createGain();
+      current.gain = context.createGain();
       current.gain.gain.value = 0;
-      current.source.connect(current.worklet);
       current.worklet.connect(current.gain);
-      current.gain.connect(current.context.destination);
+      current.gain.connect(context.destination);
+      if (!isCurrent()) throw aborted();
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true }, video: false });
+      if (!isCurrent()) { stream.getTracks().forEach((track) => track.stop()); throw aborted(); }
+      current.stream = stream;
+      current.source = context.createMediaStreamSource(stream);
+      current.source.connect(current.worklet);
       stream.getAudioTracks().forEach((track) => track.addEventListener("ended", () => {
         if (this.current === current && !current.finishing) this.failRecording(new Error("The microphone stopped. Record again or use the keypad."));
       }, { once: true }));
       current.timer = setTimeout(() => this.failRecording(new Error("Recording stopped after 45 seconds. Record again or use the keypad.")), MAX_SECONDS * 1000);
     } catch (error) {
+      const cancelled = !isCurrent();
       if (this.current === current) this.clearRecording(current);
+      if (cancelled) throw aborted();
       throw error;
     }
   }

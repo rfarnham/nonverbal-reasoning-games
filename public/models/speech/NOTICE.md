@@ -65,6 +65,9 @@ recordings are not distributed with this app. The same 5.565-second WAV passed
 both arbitrary offline PCM inference and the real MediaStream → AudioWorklet →
 WASM path, using Chromium's file-backed microphone. Silence was rejected.
 All requests were same-origin GETs; no upload request or console error occurred.
+The first microphone recording also passed with the capture-worklet download
+delayed by one second. Capture setup completes before microphone access;
+cancelling or failing that setup never opens the microphone.
 Offline inference took about 0.51 seconds on the cloud test CPU. This is a smoke
 test, not an accuracy study or a phone-performance guarantee.
 

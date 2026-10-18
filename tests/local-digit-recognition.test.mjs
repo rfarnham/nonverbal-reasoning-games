@@ -125,6 +125,98 @@ test("local setup, PCM scaling, cancellation, and idle worker failure preserve r
   }
 });
 
+test("cold capture setup finishes before opening a microphone and cancellation never opens it later", async () => {
+  const descriptors = new Map();
+  function replace(name, value) {
+    descriptors.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+    Object.defineProperty(globalThis, name, { configurable: true, writable: true, value });
+  }
+  const order = [];
+  const modules = [];
+  const contexts = [];
+  let microphones = 0;
+  let resolveMicrophone;
+  class FakeWorker {
+    postMessage(message) {
+      if (message.action === "load") queueMicrotask(() => this.onmessage({ data: { event: "load", result: true } }));
+    }
+    terminate() {}
+  }
+  class FakeContext {
+    state = "running";
+    destination = {};
+    audioWorklet = {
+      addModule() {
+        order.push("module");
+        return new Promise((resolve, reject) => modules.push({ resolve, reject }));
+      },
+    };
+    constructor() { contexts.push(this); }
+    resume() { order.push("resume"); return Promise.resolve(); }
+    createGain() { return { gain: { value: 0 }, connect() {}, disconnect() {} }; }
+    close() { this.state = "closed"; return Promise.resolve(); }
+  }
+  class FakeWorklet {
+    port = { onmessage: null, close() {} };
+    constructor() { order.push("worklet"); }
+    connect() {}
+    disconnect() {}
+  }
+  try {
+    replace("window", { isSecureContext: true, location: { origin: "https://games.example" } });
+    replace("navigator", { mediaDevices: { getUserMedia() {
+      microphones += 1;
+      order.push("microphone");
+      return new Promise((resolve) => { resolveMicrophone = resolve; });
+    } } });
+    replace("AudioContext", FakeContext);
+    replace("AudioWorkletNode", FakeWorklet);
+    replace("Worker", FakeWorker);
+    const recognizer = new LocalDigitRecognizer();
+    await recognizer.prepare();
+    const cancelled = recognizer.start();
+    const cancelledRejection = assert.rejects(cancelled, { name: "AbortError" });
+    await Promise.resolve();
+    assert.equal(modules.length, 1);
+    assert.equal(microphones, 0);
+    recognizer.cancel();
+    modules[0].resolve();
+    await cancelledRejection;
+    assert.equal(microphones, 0);
+    assert.equal(contexts[0].state, "closed");
+
+    const failed = recognizer.start();
+    const failedRejection = assert.rejects(failed, /module unavailable/);
+    await Promise.resolve();
+    modules[1].reject(new Error("module unavailable"));
+    await failedRejection;
+    assert.equal(microphones, 0);
+    assert.equal(contexts[1].state, "closed");
+
+    const latePermission = recognizer.start();
+    const lateRejection = assert.rejects(latePermission, { name: "AbortError" });
+    await Promise.resolve();
+    assert.equal(microphones, 0);
+    modules[2].resolve();
+    await Promise.resolve();
+    assert.deepEqual(order.slice(-4), ["resume", "module", "worklet", "microphone"]);
+    assert.equal(microphones, 1);
+    recognizer.cancel();
+    let tracksStopped = 0;
+    resolveMicrophone({ getTracks() { return [{ stop() { tracksStopped += 1; } }]; } });
+    await lateRejection;
+    assert.equal(tracksStopped, 1);
+    assert.equal(contexts[2].state, "closed");
+    assert.equal(recognizer.recording, false);
+    recognizer.dispose();
+  } finally {
+    for (const [name, descriptor] of descriptors) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else delete globalThis[name];
+    }
+  }
+});
+
 test("local speech assets match the audited sources and fit ordinary static hosting", async () => {
   const manifest = JSON.parse(await readFile(new URL("../public/models/speech/manifest.json", import.meta.url), "utf8"));
   for (const asset of manifest.assets) {

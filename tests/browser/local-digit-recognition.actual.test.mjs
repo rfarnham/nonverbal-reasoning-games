@@ -13,7 +13,7 @@ const root = fileURLToPath(new URL("../../", import.meta.url));
 
 // Optional real inference with an independently supplied 16kHz mono WAV.
 // Expected digits are asserted by this test and never passed to the recognizer.
-test("actual local WASM digit recognition and AudioWorklet microphone capture", { skip: !wavPath || !expected, timeout: 180_000 }, async () => {
+test("actual local WASM recognition preserves the first spoken digits with a cold AudioWorklet", { skip: !wavPath || !expected, timeout: 180_000 }, async () => {
   const fixture = await readFile(path.resolve(wavPath));
   const source = await readFile(path.join(root, "app/lab/working-memory/local-digit-recognition.ts"), "utf8");
   const compiled = ts.transpileModule(source.replace("process.env.NEXT_PUBLIC_BASE_PATH", '""'), {
@@ -29,6 +29,9 @@ test("actual local WASM digit recognition and AudioWorklet microphone capture", 
       if (request.url === "/favicon.ico") { response.statusCode = 204; response.end(); return; }
       const relative = String(request.url).slice(1);
       if (!relative.startsWith("models/speech/") || relative.includes("..")) throw new Error("Invalid asset path");
+      // Simulate the initial worklet fetch on a slow phone connection. Capture
+      // must start after this delay or the file-backed microphone loses digits.
+      if (relative.endsWith("digit-capture.worklet.js")) await new Promise((resolve) => setTimeout(resolve, 1000));
       response.setHeader("Content-Type", relative.endsWith(".js") ? "text/javascript" : "application/octet-stream");
       response.end(await readFile(path.join(root, "public", relative)));
     } catch { response.statusCode = 404; response.end(); }
