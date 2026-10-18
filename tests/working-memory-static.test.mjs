@@ -28,8 +28,8 @@ test('Memory Lab exports a locked, noindex, hard-refresh-safe GitHub Pages route
   ]);
   assert.match(html, /<title>Memory Lab · Spatial Gym<\/title>/);
   assert.match(html, /name="robots" content="noindex, nofollow"/);
-  assert.match(html, /Your access password/);
-  assert.match(html, /Unlock lab/);
+  assert.match(html, /Password/);
+  assert.match(html, /Unlock/);
   assert.match(home, new RegExp(`href="${basePath}/lab/working-memory/"`));
   assert.match(html, new RegExp(`href="${basePath}/"`));
   const passwordInputs = [...html.matchAll(/<input\b[^>]*type="password"[^>]*>/g)].map(match => match[0]);

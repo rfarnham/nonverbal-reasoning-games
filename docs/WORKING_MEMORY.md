@@ -38,6 +38,29 @@ completed-round totals and adaptive spans, but does not count it as a completed
 session. A presentation interrupted by pause or a hidden tab restarts; a paused
 recall retains the response entered so far.
 
+Checking a correct sequence now records the result, advances, and presents the
+next challenge in the same action. There is no intermediate Next or Start
+screen. The last correct result remains in a compact status line. An incorrect
+answer retains its correction and a single Replay sequence action; replay does
+not change its first-attempt record. The last successful submission completes
+the session directly. This is a user-requested exception to the shared shell's
+explicit Next checkpoint. Saved sessions from the earlier flow remain valid.
+If sound is muted when a listening exercise is next, it waits for an explicit
+Turn sound on & listen action rather than changing the saved sound preference.
+Each new presentation brings its instructions and board into view before cues
+begin, including on short phone screens.
+
+The interface follows the [worksheet workflow's plain-language standard](https://github.com/jamesrp/math-circle-worksheets/blob/main/worksheet-workflow/blocks/spec.md)
+and [do-not list](https://github.com/jamesrp/math-circle-worksheets/blob/main/worksheet-workflow/blocks/neg.md):
+short concrete instructions, diagrams that serve the task, and no decorative
+framing or manufactured praise. The lab removes its promotional hero, slogans,
+stickers, icon cards, and repeated stage labels. Statistics sit behind Progress.
+Opening examples and optional in-round examples remain because this standalone
+app has no adult facilitator supplying the instructions. A separate reviewer
+checks the revised screens before release, following the workflow's independent
+review and revision principle. The encrypted pack and its key do not change, so
+existing encrypted device progress remains readable.
+
 To rebuild the encrypted pack, keep source JSON and generated digit MP3s outside
 the repository, then run `node scripts/encrypt-working-memory.mjs --source
 /private/content.json --audio-directory /private/digits --password-file
