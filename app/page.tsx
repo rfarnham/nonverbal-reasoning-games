@@ -171,6 +171,19 @@ export default function Home() {
         <div className="lab-grid">
           <article className="lab-card">
             <div className="lab-card-equation" aria-hidden="true">
+              <span>●</span><i>→</i><span>◆</span><i>→</i><strong>?</strong>
+            </div>
+            <div className="lab-card-copy">
+              <span className="status-pill status-lab">Encrypted working-memory practice</span>
+              <h3>Memory Lab</h3>
+              <p>Practice visual and listening sequences with an adaptive mix or one focused exercise. Unlock the content locally; progress stays encrypted on your device.</p>
+              <Link className="game-link" href="/lab/working-memory/" prefetch={false}>
+                Unlock the lab <span aria-hidden="true">→</span>
+              </Link>
+            </div>
+          </article>
+          <article className="lab-card">
+            <div className="lab-card-equation" aria-hidden="true">
               <span>△</span><i>+</i><span>□</span><i>=</i><strong>?</strong>
             </div>
             <div className="lab-card-copy">

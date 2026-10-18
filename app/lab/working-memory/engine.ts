@@ -1,0 +1,365 @@
+/** Pure, deterministic mechanics for the standalone working-memory lab. */
+export const VISUAL_TASK_IDS = [
+  "forward", "backward", "rotation", "tracking", "symbols", "locations", "pattern", "split",
+] as const;
+export const AUDIO_TASK_IDS = ["reverse-digits", "hidden-digits", "sort-digits"] as const;
+export const TASK_IDS = [...VISUAL_TASK_IDS, ...AUDIO_TASK_IDS] as const;
+
+export type TaskId = (typeof TASK_IDS)[number];
+export type SessionModality = "visual" | "audio" | "mixed";
+export const SESSION_TASK_POOLS = {
+  visual: VISUAL_TASK_IDS,
+  audio: AUDIO_TASK_IDS,
+  mixed: ["forward", "rotation", "tracking", ...AUDIO_TASK_IDS],
+} as const satisfies Record<SessionModality, readonly TaskId[]>;
+export type Seed = string | number;
+export type SessionLength = 8 | 24 | 48;
+export type RotationDirection = "clockwise" | "counterclockwise";
+export type AnswerKind = "ordered-cells" | "unordered-cells" | "ordered-symbols" | "ordered-digits";
+export type Swap = [number, number];
+
+export interface MemoryRound {
+  version: 1;
+  id: string;
+  task: TaskId;
+  span: number;
+  gridSize: 4;
+  /** Ordered cells, marker IDs, symbol IDs, or digits 1–9; pattern is a simultaneous set. */
+  sequence: number[];
+  expected: number[];
+  answerKind: AnswerKind;
+  rotation?: RotationDirection;
+  /** Initial cell for each marker/symbol ID. Eight tracking markers; six symbols. */
+  positions?: number[];
+  /** Swapped marker IDs, applied sequentially to positions. */
+  moves?: Swap[];
+  /** Symbol IDs to cue during location recall, in response order. */
+  cues?: number[];
+  fingerprint: string;
+}
+
+export interface TaskState {
+  span: number;
+  successStreak: 0 | 1;
+  attempts: number;
+  correct: number;
+}
+export type TaskStates = Record<TaskId, TaskState>;
+export interface RoundResult { round: MemoryRound; correct: boolean }
+
+export interface MemoryProgress {
+  version: 1;
+  seed: string;
+  length: SessionLength;
+  modality: SessionModality;
+  focusedTask?: TaskId;
+  /** Starting adaptive state is retained so stored progress can be replay-validated. */
+  initialTasks: TaskStates;
+  tasks: TaskStates;
+  plan: TaskId[];
+  cursor: number;
+  history: RoundResult[];
+  active: MemoryRound | null;
+  answered: boolean;
+}
+
+export interface ProgressOptions { focusedTask?: TaskId; tasks?: TaskStates; modality?: SessionModality }
+
+const CELLS = Array.from({ length: 16 }, (_, index) => index);
+const MIN_SPAN = 2;
+const INITIAL_SPAN = 3;
+const MAX_SPAN = 9;
+const GENERATION_ATTEMPTS = 128;
+const MAX_COUNT = 1_000_000;
+
+function hash(value: string): number {
+  let result = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    result = Math.imul(result ^ value.charCodeAt(index), 16777619);
+  }
+  return result >>> 0;
+}
+
+function randomFor(seed: Seed): () => number {
+  let value = hash(String(seed));
+  return () => {
+    value += 0x6d2b79f5;
+    let mixed = Math.imul(value ^ (value >>> 15), 1 | value);
+    mixed ^= mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed);
+    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function shuffled<T>(values: readonly T[], random: () => number): T[] {
+  const result = [...values];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const other = Math.floor(random() * (index + 1));
+    [result[index], result[other]] = [result[other], result[index]];
+  }
+  return result;
+}
+
+function idSequence(count: number, span: number, random: () => number): number[] {
+  const sequence: number[] = [];
+  for (let index = 0; index < span; index += 1) {
+    const previous = sequence[index - 1];
+    const options = Array.from({ length: count }, (_, id) => id).filter((id) => id !== previous);
+    sequence.push(options[Math.floor(random() * options.length)]);
+  }
+  return sequence;
+}
+
+function isTask(value: unknown): value is TaskId {
+  return typeof value === "string" && TASK_IDS.includes(value as TaskId);
+}
+
+function isModality(value: unknown): value is SessionModality {
+  return value === "visual" || value === "audio" || value === "mixed";
+}
+
+function assertSpan(span: number): void {
+  if (!Number.isInteger(span) || span < MIN_SPAN || span > MAX_SPAN) {
+    throw new RangeError("Memory span must be an integer from 2 through 9.");
+  }
+}
+
+export function rotateCell(cell: number, direction: RotationDirection): number {
+  if (!Number.isInteger(cell) || cell < 0 || cell >= 16) throw new RangeError("Invalid grid cell.");
+  if (direction !== "clockwise" && direction !== "counterclockwise") throw new TypeError("Invalid turn.");
+  const row = Math.floor(cell / 4);
+  const column = cell % 4;
+  return direction === "clockwise" ? column * 4 + (3 - row) : (3 - column) * 4 + row;
+}
+
+export function finalTrackingPositions(round: Pick<MemoryRound, "positions" | "moves">): number[] {
+  if (!round.positions || !round.moves) throw new TypeError("Tracking round needs positions and moves.");
+  const positions = [...round.positions];
+  for (const [first, second] of round.moves) {
+    if (first === second || !Number.isInteger(first) || !Number.isInteger(second) || first < 0 || second < 0 || first >= positions.length || second >= positions.length) {
+      throw new RangeError("Invalid marker swap.");
+    }
+    [positions[first], positions[second]] = [positions[second], positions[first]];
+  }
+  return positions;
+}
+
+/** Three successive adjacent cells on one straight line form an easy spatial chunk. */
+export function hasStraightRun(sequence: readonly number[]): boolean {
+  for (let index = 2; index < sequence.length; index += 1) {
+    const [first, second, third] = sequence.slice(index - 2, index + 1);
+    const rowStep = Math.floor(second / 4) - Math.floor(first / 4);
+    const columnStep = second % 4 - first % 4;
+    if (Math.abs(rowStep) <= 1 && Math.abs(columnStep) <= 1 && (rowStep !== 0 || columnStep !== 0)
+      && Math.floor(third / 4) - Math.floor(second / 4) === rowStep
+      && third % 4 - second % 4 === columnStep) return true;
+  }
+  return false;
+}
+
+function candidate(task: TaskId, span: number, seed: string): MemoryRound {
+  const random = randomFor(seed);
+  let sequence = shuffled(CELLS, random).slice(0, span);
+  let expected = [...sequence];
+  let answerKind: AnswerKind = "ordered-cells";
+  let rotation: RotationDirection | undefined;
+  let positions: number[] | undefined;
+  let moves: Swap[] | undefined;
+  let cues: number[] | undefined;
+
+  if (task === "backward") expected.reverse();
+  if (task === "rotation") {
+    rotation = random() < 0.5 ? "clockwise" : "counterclockwise";
+    expected = sequence.map((cell) => rotateCell(cell, rotation!));
+  }
+  if (task === "tracking") {
+    positions = shuffled(CELLS, random).slice(0, 8);
+    const moving = shuffled(Array.from({ length: 8 }, (_, id) => id), random);
+    moves = [[moving[0], moving[1]], [moving[2], moving[3]], [moving[4], moving[5]]];
+    sequence = idSequence(8, span, random);
+    // At least one remembered identity must actually change location.
+    if (!sequence.some((id) => moving.slice(0, 6).includes(id))) sequence[0] = moving[0];
+    const final = finalTrackingPositions({ positions, moves });
+    expected = sequence.map((id) => final[id]);
+  }
+  if (task === "symbols") {
+    sequence = idSequence(6, span, random);
+    expected = [...sequence];
+    answerKind = "ordered-symbols";
+  }
+  if (task === "locations") {
+    positions = shuffled(CELLS, random).slice(0, 6);
+    cues = idSequence(6, span, random);
+    sequence = [...cues];
+    expected = cues.map((id) => positions![id]);
+  }
+  if (task === "pattern") {
+    sequence.sort((first, second) => first - second);
+    expected = [...sequence];
+    answerKind = "unordered-cells";
+  }
+  if (task === "split") {
+    const left = shuffled(CELLS.filter((cell) => cell % 4 < 2), random);
+    const right = shuffled(CELLS.filter((cell) => cell % 4 >= 2), random);
+    const startsLeft = random() < 0.5;
+    sequence = Array.from({ length: span }, (_, index) => {
+      const side = ((index % 2 === 0) === startsLeft) ? left : right;
+      return side[Math.floor(index / 2)];
+    });
+    expected = [...sequence];
+  }
+  if (task === "reverse-digits" || task === "hidden-digits" || task === "sort-digits") {
+    sequence = idSequence(9, span, random).map((id) => id + 1);
+    expected = task === "sort-digits" ? [...sequence].sort((first, second) => first - second) : [...sequence].reverse();
+    answerKind = "ordered-digits";
+  }
+
+  // A simultaneous set and disjoint swaps have one stable semantic fingerprint.
+  const finalPositions = task === "tracking" ? finalTrackingPositions({ positions, moves }) : undefined;
+  const fingerprint = JSON.stringify([task, sequence, rotation ?? null, positions ?? null, finalPositions ?? null]);
+  return {
+    version: 1, id: `${task}-${hash(fingerprint).toString(36)}`, task, span, gridSize: 4,
+    sequence, expected, answerKind,
+    ...(rotation ? { rotation } : {}), ...(positions ? { positions } : {}),
+    ...(moves ? { moves } : {}), ...(cues ? { cues } : {}), fingerprint,
+  };
+}
+
+/** Generation is reproducible and never returns a repeated session fingerprint. */
+export function generateRound(task: TaskId, span: number, seed: Seed, seen: ReadonlySet<string> = new Set()): MemoryRound {
+  if (!isTask(task)) throw new TypeError("Unknown memory task.");
+  assertSpan(span);
+  for (let attempt = 0; attempt < GENERATION_ATTEMPTS; attempt += 1) {
+    const round = candidate(task, span, `${String(seed)}:candidate:${attempt}`);
+    if ((task === "forward" || task === "backward" || task === "rotation" || task === "split") && hasStraightRun(round.sequence)) continue;
+    // Every audio manipulation must change the presented order, including palindromes.
+    if (round.answerKind === "ordered-digits" && round.expected.every((digit, index) => digit === round.sequence[index])) continue;
+    if (!seen.has(round.fingerprint)) return round;
+  }
+  throw new Error("Could not create a new memory round after 128 attempts.");
+}
+
+export function isCorrectResponse(round: MemoryRound, response: readonly number[]): boolean {
+  if (response.length !== round.expected.length || response.some((value) => !Number.isInteger(value))) return false;
+  if (round.answerKind === "unordered-cells") {
+    if (new Set(response).size !== response.length) return false;
+    return [...response].sort((first, second) => first - second).every((cell, index) => cell === round.expected[index]);
+  }
+  return response.every((value, index) => value === round.expected[index]);
+}
+
+/** Each block presents every task in the selected pool, with no repeated boundary task. */
+export function createSessionPlan(length: SessionLength, seed: Seed, focusedTask?: TaskId, modality: SessionModality = "mixed"): TaskId[] {
+  if (!isModality(modality)) throw new TypeError("Unknown session modality.");
+  if (focusedTask !== undefined) {
+    if (!isTask(focusedTask) || length !== 8) throw new TypeError("Focused practice contains eight rounds of one known task.");
+    return Array.from({ length }, () => focusedTask);
+  }
+  if (length !== 24 && length !== 48) throw new RangeError("A balanced session contains 24 or 48 rounds.");
+  const random = randomFor(`${String(seed)}:plan`);
+  const pool = SESSION_TASK_POOLS[modality];
+  const result: TaskId[] = [];
+  for (let block = 0; block < length / pool.length; block += 1) {
+    const tasks: TaskId[] = shuffled<TaskId>(pool, random);
+    if (tasks[0] === result[result.length - 1]) [tasks[0], tasks[1]] = [tasks[1], tasks[0]];
+    result.push(...tasks);
+  }
+  return result;
+}
+
+export function createTaskStates(): TaskStates {
+  return Object.fromEntries(TASK_IDS.map((task) => [task, { span: INITIAL_SPAN, successStreak: 0, attempts: 0, correct: 0 }])) as TaskStates;
+}
+
+function cloneTasks(tasks: TaskStates): TaskStates {
+  return Object.fromEntries(TASK_IDS.map((task) => [task, { ...tasks[task] }])) as TaskStates;
+}
+
+function validTasks(value: unknown): value is TaskStates {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const tasks = value as Record<string, unknown>;
+  if (Object.keys(tasks).length !== TASK_IDS.length) return false;
+  return TASK_IDS.every((task) => {
+    const state = tasks[task] as TaskState | undefined;
+    return !!state && typeof state === "object" && !Array.isArray(state)
+      && Number.isInteger(state.span) && state.span >= MIN_SPAN && state.span <= MAX_SPAN
+      && (state.successStreak === 0 || state.successStreak === 1)
+      && Number.isInteger(state.attempts) && state.attempts >= 0 && state.attempts <= MAX_COUNT
+      && Number.isInteger(state.correct) && state.correct >= 0 && state.correct <= state.attempts
+      && (state.successStreak === 0 || state.correct > 0);
+  });
+}
+
+export function createProgress(seed: Seed, length: SessionLength = 24, options: ProgressOptions = {}): MemoryProgress {
+  if ((typeof seed !== "string" && typeof seed !== "number") || String(seed).length > 256 || (typeof seed === "number" && !Number.isFinite(seed))) {
+    throw new TypeError("Invalid session seed.");
+  }
+  if (options.tasks && !validTasks(options.tasks)) throw new TypeError("Invalid starting adaptive state.");
+  const tasks = cloneTasks(options.tasks ?? createTaskStates());
+  const modality = options.modality ?? "mixed";
+  const plan = createSessionPlan(length, seed, options.focusedTask, modality);
+  const normalizedSeed = String(seed);
+  return {
+    version: 1, seed: normalizedSeed, length, modality,
+    ...(options.focusedTask ? { focusedTask: options.focusedTask } : {}),
+    initialTasks: cloneTasks(tasks), tasks, plan, cursor: 0, history: [], answered: false,
+    active: generateRound(plan[0], tasks[plan[0]].span, `${normalizedSeed}:round:0`),
+  };
+}
+
+export function activeRound(progress: MemoryProgress): MemoryRound | null { return progress.active; }
+
+/** A retry must not call this function: only the first committed response changes adaptation. */
+export function recordFirstAttempt(progress: MemoryProgress, round: MemoryRound, correct: boolean): MemoryProgress {
+  if (!progress.active || progress.answered || progress.cursor >= progress.length) throw new Error("This round has already recorded its first attempt.");
+  if (typeof correct !== "boolean" || JSON.stringify(round) !== JSON.stringify(progress.active)) throw new TypeError("First attempt does not match the active round.");
+  const tasks = cloneTasks(progress.tasks);
+  const previous = tasks[round.task];
+  const streak = correct ? previous.successStreak + 1 : 0;
+  tasks[round.task] = {
+    span: Math.max(MIN_SPAN, Math.min(MAX_SPAN, previous.span + (correct ? (streak === 2 ? 1 : 0) : -1))),
+    successStreak: streak === 1 ? 1 : 0,
+    attempts: previous.attempts + 1,
+    correct: previous.correct + (correct ? 1 : 0),
+  };
+  return { ...progress, tasks, answered: true, history: [...progress.history, { round, correct }] };
+}
+
+export function advanceRound(progress: MemoryProgress): MemoryProgress {
+  if (!progress.active || !progress.answered) throw new Error("Commit the active round before continuing.");
+  const cursor = progress.cursor + 1;
+  const task = progress.plan[cursor];
+  const active = cursor >= progress.length ? null : generateRound(
+    task, progress.tasks[task].span, `${progress.seed}:round:${cursor}`,
+    new Set(progress.history.map((result) => result.round.fingerprint)),
+  );
+  return { ...progress, cursor, active, answered: false };
+}
+
+/** Reject corrupted, incompatible, truncated, or internally inconsistent stored sessions. */
+export function validateProgress(value: unknown): MemoryProgress | null {
+  try {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const saved = value as MemoryProgress;
+    if (saved.version !== 1 || typeof saved.seed !== "string" || saved.seed.length > 256
+      || (saved.length !== 8 && saved.length !== 24 && saved.length !== 48)
+      || !Number.isInteger(saved.cursor) || saved.cursor < 0 || saved.cursor > saved.length
+      || typeof saved.answered !== "boolean" || !Array.isArray(saved.history) || saved.history.length > saved.length
+      || !validTasks(saved.initialTasks) || !validTasks(saved.tasks)) return null;
+    if ((saved.modality !== undefined && !isModality(saved.modality))
+      || (saved.focusedTask !== undefined && !isTask(saved.focusedTask))
+      || saved.history.length !== saved.cursor + (saved.answered ? 1 : 0)
+      || (saved.cursor === saved.length && saved.answered)) return null;
+    let replay = createProgress(saved.seed, saved.length, { focusedTask: saved.focusedTask, tasks: saved.initialTasks, modality: saved.modality });
+    if (JSON.stringify(replay.plan) !== JSON.stringify(saved.plan)) return null;
+    for (let index = 0; index < saved.history.length; index += 1) {
+      const result = saved.history[index];
+      if (!result || typeof result.correct !== "boolean" || JSON.stringify(result.round) !== JSON.stringify(replay.active)) return null;
+      replay = recordFirstAttempt(replay, replay.active!, result.correct);
+      if (index < saved.cursor) replay = advanceRound(replay);
+    }
+    if (JSON.stringify(replay.tasks) !== JSON.stringify(saved.tasks)
+      || replay.cursor !== saved.cursor || replay.answered !== saved.answered
+      || JSON.stringify(replay.active) !== JSON.stringify(saved.active)) return null;
+    return replay;
+  } catch { return null; }
+}

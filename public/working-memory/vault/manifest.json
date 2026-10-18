@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "version": "5c1fdb5377964c3ae182f0639d082d9b",
+  "payload": {
+    "path": "content-5c1fdb5377964c3ae182f0639d082d9b.bin",
+    "sha256": "792bd21a8d870c429894a279be3cdf80717f938dabcbc9dad6ad448d2e22a79d",
+    "bytes": 6418
+  },
+  "assets": {
+    "digit-1": {
+      "path": "asset-f5cab5846a264e9a00f789ef6a1eb2ae.bin",
+      "sha256": "f551bec66ca1754eed264bcbf0b78b7619796f6abeea4b95ef1aefd10a581806",
+      "bytes": 3864
+    },
+    "digit-2": {
+      "path": "asset-832204650c8444f0d2fdd77d63b95d8b.bin",
+      "sha256": "c3aa720ccd7f906a64f332e32cdf36208082461ef3858c525d2376990abbf4ce",
+      "bytes": 3864
+    },
+    "digit-3": {
+      "path": "asset-1af695485149e50f44f8930c07462dec.bin",
+      "sha256": "1403a61037583189f0da8eb55823a5772680542f428195b8e3530d006324e67a",
+      "bytes": 4296
+    },
+    "digit-4": {
+      "path": "asset-d3d6d58e43ff31cc77fce4ccc99a46e4.bin",
+      "sha256": "40e8ef96b81e536bb07a10e38cbc0822b02854f50cc35f4d0e1d8bfaefd591d6",
+      "bytes": 4008
+    },
+    "digit-5": {
+      "path": "asset-f1257ef2dbcb189d9e9adcccc6ec78ce.bin",
+      "sha256": "8a05ef09d136ccd6eb6a82da2fe94b7ccd23b65fc9a1ca9e9e38f4265017a6df",
+      "bytes": 4440
+    },
+    "digit-6": {
+      "path": "asset-94d37df8b1970f692260a373df2870d3.bin",
+      "sha256": "eea21d314a1a3f4783e3016b4d76ea685a65a4fc1e9d51dc650d85d4b023d0ab",
+      "bytes": 4440
+    },
+    "digit-7": {
+      "path": "asset-29fb40de8de4018edd89e23410f2efc2.bin",
+      "sha256": "53c603355358f4bd06a73a2cb68398ebfdedc38fd541cf60395951ae03c093b7",
+      "bytes": 4152
+    },
+    "digit-8": {
+      "path": "asset-9325c1913ef0cbffc4f18e5f3da37ff6.bin",
+      "sha256": "467d93f103e956ea0b1d0f205f19bb8494bf0d428a32edd959e503ec6de705df",
+      "bytes": 3864
+    },
+    "digit-9": {
+      "path": "asset-2a201b5e1efec64a2241ecc6ea0ffc85.bin",
+      "sha256": "62b49c75d1dfe9506677a557ad058ec1a1051a96e2cdef8682b42b9025655930",
+      "bytes": 4152
+    }
+  },
+  "encryption": {
+    "name": "AES-GCM",
+    "kdf": "PBKDF2",
+    "hash": "SHA-256",
+    "iterations": 600000,
+    "salt": "lZgjBNpdUNN6Kg+/FpGKOA=="
+  }
+}

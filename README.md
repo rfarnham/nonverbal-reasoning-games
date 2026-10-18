@@ -53,12 +53,19 @@ Kangaroo Shuffle saves its current question, filters, totals, and seen-question
 history on the device so a later visit resumes without immediately repeating
 questions.
 
+[Memory Lab](https://rfarnham.github.io/nonverbal-reasoning-games/lab/working-memory/)
+provides eight visual and three locally narrated working-memory exercises with
+adaptive mixed sessions or focused practice. Its authored content, digit audio,
+and saved device-local progress are encrypted. See the
+[research audit and design scope](docs/WORKING_MEMORY.md).
+
 | Lab | Practice | Status |
 | --- | --- | --- |
 | [Borrow Flash](https://rfarnham.github.io/nonverbal-reasoning-games/lab/subtraction-flash/) | Visual and listening subtraction practice with tap, handwriting, and speech answers | Playable |
 | [Subtraction Steps](https://rfarnham.github.io/nonverbal-reasoning-games/lab/subtraction-trainer/) | Draw-only vertical subtraction, a writable workspace, five adaptive fluency tiers, and mistake review | Playable |
 | [Math Kangaroo Shuffle](https://rfarnham.github.io/nonverbal-reasoning-games/lab/math-kangaroo/) | Random spatial questions filtered by grade, point value, and question type | Playable |
 | [Think Academy Lab](https://rfarnham.github.io/nonverbal-reasoning-games/lab/think-academy/) | Mixed tests or focused practice across 15 recorded question types, at the original difficulty and three further challenge levels | Playable |
+| [Memory Lab](https://rfarnham.github.io/nonverbal-reasoning-games/lab/working-memory/) | Adaptive visual, spatial, and auditory working-memory practice | Password protected |
 
 The [Think Academy Lab source and curriculum](docs/think-academy-lab.md)
 records all 15 question panels (21 answer slots) extracted from the supplied

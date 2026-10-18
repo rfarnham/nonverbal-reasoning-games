@@ -1,0 +1,99 @@
+{
+  "narrator": {
+    "model": "hexgrad/Kokoro-82M",
+    "revision": "f3ff3571791e39611d31c381e3a41a3af07b4987",
+    "voice": "af_heart",
+    "speed": 0.88,
+    "sampleRate": 24000,
+    "format": "mp3"
+  },
+  "postprocess": {
+    "trimEdgeSilence": true,
+    "ffmpegAudioFilter": "silenceremove=start_periods=1:start_duration=0.04:start_threshold=-50dB:start_silence=0.08:detection=rms,areverse,silenceremove=start_periods=1:start_duration=0.04:start_threshold=-50dB:start_silence=0.08:detection=rms,areverse",
+    "ffmpegAudioCodec": "libmp3lame",
+    "audioBitrateKbps": 48
+  },
+  "cues": {
+    "1": {
+      "caption": "1",
+      "speechText": "one.",
+      "file": "digit-1.mp3",
+      "audioDurationMs": 600,
+      "minVisualMs": 800,
+      "lingerMs": 200,
+      "sha256": "0e3ab99e0a3462a228010206dd5a14665311357723d9ed04895dbe092d0c3694"
+    },
+    "2": {
+      "caption": "2",
+      "speechText": "two.",
+      "file": "digit-2.mp3",
+      "audioDurationMs": 600,
+      "minVisualMs": 800,
+      "lingerMs": 200,
+      "sha256": "ae47f6ac7f762a82e78a03b99bbd32282995c4296d5c2e9fc055a9e99fa3eca1"
+    },
+    "3": {
+      "caption": "3",
+      "speechText": "three.",
+      "file": "digit-3.mp3",
+      "audioDurationMs": 672,
+      "minVisualMs": 800,
+      "lingerMs": 200,
+      "sha256": "4d4c59837746f5a7e36cbdd4d82ca78496cec8d6cec8b9013967cf7af6c658b9"
+    },
+    "4": {
+      "caption": "4",
+      "speechText": "four.",
+      "file": "digit-4.mp3",
+      "audioDurationMs": 624,
+      "minVisualMs": 800,
+      "lingerMs": 200,
+      "sha256": "ccc6c6237e1a77eefa6f061653aed766398c8a4328c99f706b9140846d102ff9"
+    },
+    "5": {
+      "caption": "5",
+      "speechText": "five.",
+      "file": "digit-5.mp3",
+      "audioDurationMs": 696,
+      "minVisualMs": 800,
+      "lingerMs": 200,
+      "sha256": "a938e7b9c19ef656ec93dd97c3179acd49e0ce310f5d5e798af5100730ef98a2"
+    },
+    "6": {
+      "caption": "6",
+      "speechText": "six.",
+      "file": "digit-6.mp3",
+      "audioDurationMs": 696,
+      "minVisualMs": 800,
+      "lingerMs": 200,
+      "sha256": "87a3e6020da2c010bb752e20559dcbf1cc02f2541104d365cf555864e683a4e0"
+    },
+    "7": {
+      "caption": "7",
+      "speechText": "seven.",
+      "file": "digit-7.mp3",
+      "audioDurationMs": 648,
+      "minVisualMs": 800,
+      "lingerMs": 200,
+      "sha256": "4a1865944b7bfdde91d981d1cc50b5a55f5c4ebcd832326853a050bbf908538b"
+    },
+    "8": {
+      "caption": "8",
+      "speechText": "eight.",
+      "file": "digit-8.mp3",
+      "audioDurationMs": 600,
+      "minVisualMs": 800,
+      "lingerMs": 200,
+      "sha256": "abf340e13ee1128c631b8d0dde99cccd51a417eff8346df7971cf73760caf782"
+    },
+    "9": {
+      "caption": "9",
+      "speechText": "nine.",
+      "file": "digit-9.mp3",
+      "audioDurationMs": 648,
+      "minVisualMs": 800,
+      "lingerMs": 200,
+      "sha256": "c1374dc032aff963ed42ef5b8229c3bd497955c1038642c5b5ce3ae7bcb52178"
+    }
+  }
+}
