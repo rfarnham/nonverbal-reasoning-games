@@ -35,6 +35,7 @@ import {
   recordInfiniteFirstAttempt,
 } from "./infinite-progression";
 import { Picture } from "./picture";
+import { useVisibleTimer } from "./use-visible-timer";
 import { PICTURE_BY_ID } from "./picture-data";
 import {
   encodeSelectionAnswerToken,
@@ -82,9 +83,11 @@ type CampaignReviewSelection = {
 };
 
 const CORRECT_REVEAL_MS = 900;
-const REDUCED_CORRECT_REVEAL_MS = 140;
-const WRONG_REVIEW_MS = 2200;
-const REDUCED_WRONG_REVIEW_MS = 1300;
+const WRONG_REVIEW_MS = 900;
+
+function studyDurationMs(difficulty: Difficulty): number {
+  return difficulty === "Expert" || difficulty === "Wizard" ? 12000 : 4000;
+}
 const CAMPAIGN_PROBLEMS_PER_LEVEL = 12;
 const LEGACY_SOUND_KEYS = ["picture-memory-sound"] as const;
 
@@ -264,7 +267,9 @@ export default function PictureMemoryPage() {
   const [selected, setSelected] = useState<readonly PictureId[]>([]);
   const [recalling, setRecalling] = useState(false);
   const [hydratedPlayId, setHydratedPlayId] = useState<string | null>(null);
-  const readyButtonRef = useRef<HTMLButtonElement>(null);
+  const questionHeadingRef = useRef<HTMLHeadingElement>(null);
+  const [studyRemainingMs, setStudyRemainingMs] = useState<number | null>(null);
+  const [studyCycle, setStudyCycle] = useState(0);
   const [completedCount, setCompletedCount] = useState(0);
   const [complete, setComplete] = useState(false);
   const [phase, setPhase] = useState<GamePhase>("idle");
@@ -286,7 +291,6 @@ export default function PictureMemoryPage() {
     useState<CampaignReviewSelection | null>(null);
 
   const optionButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const nextButtonRef = useRef<HTMLButtonElement>(null);
   const levelCompleteButtonRef = useRef<HTMLButtonElement>(null);
   const resultHeadingRef = useRef<HTMLHeadingElement>(null);
   const historicalReviewHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -295,8 +299,6 @@ export default function PictureMemoryPage() {
   );
   const reviewOriginIdRef = useRef<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const feedbackTokenRef = useRef(0);
   const inputLockedRef = useRef(false);
   const shouldFocusFirstOption = useRef(false);
   const retryFocusIndexRef = useRef<number | null>(null);
@@ -388,23 +390,17 @@ export default function PictureMemoryPage() {
     : 0;
   const infiniteEnergy = comboEnergyPercent(infiniteAdaptive.combo);
   const infiniteSupercharged = infiniteAdaptive.combo >= MAX_ENERGY_COMBO;
-  const clearFeedbackTimer = useCallback(() => {
-    if (!feedbackTimerRef.current) return;
-    clearTimeout(feedbackTimerRef.current);
-    feedbackTimerRef.current = null;
-  }, []);
-
   const resetAttemptState = useCallback(() => {
-    feedbackTokenRef.current += 1;
-    clearFeedbackTimer();
     inputLockedRef.current = false;
     retryFocusIndexRef.current = null;
     setSelected([]);
     setRecalling(false);
+    setStudyRemainingMs(null);
+    setStudyCycle((current) => current + 1);
     setRetryReady(false);
     setPhase("idle");
     setGenerationError(null);
-  }, [clearFeedbackTimer]);
+  }, []);
 
   const ensureAudioContext = useCallback(() => {
     if (typeof window === "undefined") return null;
@@ -477,9 +473,6 @@ export default function PictureMemoryPage() {
     setRetryReady(false);
     setGenerationError(null);
     const isCorrect = evaluateSelection(round, selected).correct;
-    const reducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
 
     if (progressionControlled) {
       progression.answer({
@@ -533,40 +526,10 @@ export default function PictureMemoryPage() {
             ],
       );
     }
-
-    const feedbackToken = feedbackTokenRef.current + 1;
-    feedbackTokenRef.current = feedbackToken;
-    clearFeedbackTimer();
-    feedbackTimerRef.current = setTimeout(
-      () => {
-        if (feedbackTokenRef.current !== feedbackToken) return;
-
-        if (isCorrect) {
-          setPhase("answered");
-          return;
-        }
-
-        if (progressionControlled) progression.retry();
-        retryFocusIndexRef.current = 0;
-        inputLockedRef.current = false;
-        setSelected([]);
-        setRecalling(false);
-        setRetryReady(true);
-        setPhase("idle");
-      },
-      isCorrect
-        ? reducedMotion
-          ? REDUCED_CORRECT_REVEAL_MS
-          : CORRECT_REVEAL_MS
-        : reducedMotion
-          ? REDUCED_WRONG_REVIEW_MS
-          : WRONG_REVIEW_MS,
-    );
   }, [
     activeCampaignLevelComplete,
     activeSessionRound,
     campaignReviewSelection,
-    clearFeedbackTimer,
     complete,
     isCampaign,
     isInfinite,
@@ -855,8 +818,6 @@ export default function PictureMemoryPage() {
     ) {
       return;
     }
-    feedbackTokenRef.current += 1;
-    clearFeedbackTimer();
     retryFocusIndexRef.current = null;
     const controlled = progression;
     const savedSelection = controlled.current
@@ -874,7 +835,7 @@ export default function PictureMemoryPage() {
         setSelected([...controlled.current.round.study]);
         setRecalling(true);
         setRetryReady(false);
-        setPhase("answered");
+        setPhase("correct-reveal");
         shouldFocusFirstOption.current = false;
       } else if (
         controlled.roundPhase === "feedback" &&
@@ -888,28 +849,12 @@ export default function PictureMemoryPage() {
         setRetryReady(false);
         setPhase("wrong-review");
         shouldFocusFirstOption.current = false;
-        const hydrationToken = feedbackTokenRef.current;
-        const reducedMotion = window.matchMedia(
-          "(prefers-reduced-motion: reduce)",
-        ).matches;
-        feedbackTimerRef.current = setTimeout(
-          () => {
-            if (feedbackTokenRef.current !== hydrationToken) return;
-            controlled.retry();
-            retryFocusIndexRef.current = 0;
-            inputLockedRef.current = false;
-            setSelected([]);
-            setRecalling(false);
-            setRetryReady(true);
-            setPhase("idle");
-          },
-          reducedMotion ? REDUCED_WRONG_REVIEW_MS : WRONG_REVIEW_MS,
-        );
       } else {
         if (controlled.roundPhase === "feedback") controlled.retry();
         inputLockedRef.current = false;
         setSelected([]);
         setRecalling(false);
+        setStudyRemainingMs(null);
         setRetryReady(controlled.currentAttemptCount > 0);
         setPhase("idle");
         shouldFocusFirstOption.current = true;
@@ -920,16 +865,26 @@ export default function PictureMemoryPage() {
                 recallStorageKey ?? "picture-memory-recall-v1",
               ) ?? "null",
             );
-            if (
-              saved?.playId === progressionPlayId &&
-              saved?.recalling === true
-            ) {
-              setRecalling(true);
+            if (saved?.playId === progressionPlayId) {
+              const duration = studyDurationMs(
+                controlled.current?.round.difficulty ?? "Starter",
+              );
+              if (
+                typeof saved.studyRemainingMs === "number" &&
+                Number.isFinite(saved.studyRemainingMs)
+              ) {
+                setStudyRemainingMs(
+                  Math.max(0, Math.min(duration, saved.studyRemainingMs)),
+                );
+              }
+              setRecalling(saved.recalling === true);
               setSelected(
-                decodeSelectionFromAnswerToken(
-                  saved.token,
-                  controlled.current?.round.options ?? [],
-                ) ?? [],
+                saved.recalling === true
+                  ? (decodeSelectionFromAnswerToken(
+                      saved.token,
+                      controlled.current?.round.options ?? [],
+                    ) ?? [])
+                  : [],
               );
             }
           } catch {
@@ -939,13 +894,7 @@ export default function PictureMemoryPage() {
       }
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [
-    clearFeedbackTimer,
-    progression,
-    progressionControlled,
-    progressionPlayId,
-    recallStorageKey,
-  ]);
+  }, [progression, progressionControlled, progressionPlayId, recallStorageKey]);
 
   useEffect(() => {
     if (!progressionControlled) return;
@@ -997,13 +946,16 @@ export default function PictureMemoryPage() {
         return;
       const id = round.options[optionIndex];
       if (!id) return;
+      resumeAudio();
       setSelected((current) =>
         current.includes(id)
           ? current.filter((item) => item !== id)
-          : [...current, id],
+          : current.length < round.study.length
+            ? [...current, id]
+            : current,
       );
     },
-    [recalling, phase, campaignReviewSelection, complete, round],
+    [recalling, phase, campaignReviewSelection, complete, round, resumeAudio],
   );
 
   useEffect(() => {
@@ -1020,6 +972,8 @@ export default function PictureMemoryPage() {
         JSON.stringify({
           playId: progressionPlayId,
           recalling,
+          studyRemainingMs:
+            studyRemainingMs ?? studyDurationMs(round.difficulty),
           token: encodeSelectionAnswerToken(selected, round.options),
         }),
       );
@@ -1034,7 +988,90 @@ export default function PictureMemoryPage() {
     round,
     phase,
     recallStorageKey,
+    studyRemainingMs,
   ]);
+
+  const clockKey = `${progressionPlayId ?? activeSessionRound?.id ?? "example"}:${studyCycle}`;
+  const activeRoundVisible =
+    gameplayStarted &&
+    !complete &&
+    campaignReviewSelection === null &&
+    !showCampaignLevelComplete &&
+    Boolean(activeSessionRound) &&
+    (!progressionControlled ||
+      (hydratedPlayId === progressionPlayId &&
+        progression.sectionIntro === null &&
+        progression.stage !== "redemption-ready"));
+
+  useVisibleTimer({
+    active: activeRoundVisible && phase === "idle" && !recalling,
+    resetKey: `${clockKey}:study`,
+    durationMs: studyRemainingMs ?? studyDurationMs(round.difficulty),
+    onRemaining: (remaining) => {
+      setStudyRemainingMs(remaining);
+      if (!progressionControlled || !progressionPlayId || !recallStorageKey)
+        return;
+      try {
+        localStorage.setItem(
+          recallStorageKey,
+          JSON.stringify({
+            playId: progressionPlayId,
+            recalling: false,
+            token: encodeSelectionAnswerToken([], round.options),
+            studyRemainingMs: remaining,
+          }),
+        );
+      } catch {
+        /* Optional local storage. */
+      }
+    },
+    onElapsed: () => {
+      setSelected([]);
+      setRecalling(true);
+    },
+  });
+
+  useVisibleTimer({
+    active:
+      activeRoundVisible &&
+      phase === "idle" &&
+      recalling &&
+      selected.length === round.study.length,
+    resetKey: `${clockKey}:commit`,
+    durationMs: 0,
+    onElapsed: submitSelection,
+  });
+
+  useVisibleTimer({
+    active: activeRoundVisible && phase === "correct-reveal",
+    resetKey: `${clockKey}:correct`,
+    durationMs: CORRECT_REVEAL_MS,
+    onElapsed: () => setPhase("answered"),
+  });
+
+  useVisibleTimer({
+    active: activeRoundVisible && phase === "answered" && !generationError,
+    resetKey: `${clockKey}:advance`,
+    durationMs: 0,
+    onElapsed: goNext,
+  });
+
+  useVisibleTimer({
+    active: activeRoundVisible && phase === "wrong-review",
+    resetKey: `${clockKey}:wrong`,
+    durationMs: WRONG_REVIEW_MS,
+    onElapsed: () => {
+      if (progressionControlled) progression.retry();
+      retryFocusIndexRef.current = 0;
+      inputLockedRef.current = false;
+      setSelected([]);
+      setRecalling(false);
+      setStudyRemainingMs(null);
+      setStudyCycle((current) => current + 1);
+      setRetryReady(true);
+      setPhase("idle");
+    },
+  });
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -1046,7 +1083,8 @@ export default function PictureMemoryPage() {
         event.altKey ||
         event.ctrlKey ||
         event.metaKey ||
-        isEditableTarget(event.target)
+        isEditableTarget(event.target) ||
+        event.repeat
       )
         return;
       const index = Number(event.key) - 1;
@@ -1075,7 +1113,7 @@ export default function PictureMemoryPage() {
       phase === "idle"
     ) {
       if (recalling) optionButtonRefs.current[0]?.focus();
-      else readyButtonRef.current?.focus();
+      else questionHeadingRef.current?.focus({ preventScroll: true });
     }
   }, [
     recalling,
@@ -1090,10 +1128,6 @@ export default function PictureMemoryPage() {
   ]);
 
   useEffect(() => {
-    if (phase === "answered") nextButtonRef.current?.focus();
-  }, [phase]);
-
-  useEffect(() => {
     if (
       shouldFocusFirstOption.current &&
       gameplayStarted &&
@@ -1102,7 +1136,7 @@ export default function PictureMemoryPage() {
     ) {
       (recalling
         ? optionButtonRefs.current[0]
-        : readyButtonRef.current
+        : questionHeadingRef.current
       )?.focus();
       shouldFocusFirstOption.current = false;
     }
@@ -1119,7 +1153,7 @@ export default function PictureMemoryPage() {
 
   useEffect(() => {
     if (phase === "idle" && retryReady && retryFocusIndexRef.current !== null) {
-      readyButtonRef.current?.focus();
+      questionHeadingRef.current?.focus({ preventScroll: true });
       retryFocusIndexRef.current = null;
     }
   }, [phase, retryReady]);
@@ -1140,15 +1174,13 @@ export default function PictureMemoryPage() {
 
   useEffect(
     () => () => {
-      feedbackTokenRef.current += 1;
-      clearFeedbackTimer();
       const context = audioContextRef.current;
       audioContextRef.current = null;
       if (context && context.state !== "closed") {
         void context.close().catch(() => undefined);
       }
     },
-    [clearFeedbackTimer],
+    [],
   );
 
   const infiniteFirstTryScore = infiniteAdaptive.attempts.filter(
@@ -1219,8 +1251,7 @@ export default function PictureMemoryPage() {
               <p className={styles.kicker}>Example</p>
               <h1 id="tutorial-title">Look. Hide. Remember.</h1>
               <p className={styles.tutorialLede}>
-                Study the pictures. When you’re ready, hide them and find the
-                same ones.
+                Study the pictures, then find the same ones after they hide.
               </p>
             </div>
             <div className={styles.examplePanel}>
@@ -1257,8 +1288,8 @@ export default function PictureMemoryPage() {
               </div>
             </div>
             <p className={styles.exampleNote}>
-              Choose every picture you saw. The order doesn’t matter. Take your
-              time.
+              Choose every picture you saw. The order doesn’t matter. Pictures
+              hide automatically.
             </p>
 
             {progressionControlled && progression.sectionIntro ? (
@@ -1657,7 +1688,7 @@ export default function PictureMemoryPage() {
                   <p className={styles.kicker}>
                     {recalling ? "2 · Remember" : "1 · Study"}
                   </p>
-                  <h1>
+                  <h1 ref={questionHeadingRef} tabIndex={-1}>
                     {recalling
                       ? "Which pictures did you see?"
                       : `Remember ${round.study.length === 1 ? "this picture" : "these pictures"}.`}
@@ -1665,9 +1696,9 @@ export default function PictureMemoryPage() {
                   <p>
                     {recalling
                       ? round.difficulty === "Wizard"
-                        ? "Choose every picture you remember. Then check your answer."
-                        : `Choose ${round.study.length} ${round.study.length === 1 ? "picture" : "pictures"}. Then check your answer.`
-                      : "Take your time. Hide the pictures when you’re ready."}
+                        ? "Choose the exact pictures you remember."
+                        : `Choose ${round.study.length} ${round.study.length === 1 ? "picture" : "exact pictures"}.`
+                      : `${round.difficulty === "Expert" || round.difficulty === "Wizard" ? "Remember the details and direction. " : ""}The pictures will hide after ${studyDurationMs(round.difficulty) / 1000} seconds.`}
                   </p>
                 </div>
                 <div className={styles.gameBoard} id="campaign-play-area">
@@ -1680,18 +1711,6 @@ export default function PictureMemoryPage() {
                         ids={round.study}
                         label="Pictures to remember"
                       />
-                      <button
-                        className={styles.primaryButton}
-                        type="button"
-                        ref={readyButtonRef}
-                        onClick={() => {
-                          resumeAudio();
-                          setRecalling(true);
-                          setSelected([]);
-                        }}
-                      >
-                        I’m ready <span aria-hidden="true">→</span>
-                      </button>
                     </section>
                   ) : (
                     <section
@@ -1707,17 +1726,14 @@ export default function PictureMemoryPage() {
                           const isSelected = selected.includes(id);
                           const solved =
                             phase === "correct-reveal" || phase === "answered";
-                          const wrong =
-                            phase === "wrong-review" &&
-                            isSelected &&
-                            !round.study.includes(id);
+                          const wrong = phase === "wrong-review" && isSelected;
                           return (
                             <button
                               type="button"
                               key={id}
                               className={`${styles.optionButton} ${isSelected ? styles.selectedOption : ""} ${solved && isSelected ? styles.correctOption : ""} ${solved && !isSelected ? styles.mutedOption : ""} ${wrong ? styles.wrongOption : ""}`}
                               aria-pressed={isSelected}
-                              aria-label={`Picture ${index + 1}: ${PICTURE_BY_ID[id].label}${wrong ? ", not in the study set" : ""}`}
+                              aria-label={`Picture ${index + 1}: ${PICTURE_BY_ID[id].label}${wrong ? ", try again" : ""}`}
                               aria-keyshortcuts={`${index + 1}`}
                               disabled={phase !== "idle"}
                               onClick={() => togglePicture(index)}
@@ -1747,14 +1763,6 @@ export default function PictureMemoryPage() {
                           <span role="status" aria-live="polite">
                             {selected.length} selected
                           </span>
-                          <button
-                            type="button"
-                            className={styles.primaryButton}
-                            onClick={submitSelection}
-                            disabled={selected.length === 0}
-                          >
-                            Check answer
-                          </button>
                         </div>
                       ) : null}
                     </section>
@@ -1766,55 +1774,31 @@ export default function PictureMemoryPage() {
                   role="status"
                 >
                   {phase === "wrong-review" ? (
-                    <div className={styles.wrongFeedback}>
-                      <strong className={styles.wrongText}>
-                        × {selectionFeedback(round, selected)}
-                      </strong>
-                      <span>Look again at the pictures you studied.</span>
-                      <PictureRow
-                        ids={round.study}
-                        label="Study pictures shown again"
-                      />
-                    </div>
+                    <strong className={styles.wrongText}>× Try again</strong>
                   ) : phase === "correct-reveal" ? (
-                    <strong className={styles.correctText}>
-                      ✓ Correct · Every picture remembered.
-                    </strong>
-                  ) : phase === "answered" ? (
+                    <strong className={styles.correctText}>✓ Correct</strong>
+                  ) : phase === "answered" && generationError ? (
                     <>
-                      <strong className={styles.correctText}>
-                        ✓ {generationError ?? "Correct"}
+                      <strong className={styles.wrongText}>
+                        {generationError}
                       </strong>
                       <button
-                        className={styles.nextButton}
+                        className={styles.modeButton}
                         type="button"
                         onClick={goNext}
-                        ref={nextButtonRef}
                       >
-                        {generationError
-                          ? "Try another picture set"
-                          : isLastRedemptionRound
-                            ? reviewLevelId
-                              ? "Finish review"
-                              : "Results"
-                            : isCampaign &&
-                                campaignProblemIndex ===
-                                  CAMPAIGN_PROBLEMS_PER_LEVEL - 1
-                              ? "Finish level"
-                              : "Next"}
-                        <span aria-hidden="true">→</span>
+                        Try another picture set
                       </button>
                     </>
                   ) : retryReady ? (
                     <strong className={styles.retryText}>
-                      Try again · Study once more, then hide the pictures.
+                      Try again · Look carefully at the pictures.
                     </strong>
                   ) : null}
                 </div>
                 {recalling ? (
                   <p className={styles.keyboardHint}>
-                    Keys 1–{round.options.length} to select · Check answer when
-                    ready
+                    Keys 1–{round.options.length} to select
                   </p>
                 ) : null}
               </>

@@ -7,6 +7,7 @@ import {
   validateRound,
 } from "../app/games/picture-memory/game-engine.ts";
 import { progressionAdapter } from "../app/games/picture-memory/progression-adapter.ts";
+import { progressionMetadata } from "../app/games/picture-memory/progression-metadata.ts";
 import {
   decodeSelectionFromAnswerToken,
   encodeSelectionAnswerToken,
@@ -83,15 +84,16 @@ test("Journey persists a complete Picture Memory selection through feedback and 
     })),
   ];
   const journey = buildJourneyPlan(gameSnapshot);
-  const node = journey.boards[0].nodes.find(({ kind }) => kind === "normal");
+  const node = journey.boards.find(({ journeyLevel }) => journeyLevel === "junior-1")
+    .nodes.find(({ kind }) => kind === "normal");
   const attempt = createNormalProgressionAttempt({
     id: "picture-memory-selection-test",
     node,
-    journeyQuestions: journeyQuestionReferences(progressionAdapter, "starter"),
+    journeyQuestions: journeyQuestionReferences(progressionAdapter, "junior-1"),
     nowMs: 1,
   });
   const profile = upsertProfileAttempt(createPlayerProfile({
-    id: "picture-memory-player", name: "Memory player", avatarId: "hedgehog", gameSnapshot, nowMs: 1,
+    id: "picture-memory-player", name: "testUser123", avatarId: "hedgehog", gameSnapshot, nowMs: 1,
   }), attempt);
   assert.equal(saveProgressionState(addPlayerProfile(createProgressionState(), profile), storage), true);
   const sessionOptions = { attemptId: attempt.id, storage };
@@ -101,6 +103,7 @@ test("Journey persists a complete Picture Memory selection through feedback and 
   const recalled = round.options.filter((picture) => round.study.includes(picture));
   const lure = round.options.find((picture) => !round.study.includes(picture));
   const selected = [recalled[0], lure];
+  assert.equal(selected.length, round.study.length, "The complete group reaches the automatic submission threshold.");
   const token = encodeSelectionAnswerToken(selected, round.options);
   answerProgressionBrowserSession(progressionAdapter, attempt.id, { correct: false, answerToken: token, nowMs: 2 }, { storage });
 
@@ -123,4 +126,26 @@ test("Journey persists a complete Picture Memory selection through feedback and 
   assert.equal(session.attempt.rounds[0].phase, "solved");
   assert.equal(session.attempt.rounds[0].firstTryCorrect, false);
   assert.equal(session.attempt.rounds[0].attemptCount, 2);
+});
+
+test("Picture Memory publishes v2 content and round-trips new question references", () => {
+  assert.deepEqual(progressionMetadata, {
+    contentVersion: "2", generatorVersion: "2", journeyContentVersion: "2",
+  });
+  for (const level of JOURNEY_LEVELS) {
+    for (const reference of journeyQuestionReferences(progressionAdapter, level)) {
+      assert.equal(reference.contentVersion, "2");
+      const resolved = resolveProgressionQuestion(progressionAdapter, reference);
+      assert.equal(resolved.resolution, "current");
+      assert.deepEqual(resolved.ref, reference);
+      assert.equal(validateRound(resolved.round), true);
+    }
+  }
+  for (const level of PROGRESSION_LEVELS) {
+    const generated = createFreshGeneratedQuestion(progressionAdapter, {
+      level, seedBase: `picture-memory:v2:${level}`,
+    });
+    assert.equal(generated.ref.generatorVersion, "2");
+    assert.equal(resolveProgressionQuestion(progressionAdapter, generated.ref).fingerprint, generated.fingerprint);
+  }
 });

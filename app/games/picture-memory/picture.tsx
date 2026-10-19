@@ -1,5 +1,5 @@
 import type { SVGProps } from "react";
-import { PICTURE_BY_ID, type PictureId } from "./picture-data";
+import { PICTURE_BY_ID, PICTURE_POSE_TRANSFORMS, type PictureId } from "./picture-data";
 
 const ink = "#17213d";
 const paper = "#fffdf8";
@@ -11,7 +11,7 @@ const violet = "#7767d7";
 /** A fixed drawing box keeps study pictures and recall choices the same size.
  * Parents own accessible task/choice names, so duplicate SVG detail is hidden. */
 export function Picture({ id, ...props }: Omit<SVGProps<SVGSVGElement>, "id"> & { id: PictureId }) {
-  const { family, variant } = PICTURE_BY_ID[id];
+  const { family, variant, pose } = PICTURE_BY_ID[id];
   const second = variant === 2;
   let drawing;
 
@@ -39,7 +39,7 @@ export function Picture({ id, ...props }: Omit<SVGProps<SVGSVGElement>, "id"> & 
     case "bird":
       drawing = <>
         {second && <path d="M55 57C26 53 15 30 18 15c23 2 37 17 44 37 11-21 27-32 45-31-2 21-16 35-36 41Z" fill={teal} />}
-        <path d="M41 73 16 58l3 28 30 1" fill={teal} />
+        <path d="M41 73 16 58l3 28 30 1" fill={teal} data-pose-witness="bird-tail" data-pose-witness-kind="bounds-center" />
         <path d="M43 58c3-17 17-24 31-21 13 2 20 13 17 24-3 24-20 36-39 29-15-5-21-20-9-32Z" fill={gold} />
         {!second && <path d="M47 66c7-11 19-13 30-7-6 15-16 22-30 7Z" fill={teal} />}
         <path d="m90 51 18 8-18 6" fill={coral} /><circle cx="78" cy="50" r="3" fill={ink} stroke="none" /><path d="m53 91-3 13m18-11 2 11" />
@@ -52,7 +52,7 @@ export function Picture({ id, ...props }: Omit<SVGProps<SVGSVGElement>, "id"> & 
       </>;
       break;
     case "key":
-      drawing = <g transform="rotate(-35 60 60)"><path d="M53 47h15v54H53Z" fill={gold} /><path d={second ? "M64 72h22v12H69v11h17v12H54V72Z" : "M63 88h23v19H54V88Z"} fill={gold} /><circle cx="60" cy="34" r="24" fill={gold} /><circle cx="60" cy="34" r="10" fill={paper} /></g>;
+      drawing = <g transform="rotate(-35 60 60)"><path d="M53 47h15v54H53Z" fill={gold} /><path d={second ? "M64 72h22v12H69v11h17v12H54V72Z" : "M63 88h23v19H54V88Z"} fill={gold} /><circle cx="60" cy="34" r="24" fill={gold} /><circle cx="60" cy="34" r="10" fill={paper} data-pose-witness="key-hole" data-pose-witness-kind="circle-center" /></g>;
       break;
     case "umbrella":
       drawing = <>
@@ -81,7 +81,7 @@ export function Picture({ id, ...props }: Omit<SVGProps<SVGSVGElement>, "id"> & 
       break;
     case "boat":
       drawing = <>
-        <path d="M61 15v73" fill="none" /><path d="M56 20 20 73h36Z" fill={gold} />
+        <path d="M61 15v73" fill="none" /><path d="M56 20 20 73h36Z" fill={gold} data-pose-witness="boat-sail" data-pose-witness-kind="bounds-center" />
         {second && <path d="M67 32v41h33Z" fill={coral} />}
         <path d="m13 84 16 19h62l17-19Z" fill={teal} /><path d="M11 110c8-7 15-7 23 0 8-7 15-7 23 0 8-7 15-7 23 0 8-7 15-7 23 0" fill="none" />
       </>;
@@ -101,7 +101,7 @@ export function Picture({ id, ...props }: Omit<SVGProps<SVGSVGElement>, "id"> & 
     case "teapot":
       drawing = <>
         <path d="M82 49c32-15 34 32 4 34" fill="none" strokeWidth="9" />
-        <path d="m36 51-22-9 4 21 21 14" fill={teal} />
+        <path d="M14 42l4 21 21 14-3-26Z" fill={teal} data-pose-witness="teapot-spout" data-pose-witness-kind="path-start" />
         {second ? <path d="M37 34h45l7 60H30Z" fill={teal} /> : <ellipse cx="60" cy="69" rx="34" ry="27" fill={teal} />}
         <path d={second ? "M32 34h55l-9-11H41Z" : "M34 47h52l-9-12H43Z"} fill={gold} /><path d={second ? "M60 23v-9" : "M60 35v-9"} fill="none" /><path d="M32 98h56" fill="none" />
       </>;
@@ -109,17 +109,17 @@ export function Picture({ id, ...props }: Omit<SVGProps<SVGSVGElement>, "id"> & 
     case "mug":
       drawing = <>
         {second && <><path d="m65 59 19-38" fill="none" strokeWidth="7" /><ellipse cx="88" cy="17" rx="8" ry="14" transform="rotate(26 88 17)" fill={gold} /></>}
-        <path d="M82 47h9c27 0 27 35 0 35H80" fill="none" strokeWidth="9" /><path d="M24 39h61v47c0 13-11 19-30 19S24 99 24 86Z" fill={coral} /><path d="M24 39h61" fill="none" /><path d="M32 112h58" fill="none" />
+        <path d="M82 47h9c27 0 27 35 0 35H80" fill="none" strokeWidth="9" data-pose-witness="mug-handle" data-pose-witness-kind="bounds-center" /><path d="M24 39h61v47c0 13-11 19-30 19S24 99 24 86Z" fill={coral} /><path d="M24 39h61" fill="none" /><path d="M32 112h58" fill="none" />
       </>;
       break;
     case "boot":
       drawing = <>
-        <path d={second ? "M36 12h39v65l22 8c11 3 14 11 10 20H24V88l12-5Z" : "M36 48h39v29l22 8c11 3 14 11 10 20H24V88l12-5Z"} fill={gold} /><path d={second ? "M36 23h39" : "M36 58h39"} fill="none" /><path d="M24 105h83v9H24Z" fill={ink} /><path d="M59 68h16m-16 11h16" fill="none" />
+        <path d={second ? "M36 12h39v65l22 8c11 3 14 11 10 20H24V88l12-5Z" : "M36 48h39v29l22 8c11 3 14 11 10 20H24V88l12-5Z"} fill={gold} /><path d={second ? "M36 23h39" : "M36 58h39"} fill="none" /><path d="M24 105h83v9H24Z" fill={ink} data-pose-witness="boot-sole" data-pose-witness-kind="bounds-center" /><path d="M59 68h16m-16 11h16" fill="none" />
       </>;
       break;
     case "guitar":
       drawing = <g transform="rotate(27 60 60)">
-        <path d="M54 13h12v51H54Z" fill={gold} /><path d="M50 8h20v20H50Z" fill={teal} /><path d={second ? "M42 51 29 39v27c-18 9-15 34 2 42 20 10 42-1 46-15 3-11-3-22-8-25V44L59 60Z" : "M44 53c-15 0-20 14-13 27-23 14-13 38 9 38h20c22 0 32-24 9-38 7-13 2-27-13-27Z"} fill={coral} />
+        <path d="M54 13h12v51H54Z" fill={gold} /><path d="M50 8h20v20H50Z" fill={teal} data-pose-witness="guitar-headstock" data-pose-witness-kind="bounds-center" /><path d={second ? "M42 51 29 39v27c-18 9-15 34 2 42 20 10 42-1 46-15 3-11-3-22-8-25V44L59 60Z" : "M44 53c-15 0-20 14-13 27-23 14-13 38 9 38h20c22 0 32-24 9-38 7-13 2-27-13-27Z"} fill={coral} />
         {second ? <><path d="M42 77h18v8H42Zm-1 17h21" fill={ink} /></> : <circle cx="50" cy="78" r="12" fill={ink} />}
         <path d="M48 31v69m6-69v69m-15 1h23" fill="none" strokeWidth="2" />
       </g>;
@@ -160,5 +160,5 @@ export function Picture({ id, ...props }: Omit<SVGProps<SVGSVGElement>, "id"> & 
       break;
   }
 
-  return <svg viewBox="0 0 120 120" fill="none" stroke={ink} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" {...props}>{drawing}</svg>;
+  return <svg viewBox="0 0 120 120" fill="none" stroke={ink} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" data-picture-id={id} {...props}><g transform={PICTURE_POSE_TRANSFORMS[pose]} data-picture-pose={pose}>{drawing}</g></svg>;
 }
