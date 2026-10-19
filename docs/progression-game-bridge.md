@@ -28,13 +28,15 @@ Journey automatically.
 Journey membership still comes from the generated game catalog in
 `lib/games.ts`. There is no second list of Journey games.
 
-New profiles snapshot the complete ordered catalog. Each board keeps eight
-ordinary stops and four Turbo stops; catalogs larger than eight use successive
-eight-game windows, wrapping through that saved order. Culminations include
-every snapshotted canonical game. A catalog release does not append games to an
-existing profile or change its saved stops. Profiles with eight or fewer games
-retain the original board order, and legacy four-board plans retain their
-original eight-game cap.
+New profiles snapshot the complete ordered catalog. Every board has one
+ordinary stop for every canonical game and four Turbo stops; there is no
+eight-game limit. Culminations include every snapshotted canonical game.
+Existing profiles retain their original membership, stop IDs, clears, and
+earned XP. Catalog additions and games omitted by older trails gain stable
+catch-up stops before each board's culmination. Outstanding earlier-board
+catch-up stops become prerequisites for further progress. Reconciliation waits
+until an active saved attempt finishes and is idempotent across reloads and
+catalog reorderings.
 
 ## Game-owned bridge files
 

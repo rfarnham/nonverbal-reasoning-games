@@ -178,7 +178,7 @@ test("controlled games restore persisted answer and feedback UI before retrying"
     const gameSource = await source(entry);
     assert.match(
       gameSource,
-      /progressionOptionIndexFromAnswerToken/,
+      /progressionOptionIndexFromAnswerToken|decodeSelectionFromAnswerToken/,
       `${slug} must decode saved answer tokens`,
     );
     assert.match(

@@ -45,6 +45,11 @@ never alter Journey progress.
 | [Changing Strips](https://rfarnham.github.io/nonverbal-reasoning-games/games/changing-strips/) | Visual sequencing and ordered pattern replacement | Playable |
 | [Bracelet Search](https://rfarnham.github.io/nonverbal-reasoning-games/games/bracelet-search/) | Sequence search and mental reversal | Playable |
 | [Extra Piece](https://rfarnham.github.io/nonverbal-reasoning-games/games/extra-piece/) | Spatial composition, mental rotation, and pattern matching | Playable |
+| [Picture Memory](https://rfarnham.github.io/nonverbal-reasoning-games/games/picture-memory/) | Visual memory, recognition, and focused attention | Playable |
+
+[Picture Memory's design notes](docs/picture-memory-design.md) explain the
+study-and-recall format, original picture vocabulary, and multi-selection
+response model.
 
 ## Labs
 
@@ -91,6 +96,7 @@ app/
     folded-items/     # labeled-item folding; separate from hole punching
     libra/            # route, catalog metadata, and shelf icon
     pattern-matrix/   # route, catalog metadata, and shelf icon
+    picture-memory/   # study, hide, and recognize everyday objects
     rotation-match/   # route, catalog metadata, and shelf icon
     shape-fold/       # route, catalog metadata, and shelf icon
     whose-left/       # route, catalog metadata, and shelf icon
