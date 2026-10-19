@@ -3,38 +3,46 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   LocalDigitRecognizer,
+  LocalSpeechInputError,
   localDigitRecognitionSupported,
   type LocalDigitResult,
 } from "./local-digit-recognition";
 
 export type SpeechSetup = "idle" | "loading" | "ready" | "error";
-export type SpeechState = "idle" | "starting" | "recording" | "recognizing" | "review";
+export type SpeechState = "idle" | "starting" | "recording" | "recognizing" | "complete";
+export interface SpeechFailure {
+  kind: "no-speech" | "timeout" | "uncertain" | "capture";
+  message: string;
+}
 
 export interface LocalSpeechInput {
   supported: boolean;
   ready: boolean;
   setup: SpeechSetup;
   state: SpeechState;
-  result: LocalDigitResult | null;
+  failure: SpeechFailure | null;
   message: string;
   prepare(): Promise<void>;
   prime(): void;
-  record(): Promise<void>;
-  stop(): Promise<LocalDigitResult | null>;
+  record(onRecognized: (result: LocalDigitResult) => void): Promise<void>;
   cancel(): void;
 }
 
-const UNCLEAR = "Could not recognize a clear digit sequence. Record again; this attempt was not scored.";
-const FAILED = "Speech input could not finish. Record again or use the keypad; this attempt was not scored.";
+const UNCLEAR = "I couldn’t recognize a clear digit sequence. Please try again.";
+const FAILED = "Speech input could not finish. Please try again.";
 
-function recordingFailure(error: unknown): string {
+function recordingFailure(error: unknown): SpeechFailure {
+  if (error instanceof LocalSpeechInputError) {
+    if (error.code === "no-speech") return { kind: "no-speech", message: "I didn’t hear an answer. Please try again." };
+    if (error.code === "timeout") return { kind: "timeout", message: "The recording did not finish. Please try again." };
+  }
   if (error instanceof DOMException && (error.name === "NotAllowedError" || error.name === "SecurityError")) {
-    return "Microphone access was not allowed. Allow access to record, or use the keypad; this attempt was not scored.";
+    return { kind: "capture", message: "Microphone access was not allowed. Allow access, then retry." };
   }
   if (error instanceof DOMException && error.name === "NotFoundError") {
-    return "No microphone is available. Connect one or use the keypad; this attempt was not scored.";
+    return { kind: "capture", message: "No microphone is available. Connect one to retry." };
   }
-  return FAILED;
+  return { kind: "capture", message: FAILED };
 }
 
 /** Recognition is independent of the expected answer and never records a score. */
@@ -43,7 +51,7 @@ export function useLocalSpeech(): LocalSpeechInput {
   const [ready, setReady] = useState(false);
   const [setup, setSetup] = useState<SpeechSetup>("idle");
   const [state, setState] = useState<SpeechState>("idle");
-  const [result, setResult] = useState<LocalDigitResult | null>(null);
+  const [failure, setFailure] = useState<SpeechFailure | null>(null);
   const [message, setMessage] = useState("");
   const recognizerRef = useRef<LocalDigitRecognizer | null>(null);
   const mountedRef = useRef(false);
@@ -68,7 +76,7 @@ export function useLocalSpeech(): LocalSpeechInput {
           if (!recognizer.ready) setSetup("error");
           if (generationRef.current !== generation) return;
           setState("idle");
-          setResult(null);
+          setFailure({ kind: "capture", message: FAILED });
           setMessage(FAILED);
         });
       },
@@ -95,7 +103,7 @@ export function useLocalSpeech(): LocalSpeechInput {
     recognizerRef.current?.cancel();
     if (!mountedRef.current) return;
     setState("idle");
-    setResult(null);
+    setFailure(null);
     setMessage("");
   }, []);
 
@@ -134,70 +142,66 @@ export function useLocalSpeech(): LocalSpeechInput {
     recognizerRef.current?.prime();
   }, []);
 
-  const record = useCallback(async (): Promise<void> => {
+  const record = useCallback(async (onRecognized: (result: LocalDigitResult) => void): Promise<void> => {
     const recognizer = recognizerRef.current;
-    if (!mountedRef.current || !recognizer || (stateRef.current !== "idle" && stateRef.current !== "review")) return;
+    if (!mountedRef.current || !recognizer || (stateRef.current !== "idle" && stateRef.current !== "complete")) return;
     if (!recognizer.ready) {
       setReady(false);
-      setMessage("Download the local speech model before recording.");
+      const message = "Download the local speech model, then retry.";
+      setFailure({ kind: "capture", message });
+      setMessage(message);
       return;
     }
     const generation = ++generationRef.current;
     stateRef.current = "starting";
     setState("starting");
-    setResult(null);
+    setFailure(null);
     setMessage("");
-    try {
-      await recognizer.start();
-      if (!mountedRef.current || recognizerRef.current !== recognizer || generationRef.current !== generation) return;
-      stateRef.current = "recording";
-      setState("recording");
-    } catch (error) {
-      if (!mountedRef.current || recognizerRef.current !== recognizer || generationRef.current !== generation) return;
+    const isCurrent = () => mountedRef.current && recognizerRef.current === recognizer && generationRef.current === generation;
+    const fail = (error: unknown) => {
+      if (!isCurrent()) return;
       stateRef.current = "idle";
       setState("idle");
-      setResult(null);
       setReady(recognizer.ready);
       if (!recognizer.ready) setSetup("error");
-      setMessage(recordingFailure(error));
-    }
-  }, []);
-
-  const stop = useCallback(async (): Promise<LocalDigitResult | null> => {
-    const recognizer = recognizerRef.current;
-    if (!mountedRef.current || !recognizer || stateRef.current !== "recording") return null;
-    const generation = ++generationRef.current;
-    stateRef.current = "recognizing";
-    setState("recognizing");
-    setResult(null);
-    setMessage("");
+      const problem = recordingFailure(error);
+      setFailure(problem);
+      setMessage(problem.message);
+    };
     try {
-      const recognized = await recognizer.stop();
-      if (!mountedRef.current || recognizerRef.current !== recognizer || generationRef.current !== generation) return null;
-      if (recognized.status !== "recognized" || recognized.digits.length === 0) {
-        stateRef.current = "idle";
-        setState("idle");
-        setMessage(UNCLEAR);
-        return null;
+      await recognizer.start({ autoEndpoint: {
+        onStopping: () => {
+          if (!isCurrent()) return;
+          stateRef.current = "recognizing";
+          setState("recognizing");
+        },
+        onResult: (recognized) => {
+          if (!isCurrent()) return;
+          if (recognized.status !== "recognized" || recognized.digits.length === 0) {
+            stateRef.current = "idle";
+            setState("idle");
+            setFailure({ kind: "uncertain", message: UNCLEAR });
+            setMessage(UNCLEAR);
+            return;
+          }
+          const digits = [...recognized.digits];
+          Object.freeze(digits);
+          const snapshot = Object.freeze({ ...recognized, digits });
+          stateRef.current = "complete";
+          setState("complete");
+          onRecognized(snapshot);
+        },
+        onFailure: fail,
+      } });
+      if (!isCurrent()) return;
+      if (stateRef.current === "starting") {
+        stateRef.current = "recording";
+        setState("recording");
       }
-      const digits = [...recognized.digits];
-      Object.freeze(digits);
-      const snapshot = Object.freeze({ ...recognized, digits });
-      stateRef.current = "review";
-      setResult(snapshot);
-      setState("review");
-      return snapshot;
     } catch (error) {
-      if (!mountedRef.current || recognizerRef.current !== recognizer || generationRef.current !== generation) return null;
-      stateRef.current = "idle";
-      setState("idle");
-      setResult(null);
-      setReady(recognizer.ready);
-      if (!recognizer.ready) setSetup("error");
-      setMessage(recordingFailure(error));
-      return null;
+      fail(error);
     }
   }, []);
 
-  return { supported, ready, setup, state, result, message, prepare, prime, record, stop, cancel };
+  return { supported, ready, setup, state, failure, message, prepare, prime, record, cancel };
 }

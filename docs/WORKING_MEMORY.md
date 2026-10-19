@@ -29,9 +29,11 @@ change the key.
 
 The requested Cogmed-style experience is a mechanic-specific Lab exception to
 the canonical Campaign/Infinite session contract in `AGENTS.md`. Brief stimulus
-presentation and a retention interval are intrinsic to these memory tasks;
-answering is untimed. The lab has its own adaptive sessions and progress. It
-does not join the generated game catalog or alter Journey progress or XP.
+presentation and a retention interval are intrinsic to these memory tasks.
+Answers have no scored time limit. Spoken capture has bounded input watchdogs;
+silence or an unfinished recording produces an unscored input failure, not a
+wrong answer. The lab has its own adaptive sessions and progress. It does not
+join the generated game catalog or alter Journey progress or XP.
 
 Mixed sessions contain 24 or 48 trials and alternate the selected Digits
 variant with Light Path, Turning Grid, and Moving Lights. Half the rounds are
@@ -84,9 +86,10 @@ Save & exit retains an unfinished session. Ending it from the lab keeps
 completed-round totals and adaptive spans, but does not count it as a completed
 session. A presentation interrupted by pause or a hidden tab restarts. Paused
 manual recall retains the response entered so far; spoken recall stops the
-microphone and discards its uncommitted recording. Continue starts a fresh
-capture automatically when resuming spoken recall. Hiding the page or locking
-the lab also cancels the microphone and uncommitted speech.
+microphone and discards its recording and any pending recognition result.
+Continue starts a fresh capture automatically when resuming spoken recall.
+Hiding the page or locking the lab also cancels capture and pending speech
+results.
 
 Board changes have a separate observation interval: a quarter turn travels for
 1.6 seconds and settles for 0.4 seconds. Each moving-circle leg travels for
@@ -105,9 +108,10 @@ practice conditions rather than separate ability measures. Hiding the keypad
 during numerical sorting is an app extension, not a newly identified Cogmed
 task.
 
-Checking a correct sequence now records the result, advances, and presents the
-next challenge in the same action. There is no intermediate Next or Start
-screen. The last correct result remains in a compact status line. An incorrect
+Checking a correct keypad sequence records the result, advances, and presents
+the next challenge in the same action; a recognized spoken answer is checked
+automatically. There is no intermediate Next or Start screen. The last correct
+result remains in a compact status line. An incorrect
 answer shows a mismatch without revealing the expected answer, and retains a
 single Replay sequence action. Spoken feedback can also show the submitted
 recognized digits. Replay does not change the first-attempt record. Solved
@@ -172,24 +176,40 @@ the device. There is no Web Speech API, cloud speech service, remote recognition
 fallback, or audio upload. Microphone permission is requested for recording.
 
 Once local speech is ready, recording starts automatically after the narrated
-sequence and hold interval. The answer controls are **OK** and **Restart**.
-OK stops capture, recognizes locally, and commits the recognized sequence in
-one tap. Restart discards the uncommitted recording and immediately starts a
-fresh capture for the same heard sequence; it does not replay the stimulus or
-record an attempt. The keypad, live transcript, and recognized digits remain
-hidden before commitment. An audio context can be primed from an earlier user
-gesture, but the microphone is not opened during narration.
+sequence and its 800 ms hold interval. The player says an answer, then pauses;
+capture stops after about two seconds of trailing quiet and recognition is
+checked automatically. There are no OK or Restart controls. The keypad, live
+transcript, and recognized digits remain hidden before grading. An audio
+context can be primed from an earlier user gesture, but the microphone is not
+opened during narration.
 
-Only after a wrong committed spoken answer does feedback show the submitted
-recognized digits, so the player can inspect a possible recognition mistake.
-It does not show the expected answer.
-That first-attempt miss remains recorded; the app cannot distinguish a valid
-misrecognition from a memory error. The normal Replay sequence action remains
-available as a learning retry. Empty, uncertain, or failed recognition stays
-unscored and offers Restart. A correct OK submission advances directly to the
-next challenge. Keypad remains available when the local speech setup or
-microphone is unavailable. Speech is an additional practice condition, not an
-input method documented for the audited Cogmed training tasks.
+Endpoint detection uses local microphone activity and answer-independent speech
+hypotheses. Sound bursts shorter than 160 ms do not by themselves establish
+speech, and repeated unchanged partial transcripts do not prolong capture.
+Neither the expected digits nor the expected answer length is supplied to the
+recognizer or used to decide when to stop. Confident, valid digit recognition
+is a submitted answer even when its length differs from the challenge.
+
+No detected speech within ten seconds, a recording that reaches 45 seconds,
+unknown or uncertain speech, and capture or recognition errors produce a
+separate input failure. Feedback says **Input not recognized** or **Speech input
+unavailable**, explains that no attempt was scored, and offers **Retry**. Retry
+starts a fresh capture for the same heard sequence without replaying it.
+These failures do not change the first-attempt score or adaptive state. The
+recording bounds prevent a microphone from remaining open indefinitely; they
+are not a punitive game timer and do not turn silence into an incorrect answer.
+
+Only after a wrong recognized spoken answer does **Answer did not match**
+feedback show the submitted digits, so the player can inspect a possible
+recognition mistake. It does not show the expected answer. That first-attempt
+miss remains recorded: the app
+cannot reliably distinguish confidently misheard digits from incorrectly
+recalled digits. The normal Replay sequence action remains available as a
+learning retry. A correct spoken answer advances directly to the next
+challenge. Keypad remains available when the local speech setup or microphone
+is unavailable. Speech is an additional practice condition, not an input method
+documented for the audited Cogmed training tasks. Existing saved sessions,
+condition records, and first-attempt histories retain their meaning.
 
 Authored content is password-encrypted. Saved practice progress is encrypted on
 the device and does not require an account, server, or remote analytics. The
