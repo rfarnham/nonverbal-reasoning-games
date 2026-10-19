@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { deriveSearchKey, encryptSearchBytes, decryptSearchBytes, sha256 } from "../lib/question-search/crypto.ts";
 import {
   unlockMemoryVault, loadMemoryAudio, validateMemoryContent, validateMemoryManifest, memoryContentContext, memoryAudioContext,
@@ -252,7 +253,7 @@ test("the pack builder publishes only ciphertext and a minimal manifest that unl
     const content = contentFixture();
     const password = randomBytes(24).toString("base64");
     await writeFile(source, JSON.stringify(content));
-    const result = await execute(process.execPath, [new URL("../scripts/encrypt-working-memory.mjs", import.meta.url).pathname,
+    const result = await execute(process.execPath, [fileURLToPath(new URL("../scripts/encrypt-working-memory.mjs", import.meta.url)),
       "--source", source, "--audio-directory", audioDirectory, "--output", output], {
       env: { ...process.env, WORKING_MEMORY_PASSWORD: password },
     });
@@ -269,7 +270,7 @@ test("the pack builder publishes only ciphertext and a minimal manifest that unl
       assert.deepEqual((await unlockMemoryVault(password)).content, content);
     });
     assert.ok(!Buffer.from(encrypted).includes(Buffer.from(content.intro)));
-    const args = [new URL("../scripts/encrypt-working-memory.mjs", import.meta.url).pathname,
+    const args = [fileURLToPath(new URL("../scripts/encrypt-working-memory.mjs", import.meta.url)),
       "--source", source, "--audio-directory", audioDirectory, "--output", output];
     await execute(process.execPath, args, { env: { ...process.env, WORKING_MEMORY_PASSWORD: password } });
     const replaced = JSON.parse(await readFile(join(output, "manifest.json"), "utf8"));
