@@ -139,25 +139,38 @@ answer. Spoken mode removes those supports during recall and introduces speech
 production and recognition. The user's experience motivates offering both, but
 the publications do not establish that speech is harder for every player or
 more beneficial. Spoken responses use local recognition. Capture starts
-automatically after the sequence and hold interval. OK stops, recognizes, and
-commits in one action; Restart discards the uncommitted recording and begins
-another capture without replaying the sequence or recording a score. Neither
-a live transcript nor recognized digits are shown before commitment. Empty,
-uncertain, and technical recognition failures remain unscored and can be
-restarted.
+automatically after the sequence and an 800 ms hold interval, stops after about
+two seconds of trailing quiet, and submits without OK or Restart controls.
+Local audio activity and changed speech hypotheses determine the endpoint;
+short sound bursts alone do not open it, and repeated unchanged hypotheses do
+not keep it open. Neither expected digits nor expected answer length is given
+to the recognizer. A confident valid digit sequence is graded, including one
+with a different length from the expected answer. Neither a live transcript nor
+recognized digits are shown before grading.
 
-After a wrong committed spoken answer, feedback shows the recognized submitted
-digits to help inspect a possible misrecognition. The first-attempt miss still
-stands. This display cannot establish whether a valid digit sequence was
-misrecognized or incorrectly recalled. The ordinary Replay sequence learning
+Silence, unknown or uncertain speech, and technical failures are input failures,
+distinct from recognized incorrect answers. **Input not recognized** or **Speech
+input unavailable** feedback offers **Retry** to record another answer to the
+same heard sequence without replaying it. No attempt or adaptive evidence is
+recorded. The ten-second no-speech and 45-second maximum-recording bounds stop
+capture safely; they do not impose a scored response deadline or make silence
+a memory error. These endpoint and confidence rules are app design choices,
+not published Cogmed parameters or validated diagnostic criteria.
+
+After a wrong recognized spoken answer, **Answer did not match** feedback shows
+the submitted digits to help inspect a possible misrecognition. The
+first-attempt miss still stands.
+This display cannot reliably establish whether confidently recognized digits
+were misheard or incorrectly recalled. The ordinary Replay sequence learning
 retry remains available and cannot rewrite the original result. Wrong feedback
 in every game indicates a mismatch without displaying the expected answer.
 Solved examples use independent practice questions, and historical review does
 not reveal the full stimulus or answer to an unredeemed miss: for several
 mechanics the stimulus itself exposes the solution. Actual-round solutions
 are available only after first-try success or redemption. Pausing,
-hiding, or locking cancels capture and discards the draft; Continue starts a
-fresh capture automatically if it resumes spoken recall. Priming an audio
+hiding, or locking cancels capture and discards both the recording and pending
+recognition results; Continue starts a fresh capture automatically if it
+resumes spoken recall. Priming an audio
 context from a user gesture does not open the microphone during narration.
 
 Adaptive records are separated by standard/slower presentation and by each

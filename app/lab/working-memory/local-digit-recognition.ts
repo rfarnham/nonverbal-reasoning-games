@@ -1,4 +1,6 @@
 /** Local-only digit ASR. Model/runtime are requested only by prepare(). */
+import { SpeechEndpoint, SPEECH_ENDPOINT_TIMING } from "./speech-endpoint.ts";
+
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const SPEECH_ROOT = `${BASE_PATH}/models/speech`;
 export const LOCAL_SPEECH_DOWNLOAD_MB = 46;
@@ -17,6 +19,23 @@ export interface LocalDigitResult {
   transcript: string;
   status: "recognized" | "uncertain";
 }
+export type LocalSpeechFailureCode = "no-speech" | "timeout" | "technical";
+export class LocalSpeechInputError extends Error {
+  readonly code: LocalSpeechFailureCode;
+  constructor(code: LocalSpeechFailureCode, message: string) {
+    super(message);
+    this.name = "LocalSpeechInputError";
+    this.code = code;
+  }
+}
+export interface LocalDigitAutoEndpoint {
+  onStopping(): void;
+  onResult(result: LocalDigitResult): void;
+  onFailure(error: Error): void;
+}
+export interface LocalDigitStartOptions {
+  autoEndpoint?: LocalDigitAutoEndpoint;
+}
 export interface LocalSpeechProgress {
   phase: "loading" | "ready";
   downloadMB: number;
@@ -27,6 +46,7 @@ interface Word {
 }
 interface Segment {
   text?: string;
+  partial?: string;
   result?: Word[];
 }
 interface WorkerReply {
@@ -45,11 +65,16 @@ interface Recording {
   worklet: AudioWorkletNode | null;
   gain: GainNode | null;
   timer: ReturnType<typeof setTimeout> | null;
+  noSpeechTimer: ReturnType<typeof setTimeout> | null;
   flush: (() => void) | null;
   resolve: ((value: LocalDigitResult) => void) | null;
   reject: ((error: Error) => void) | null;
   startReject: ((error: Error) => void) | null;
   finishing: boolean;
+  started: boolean;
+  autoEndpoint: LocalDigitAutoEndpoint | null;
+  endpoint: SpeechEndpoint | null;
+  partial: string;
 }
 interface CaptureContext {
   context: AudioContext;
@@ -216,6 +241,15 @@ export class LocalDigitRecognizer {
       return;
     }
     if (!current || message.recognizerId !== current.id || !message.result || typeof message.result !== "object") return;
+    if (!current.finishing && current.endpoint) {
+      const text = (message.event === "partialresult" ? message.result.partial : message.result.text)?.trim().toLowerCase() ?? "";
+      const isDigitSpeech = text.length > 0 && text.split(/\s+/).every((word) => DIGITS[word] !== undefined);
+      // Vosk repeats its current partial hypothesis on silent chunks. Only a
+      // changed hypothesis (or a newly completed segment) extends activity.
+      if (isDigitSpeech && (message.event === "result" || (message.event === "partialresult" && text !== current.partial))) current.endpoint.confirmSpeech();
+      if (message.event === "partialresult") current.partial = text;
+      else if (message.event === "result") current.partial = "";
+    }
     if (message.event === "result" || message.event === "finalresult") current.segments.push(message.result);
     if (message.event === "finalresult" && current.finishing) {
       const result = parseLocalDigitResult(current.segments);
@@ -226,13 +260,15 @@ export class LocalDigitRecognizer {
     }
   }
 
-  private createRecording(): Recording {
+  private createRecording(options: LocalDigitStartOptions = {}): Recording {
     if (!this.prepared || !this.worker) throw new Error("Set up local speech before recording.");
     if (this.current) throw new Error("Speech input is already active.");
     const current: Recording = {
       id: `digits-${++this.sequence}`, segments: [], samples: 0, stream: null,
-      context: null, source: null, worklet: null, gain: null, timer: null,
+      context: null, source: null, worklet: null, gain: null, timer: null, noSpeechTimer: null,
       flush: null, resolve: null, reject: null, startReject: null, finishing: false,
+      started: false, autoEndpoint: options.autoEndpoint ?? null,
+      endpoint: options.autoEndpoint ? new SpeechEndpoint(SAMPLE_RATE) : null, partial: "",
     };
     this.current = current;
     try {
@@ -245,12 +281,12 @@ export class LocalDigitRecognizer {
     return current;
   }
 
-  async start(): Promise<void> {
+  async start(options: LocalDigitStartOptions = {}): Promise<void> {
     const generation = this.generation;
-    const current = this.createRecording();
+    const current = this.createRecording(options);
     const isCurrent = () => this.current === current && generation === this.generation;
     try {
-      // prime() normally ran on Listen/OK/Restart. Keep direct recording usable,
+      // prime() normally ran on Listen/Retry. Keep direct recording usable,
       // but do not retry a failed gesture-time prime from delayed recall.
       if (!this.capture && !this.primeError) this.prime();
       const capture = this.capture;
@@ -287,7 +323,15 @@ export class LocalDigitRecognizer {
       stream.getAudioTracks().forEach((track) => track.addEventListener("ended", () => {
         if (this.current === current && !current.finishing) this.failRecording(new Error("The microphone stopped. Record again or use the keypad."));
       }, { once: true }));
-      current.timer = setTimeout(() => this.failRecording(new Error("Recording stopped after 45 seconds. Record again or use the keypad.")), MAX_SECONDS * 1000);
+      current.started = true;
+      if (current.endpoint) {
+        current.noSpeechTimer = setTimeout(() => {
+          if (this.current === current && !current.finishing && !current.endpoint?.hasSpeech) {
+            this.failRecording(new LocalSpeechInputError("no-speech", "No speech was detected. Retry; this attempt was not scored."));
+          }
+        }, SPEECH_ENDPOINT_TIMING.noSpeechMs);
+      }
+      current.timer = setTimeout(() => this.failRecording(new LocalSpeechInputError("timeout", "Recording stopped after 45 seconds. Retry; this attempt was not scored.")), MAX_SECONDS * 1000);
     } catch (error) {
       const cancelled = generation !== this.generation;
       if (this.current === current) this.clearRecording(current);
@@ -306,10 +350,27 @@ export class LocalDigitRecognizer {
   private sendSamples(current: Recording, samples: Float32Array): void {
     if (this.current !== current) return;
     current.samples += samples.length;
-    if (current.samples > SAMPLE_RATE * MAX_SECONDS) { this.failRecording(new Error("The recording was too long. Record again or use the keypad.")); return; }
+    if (current.samples > SAMPLE_RATE * MAX_SECONDS) { this.failRecording(new LocalSpeechInputError("timeout", "The recording was too long. Retry; this attempt was not scored.")); return; }
     // Vosk's native float input uses the int16 amplitude scale, unlike WebAudio.
     const data = samples.map((value) => value * 32768);
     this.worker?.postMessage({ action: "audioChunk", recognizerId: current.id, data, sampleRate: SAMPLE_RATE }, [data.buffer]);
+    if (!current.finishing && current.started && current.endpoint?.push(samples)) void this.stopAutomatically(current);
+  }
+
+  private async stopAutomatically(current: Recording): Promise<void> {
+    if (this.current !== current || current.finishing || !current.autoEndpoint) return;
+    const generation = this.generation;
+    const callbacks = current.autoEndpoint;
+    callbacks.onStopping();
+    if (this.current !== current || generation !== this.generation) return;
+    try {
+      const result = await this.stop();
+      if (generation === this.generation) callbacks.onResult(result);
+    } catch (error) {
+      if (generation === this.generation && !(error instanceof Error && error.name === "AbortError")) {
+        callbacks.onFailure(error instanceof Error ? error : new LocalSpeechInputError("technical", "Speech input could not finish."));
+      }
+    }
   }
 
   async stop(): Promise<LocalDigitResult> {
@@ -317,6 +378,7 @@ export class LocalDigitRecognizer {
     if (!current || current.finishing) throw new Error("No speech recording is active.");
     current.finishing = true;
     if (current.timer) clearTimeout(current.timer);
+    if (current.noSpeechTimer) clearTimeout(current.noSpeechTimer);
     current.stream?.getTracks().forEach((track) => track.stop());
     current.source?.disconnect();
     try {
@@ -379,6 +441,7 @@ export class LocalDigitRecognizer {
   private clearRecording(current: Recording): void {
     if (this.current === current) this.current = null;
     if (current.timer) clearTimeout(current.timer);
+    if (current.noSpeechTimer) clearTimeout(current.noSpeechTimer);
     current.flush?.();
     current.flush = null;
     this.closeAudio(current);
@@ -389,16 +452,19 @@ export class LocalDigitRecognizer {
     const current = this.current;
     if (!current) return;
     const wasFinishing = current.finishing;
+    const automatic = current.started ? current.autoEndpoint : null;
     current.startReject?.(error);
     current.reject?.(error);
     this.clearRecording(current);
-    if (notify && !wasFinishing) this.onError?.(error);
+    if (!wasFinishing && automatic && error.name !== "AbortError") automatic.onFailure(error);
+    else if (notify && !wasFinishing) this.onError?.(error);
   }
 
   private failWorker(error: Error): void {
     // A warmed worker can fail while idle, so readiness notification must not
     // depend on a live recording. Set readiness before notifying the consumer.
     const notify = this.prepared && error.name !== "AbortError";
+    const automatic = Boolean(this.current?.started && this.current.autoEndpoint);
     this.prepared = false;
     this.prepareReject?.(error);
     this.prepareReject = null;
@@ -408,7 +474,7 @@ export class LocalDigitRecognizer {
     this.failRecording(error, false);
     this.worker?.terminate();
     this.worker = null;
-    if (notify) this.onError?.(error);
+    if (notify && !automatic) this.onError?.(error);
   }
 
   cancel(): void {

@@ -189,6 +189,9 @@
 .speechSetup { padding: 0 0 16px; font-size: .85rem; line-height: 1.6; }
 .speechSetup .privacy { display: block; max-width: 600px; margin: 0 0 12px; }
 .spokenRecall { max-width: 600px; margin: 28px auto; }
+.inputFailure { padding: 18px; border: 1px solid var(--control-line); border-radius: 5px; background: var(--panel); text-align: left; }
+.inputFailure h2 { margin: 0 0 10px; font-size: 1rem; }
+.inputFailure p { margin: 8px 0 12px; font-size: .85rem; line-height: 1.6; }
 .settingRow input[type="checkbox"] { flex-shrink: 0; width: 20px; height: 20px; accent-color: var(--ink); }
 .pauseOverlay { display: grid; align-content: center; justify-items: center; gap: 16px; padding: 24px 0; }
 .pauseOverlay h2 { margin: 0; font-size: 1.6rem; font-weight: 700; }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { DIGIT_GRAMMAR, LocalDigitRecognizer, parseLocalDigitResult } from "../app/lab/working-memory/local-digit-recognition.ts";
+import { DIGIT_GRAMMAR, LocalDigitRecognizer, LocalSpeechInputError, parseLocalDigitResult } from "../app/lab/working-memory/local-digit-recognition.ts";
 
 function segment(words, confidence = 0.99) {
   return { text: words.join(" "), result: words.map((word) => ({ word, conf: confidence })) };
@@ -191,8 +191,8 @@ async function captureHarness(run) {
     replace("Worker", FakeWorker);
     await run({
       order, modules, contexts, permissions, worklets, workers,
-      async recognizer() {
-        const recognizer = new LocalDigitRecognizer();
+      async recognizer(options) {
+        const recognizer = new LocalDigitRecognizer(options);
         recognizers.push(recognizer);
         await recognizer.prepare();
         return recognizer;
@@ -243,6 +243,169 @@ test("gesture priming opens no microphone or recognizer, and survives cancellati
     assert.equal(h.contexts[0].state, "running");
     recognizer.dispose();
     assert.equal(h.contexts[0].state, "closed");
+  });
+});
+
+function captureSamples(h, samples, index = h.worklets.length - 1) {
+  h.worklets[index].port.onmessage?.({ data: { type: "samples", samples } });
+}
+
+function captureTone(milliseconds, amplitude = 0.08) {
+  return Float32Array.from({ length: milliseconds * 16 }, (_, sample) => amplitude * Math.sin(2 * Math.PI * 220 * sample / 16_000));
+}
+
+async function beginAutomaticCapture(h, callbacks, recognizerOptions) {
+  const recognizer = await h.recognizer(recognizerOptions);
+  h.gesture(() => recognizer.prime());
+  h.modules.at(-1).resolve();
+  const starting = recognizer.start({ autoEndpoint: callbacks });
+  await h.tick();
+  const stream = h.stream();
+  h.permissions.at(-1).resolve(stream);
+  await starting;
+  const worker = h.workers.at(-1);
+  const id = worker.messages.filter((message) => message.action === "create").at(-1).recognizerId;
+  return { recognizer, worker, id, stream };
+}
+
+test("automatic capture waits across digit pauses, flushes once, and returns all segments without answer bias", async () => {
+  await captureHarness(async (h) => {
+    const events = [];
+    const { recognizer, worker, id, stream } = await beginAutomaticCapture(h, {
+      onStopping() { events.push("stopping"); },
+      onResult(result) { events.push(result); },
+      onFailure(error) { events.push(error); },
+    });
+    captureSamples(h, captureTone(400));
+    worker.emit({ event: "partialresult", recognizerId: id, result: { partial: "three" } });
+    captureSamples(h, new Float32Array(16 * 1_900));
+    assert.deepEqual(events, []);
+    worker.emit({ event: "result", recognizerId: id, result: segment(["three"]) });
+    captureSamples(h, captureTone(400));
+    worker.emit({ event: "partialresult", recognizerId: id, result: { partial: "one" } });
+    captureSamples(h, new Float32Array(16 * 2_000));
+    assert.deepEqual(events, ["stopping"]);
+    assert.ok(stream.track.stops >= 1, "microphone is stopped before final decoding");
+    await h.tick();
+    const messages = worker.messages.filter((message) => message.recognizerId === id);
+    assert.equal(messages.filter((message) => message.action === "retrieveFinalResult").length, 1);
+    assert.equal(messages.at(-2).action, "audioChunk", "flushed tail reaches ASR before final decode");
+    worker.emit({ event: "finalresult", recognizerId: id, result: segment(["one", "nine"]) });
+    await h.tick();
+    assert.deepEqual(events, ["stopping", { digits: [3, 1, 9], transcript: "three one nine", status: "recognized" }]);
+    assert.equal(recognizer.recording, false);
+    assert.deepEqual(JSON.parse(worker.messages.find((message) => message.action === "create").grammar), DIGIT_GRAMMAR);
+    worker.emit({ event: "finalresult", recognizerId: id, result: segment(["two"]) });
+    captureSamples(h, new Float32Array(32_000));
+    await h.tick();
+    assert.equal(events.length, 2, "duplicate and late completions do not emit another answer");
+  });
+});
+
+test("unchanged ASR partials cannot keep quiet capture open, while quiet voices can supply speech evidence", async () => {
+  await captureHarness(async (h) => {
+    const events = [];
+    const { worker, id } = await beginAutomaticCapture(h, {
+      onStopping() { events.push("stopping"); }, onResult(result) { events.push(result); }, onFailure(error) { events.push(error); },
+    });
+    captureSamples(h, captureTone(400, 0.003));
+    worker.emit({ event: "partialresult", recognizerId: id, result: { partial: "seven" } });
+    for (let frame = 0; frame < 20; frame += 1) {
+      captureSamples(h, new Float32Array(1_600));
+      worker.emit({ event: "partialresult", recognizerId: id, result: { partial: "seven" } });
+    }
+    assert.deepEqual(events, ["stopping"]);
+    await h.tick();
+    worker.emit({ event: "finalresult", recognizerId: id, result: segment(["seven"]) });
+    await h.tick();
+    assert.equal(events[1].status, "recognized");
+  });
+});
+
+test("automatic no-speech and maximum duration failures stop tracks and remain separate from recognized answers", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    await captureHarness(async (h) => {
+      const events = [];
+      const callbacks = { onStopping() { events.push("stopping"); }, onResult(result) { events.push(result); }, onFailure(error) { events.push(error); } };
+      const first = await beginAutomaticCapture(h, callbacks);
+      captureSamples(h, new Float32Array(16 * 9_000));
+      t.mock.timers.tick(10_000);
+      assert.equal(events.length, 1);
+      assert.ok(events[0] instanceof LocalSpeechInputError);
+      assert.equal(events[0].code, "no-speech");
+      assert.ok(first.stream.track.stops >= 1);
+      assert.equal(first.worker.messages.some((message) => message.action === "retrieveFinalResult"), false, "silence is not decoded as an answer");
+      assert.equal(first.recognizer.ready, true);
+
+      const recording = first.recognizer.start({ autoEndpoint: callbacks });
+      await h.tick();
+      const secondStream = h.stream();
+      h.permissions.at(-1).resolve(secondStream);
+      await recording;
+      captureSamples(h, captureTone(400));
+      t.mock.timers.tick(10_000);
+      assert.equal(events.length, 1, "the initial deadline does not truncate detected speech");
+      t.mock.timers.tick(35_000);
+      assert.equal(events.length, 2);
+      assert.equal(events[1].code, "timeout");
+      assert.ok(secondStream.track.stops >= 1);
+      assert.equal(first.recognizer.recording, false);
+    });
+  } finally { t.mock.timers.reset(); }
+});
+
+test("uncertain automatic recognition remains a decode failure candidate rather than guessed digits", async () => {
+  await captureHarness(async (h) => {
+    const events = [];
+    const { worker, id } = await beginAutomaticCapture(h, {
+      onStopping() { events.push("stopping"); }, onResult(result) { events.push(result); }, onFailure(error) { events.push(error); },
+    });
+    captureSamples(h, captureTone(400));
+    captureSamples(h, new Float32Array(32_000));
+    await h.tick();
+    worker.emit({ event: "finalresult", recognizerId: id, result: segment(["one", "two"], 0.6) });
+    await h.tick();
+    assert.deepEqual(events, ["stopping", { digits: [], transcript: "one two", status: "uncertain" }]);
+  });
+});
+
+test("pause, lock, disposal, and late worker results cannot deliver an automatic answer", async () => {
+  for (const cancelAt of ["capture", "flush", "inference", "dispose"]) {
+    await captureHarness(async (h) => {
+      const events = [];
+      const { recognizer, worker, id, stream } = await beginAutomaticCapture(h, {
+        onStopping() { events.push("stopping"); }, onResult(result) { events.push(result); }, onFailure(error) { events.push(error); },
+      });
+      captureSamples(h, captureTone(400));
+      if (cancelAt !== "capture") captureSamples(h, new Float32Array(32_000));
+      if (cancelAt === "inference") await h.tick();
+      if (cancelAt === "dispose") recognizer.dispose();
+      else recognizer.cancel();
+      worker.emit({ event: "finalresult", recognizerId: id, result: segment(["one"]) });
+      await h.tick();
+      assert.deepEqual(events, cancelAt === "capture" ? [] : ["stopping"], cancelAt);
+      assert.ok(stream.track.stops >= 1);
+      assert.equal(recognizer.recording, false);
+    });
+  }
+});
+
+test("active automatic worker failure emits one failure with updated readiness", async () => {
+  await captureHarness(async (h) => {
+    const events = [];
+    let recognizer;
+    ({ recognizer } = await beginAutomaticCapture(h, {
+      onStopping() { events.push("stopping"); }, onResult(result) { events.push(result); },
+      onFailure(error) { events.push({ error, ready: recognizer.ready }); },
+    }, { onError() { events.push("duplicate global failure"); } }));
+    const worker = h.workers[0];
+    worker.onerror({ preventDefault() {} });
+    await h.tick();
+    assert.equal(events.length, 1);
+    assert.equal(events[0].ready, false);
+    assert.match(events[0].error.message, /could not run/);
+    assert.equal(recognizer.recording, false);
   });
 });
 

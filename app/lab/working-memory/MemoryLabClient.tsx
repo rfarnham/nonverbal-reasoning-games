@@ -598,6 +598,7 @@ function UnlockedLab({
   const audio = useRef<AudioContext | null>(null);
   const actionRef = useRef<HTMLButtonElement>(null);
   const firstCell = useRef<HTMLButtonElement>(null);
+  const spokenStatus = useRef<HTMLParagraphElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const roundTitleRef = useRef<HTMLDivElement>(null);
   const reviewTrigger = useRef<HTMLButtonElement | null>(null);
@@ -777,11 +778,11 @@ function UnlockedLab({
   useEffect(() => {
     if (!spoken || phase !== "recall") return;
     const frame = requestAnimationFrame(() => {
-      if (speech.state === "recording") firstCell.current?.focus();
-      else actionRef.current?.focus();
+      if (speech.failure) actionRef.current?.focus();
+      else spokenStatus.current?.focus();
     });
     return () => cancelAnimationFrame(frame);
-  }, [speech.state, spoken, phase]);
+  }, [speech.state, speech.failure, spoken, phase]);
 
   useEffect(() => {
     if (!spoken || phase !== "ready" || !speech.ready) return;
@@ -905,7 +906,7 @@ function UnlockedLab({
       } else await wait(800, token);
       changePhase("recall");
       if (target.answerKind === "ordered-digits" && savedRef.current.sessionCondition?.inputMode === "spoken"
-        && playback.current === token && !document.hidden) void speech.record();
+        && playback.current === token && !document.hidden) beginSpoken();
     } catch {
       /* Pausing, locking, and navigation cancel the presentation. */
     }
@@ -1026,31 +1027,29 @@ function UnlockedLab({
     responseRef.current = next;
     setResponse(next);
   }
-  function restartSpoken() {
-    if (phaseRef.current !== "recall" || !spoken || review || !speech.ready) return;
+  function retrySpoken() {
+    if (phaseRef.current !== "recall" || !spoken || review || !speech.ready || !speech.failure) return;
     primeAudio();
     speechOperation.current += 1;
     speechSubmitting.current = false;
     cancelSpeech();
     setSpokenDebug(null);
-    void speech.record();
+    beginSpoken();
   }
-  async function confirmSpoken() {
+  function beginSpoken() {
     const active = savedRef.current.session?.active;
-    if (phaseRef.current !== "recall" || !active || !spoken || review
-      || speech.state !== "recording" || speechSubmitting.current) return;
-    primeAudio();
+    if (phaseRef.current !== "recall" || !active || review
+      || active.answerKind !== "ordered-digits" || savedRef.current.sessionCondition?.inputMode !== "spoken") return;
     const operation = ++speechOperation.current;
     const token = playback.current;
-    speechSubmitting.current = true;
-    try {
-      const recognized = await speech.stop();
+    speechSubmitting.current = false;
+    void speech.record((recognized) => {
       if (!mounted.current || operation !== speechOperation.current || playback.current !== token
-        || document.hidden || phaseRef.current !== "recall" || savedRef.current.session?.active?.id !== active.id) return;
-      if (recognized?.status === "recognized") submit(recognized.digits);
-    } finally {
-      if (operation === speechOperation.current) speechSubmitting.current = false;
-    }
+        || document.hidden || phaseRef.current !== "recall" || savedRef.current.session?.active?.id !== active.id
+        || speechSubmitting.current) return;
+      speechSubmitting.current = true;
+      if (recognized.status === "recognized") submit(recognized.digits);
+    });
   }
   function submit(spokenDigits?: readonly number[]) {
     const s = savedRef.current.session;
@@ -1809,7 +1808,7 @@ function UnlockedLab({
                               ? "Paused"
                               : phase === "correct"
                                 ? "✓ Correct"
-                                : "× Try again"}
+                              : spoken ? "× Answer did not match" : "× Try again"}
                   </div>
                   {round.task === "locations" &&
                     phase === "recall" &&
@@ -1833,10 +1832,11 @@ function UnlockedLab({
                         ref={actionRef}
                         className={styles.button}
                         onClick={() => {
+                          if (phaseRef.current !== "paused") return;
                           primeAudio();
                           if (pausedFrom === "recall") {
                             changePhase("recall");
-                            if (spoken && !document.hidden) void speech.record();
+                            if (spoken && !document.hidden) beginSpoken();
                           }
                           else {
                             enableListening(round);
@@ -1858,14 +1858,21 @@ function UnlockedLab({
                             {speech.setup === "loading" ? "Loading speech model…" : "Download speech model"}
                           </button>
                         )}
-                        <p className={styles.exampleText} role="status">
-                          {speech.state === "recording" ? "Listening… Tap OK when you’re done." : speech.state === "recognizing" ? "Checking on this device…" : speech.state === "starting" ? "Opening microphone…" : "Tap Restart to record your answer."}
-                        </p>
-                        <div className={styles.roundActions}>
-                          <button className={styles.button} ref={firstCell} disabled={!speech.ready || speech.state !== "recording"} onClick={() => void confirmSpoken()}>OK</button>
-                          <button className={styles.secondaryButton} ref={actionRef} disabled={!speech.ready} onClick={restartSpoken}>Restart</button>
-                        </div>
-                        {speech.message && <p className={styles.exampleText} role="status">{speech.message}</p>}
+                        {!speech.ready && speech.message && speech.message !== speech.failure?.message && (
+                          <p className={styles.exampleText} role="status">{speech.message}</p>
+                        )}
+                        {speech.failure ? (
+                          <div className={styles.inputFailure} role="alert">
+                            <h2>{speech.failure.kind === "uncertain" || speech.failure.kind === "no-speech" ? "Input not recognized" : "Speech input unavailable"}</h2>
+                            <p>{speech.failure.message}</p>
+                            <p>No attempt was scored.</p>
+                            <button className={styles.button} ref={actionRef} disabled={!speech.ready} onClick={retrySpoken}>Retry</button>
+                          </div>
+                        ) : (
+                          <p className={styles.exampleText} role="status" tabIndex={-1} ref={spokenStatus}>
+                            {speech.state === "recording" ? "Listening… Say your answer, then pause." : speech.state === "recognizing" || speech.state === "complete" ? "Checking your answer…" : speech.state === "starting" ? "Opening microphone…" : "Getting ready…"}
+                          </p>
+                        )}
                       </div>
                     ) : null
                   ) : (
@@ -1939,12 +1946,13 @@ function UnlockedLab({
                     className={`${styles.feedback} ${phase === "correct" ? styles.feedbackCorrect : styles.feedbackWrong}`}
                     role="status"
                   >
-                    <h2>{phase === "correct" ? "Correct" : "Try again"}</h2>
+                    <h2>{phase === "correct" ? "Correct" : spoken ? "Answer did not match" : "Try again"}</h2>
                     <p>
                       {phase === "correct"
                         ? session!.history.at(-1)?.correct
                           ? "Correct on the first attempt."
                           : "Correct after replay. The first attempt remains recorded as missed."
+                        : spoken ? "The recognized answer did not match."
                         : `The ${round.answerKind === "unordered-cells" ? "selected places" : "sequence"} did not match.`}
                     </p>
                     {phase === "wrong" && spoken && spokenDebug?.roundId === round.id && (

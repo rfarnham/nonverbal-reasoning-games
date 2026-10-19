@@ -123,17 +123,23 @@ async function installSpeechMock(context, options) {
     const heldFinals = [];
     const heldPermissions = [];
     const awaitingResponses = [];
+    const microphoneGains = new Set();
     const words = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
     const state = {
       microphoneRequests: 0, activeTracks: 0, stoppedTracks: 0, nativeSpeechRequests: 0,
       workersCreated: 0, workersTerminated: 0, endpointResults: 0, stimulusPlays: 0, recognitionDisplays: 0, messages: [], results: [], modelUrls: [],
       holdFinal: Boolean(config.holdFinal),
       holdMicrophone: Boolean(config.holdMicrophone),
+      setMicrophoneVolume(volume) { microphoneGains.forEach(gain => { gain.gain.value = volume; }); },
       queue(digits, settings = {}) {
-        const response = { digits, confidence: 0.99, ...settings };
+        const response = { digits, confidence: 0.99, endpoint: true, ...settings };
         const pending = awaitingResponses.shift();
         if (pending) pending.worker.responses.set(pending.id, response);
         else this.results.push(response);
+      },
+      sendSegment(digits, settings = {}) {
+        const active = this.latestRecognizer;
+        if (active) active.worker.emit({ event: 'result', recognizerId: active.id, result: segment({ digits, confidence: 0.99, ...settings }) });
       },
       releaseFinals() { heldFinals.splice(0).forEach(deliver => deliver()); },
       releaseMicrophones() { heldPermissions.splice(0).forEach(deliver => deliver()); },
@@ -159,7 +165,8 @@ async function installSpeechMock(context, options) {
       if (state.holdMicrophone) await new Promise(resolve => heldPermissions.push(resolve));
       const source = new NativeAudioContext();
       const oscillator = source.createOscillator(), gain = source.createGain(), destination = source.createMediaStreamDestination();
-      gain.gain.value = 0.1;
+      gain.gain.value = config.silentMicrophone ? 0 : 0.1;
+      microphoneGains.add(gain);
       oscillator.connect(gain).connect(destination);
       oscillator.start();
       await source.resume();
@@ -172,6 +179,7 @@ async function installSpeechMock(context, options) {
             stopped = true;
             state.activeTracks--;
             state.stoppedTracks++;
+            microphoneGains.delete(gain);
             oscillator.stop();
             void source.close();
           }
@@ -210,6 +218,7 @@ async function installSpeechMock(context, options) {
           state.modelUrls.push(message.modelUrl);
           setTimeout(() => this.emit({ event: 'load', result: !config.loadFailure }), 0);
         } else if (message.action === 'create') {
+          state.latestRecognizer = { worker: this, id: message.recognizerId };
           const response = state.results.shift();
           if (response) this.responses.set(message.recognizerId, response);
           else awaitingResponses.push({ worker: this, id: message.recognizerId });
@@ -217,7 +226,11 @@ async function installSpeechMock(context, options) {
           const response = this.responses.get(message.recognizerId);
           if (response?.endpoint && !this.endpointSent.has(message.recognizerId)) {
             this.endpointSent.add(message.recognizerId);
-            setTimeout(() => this.emit({ event: 'result', recognizerId: message.recognizerId, result: segment(response) }), 0);
+            setTimeout(() => {
+              if (this.terminated || !this.responses.has(message.recognizerId)) return;
+              this.emit({ event: 'result', recognizerId: message.recognizerId, result: segment(response) });
+              if (response.silence !== false) state.setMicrophoneVolume(0);
+            }, response.endpointDelay ?? 300);
           }
         } else if (message.action === 'retrieveFinalResult') {
           const response = this.responses.get(message.recognizerId) ?? { digits: [], confidence: 0.99 };
@@ -336,9 +349,9 @@ async function enter(page, round, values = round.expected, { keyboard = false, t
 async function check(page, { correct = true, key = fixture.key } = {}) {
   const before = await readSaved(page, key);
   const spoken = before.session.active.answerKind === 'ordered-digits' && before.sessionCondition?.inputMode === 'spoken';
-  await page.getByRole('button', { name: spoken ? 'OK' : 'Check sequence', exact: true }).click();
+  if (!spoken) await page.getByRole('button', { name: 'Check sequence', exact: true }).click();
   if (!correct) {
-    await page.getByRole('heading', { name: 'Try again', exact: true }).waitFor();
+    await page.getByRole('heading', { name: spoken ? 'Answer did not match' : 'Try again', exact: true }).waitFor();
     await assertNoMissSolution(page);
     return;
   }
@@ -354,7 +367,7 @@ async function assertAutoPresentation(page) {
   await page.getByRole('status').filter({ hasText: /^(Get ready(?: \+)?|Watch|Listen)$/ }).waitFor();
   assert.equal(await page.getByRole('button', { name: /^(Next round|Finish session|Watch the sequence|Listen to the sequence|Turn sound on & listen)/ }).count(), 0, 'A committed answer starts the next challenge without another action.');
   assert.equal(await page.getByRole('button', { name: 'Check sequence', exact: true }).count(), 0, 'Answers stay locked while the next sequence is presented.');
-  assert.equal(await page.getByRole('button', { name: /^(OK|Restart)$/ }).count(), 0, 'Spoken controls also stay unavailable during the next presentation.');
+  assert.equal(await page.getByRole('button', { name: /^(OK|Restart|Retry)$/ }).count(), 0, 'Spoken controls also stay unavailable during the next presentation.');
 }
 async function assertNoPlaintext(page, state) {
   const stored = await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage }, cookie: document.cookie }));
@@ -390,7 +403,7 @@ async function presentForSpeech(page) {
   await page.getByRole('button', { name: /^(Listen to the sequence|Turn sound on & listen)/ }).click();
   await page.getByRole('status').filter({ hasText: /^Listen$/ }).waitFor();
   assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), previous, 'The microphone stays closed while the stimulus is playing.');
-  assert.equal(await page.getByRole('button', { name: /^(OK|Restart)$/ }).count(), 0, 'A spoken answer cannot be committed while listening.');
+  assert.equal(await page.getByRole('button', { name: /^(OK|Restart|Retry)$/ }).count(), 0, 'There are no spoken answer actions while listening.');
   await speechCapturing(page);
 }
 async function assertNoSpokenTranscript(page) {
@@ -399,20 +412,30 @@ async function assertNoSpokenTranscript(page) {
   assert.equal(await page.getByRole('listitem', { name: /^Digit \d+$/, includeHidden: true }).count(), 0);
 }
 async function assertNoMissSolution(page) {
-  const feedback = page.getByRole('status').filter({ has: page.getByRole('heading', { name: 'Try again', exact: true }) });
+  const feedback = page.getByRole('status').filter({ has: page.getByRole('heading', { name: /^(Try again|Answer did not match)$/ }) });
   await feedback.waitFor();
   assert.equal(await feedback.getByText(/expected response|correct sequence|correct answer|solution/i).count(), 0, 'A missed answer does not reveal the solution.');
   assert.equal(await feedback.locator('svg[aria-label^="Row "]').count(), 0, 'The expected visual positions cannot be exposed through SVG labels.');
   assert.equal(await feedback.getByRole('group', { name: /expected|correct|solution/i, includeHidden: true }).count(), 0);
 }
-async function speechCapturing(page) {
-  await page.getByRole('button', { name: 'OK', exact: true }).waitFor();
-  await page.waitForFunction(() => window.__speechTest.activeTracks === 1 && [...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'OK' && !button.disabled));
+async function assertInputFailure(page, heading) {
+  const failure = page.getByRole('alert').filter({ has: page.getByRole('heading', { name: heading, exact: true }) });
+  await failure.waitFor();
+  assert.match(await failure.innerText(), /No attempt was scored\./);
+  assert.equal(await page.evaluate(() => window.__speechTest.activeTracks), 0, 'An input failure closes the microphone.');
   const controls = page.getByRole('group', { name: 'Spoken answer controls', exact: true });
-  assert.deepEqual(await controls.getByRole('button').allTextContents(), ['OK', 'Restart'], 'The spoken response has exactly its two requested actions.');
-  assert.equal(await page.getByRole('button', { name: 'OK', exact: true }).isEnabled(), true);
-  assert.equal(await page.getByRole('button', { name: 'Restart', exact: true }).isEnabled(), true);
-  assert.equal(await page.getByRole('button', { name: /^(Record answer|Record again|Stop recording|Check sequence)$/ }).count(), 0);
+  assert.deepEqual(await controls.getByRole('button').allTextContents(), ['Retry'], 'Only failed recognition offers an answer action.');
+  assert.equal(await controls.getByRole('button', { name: 'Retry', exact: true }).isEnabled(), true);
+  assert.equal(await page.getByRole('button', { name: /^(OK|Restart|Check sequence)$/ }).count(), 0);
+  assert.equal(await page.getByRole('heading', { name: /^(Try again|Answer did not match)$/ }).count(), 0, 'Input failure cannot masquerade as an incorrect answer.');
+  await assertNoSpokenTranscript(page);
+}
+async function speechCapturing(page) {
+  await page.waitForFunction(() => window.__speechTest.activeTracks === 1);
+  const controls = page.getByRole('group', { name: 'Spoken answer controls', exact: true });
+  await controls.waitFor();
+  assert.equal(await controls.getByRole('button').count(), 0, 'A successful spoken answer needs no start, stop, or confirmation action.');
+  assert.equal(await page.getByRole('button', { name: /^(OK|Restart|Retry|Record answer|Record again|Stop recording|Check sequence)$/ }).count(), 0);
   assert.equal(await page.getByRole('group', { name: 'Digit keypad', exact: true }).count(), 0);
   assert.equal(await page.getByRole('button', { name: /^Digit [1-9]$/ }).count(), 0);
   assert.equal(await page.getByLabel(/^\d+ of \d+ places entered$/).count(), 0, 'Spoken recall has no visual answer slots.');
@@ -421,9 +444,10 @@ async function speechCapturing(page) {
 async function recordSpeech(page, digits, settings = {}, { again = false } = {}) {
   const previous = await page.evaluate(({ digits, settings }) => {
     window.__speechTest.queue(digits, settings);
+    window.__speechTest.setMicrophoneVolume(0.1);
     return window.__speechTest.messages.filter(message => message.action === 'audioChunk').length;
   }, { digits, settings });
-  if (again) await page.getByRole('button', { name: 'Restart', exact: true }).click();
+  if (again) await page.getByRole('button', { name: 'Retry', exact: true }).click();
   await speechCapturing(page);
   await page.waitForFunction(count => window.__speechTest.messages.filter(message => message.action === 'audioChunk').length > count, previous);
 }
@@ -905,7 +929,7 @@ test('Large to small selection keeps a descending order cue and accepts only des
   } finally { await context.close(); }
 });
 
-test('spoken recall starts automatically, keeps recognition private, and commits once with OK before auto-recording the next round', { timeout: 60_000 }, async () => {
+test('spoken recall automatically starts, stops, and commits once without exposing correct recognition', { timeout: 60_000 }, async () => {
   const opened = await open({ width: 390, speech: {} });
   const { context, page } = opened;
   try {
@@ -921,40 +945,39 @@ test('spoken recall starts automatically, keeps recognition private, and commits
     const round = await startFocus(page, 'reverse-digits');
     const initial = await saved(page);
     await presentForSpeech(page);
-    assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 1, 'Recall starts its recording without an extra action.');
-    await recordSpeech(page, round.expected, { endpoint: true });
+    assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 1, 'Recall starts recording without an action.');
+    await recordSpeech(page, round.expected);
     await page.waitForFunction(() => window.__speechTest.endpointResults === 1);
     await assertNoSpokenTranscript(page);
     assert.equal(await page.getByRole('button', { name: 'Check sequence', exact: true }).count(), 0);
     await page.keyboard.press('1');
     assert.equal(await page.getByRole('group', { name: 'Digit keypad', exact: true }).count(), 0);
-    assert.deepEqual(await saved(page), initial);
+    assert.deepEqual(await saved(page), initial, 'Recognition is not graded until the utterance finishes.');
     await assertFits(page, 'spoken phone recording');
     await page.screenshot({ path: resolve(shots, 'spoken-recording-phone.png'), fullPage: true });
-    await page.getByRole('button', { name: 'OK', exact: true }).dblclick({ delay: 25 });
+    await check(page);
     const completed = await saved(page, value => value?.session?.cursor === 1);
     assert.equal(completed.session.history.length, 1);
     assert.equal(completed.session.history[0].correct, true);
     assert.equal(completed.conditions[conditionKey('reverse-digits', completed.sessionCondition)].attempts, 1);
     assert.equal(selectTaskStates(completed, { ...completed, inputMode: 'keypad', digitVariant: { ...completed.digitVariant, inputMode: 'keypad', keypad: 'visible' } })['reverse-digits'].attempts, 0);
-    assert.deepEqual(digitTotals(completed), { attempts: 1, correct: 1 }, 'The shared digit condition contributes one attempt to family totals.');
-    await assertAutoPresentation(page);
+    assert.deepEqual(digitTotals(completed), { attempts: 1, correct: 1 }, 'One automatically submitted utterance contributes exactly one attempt.');
     await assertNoSpokenTranscript(page);
     assert.equal(await page.evaluate(() => window.__speechTest.activeTracks), 0);
     await speechCapturing(page);
-    assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 2, 'The next heard sequence also starts recording automatically.');
+    assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 2, 'The next sequence also starts recording automatically.');
     await recordSpeech(page, completed.session.active.expected);
     await check(page);
     const twice = await saved(page, value => value?.session?.cursor === 2);
     assert.equal(twice.session.history.length, 2);
     assert.deepEqual(digitTotals(twice), { attempts: 2, correct: 2 });
-    assert.equal(await page.evaluate(() => window.__speechTest.recognitionDisplays), 0, 'A correct capture never transiently mounts its transcript, including in accessibility markup.');
+    assert.equal(await page.evaluate(() => window.__speechTest.recognitionDisplays), 0, 'Correct recognition never transiently mounts its transcript, including accessibility markup.');
     await assertNoPlaintext(page, completed);
     await assertLocalSpeech(opened);
   } finally { await context.close(); }
 });
 
-test('uncertain speech stays unscored and Restart records afresh without replaying or displaying a transcript', { timeout: 60_000 }, async () => {
+test('uncertain and unknown speech stay unscored with only Retry, then resume without replaying the sequence', { timeout: 60_000 }, async () => {
   const opened = await open({ speech: {} });
   const { context, page } = opened;
   try {
@@ -965,21 +988,14 @@ test('uncertain speech stays unscored and Restart records afresh without replayi
     await presentForSpeech(page);
     const stimulusPlays = await page.evaluate(() => window.__speechTest.stimulusPlays);
     await recordSpeech(page, round.expected, { confidence: 0.2 });
-    await page.getByRole('button', { name: 'OK', exact: true }).click();
-    await page.getByRole('status').filter({ hasText: /^Could not recognize a clear digit sequence/ }).waitFor();
-    assert.equal(await page.evaluate(() => window.__speechTest.activeTracks), 0);
-    assert.equal(await page.getByRole('button', { name: 'OK', exact: true }).isDisabled(), true);
-    assert.equal(await page.getByRole('button', { name: 'Restart', exact: true }).isEnabled(), true);
-    await assertNoSpokenTranscript(page);
+    await assertInputFailure(page, 'Input not recognized');
     assert.deepEqual(await saved(page), initial, 'Low-confidence recognition does not become a failed memory attempt.');
-    const misheard = [...round.expected]; misheard[0] = misheard[0] % 9 + 1;
-    await recordSpeech(page, misheard, {}, { again: true });
-    await assertNoSpokenTranscript(page);
-    assert.deepEqual(await saved(page), initial, 'A restarted capture cannot change the first-try record.');
+    await recordSpeech(page, [], { text: '[unk]' }, { again: true });
+    await assertInputFailure(page, 'Input not recognized');
+    assert.deepEqual(await saved(page), initial, 'Unknown speech also preserves the complete first-try record.');
     await recordSpeech(page, round.expected, {}, { again: true });
-    assert.equal(await page.evaluate(() => window.__speechTest.stimulusPlays), stimulusPlays, 'Restart re-records the heard sequence without playing it again.');
+    assert.equal(await page.evaluate(() => window.__speechTest.stimulusPlays), stimulusPlays, 'Retry records the already heard sequence without playing it again.');
     assert.equal(await page.getByRole('status').filter({ hasText: /^Listen$/ }).count(), 0);
-    assert.deepEqual(await saved(page), initial);
     await check(page);
     const completed = await saved(page, value => value?.session?.cursor === 1);
     assert.equal(completed.session.history.length, 1);
@@ -987,11 +1003,12 @@ test('uncertain speech stays unscored and Restart records afresh without replayi
     assert.equal(completed.tasks[round.task].attempts, 1);
     assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 3);
     assert.equal(await page.evaluate(() => window.__speechTest.stoppedTracks), 3);
+    assert.equal(await page.evaluate(() => window.__speechTest.recognitionDisplays), 0);
     await assertLocalSpeech(opened);
   } finally { await context.close(); }
 });
 
-test('a confirmed spoken answer with the wrong length is recorded as a memory miss', { timeout: 45_000 }, async () => {
+test('a confident spoken answer with the wrong length is a memory miss and displays only what recognition heard', { timeout: 45_000 }, async () => {
   const opened = await open({ speech: {} });
   const { context, page } = opened;
   try {
@@ -1003,7 +1020,9 @@ test('a confirmed spoken answer with the wrong length is recorded as a memory mi
     await recordSpeech(page, shorter);
     await assertNoSpokenTranscript(page);
     await check(page, { correct: false });
-    assert.deepEqual(await submittedSpeech(page), shorter, 'Only an already committed miss exposes the recognition snapshot for debugging.');
+    await page.getByText('The recognized answer did not match.', { exact: true }).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Retry', exact: true }).count(), 0, 'A recognized wrong answer follows memory replay rather than input retry.');
+    assert.deepEqual(await submittedSpeech(page), shorter, 'Only a scored miss exposes recognition for debugging.');
     const result = await saved(page, value => value?.session?.answered);
     assert.equal(result.session.cursor, 0);
     assert.equal(result.session.history.length, 1);
@@ -1011,22 +1030,21 @@ test('a confirmed spoken answer with the wrong length is recorded as a memory mi
     assert.equal(result.tasks['reverse-digits'].attempts, 1);
     assert.equal(result.tasks['reverse-digits'].correct, 0);
     assert.equal(result.tasks['reverse-digits'].balance, -3);
-    await page.getByRole('button', { name: 'Replay sequence', exact: true }).waitFor();
     await page.getByRole('button', { name: 'Replay sequence', exact: true }).click();
     await page.getByRole('status').filter({ hasText: /^Listen$/ }).waitFor();
     await assertNoSpokenTranscript(page);
     await speechCapturing(page);
-    assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 2, 'Replay also starts its recording automatically.');
+    assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 2, 'Replay starts recording automatically.');
     await recordSpeech(page, round.expected);
     await check(page);
     const replayed = await saved(page, value => value?.session?.cursor === 1);
-    assert.deepEqual(replayed.tasks, result.tasks, 'Correct spoken replay preserves the original first-try miss.');
+    assert.deepEqual(replayed.tasks, result.tasks, 'Correct replay preserves the original first-try miss.');
     assert.equal(replayed.session.history.length, 1);
     await assertLocalSpeech(opened);
   } finally { await context.close(); }
 });
 
-test('pause, hiding, and locking stop the microphone and ignore a late local recognition result', { timeout: 60_000 }, async () => {
+test('pause, hiding, and locking stop auto-capture and ignore a late local recognition result', { timeout: 60_000 }, async () => {
   const opened = await open({ speech: {} });
   const { context, page } = opened;
   try {
@@ -1036,7 +1054,7 @@ test('pause, hiding, and locking stop the microphone and ignore a late local rec
     const initial = await saved(page);
     await presentForSpeech(page);
     for (const interruption of ['pause', 'hidden']) {
-      await recordSpeech(page, round.expected);
+      await recordSpeech(page, round.expected, { endpoint: false });
       if (interruption === 'pause') await page.keyboard.press('Escape');
       else await page.evaluate(() => {
         Object.defineProperty(document, 'hidden', { configurable: true, value: true });
@@ -1051,21 +1069,22 @@ test('pause, hiding, and locking stop the microphone and ignore a late local rec
       });
       await page.getByRole('button', { name: /^Continue →$/ }).click();
       await speechCapturing(page);
-      assert.equal(await page.getByRole('status').filter({ hasText: /^Listen$/ }).count(), 0, 'Continuing paused recall resumes recording without replaying the stimulus.');
+      assert.equal(await page.getByRole('status').filter({ hasText: /^Listen$/ }).count(), 0, 'Continuing recall resumes recording without replaying the stimulus.');
     }
     await page.evaluate(() => { window.__speechTest.holdFinal = true; });
-    await recordSpeech(page, round.expected);
     const finalRequests = await page.evaluate(() => window.__speechTest.messages.filter(message => message.action === 'retrieveFinalResult').length);
-    await page.getByRole('button', { name: 'OK', exact: true }).click();
+    await recordSpeech(page, round.expected);
     await page.waitForFunction(previous => window.__speechTest.messages.filter(message => message.action === 'retrieveFinalResult').length > previous, finalRequests);
     assert.equal(await page.evaluate(() => window.__speechTest.activeTracks), 0);
+    await assertNoSpokenTranscript(page);
+    assert.equal(await page.getByRole('button', { name: 'Retry', exact: true }).count(), 0, 'Recognition in flight offers no extra confirmation action.');
     await page.keyboard.press('Escape');
     await page.getByRole('heading', { name: 'Paused', exact: true }).waitFor();
     await page.evaluate(() => window.__speechTest.releaseFinals());
     await assertNoSpokenTranscript(page);
-    assert.deepEqual(await saved(page), initial, 'A result delivered after cancellation cannot commit or reveal an answer.');
+    assert.deepEqual(await saved(page), initial, 'A result after cancellation cannot commit or reveal an answer.');
     await page.getByRole('button', { name: /^Continue →$/ }).click();
-    await recordSpeech(page, round.expected);
+    await recordSpeech(page, round.expected, { endpoint: false });
     await page.getByRole('button', { name: /^Lock/ }).click();
     await page.getByLabel('Password', { exact: true }).waitFor();
     assert.equal(await page.evaluate(() => window.__speechTest.activeTracks), 0);
@@ -1073,15 +1092,15 @@ test('pause, hiding, and locking stop the microphone and ignore a late local rec
     assert.equal(await page.evaluate(() => window.__speechTest.workersTerminated), 1);
     assert.deepEqual(await saved(page), initial);
     await unlock(page);
-    assert.equal(await page.evaluate(() => window.__speechTest.workersCreated), 1, 'Unlock does not reload the speech model without a new explicit request.');
+    assert.equal(await page.evaluate(() => window.__speechTest.workersCreated), 1, 'Unlock does not reload the model without an explicit request.');
     assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 4);
     await page.getByRole('button', { name: 'Download speech model', exact: true }).waitFor();
     await assertLocalSpeech(opened);
   } finally { await context.close(); }
 });
 
-test('Restart cancels an in-flight OK recognition and ignores its late result without replaying', { timeout: 45_000 }, async () => {
-  const opened = await open({ speech: { holdFinal: true } });
+test('recognizer word segments do not end an utterance until real microphone silence follows the full sequence', { timeout: 45_000 }, async () => {
+  const opened = await open({ speech: {} });
   const { context, page } = opened;
   try {
     await unlock(page);
@@ -1089,28 +1108,71 @@ test('Restart cancels an in-flight OK recognition and ignores its late result wi
     const round = await startFocus(page, 'reverse-digits');
     const initial = await saved(page);
     await presentForSpeech(page);
-    const misheard = [...round.expected]; misheard[0] = misheard[0] % 9 + 1;
-    await recordSpeech(page, misheard);
     const stimulusPlays = await page.evaluate(() => window.__speechTest.stimulusPlays);
-    await page.getByRole('button', { name: 'OK', exact: true }).click();
-    await page.waitForFunction(() => window.__speechTest.messages.some(message => message.action === 'retrieveFinalResult'));
-    assert.equal(await page.evaluate(() => window.__speechTest.activeTracks), 0);
-    assert.equal(await page.getByRole('button', { name: 'OK', exact: true }).isDisabled(), true);
+    const chunks = await page.evaluate(() => window.__speechTest.messages.filter(message => message.action === 'audioChunk').length);
+    await recordSpeech(page, round.expected.slice(0, 1), { silence: false });
+    await page.waitForFunction(() => window.__speechTest.endpointResults === 1);
+    await page.waitForFunction(count => window.__speechTest.messages.filter(message => message.action === 'audioChunk').length >= count + 36, chunks);
+    assert.equal(await page.evaluate(() => window.__speechTest.activeTracks), 1, 'A completed recognizer word segment cannot cut off a still-speaking participant.');
+    assert.deepEqual(await saved(page), initial, 'The first segment alone does not become a short wrong answer.');
     await assertNoSpokenTranscript(page);
-    await recordSpeech(page, round.expected, {}, { again: true });
-    await page.evaluate(() => {
-      window.__speechTest.holdFinal = false;
-      window.__speechTest.releaseFinals();
-    });
-    await assertNoSpokenTranscript(page);
-    assert.deepEqual(await saved(page), initial, 'Restart invalidates the earlier OK while its recognition is pending.');
-    assert.equal(await page.evaluate(() => window.__speechTest.stimulusPlays), stimulusPlays);
+    await page.evaluate(digits => {
+      window.__speechTest.sendSegment(digits);
+      window.__speechTest.setMicrophoneVolume(0);
+    }, round.expected.slice(1));
     await check(page);
     const result = await saved(page, value => value?.session?.cursor === 1);
-    assert.equal(result.session.history.length, 1);
+    assert.equal(result.session.history[0].correct, true, 'Every recognized segment belongs to the same full utterance.');
+    assert.equal(result.tasks[round.task].attempts, 1);
+    assert.equal(await page.evaluate(() => window.__speechTest.stoppedTracks), 1);
+    assert.equal(await page.evaluate(() => window.__speechTest.stimulusPlays), stimulusPlays, 'Answer capture does not replay the challenge.');
+    assert.equal(await page.evaluate(() => window.__speechTest.recognitionDisplays), 0);
+    await assertLocalSpeech(opened);
+  } finally { await context.close(); }
+});
+
+test('initial microphone silence is an unscored input failure and Retry listens again without replaying', { timeout: 45_000 }, async () => {
+  const opened = await open({ speech: { silentMicrophone: true } });
+  const { context, page } = opened;
+  try {
+    await unlock(page);
+    await prepareSpeech(page);
+    const round = await startFocus(page, 'reverse-digits');
+    const initial = await saved(page);
+    await presentForSpeech(page);
+    const stimulusPlays = await page.evaluate(() => window.__speechTest.stimulusPlays);
+    await assertInputFailure(page, 'Input not recognized');
+    assert.deepEqual(await saved(page), initial, 'Not speaking cannot lower the difficulty or count as a memory error.');
+    await recordSpeech(page, round.expected, {}, { again: true });
+    await page.evaluate(() => window.__speechTest.setMicrophoneVolume(0.1));
+    await check(page);
+    const result = await saved(page, value => value?.session?.cursor === 1);
+    assert.equal(result.tasks[round.task].attempts, 1);
+    assert.equal(result.tasks[round.task].correct, 1);
+    assert.equal(await page.evaluate(() => window.__speechTest.stimulusPlays), stimulusPlays);
+    assert.equal(await page.evaluate(() => window.__speechTest.stoppedTracks), 2);
+    await assertLocalSpeech(opened);
+  } finally { await context.close(); }
+});
+
+test('PCM silence automatically submits a full final result even without an intermediate recognizer endpoint', { timeout: 45_000 }, async () => {
+  const opened = await open({ speech: {} });
+  const { context, page } = opened;
+  try {
+    await unlock(page);
+    await prepareSpeech(page);
+    const round = await startFocus(page, 'reverse-digits');
+    await presentForSpeech(page);
+    const chunks = await page.evaluate(() => window.__speechTest.messages.filter(message => message.action === 'audioChunk').length);
+    await recordSpeech(page, round.expected, { endpoint: false });
+    await page.waitForFunction(count => window.__speechTest.messages.filter(message => message.action === 'audioChunk').length >= count + 8, chunks);
+    await page.evaluate(() => window.__speechTest.setMicrophoneVolume(0));
+    await check(page);
+    const result = await saved(page, value => value?.session?.cursor === 1);
+    assert.equal(await page.evaluate(() => window.__speechTest.endpointResults), 0);
     assert.equal(result.session.history[0].correct, true);
     assert.equal(result.tasks[round.task].attempts, 1);
-    assert.equal(await page.evaluate(() => window.__speechTest.stoppedTracks), 2);
+    assert.equal(await page.evaluate(() => window.__speechTest.stoppedTracks), 1);
     assert.equal(await page.evaluate(() => window.__speechTest.recognitionDisplays), 0);
     await assertLocalSpeech(opened);
   } finally { await context.close(); }
@@ -1162,10 +1224,10 @@ test('microphone denial leaves spoken progress unscored and permits keypad pract
     await startFocus(page, 'reverse-digits');
     const initial = await saved(page);
     await page.getByRole('button', { name: /^(Listen to the sequence|Turn sound on & listen)/ }).click();
-    await page.getByRole('status').filter({ hasText: /^Microphone access was not allowed/ }).waitFor();
+    await assertInputFailure(page, 'Speech input unavailable');
+    await page.getByRole('alert').filter({ hasText: /Microphone access was not allowed/ }).waitFor();
     assert.equal(await page.evaluate(() => window.__speechTest.activeTracks), 0);
-    assert.equal(await page.getByRole('button', { name: 'OK', exact: true }).isDisabled(), true);
-    assert.equal(await page.getByRole('button', { name: 'Restart', exact: true }).isEnabled(), true);
+    assert.equal(await page.getByRole('button', { name: 'Retry', exact: true }).isEnabled(), true);
     await assertNoSpokenTranscript(page);
     assert.deepEqual(await saved(page), initial);
     await page.getByRole('button', { name: /Save & exit/ }).click();
@@ -1217,17 +1279,17 @@ test('a failed local worker disables spoken starts and recovers in an unscored a
     const round = await startFocus(page, 'reverse-digits');
     const initial = await saved(page);
     await presentForSpeech(page);
-    await recordSpeech(page, round.expected);
+    await recordSpeech(page, round.expected, { endpoint: false });
     await page.evaluate(() => window.__speechTest.failWorker());
     const recovery = page.getByRole('button', { name: 'Download speech model', exact: true });
     await recovery.waitFor();
     assert.equal(await page.evaluate(() => window.__speechTest.activeTracks), 0, 'A failed recognizer stops the active microphone.');
-    assert.equal(await page.getByRole('button', { name: 'Restart', exact: true }).isDisabled(), true);
-    assert.equal(await page.getByRole('button', { name: 'OK', exact: true }).isDisabled(), true);
+    assert.equal(await page.getByRole('button', { name: 'Retry', exact: true }).isDisabled(), true);
+    assert.equal(await page.getByRole('button', { name: /^(OK|Restart)$/ }).count(), 0);
     await assertNoSpokenTranscript(page);
     assert.deepEqual(await saved(page), initial);
     await recovery.click();
-    await page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'Restart' && !button.disabled));
+    await page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'Retry' && !button.disabled));
     assert.equal(await page.evaluate(() => window.__speechTest.activeTracks), 0, 'Model recovery does not retry a failed microphone capture automatically.');
     await recordSpeech(page, round.expected, {}, { again: true });
     await check(page);
@@ -1417,7 +1479,7 @@ test(`${inputMode}: rejected audio playback cannot open recording or create a sc
     await page.getByRole('status').filter({ hasText: /audio could not play/ }).waitFor();
     await page.getByRole('button', { name: /^Listen to the sequence/ }).waitFor();
     assert.equal(await page.getByRole('button', { name: 'Check sequence', exact: true }).count(), 0);
-    assert.equal(await page.getByRole('button', { name: /^(OK|Restart)$/ }).count(), 0);
+    assert.equal(await page.getByRole('button', { name: /^(OK|Restart|Retry)$/ }).count(), 0);
     if (inputMode === 'spoken') assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 0, 'An unheard sequence cannot start the microphone.');
     assert.deepEqual(await saved(page), initial, 'A sequence that was not heard leaves progress unchanged.');
     await assertClean(opened);

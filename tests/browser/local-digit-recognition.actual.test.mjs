@@ -19,12 +19,17 @@ test("actual local WASM recognition preserves the first spoken digits with a col
   const compiled = ts.transpileModule(source.replace("process.env.NEXT_PUBLIC_BASE_PATH", '""'), {
     compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
   }).outputText;
+  const endpointSource = await readFile(path.join(root, "app/lab/working-memory/speech-endpoint.ts"), "utf8");
+  const compiledEndpoint = ts.transpileModule(endpointSource, {
+    compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
   const requests = [];
   const server = http.createServer(async (request, response) => {
     requests.push({ url: request.url, method: request.method });
     try {
       if (request.url === "/") { response.setHeader("Content-Type", "text/html"); response.end("<!doctype html><title>Local speech verification</title>"); return; }
       if (request.url === "/asr.js") { response.setHeader("Content-Type", "text/javascript"); response.end(compiled); return; }
+      if (request.url === "/speech-endpoint.ts") { response.setHeader("Content-Type", "text/javascript"); response.end(compiledEndpoint); return; }
       if (request.url === "/fixture.wav") { response.setHeader("Content-Type", "audio/wav"); response.end(fixture); return; }
       if (request.url === "/favicon.ico") { response.statusCode = 204; response.end(); return; }
       const relative = String(request.url).slice(1);
