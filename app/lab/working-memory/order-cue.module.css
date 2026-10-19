@@ -1,0 +1,40 @@
+.cue {
+  width: min(202px, 100%);
+  margin: 8px auto;
+  color: var(--ink, #17213d);
+}
+
+.caption {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  line-height: 1.4;
+}
+
+.caption strong {
+  font-size: .9rem;
+  font-weight: 700;
+}
+
+.diagram {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.input {
+  fill: var(--muted, #596277);
+}
+
+.output {
+  fill: currentColor;
+}
+
+.arrow {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

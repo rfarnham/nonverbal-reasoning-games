@@ -1,0 +1,4 @@
+# Preserve audited third-party bytes and upstream license formatting.
+public/models/speech/vosk-worker-v0.0.8.js -text -diff -whitespace
+public/models/speech/LICENSE-*.txt -text -whitespace
+public/models/speech/MODEL-README.txt -text -whitespace
