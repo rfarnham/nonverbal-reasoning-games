@@ -61,6 +61,8 @@ export interface Saved extends SessionCondition {
   sessionCondition: SessionCondition | null;
   logs: Log[];
   redeemed: string[];
+  /** Cosmetic choice only; encrypted with the rest of this lab's progress. */
+  buddy?: string;
 }
 
 export type TaskTotals = Record<TaskId, { attempts: number; correct: number }>;
@@ -349,6 +351,9 @@ export function restore(value: unknown): Saved | null {
   try {
     if (!value || typeof value !== "object" || Array.isArray(value)) return null;
     const data = value as Record<string, unknown>;
+    // A malformed cosmetic preference must never discard earned practice.
+    const buddy = typeof data.buddy === "string" && data.buddy.trim().length > 0 && data.buddy.length <= 64
+      ? { buddy: data.buddy } : {};
     if (![1, 2, 3].includes(data.version as number) || typeof data.slow !== "boolean"
       || (data.digitOrder !== undefined && data.digitOrder !== "ascending" && data.digitOrder !== "descending")
       || !logsValid(data.logs)) return null;
@@ -371,7 +376,7 @@ export function restore(value: unknown): Saved | null {
         };
         if (session.active && !sameCondition(context, settings, false)) return null;
       }
-      return migrate(session, settings, context, data.tasks, {}, data.logs, data.redeemed);
+      return { ...migrate(session, settings, context, data.tasks, {}, data.logs, data.redeemed), ...buddy };
     }
 
     if (!condition(data) || !validateTaskStates(data.legacyTasks)) return null;
@@ -391,7 +396,7 @@ export function restore(value: unknown): Saved | null {
           if (!sameTasks(oldTaskStates(data.conditions, context!), session.tasks)) return null;
         } else if (!sameTasks(data.legacyTasks, session.tasks)) return null;
       } else if (!sameTasks(data.tasks, oldTaskStates(data.conditions, settings))) return null;
-      return migrate(session, settings, context, data.legacyTasks, data.conditions, data.logs, data.redeemed);
+      return { ...migrate(session, settings, context, data.legacyTasks, data.conditions, data.logs, data.redeemed), ...buddy };
     }
 
     if (!isCanonicalDigitVariant(data.digitVariant) || !conditionsValid(data.conditions)
@@ -402,6 +407,7 @@ export function restore(value: unknown): Saved | null {
       conditions: copyBank(data.conditions), archivedConditions: copyBank(data.archivedConditions), sessionCondition: context,
       logs: data.logs.map((log) => ({ ...log, ...(log.digitVariant ? { digitVariant: { ...log.digitVariant } } : {}) })),
       redeemed: [...data.redeemed],
+      ...buddy,
     };
     if (session) {
       if (session.profile === RESEARCH_PROFILE) {

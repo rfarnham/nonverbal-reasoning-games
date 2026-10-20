@@ -13,9 +13,11 @@ import {
 import {
   createGameAudioContext,
   playFeedbackEarcon,
+  playXpJingle,
   readSoundPreference,
   writeSoundPreference,
 } from "@/lib/game-audio";
+import { Avatar, DEFAULT_AVATAR_ID } from "@/components/progression/avatar";
 import {
   TASK_IDS,
   AUDIO_TASK_IDS,
@@ -58,6 +60,8 @@ import {
   type DigitVariant,
 } from "./digit-options";
 import styles from "./memory.module.css";
+import { MemoryCelebration, MemoryTrail } from "./MemoryTrail";
+import { getMemoryRewards } from "./rewards";
 
 type Phase =
   | "ready"
@@ -190,7 +194,7 @@ export function MemoryLabClient() {
               Memory Lab
             </h1>
             <p className={styles.lede}>
-              Visual and listening memory exercises.
+              Memory games, little adventures, and a trail buddy.
             </p>
             <form className={styles.lockForm} onSubmit={unlock}>
               <label className={styles.passwordLabel} htmlFor="memory-password">
@@ -224,6 +228,18 @@ export function MemoryLabClient() {
               access.
             </p>
           </section>
+          <div className={styles.lockBuddy} aria-hidden="true">
+            <svg className={styles.lockLandscape} viewBox="0 0 360 250" fill="none">
+              <path d="M0 187C56 145 97 157 146 177S260 147 360 167V250H0Z" fill="#e4efd9" />
+              <path d="M0 214C92 185 119 240 207 209S312 193 360 221V250H0Z" fill="#cde3d4" />
+              <path d="M162 250C222 218 240 211 213 193S172 180 190 164" stroke="#fffdf8" strokeWidth="19" strokeLinecap="round" />
+              <path d="M42 132V195M24 157L42 121L61 157Z" stroke="#738f71" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M294 112V181M270 143L294 98L318 143Z" fill="#acc8a0" />
+              <circle cx="284" cy="45" r="19" fill="#f3bd4e" />
+            </svg>
+            <Avatar avatar={DEFAULT_AVATAR_ID} size={160} decorative eager />
+            <span className={styles.lockTrailLabel}>Your Memory Trail awaits</span>
+          </div>
         </div>
       </main>
       <footer className={styles.footer}>
@@ -624,7 +640,12 @@ function UnlockedLab({
   const games = [...visualTasks.map((item) => ({ id: item.id, title: item.title, task: item.id as TaskId })), { id: "digits", title: "Digits", task: displayedDigitsTask }];
   const selectedTasks = session?.active ? session.tasks : selectTaskStates(saved);
   const totals = taskTotals(saved);
+  const rewards = getMemoryRewards(saved);
   const listeningReady = audioReady && (saved.inputMode !== "spoken" || speech.ready);
+  const suggestedGame = games[rewards.completedStops % games.length];
+  const adventureGame = suggestedGame.id === "digits" && (!listeningReady || !sound)
+    ? games[0]
+    : suggestedGame;
 
   const changePhase = useCallback((next: Phase) => {
     phaseRef.current = next;
@@ -798,8 +819,10 @@ function UnlockedLab({
     if (audio.current?.state === "suspended")
       void audio.current.resume().catch(() => undefined);
   }
-  function feedbackAudio(correct: boolean) {
-    if (sound && audio.current) playFeedbackEarcon(audio.current, correct);
+  function feedbackAudio(correct: boolean, complete = false) {
+    if (!soundRef.current || !audio.current) return;
+    if (correct && complete) playXpJingle(audio.current);
+    else playFeedbackEarcon(audio.current, correct);
   }
   function wait(ms: number, token: number) {
     return new Promise<void>((resolve, reject) => {
@@ -925,7 +948,7 @@ function UnlockedLab({
       digitOrder: digitVariant.order === "reverse" ? previous.digitOrder : digitVariant.order,
     });
   }
-  function start(focusedTask?: TaskId) {
+  function start(focusedTask?: TaskId, autoPresent = false) {
     const needsListening = focusedTask ? AUDIO_TASK_IDS.includes(focusedTask as (typeof AUDIO_TASK_IDS)[number]) : modality !== "visual";
     if (needsListening && !listeningReady) return;
     cancelPlayback();
@@ -952,9 +975,17 @@ function UnlockedLab({
       setResponse([]);
       responseRef.current = [];
       changePhase("ready");
+      if (autoPresent && next.active) {
+        primeAudio();
+        presentOrAwaitSound(next.active);
+      }
     } catch {
       setNotice("A new session could not be prepared. Please try again.");
     }
+  }
+  function startAdventure() {
+    if (savedRef.current.session?.active) resume();
+    else start(adventureGame.task, true);
   }
   function enableListening(target: MemoryRound) {
     if (target.answerKind === "ordered-digits" && !soundRef.current) {
@@ -1071,7 +1102,7 @@ function UnlockedLab({
     setSpokenDebug(isSpoken && !correct ? { roundId: s.active.id, digits: Object.freeze([...submitted]) } : null);
     if (isSpoken) cancelSpeech();
     setLastResult(null);
-    feedbackAudio(correct);
+    feedbackAudio(correct, s.cursor === s.length - 1);
     const next = s.answered ? s : recordFirstAttempt(s, s.active, correct);
     const retried = !next.history.at(-1)?.correct;
     const redeemed =
@@ -1177,8 +1208,6 @@ function UnlockedLab({
     return () => window.removeEventListener("keydown", keyboard);
   }, [pause]);
 
-  const correctCount =
-    session?.history.filter((item) => item.correct).length ?? 0;
   const attempts = TASK_IDS.reduce(
     (sum, id) => sum + totals[id].attempts,
     0,
@@ -1227,11 +1256,17 @@ function UnlockedLab({
           <p role="status">Loading…</p>
         ) : !playing ? (
           <>
-            <section className={styles.hero}>
-              <h1 className={styles.displayTitle}>Memory Lab</h1>
-              <p className={styles.lede}>
-                Choose a session or practise one exercise.
-              </p>
+            <MemoryTrail
+              saved={saved}
+              onStart={startAdventure}
+              nextGameTitle={adventureGame.title}
+              hasActiveSession={!!session?.active}
+              startDisabled={!!session?.active && saved.sessionCondition?.inputMode === "spoken"
+                && session.plan.some((id) => AUDIO_TASK_IDS.includes(id as (typeof AUDIO_TASK_IDS)[number])) && !speech.ready}
+              onBuddyChange={(buddy) => persist({ ...savedRef.current, buddy })}
+            />
+            <div className={styles.sectionHeading}>
+              <h2 className={styles.sectionTitle}>More ways to play</h2>
               <button
                 className={styles.linkButton}
                 onClick={() => setCoach(!coach)}
@@ -1239,7 +1274,7 @@ function UnlockedLab({
               >
                 {coach ? "Hide progress" : "Progress"}
               </button>
-            </section>
+            </div>
             {coach && (
               <section className={styles.coach} aria-label="Practice progress">
                 <h2 className={styles.sectionTitle}>Progress</h2>
@@ -1269,22 +1304,6 @@ function UnlockedLab({
                   practice in these exercises. The table shows your current
                   game settings. Earlier records remain included in the totals
                   and session history.
-                </p>
-                <div
-                  className={styles.progressDots}
-                  aria-label={`${Math.min(25, saved.logs.length)} of 25 optional sessions completed`}
-                >
-                  {Array.from({ length: 25 }, (_, i) => (
-                    <span
-                      className={`${styles.progressDot} ${i < saved.logs.length ? styles.progressDone : ""}`}
-                      key={i}
-                    >
-                      {i < saved.logs.length ? "✓" : i + 1}
-                    </span>
-                  ))}
-                </div>
-                <p className={styles.privacy}>
-                  Sessions completed out of an optional 25.
                 </p>
                 <div style={{ overflowX: "auto" }}>
                   <table className={styles.coachTable}>
@@ -1675,23 +1694,7 @@ function UnlockedLab({
             )}
           </>
         ) : !round ? (
-          <section className={styles.summary}>
-            <h1 className={styles.summaryTitle} ref={headingRef} tabIndex={-1}>
-              Session complete
-            </h1>
-            <div className={styles.summaryStats}>
-              <strong>
-                {correctCount}/{session?.length}
-              </strong>
-              <span>correct on the first try</span>
-            </div>
-            <p>
-              Your exercise spans and session history are saved on this device.
-            </p>
-            <button className={styles.button} onClick={goHome}>
-              Back to the lab →
-            </button>
-          </section>
+          <MemoryCelebration saved={saved} onHome={goHome} headingRef={headingRef} />
         ) : (
           <section className={styles.roundLayout} aria-labelledby="round-title">
             <div className={styles.roundHeader}>

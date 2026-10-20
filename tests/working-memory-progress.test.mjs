@@ -391,3 +391,33 @@ test("new logs record canonical digit metadata while legacy log fields remain re
     assert.equal(restore(broken), null);
   }
 });
+
+test("optional buddy preference stays with valid encrypted progress without changing its schema or totals", () => {
+  const original = score(begin(fresh(), "locations"), false);
+  assert.equal(Object.hasOwn(original, "buddy"), false);
+  const selected = normalizeSaved({ ...original, buddy: "hedgehog" });
+  const restored = restore(json(selected));
+  assert.ok(restored);
+  assert.equal(restored.version, 3);
+  assert.equal(restored.buddy, "hedgehog");
+  assert.deepEqual(taskTotals(restored), taskTotals(original));
+  assert.deepEqual(restored.session, original.session);
+  assert.deepEqual(restore(json({ ...selected, buddy: "future-bundled-animal" })).buddy, "future-bundled-animal", "the UI, not the progress format, owns the allowed animal IDs");
+  const withoutBuddy = restore(json(original));
+  assert.deepEqual(withoutBuddy, original, "old schema-three saves do not acquire an unnecessary new field");
+  const reset = fresh();
+  assert.equal(Object.hasOwn(reset, "buddy"), false);
+  assert.deepEqual(taskTotals(reset).locations, { attempts: 0, correct: 0 });
+});
+
+test("malformed optional buddy preference is ignored without losing valid earned progress", () => {
+  const original = score(begin(fresh(), "locations"), true);
+  for (const buddy of [null, 42, false, {}, [], "", "   ", "x".repeat(65)]) {
+    const restored = restore({ ...json(original), buddy });
+    assert.ok(restored, `cosmetic corruption ${JSON.stringify(buddy)} must not erase practice`);
+    assert.equal(Object.hasOwn(restored, "buddy"), false);
+    assert.deepEqual(restored, original);
+  }
+  const bounded = restore({ ...json(original), buddy: "x".repeat(64) });
+  assert.equal(bounded.buddy.length, 64);
+});

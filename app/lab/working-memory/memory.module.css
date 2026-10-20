@@ -39,8 +39,12 @@
 .footer p { margin: 0; }
 .footer a { display: inline-flex; align-items: center; min-height: 44px; text-underline-offset: 4px; }
 
-.lockLayout { padding: 48px 0 64px; }
+.lockLayout { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(240px, 1fr); align-items: center; gap: 40px; padding: 48px 0 64px; }
 .lockCopy { max-width: 520px; }
+.lockBuddy { position: relative; display: grid; place-items: center; min-height: 280px; isolation: isolate; }
+.lockLandscape { position: absolute; z-index: -1; inset: 0; width: 100%; height: 100%; }
+.lockBuddy > span:not(.lockTrailLabel) { margin-top: 20px; }
+.lockTrailLabel { align-self: end; margin-top: 12px; color: #365b46; font-size: .85rem; font-weight: 650; }
 .displayTitle { max-width: 760px; margin: 0; font-size: clamp(1.8rem, 4vw, 2.4rem); font-weight: 750; line-height: 1.2; letter-spacing: -.035em; }
 .lede { max-width: 640px; margin: 12px 0 0; color: var(--muted); font-size: 1rem; line-height: 1.6; }
 .lockForm { max-width: 440px; margin-top: 28px; }
@@ -224,7 +228,9 @@
   .brand { gap: 8px; font-size: .85rem; }
   .headerActions { gap: 0; }
   .headerActions .quietButton { padding-inline: 8px; font-size: .8rem; }
-  .lockLayout { padding: 32px 0 48px; }
+  .lockLayout { grid-template-columns: minmax(0, 1fr); gap: 20px; padding: 32px 0 36px; }
+  .lockBuddy { min-height: 220px; max-width: 360px; width: 100%; justify-self: center; }
+  .lockBuddy > span:not(.lockTrailLabel) { --avatar-size: 128px !important; }
   .lockForm { max-width: 100%; margin-top: 24px; }
   .hero { padding: 24px 0; }
   .lede { font-size: .95rem; }

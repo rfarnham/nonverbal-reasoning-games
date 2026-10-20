@@ -126,17 +126,74 @@ Turn sound on & listen action rather than changing the saved sound preference.
 Each new presentation brings its instructions and board into view before cues
 begin, including on short phone screens.
 
+## Memory Trail and rewards
+
+Memory Trail is the owner-requested child-friendly layer over the lab's existing
+practice. It reuses Journey's twelve bundled animal avatars, with Hedgehog as
+the default and an optional **Choose your buddy** picker. The assets and their
+MIT attribution are documented in [the avatar notice](../public/avatars/README.md).
+**Start adventure** begins eight focused challenges and their first
+presentation in one action. **Continue adventure** resumes the exact saved
+session. The longer mixed sessions, individual games, settings, and optional
+progress reports remain available.
+
+The trail moves through Acorn Grove, Pebble Brook, Fern Hollow, Moonlit Meadow,
+and Starry Summit. Each habitat has five stops. Every 80 XP, representing eight
+recorded first attempts, marks another stop; 25 stops complete an expedition.
+Further expeditions retain lifetime XP. Viewing another habitat never changes
+the next exercise, its load, or its settings, and the trail does not lock games.
+
+Each recorded first attempt earns **10 XP**, whether correct or incorrect.
+Accuracy, span, presentation pace, and answering speed do not change that
+award. Replay, redemption, historical review, silence, and uncertain or failed
+speech recognition earn no extra XP. The reward total derives from
+`taskTotals(saved)`, which already counts canonical, archived, and original
+first-attempt records once. It does not add the retained session or its task
+snapshot again. Existing legitimate practice therefore receives credit without
+a claim or a reset; reloads and repeated completion screens cannot duplicate it.
+Session logs are not the source of lifetime XP.
+
+Six collectible trophies use the same durable practice totals:
+
+| Trophy | Requirement |
+| --- | --- |
+| First footsteps | 8 first attempts |
+| Trail explorer | 40 first attempts |
+| Expedition explorer | 200 first attempts |
+| Bright eyes | 8 visual first attempts |
+| Listening ears | 8 listening first attempts |
+| Curious explorer | Practice all nine game families; auditory compatibility aliases count as one Digits game |
+
+Completing a session shows a celebrating animal, that session's practice XP,
+and any newly reached trophy or trail milestone. XP is already earned; the
+single **Back to trail** action returns home without a claim screen. Celebration
+motion is brief and respects reduced motion. Animals, reward animations, and
+reward overlays do not appear during presentation, the hold interval, or recall,
+so the automatic answer-to-next-challenge flow stays uninterrupted.
+
+Companion choice is an optional `buddy` preference in encrypted Saved3 progress;
+older saves use the default animal without losing their records. Trail position
+and trophies are derived from those encrypted practice records. Memory Trail
+does not read or write Journey's profile, XP ledger, or mistake history, and it
+adds no account, cloud storage, or third-party runtime service. Its rewards
+celebrate practice rather than ability and do not change the adaptive controller
+or introduce Journey's accuracy threshold. Resetting lab progress also resets
+the lab's derived rewards and companion preference.
+
+## Interface and audio assets
+
 The interface follows the [worksheet workflow's plain-language standard](https://github.com/jamesrp/math-circle-worksheets/blob/main/worksheet-workflow/blocks/spec.md)
 and [do-not list](https://github.com/jamesrp/math-circle-worksheets/blob/main/worksheet-workflow/blocks/neg.md):
-short concrete instructions, diagrams that serve the task, and no decorative
-framing or manufactured praise. The lab removes its promotional hero, slogans,
-stickers, icon cards, and repeated stage labels. Statistics sit behind Progress.
-Opening examples and optional in-round examples remain because this standalone
-app has no adult facilitator supplying the instructions. A separate reviewer
-checks the revised screens before release, following the workflow's independent
-review and revision principle. Content and recordings remain encrypted. Audio
-and instruction updates retain the existing key, so encrypted device progress
-remains readable.
+short concrete instructions, diagrams that serve the task, and no manufactured
+praise or repeated stage labels. The owner's later request explicitly adds a
+playful trail, animals, trophies, and celebration screens to the home and session
+checkpoints. This does not make decorative framing part of the memory stimuli:
+active challenges stay sparse, and statistics remain optional. Opening examples
+and optional in-round examples remain because this standalone app has no adult
+facilitator supplying the instructions. A separate reviewer checks revised
+screens before release, following the workflow's independent review and revision
+principle. Content and recordings remain encrypted. Audio and instruction
+updates retain the existing key, so encrypted device progress remains readable.
 
 To rebuild the encrypted pack, keep source JSON and generated digit MP3s outside
 the repository, then run `node scripts/encrypt-working-memory.mjs --source

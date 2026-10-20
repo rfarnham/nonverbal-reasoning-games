@@ -1,6 +1,7 @@
 # Memory Lab: publication audit and difficulty design
 
-Last reviewed: 18 October 2026.
+Publication audit reviewed: 18 October 2026. Engagement design updated:
+20 October 2026.
 
 Memory Lab uses published Cogmed task descriptions as references for mechanics.
 It is an independent implementation. Matching a description is not evidence of
@@ -199,3 +200,35 @@ goal is an understandable entry round and adaptation of the actual memory load.
 Equivalent Cogmed difficulty would additionally require a specified edition,
 observed timing and stimuli across levels, and comparative performance data.
 Published task methods alone cannot establish that equivalence.
+
+## Engagement layer and evidence limits
+
+The owner requested Memory Trail's XP, animal companions, winding trail,
+trophies, and session celebrations using the existing Journey experience as a
+design reference. These are app design choices. The audited publications do not
+validate this reward system, show that it improves adherence or cognitive
+outcomes, or establish equivalence with Cogmed's commercial rewards.
+
+The lab awards ten XP for each recorded first attempt, independent of whether
+it was correct, its memory load, its presentation pace, or the response time.
+Correct retries and historical review add no XP. Silence, uncertain recognition,
+and technical input failures remain unscored and cannot advance the trail.
+Lifetime credit derives from the existing de-duplicated task totals, including
+archived practice; it does not count session snapshots or completion screens
+again. The six trophies measure amounts and variety of practice, not accuracy,
+maximum span, intelligence, or clinical improvement.
+
+Every eight first attempts mark a cosmetic trail stop. Five stops form a
+habitat, and five habitats form an expedition; later expeditions retain earned
+XP. These landmarks do not gate exercises or increase difficulty. In particular,
+Journey's greater-than-70% stop-clearing rule does not apply: requiring that
+accuracy would conflict with this lab's separately specified adaptive practice
+controller and its research-informed 60% reference target.
+
+The home screen and completed-session splash carry the animal and reward
+presentation. Cue, study, hold, and recall retain their original stimuli,
+timings, and response flow, without decorative animals or reward overlays.
+Companion choice stays in encrypted lab progress, and the separate Journey
+profile and XP ledger are untouched. These boundaries preserve the meaning of
+the existing first-attempt observations; they do not themselves demonstrate a
+training benefit.

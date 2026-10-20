@@ -10,8 +10,10 @@ import { SOUND_PREFERENCE_KEY } from '../../lib/game-audio.ts';
 import { decryptSearchBytes, deriveSearchKey, encryptSearchBytes, sha256 } from '../../lib/question-search/crypto.ts';
 import { AUDIO_TASK_IDS, RESEARCH_PROFILE, TASK_IDS, VISUAL_TASK_IDS, advanceRound, createProgress, finalTrackingPositions, recordFirstAttempt } from '../../app/lab/working-memory/engine.ts';
 import { conditionKey, fresh, normalizeSaved, restore as restoreSaved, selectTaskStates, taskTotals } from '../../app/lab/working-memory/progress.ts';
+import { getMemoryRewards } from '../../app/lab/working-memory/rewards.ts';
 import { digitTaskForVariant, digitVariantKey, enumerateDigitVariants, normalizeDigitVariant } from '../../app/lab/working-memory/digit-options.ts';
 import { MEMORY_PROGRESS_STORAGE_KEY, memoryAudioContext, memoryContentContext, validateMemoryContent } from '../../app/lab/working-memory/vault.ts';
+import { PROGRESSION_STORAGE_KEY } from '../../lib/progression/persistence.ts';
 
 // Ordinary browser CI exercises the production cryptographic flow with a freshly
 // encrypted synthetic pack. Neither the real pack nor its password is a fixture.
@@ -393,6 +395,10 @@ function digitTotals(data) {
   const totals = taskTotals(restored);
   return AUDIO_TASK_IDS.reduce((sum, task) => ({ attempts: sum.attempts + totals[task].attempts, correct: sum.correct + totals[task].correct }), { attempts: 0, correct: 0 });
 }
+async function assertMemoryXp(page, xp) {
+  const trail = page.getByRole('region', { name: 'Memory Trail', exact: true });
+  await trail.getByLabel(`${xp} memory XP`, { exact: true }).waitFor();
+}
 async function prepareSpeech(page) {
   await page.getByLabel('Answer with', { exact: true }).selectOption('spoken');
   await page.getByRole('button', { name: 'Download speech model', exact: true }).click();
@@ -534,6 +540,115 @@ test('locked pack discloses no exercises; incorrect password remains locked; unl
     await assertNoPlaintext(page);
     await assertClean(opened);
   } finally { releaseManifest(); await context.close(); }
+});
+
+test('Memory Trail offers twelve buddies, previews every habitat, and keeps its preference encrypted and separate from Journey', { timeout: 45_000 }, async () => {
+  const opened = await open({ width: 320 });
+  const { context, page } = opened;
+  const journeyState = JSON.stringify({ marker: 'existing-journey-player', xp: 735 });
+  try {
+    await page.evaluate(({ key, value }) => localStorage.setItem(key, value), { key: PROGRESSION_STORAGE_KEY, value: journeyState });
+    await unlock(page);
+    const trail = page.getByRole('region', { name: 'Memory Trail', exact: true });
+    await assertMemoryXp(page, 0);
+    await trail.locator('img[src$="/avatars/hedgehog.svg"]').first().waitFor();
+    assert.equal(await trail.getByRole('progressbar', { name: 'Current trail stop', exact: true }).getAttribute('aria-valuenow'), '0');
+    const habitats = trail.getByLabel('Trail habitat', { exact: true });
+    assert.deepEqual(await habitats.locator('option').allTextContents(), ['Acorn Grove', 'Pebble Brook', 'Fern Hollow', 'Moonlit Meadow', 'Starry Summit']);
+    await habitats.selectOption({ label: 'Starry Summit' });
+    await assertMemoryXp(page, 0);
+    assert.equal(await page.getByRole('button', { name: 'Practice Exercise forward', exact: true }).isEnabled(), true, 'Previewing a future habitat does not lock any practice game.');
+    await trail.getByRole('button', { name: 'Preview previous habitat', exact: true }).click();
+    assert.equal(await habitats.locator('option:checked').textContent(), 'Moonlit Meadow');
+    await habitats.selectOption({ label: 'Acorn Grove' });
+    await trail.getByText('Choose your buddy', { exact: true }).click();
+    const buddies = trail.getByRole('group', { name: 'Trail buddies', exact: true });
+    assert.equal(await buddies.getByRole('button').count(), 12);
+    assert.equal(await buddies.getByRole('button', { name: 'Hedgehog', exact: true }).getAttribute('aria-pressed'), 'true');
+    await buddies.getByRole('button', { name: 'Fox', exact: true }).click();
+    const chosen = await saved(page, value => value?.buddy === 'fox');
+    assert.equal(getMemoryRewards(restoreSaved(chosen)).xp, 0, 'Choosing an animal does not award practice XP.');
+    const stored = await page.evaluate(() => JSON.stringify({ ...localStorage }));
+    assert.equal(stored.includes('"buddy"'), false, 'The companion preference has no plaintext storage entry.');
+    await assertNoPlaintext(page, chosen);
+    for (const width of [1280, 390, 320]) {
+      await page.setViewportSize({ width, height: 900 });
+      await assertFits(page, `Memory Trail home ${width}px`);
+      await page.screenshot({ path: resolve(shots, `memory-trail-home-${width}.png`), fullPage: true });
+    }
+    await page.reload();
+    await unlock(page);
+    await assertMemoryXp(page, 0);
+    await page.getByRole('region', { name: 'Memory Trail', exact: true }).locator('img[src$="/avatars/fox.svg"]').first().waitFor();
+    assert.equal((await saved(page)).buddy, 'fox');
+    await page.getByRole('button', { name: 'Lock', exact: true }).click();
+    await page.getByLabel('Password', { exact: true }).waitFor();
+    assert.equal(await page.getByRole('region', { name: 'Memory Trail', exact: true }).count(), 0);
+    await unlock(page);
+    assert.equal((await saved(page)).buddy, 'fox');
+    assert.equal(await page.evaluate(key => localStorage.getItem(key), PROGRESSION_STORAGE_KEY), journeyState, 'Memory rewards and buddy changes cannot mutate Journey progress.');
+    await assertClean(opened);
+  } finally { await context.close(); }
+});
+
+test('Memory Trail starts eight challenges in one action and continues the exact saved round with practice XP', { timeout: 45_000 }, async () => {
+  const opened = await open({ width: 390, touch: true });
+  const { context, page } = opened;
+  try {
+    await unlock(page);
+    await assertMemoryXp(page, 0);
+    await page.getByRole('button', { name: 'Start adventure', exact: true }).tap();
+    await assertAutoPresentation(page);
+    const started = await saved(page, value => !!value?.session?.active);
+    assert.equal(started.session.length, 8);
+    assert.equal(started.session.focusedTask, started.session.active.task);
+    assert.equal(started.session.cursor, 0);
+    assert.equal(getMemoryRewards(restoreSaved(started)).xp, 0, 'Starting or watching a challenge does not award XP.');
+    assert.equal(await page.getByRole('region', { name: 'Memory Trail', exact: true }).count(), 0);
+    assert.equal(await page.locator('img[src*="/avatars/"]').count(), 0, 'Animal decorations stay off the memory challenge.');
+    await page.getByRole('button', { name: 'Check sequence', exact: true }).waitFor();
+    await enter(page, started.session.active, started.session.active.expected, { touch: true });
+    await check(page);
+    const advanced = await saved(page, value => value?.session?.cursor === 1);
+    assert.equal(getMemoryRewards(restoreSaved(advanced)).xp, 10);
+    await page.getByRole('button', { name: /Save & exit/ }).click();
+    await assertMemoryXp(page, 10);
+    assert.equal(await page.getByRole('progressbar', { name: 'Current trail stop', exact: true }).getAttribute('aria-valuenow'), '1');
+    await page.getByRole('button', { name: 'Continue adventure', exact: true }).tap();
+    await assertAutoPresentation(page);
+    const resumed = await saved(page);
+    assert.deepEqual(resumed, advanced, 'Continuing an adventure does not generate another session or award XP again.');
+    assert.equal(resumed.session.active.id, advanced.session.active.id);
+    await assertClean(opened);
+  } finally { await context.close(); }
+});
+
+test('Memory Trail credits earlier practice across expeditions and keeps all six earned trophies', { timeout: 30_000 }, async () => {
+  const opened = await open({ width: 390 });
+  const { context, page } = opened;
+  try {
+    const previous = fresh();
+    for (const task of [...VISUAL_TASK_IDS.slice(0, 6), ...AUDIO_TASK_IDS]) previous.legacyTasks[task] = { ...previous.legacyTasks[task], attempts: 20, correct: 0 };
+    await seedSaved(page, normalizeSaved(previous));
+    await assertMemoryXp(page, 1800);
+    await page.getByRole('region', { name: 'Memory trophies', exact: true }).getByRole('listitem', { name: 'Curious explorer, 7 of 9', exact: true }).waitFor();
+    for (const task of TASK_IDS) previous.legacyTasks[task] = { ...previous.legacyTasks[task], attempts: 20, correct: 0 };
+    const retained = await seedSaved(page, normalizeSaved(previous));
+    await assertMemoryXp(page, 2200);
+    const trail = page.getByRole('region', { name: 'Memory Trail', exact: true });
+    await trail.getByText(/^Memory Trail · Expedition 2$/).waitFor();
+    assert.equal(await trail.getByLabel('Trail habitat', { exact: true }).locator('option:checked').textContent(), 'Acorn Grove');
+    assert.equal(await trail.getByRole('progressbar', { name: 'Current trail stop', exact: true }).getAttribute('aria-valuenow'), '4');
+    const trophies = page.getByRole('region', { name: 'Memory trophies', exact: true });
+    assert.equal(await trophies.getByRole('listitem').count(), 6);
+    assert.equal(await trophies.getByRole('listitem', { name: /earned/i }).count(), 6, 'Earlier practice keeps all earned trophies after the trail begins another expedition.');
+    assert.equal(await page.getByRole('button', { name: 'Practice Exercise forward', exact: true }).isEnabled(), true, 'Rewards do not replace the independent adaptive practice controls.');
+    await page.reload();
+    await unlock(page);
+    await assertMemoryXp(page, 2200);
+    assert.deepEqual(await saved(page), retained, 'Viewing the new trail does not rewrite historical difficulty or reward evidence.');
+    await assertClean(opened);
+  } finally { await context.close(); }
 });
 
 test('one Digits game exposes nine unique saved variants and omits keypad options for spoken answers', { timeout: 60_000 }, async () => {
@@ -990,9 +1105,11 @@ test('uncertain and unknown speech stay unscored with only Retry, then resume wi
     await recordSpeech(page, round.expected, { confidence: 0.2 });
     await assertInputFailure(page, 'Input not recognized');
     assert.deepEqual(await saved(page), initial, 'Low-confidence recognition does not become a failed memory attempt.');
+    assert.equal(getMemoryRewards(restoreSaved(await saved(page))).xp, 0, 'Uncertain speech earns no practice XP.');
     await recordSpeech(page, [], { text: '[unk]' }, { again: true });
     await assertInputFailure(page, 'Input not recognized');
     assert.deepEqual(await saved(page), initial, 'Unknown speech also preserves the complete first-try record.');
+    assert.equal(getMemoryRewards(restoreSaved(await saved(page))).xp, 0, 'Retrying unknown speech cannot create reward activity.');
     await recordSpeech(page, round.expected, {}, { again: true });
     assert.equal(await page.evaluate(() => window.__speechTest.stimulusPlays), stimulusPlays, 'Retry records the already heard sequence without playing it again.');
     assert.equal(await page.getByRole('status').filter({ hasText: /^Listen$/ }).count(), 0);
@@ -1001,6 +1118,7 @@ test('uncertain and unknown speech stay unscored with only Retry, then resume wi
     assert.equal(completed.session.history.length, 1);
     assert.equal(completed.session.history[0].correct, true);
     assert.equal(completed.tasks[round.task].attempts, 1);
+    assert.equal(getMemoryRewards(restoreSaved(completed)).xp, 10, 'Only the recognized first attempt earns XP after input recovery.');
     assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 3);
     assert.equal(await page.evaluate(() => window.__speechTest.stoppedTracks), 3);
     assert.equal(await page.evaluate(() => window.__speechTest.recognitionDisplays), 0);
@@ -1030,6 +1148,7 @@ test('a confident spoken answer with the wrong length is a memory miss and displ
     assert.equal(result.tasks['reverse-digits'].attempts, 1);
     assert.equal(result.tasks['reverse-digits'].correct, 0);
     assert.equal(result.tasks['reverse-digits'].balance, -3);
+    assert.equal(getMemoryRewards(restoreSaved(result)).xp, 10, 'A recognized wrong answer still receives the same practice XP.');
     await page.getByRole('button', { name: 'Replay sequence', exact: true }).click();
     await page.getByRole('status').filter({ hasText: /^Listen$/ }).waitFor();
     await assertNoSpokenTranscript(page);
@@ -1040,6 +1159,7 @@ test('a confident spoken answer with the wrong length is a memory miss and displ
     const replayed = await saved(page, value => value?.session?.cursor === 1);
     assert.deepEqual(replayed.tasks, result.tasks, 'Correct replay preserves the original first-try miss.');
     assert.equal(replayed.session.history.length, 1);
+    assert.equal(getMemoryRewards(restoreSaved(replayed)).xp, 10, 'Replay cannot award the same challenge twice.');
     await assertLocalSpeech(opened);
   } finally { await context.close(); }
 });
@@ -1420,13 +1540,30 @@ test('final Check sequence completes the session and records its log exactly onc
     assert.equal(completed.logs[0].id, session.seed);
     assert.equal(completed.logs[0].correct, 8);
     assert.equal(completed.logs[0].rounds, 8);
+    assert.equal(getMemoryRewards(restoreSaved(completed)).xp, 80);
     assert.equal(await page.getByRole('button', { name: /^(Finish session|Next round|Check sequence)/ }).count(), 0);
+    const celebration = page.getByRole('region', { name: 'Adventure celebration', exact: true });
+    await celebration.getByLabel('80 XP earned this session', { exact: true }).waitFor();
+    const trophies = celebration.getByRole('group', { name: 'New trophies', exact: true });
+    await trophies.getByText('First footsteps', { exact: true }).waitFor();
+    await trophies.getByText('Bright eyes', { exact: true }).waitFor();
+    assert.equal(await celebration.getByRole('button', { name: /^Back to trail/ }).count(), 1);
+    assert.equal(await celebration.getByRole('button', { name: /claim|continue|next/i }).count(), 0, 'Earned XP is settled without another claim or continue step.');
+    await page.waitForFunction(() => document.activeElement?.textContent?.trim() === 'Session complete');
+    assert.equal(await celebration.evaluate(element => element.getAnimations({ subtree: true }).filter(animation => animation.playState === 'running').length), 0, 'Reduced motion keeps the celebration still.');
     await page.screenshot({ path: resolve(shots, 'complete-desktop.png'), fullPage: true });
+    for (const width of [1280, 390, 320]) {
+      await page.setViewportSize({ width, height: 900 });
+      await assertFits(page, `Memory Trail celebration ${width}px`);
+      await page.screenshot({ path: resolve(shots, `memory-trail-complete-${width}.png`), fullPage: true });
+    }
     await page.keyboard.press('Enter');
-    await page.getByRole('button', { name: /^Back to the lab/ }).click();
+    await page.getByRole('button', { name: /^Back to trail/ }).click();
+    await assertMemoryXp(page, 80);
     await page.getByRole('button', { name: /^Lock/ }).click();
     await unlock(page);
     assert.deepEqual(await saved(page), completed, 'Returning, locking, and unlocking do not duplicate a completed session log.');
+    await assertMemoryXp(page, 80);
     await assertNoPlaintext(page, completed);
     await assertClean(opened);
   } finally { await context.close(); }
@@ -1810,6 +1947,7 @@ test('resetting device progress confirms before erasing the encrypted session', 
   try {
     const session = createProgress('browser-reset', 8, { focusedTask: 'forward' });
     const before = await seedSession(page, recordFirstAttempt(session, session.active, true));
+    await assertMemoryXp(page, 10);
     await page.getByRole('button', { name: 'Reset device progress', exact: true }).click();
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
     assert.deepEqual(await saved(page), before, 'Cancelling reset preserves encrypted progress.');
@@ -1817,6 +1955,7 @@ test('resetting device progress confirms before erasing the encrypted session', 
     await page.getByRole('button', { name: 'Erase lab progress', exact: true }).click();
     await page.getByRole('status').filter({ hasText: 'Memory Lab progress reset.' }).waitFor();
     assert.equal(await readSaved(page), null);
+    await assertMemoryXp(page, 0);
     assert.equal(await page.getByRole('button', { name: /^Continue session/ }).count(), 0);
     await startFocus(page, 'forward');
     const restarted = await saved(page, value => value?.session?.cursor === 0);
