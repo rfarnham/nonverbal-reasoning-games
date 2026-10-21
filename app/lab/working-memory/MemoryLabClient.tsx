@@ -25,12 +25,14 @@ import {
   advanceRound,
   createProgress,
   RESEARCH_PROFILE,
+  COMFORT_ADAPTATION,
   getTaskProfile,
   studyDuration,
   finalTrackingPositions,
   generateRound,
   isCorrectResponse,
   recordFirstAttempt,
+  recordRetryAttempt,
   rotateCell,
   type MemoryProgress,
   type MemoryRound,
@@ -71,6 +73,7 @@ type Phase =
   | "recall"
   | "correct"
   | "wrong"
+  | "moving-on"
   | "paused";
 
 function Shape({ id }: { id: number }) {
@@ -606,6 +609,7 @@ function UnlockedLab({
   const [lastResult, setLastResult] = useState<{
     number: number;
     retried: boolean;
+    skipped?: boolean;
   } | null>(null);
   const [exampleOpen, setExampleOpen] = useState(false);
   const playback = useRef(0);
@@ -790,7 +794,7 @@ function UnlockedLab({
       } else if (phase === "cue")
         roundTitleRef.current?.scrollIntoView({ block: "start", behavior: "instant" });
       else if (phase === "recall") firstCell.current?.focus();
-      else if (["ready", "correct", "wrong", "paused"].includes(phase))
+      else if (["ready", "correct", "wrong", "moving-on", "paused"].includes(phase))
         actionRef.current?.focus();
     });
     return () => cancelAnimationFrame(frame);
@@ -962,6 +966,7 @@ function UnlockedLab({
         {
           focusedTask, tasks: selectTaskStates(savedRef.current), modality,
           digitOrder: savedRef.current.digitOrder, profile: RESEARCH_PROFILE,
+          adaptation: COMFORT_ADAPTATION,
           ...(needsListening ? { digitVariant: savedRef.current.digitVariant } : {}),
         },
       );
@@ -1015,10 +1020,12 @@ function UnlockedLab({
       requestAnimationFrame(() => headingRef.current?.focus());
     } else if (
       s.answered &&
-      (s.history.at(-1)?.correct ||
+      (s.history.at(-1)?.correct || s.history.at(-1)?.retryCorrect !== undefined ||
         savedRef.current.redeemed.includes(s.active.id))
     ) {
-      changePhase("correct");
+      const skipped = s.history.at(-1)?.retryCorrect === false;
+      changePhase(skipped ? "moving-on" : "correct");
+      setLastResult({ number: s.cursor + 1, retried: !s.history.at(-1)?.correct, skipped });
       advanceAndPresent(s);
     } else if (s.answered) {
       setRotated(s.active.task === "rotation");
@@ -1097,13 +1104,16 @@ function UnlockedLab({
     const isSpoken = savedRef.current.sessionCondition?.inputMode === "spoken" && s.active.answerKind === "ordered-digits";
     const submitted = isSpoken ? spokenDigits! : responseRef.current;
     const correct = isCorrectResponse(s.active, submitted);
+    const skipped = s.answered && !correct;
     // Lock synchronously so double clicks and held keys cannot submit twice.
-    changePhase(correct ? "correct" : "wrong");
+    changePhase(correct ? "correct" : skipped ? "moving-on" : "wrong");
     setSpokenDebug(isSpoken && !correct ? { roundId: s.active.id, digits: Object.freeze([...submitted]) } : null);
     if (isSpoken) cancelSpeech();
     setLastResult(null);
     feedbackAudio(correct, s.cursor === s.length - 1);
-    const next = s.answered ? s : recordFirstAttempt(s, s.active, correct);
+    const next = s.answered
+      ? recordRetryAttempt(s, s.active, correct)
+      : recordFirstAttempt(s, s.active, correct);
     const retried = !next.history.at(-1)?.correct;
     const redeemed =
       correct && retried
@@ -1115,15 +1125,15 @@ function UnlockedLab({
       tasks: next.tasks,
       redeemed,
     });
-    if (correct) {
-      setLastResult({ number: s.cursor + 1, retried });
+    if (correct || skipped) {
+      setLastResult({ number: s.cursor + 1, retried, skipped });
       advanceAndPresent(next);
     }
   }
   function advanceAndPresent(progress: MemoryProgress) {
     if (!progress.active || !progress.answered) return;
     try {
-      const next = advanceRound(progress);
+      const next = advanceRound(progress, { upgradeAdaptation: true });
       let logs = savedRef.current.logs;
       if (!next.active && !logs.some((log) => log.id === next.seed)) {
         logs = [
@@ -1171,7 +1181,7 @@ function UnlockedLab({
         requestAnimationFrame(() => headingRef.current?.focus());
       }
     } catch {
-      changePhase("correct");
+      changePhase(progress.history.at(-1)?.retryCorrect === false ? "moving-on" : "correct");
       setNotice("The next round could not be prepared. Try continuing again.");
     }
   }
@@ -1721,15 +1731,16 @@ function UnlockedLab({
               </>}
             </div>
             {lastResult && !review && phase !== "wrong" && (
-              <p className={styles.lastResult} role="status">
-                ✓ Round {lastResult.number} correct
-                {lastResult.retried ? " after replay" : ""}
+              <p className={`${styles.lastResult} ${lastResult.skipped ? styles.lastResultSkipped : ""}`} role="status">
+                {lastResult.skipped
+                  ? `Round ${lastResult.number}: moving on after two tries.`
+                  : `✓ Round ${lastResult.number} correct${lastResult.retried ? " after replay" : ""}`}
               </p>
             )}
             {review ? (
               <>
                 {reviewSolved ? <Example round={review} /> : (
-                  <p className={styles.notice}>Missed on the first attempt. Complete this round to review its solution.</p>
+                  <p className={styles.notice}>Missed on the first attempt. The answer stays hidden.</p>
                 )}
                 <button
                   className={styles.button}
@@ -1811,6 +1822,8 @@ function UnlockedLab({
                               ? "Paused"
                               : phase === "correct"
                                 ? "✓ Correct"
+                              : phase === "moving-on"
+                                ? "Moving on"
                               : spoken ? "× Answer did not match" : "× Try again"}
                   </div>
                   {round.task === "locations" &&
@@ -1944,20 +1957,22 @@ function UnlockedLab({
                     </button>
                   )}
                 </div>
-                {(phase === "correct" || phase === "wrong") && (
+                {(phase === "correct" || phase === "wrong" || phase === "moving-on") && (
                   <div
-                    className={`${styles.feedback} ${phase === "correct" ? styles.feedbackCorrect : styles.feedbackWrong}`}
+                    className={`${styles.feedback} ${phase === "correct" ? styles.feedbackCorrect : phase === "wrong" ? styles.feedbackWrong : ""}`}
                     role="status"
                   >
-                    <h2>{phase === "correct" ? "Correct" : spoken ? "Answer did not match" : "Try again"}</h2>
+                    <h2>{phase === "correct" ? "Correct" : phase === "moving-on" ? "Let’s move on" : spoken ? "Answer did not match" : "Try again"}</h2>
                     <p>
                       {phase === "correct"
                         ? session!.history.at(-1)?.correct
                           ? "Correct on the first attempt."
                           : "Correct after replay. The first attempt remains recorded as missed."
+                        : phase === "moving-on" ? "Two tries completed. Your first attempt remains recorded as missed."
                         : spoken ? "The recognized answer did not match."
                         : `The ${round.answerKind === "unordered-cells" ? "selected places" : "sequence"} did not match.`}
                     </p>
+                    {phase === "wrong" && <p>One more try, then we’ll move on.</p>}
                     {phase === "wrong" && spoken && spokenDebug?.roundId === round.id && (
                       <div className={styles.feedbackDetail} role="group" aria-label="Recognized answer">
                         <span>Recognized answer</span>
@@ -1969,7 +1984,7 @@ function UnlockedLab({
                         <p>This is what speech recognition heard.</p>
                       </div>
                     )}
-                    {phase === "correct" ? (
+                    {phase !== "wrong" ? (
                       <button
                         className={styles.button}
                         ref={actionRef}
@@ -1997,7 +2012,7 @@ function UnlockedLab({
                 )}
               </>
             )}
-            {!review && phase !== "ready" && phase !== "wrong" && (
+            {!review && phase !== "ready" && phase !== "wrong" && phase !== "moving-on" && (
               <details
                 className={styles.exampleDisclosure}
                 open={exampleOpen}

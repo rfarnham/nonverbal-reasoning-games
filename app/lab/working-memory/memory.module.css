@@ -162,6 +162,7 @@
 .feedbackWrong { border-color: #bf493e; background: #fff0e9; color: #8f352d; }
 .feedbackDetail { color: inherit; font-size: .85rem; line-height: 1.6; }
 .lastResult { margin: 12px 0 8px; padding: 4px 0 4px 10px; border-left: 3px solid var(--accent); color: #145e4f; font-size: .85rem; line-height: 1.5; }
+.lastResultSkipped { border-color: var(--line); color: var(--muted); }
 .miniSequence { display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 .miniCell { display: grid; place-items: center; width: 35px; height: 35px; border: 1px solid currentColor; border-radius: 3px; font-size: .8rem; font-weight: 700; }
 .miniCell > svg { width: 27px; height: 27px; }

@@ -8,7 +8,9 @@ import {
   createProgress,
   createTaskStates,
   recordFirstAttempt,
+  recordRetryAttempt,
 } from "../app/lab/working-memory/engine.ts";
+import { COMFORT_ADAPTATION } from "../app/lab/working-memory/comfort-adaptation.ts";
 import { digitTaskForVariant, enumerateDigitVariants } from "../app/lab/working-memory/digit-options.ts";
 import { conditionKey, fresh, normalizeSaved, restore, selectTaskStates, taskTotals } from "../app/lab/working-memory/progress.ts";
 import {
@@ -27,11 +29,11 @@ function withCounts(counts) {
   return saved;
 }
 
-function begin(saved, task = "forward", seed = "reward-session") {
+function begin(saved, task = "forward", seed = "reward-session", options = {}) {
   if (AUDIO_TASK_IDS.includes(task)) task = digitTaskForVariant(saved.digitVariant);
   const session = createProgress(seed, 8, {
     focusedTask: task, tasks: selectTaskStates(saved), profile: RESEARCH_PROFILE,
-    digitVariant: saved.digitVariant, digitOrder: saved.digitOrder,
+    digitVariant: saved.digitVariant, digitOrder: saved.digitOrder, ...options,
   });
   return normalizeSaved({ ...saved, session, redeemed: [], sessionCondition: {
     slow: saved.slow, inputMode: saved.inputMode, digitOrder: saved.digitOrder, digitVariant: saved.digitVariant,
@@ -216,4 +218,31 @@ test("reward reads cannot mutate calibration, histories, preferences, or bank to
   getMemoryRewards(saved);
   assert.deepEqual(saved, snapshot);
   assert.deepEqual(taskTotals(saved), totals);
+});
+
+test("exhausting or redeeming the second response never adds XP or rewrites first-try accuracy", () => {
+  let saved = score(begin(fresh(), "locations", "two-attempt-rewards", { adaptation: COMFORT_ADAPTATION }), false);
+  const first = getMemoryRewards(saved);
+  saved = normalizeSaved({ ...saved, session: recordRetryAttempt(saved.session, saved.session.active, false) });
+  assert.deepEqual(getMemoryRewards(saved), first);
+  saved = restore(structuredClone(saved));
+  assert.ok(saved);
+  assert.deepEqual(getMemoryRewards(saved), first);
+  saved = advance(saved);
+  assert.deepEqual(getMemoryRewards(saved), first, "moving on from an exhausted question is not a new answer");
+  saved = score(saved, false);
+  const second = getMemoryRewards(saved);
+  saved = normalizeSaved({ ...saved, session: recordRetryAttempt(saved.session, saved.session.active, true),
+    redeemed: [saved.session.active.id] });
+  assert.deepEqual(getMemoryRewards(saved), second);
+  assert.deepEqual([second.xp, second.attempts, second.correct], [20, 2, 0]);
+  assert.deepEqual(saved.session.history.map(({ correct, retryCorrect }) => [correct, retryCorrect]), [[false, false], [false, true]]);
+  saved = restore(structuredClone(saved));
+  assert.ok(saved);
+  assert.deepEqual(getMemoryRewards(saved), second);
+  assert.deepEqual([getSessionRewards(saved).xp, getSessionRewards(saved).attempts, getSessionRewards(saved).correct], [20, 2, 0]);
+  saved = advance(saved);
+  assert.deepEqual(getMemoryRewards(saved), second);
+  saved = normalizeSaved({ ...saved, session: null, redeemed: [] });
+  assert.deepEqual(getMemoryRewards(saved), second, "saving and exiting after two questions keeps exactly two awards");
 });

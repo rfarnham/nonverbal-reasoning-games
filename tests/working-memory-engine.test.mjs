@@ -6,6 +6,7 @@ import {
   VISUAL_TASK_IDS,
   SESSION_TASK_POOLS,
   RESEARCH_PROFILE,
+  COMFORT_ADAPTATION,
   activeRound,
   advanceRound,
   createProgress,
@@ -17,6 +18,8 @@ import {
   hasStraightRun,
   isCorrectResponse,
   recordFirstAttempt,
+  recordRetryAttempt,
+  scoredAttempts,
   rotateCell,
   studyDuration,
   validateProgress,
@@ -578,4 +581,146 @@ test("research binding study time scales with encoded items while original sessi
     legacy = advanceRound(recordFirstAttempt(legacy, legacy.active, true));
   }
   assert.equal("profile" in legacy, false);
+});
+
+test("comfortable-span sessions cap scored answers at two without rewriting first-attempt evidence", () => {
+  for (const profile of [undefined, RESEARCH_PROFILE]) {
+    let progress = createProgress("two-attempt-cap", 8, { profile, adaptation: COMFORT_ADAPTATION, focusedTask: "forward" });
+    assert.equal(scoredAttempts(progress), 0);
+    assert.throws(() => recordRetryAttempt(progress, progress.active, false));
+    assert.throws(() => advanceRound(progress));
+    while (progress.active) {
+      const round = progress.active;
+      const before = structuredClone(progress);
+      const answered = recordFirstAttempt(progress, round, false);
+      assert.deepEqual(progress, before);
+      assert.equal(scoredAttempts(answered), 1);
+      assert.throws(() => advanceRound(answered));
+      assert.throws(() => recordFirstAttempt(answered, round, true));
+      assert.throws(() => recordRetryAttempt(answered, { ...round, id: "stale" }, true));
+      const retryCorrect = progress.cursor % 2 === 0;
+      const resolved = recordRetryAttempt(answered, round, retryCorrect);
+      assert.equal(scoredAttempts(resolved), 2);
+      assert.deepEqual(resolved.tasks, answered.tasks);
+      assert.deepEqual(resolved.initialTasks, answered.initialTasks);
+      assert.equal(resolved.history[progress.cursor].correct, false);
+      assert.equal(resolved.history[progress.cursor].retryCorrect, retryCorrect);
+      assert.equal(answered.history[progress.cursor].retryCorrect, undefined);
+      assert.throws(() => recordRetryAttempt(resolved, round, true));
+      assert.deepEqual(validateProgress(structuredClone(answered)), answered);
+      assert.deepEqual(validateProgress(structuredClone(resolved)), resolved);
+      progress = advanceRound(resolved);
+      assert.deepEqual(validateProgress(structuredClone(progress)), progress);
+    }
+    assert.equal(scoredAttempts(progress), 0);
+    assert.equal(progress.tasks.forward.attempts, 8);
+    assert.equal(progress.tasks.forward.correct, 0);
+    assert.equal(progress.tasks.forward.span, 2);
+    assert.equal(progress.cursor, 8);
+  }
+  const start = createProgress("first-correct", 8, { adaptation: COMFORT_ADAPTATION, focusedTask: "forward" });
+  const correct = recordFirstAttempt(start, start.active, true);
+  assert.equal(scoredAttempts(correct), 1);
+  assert.throws(() => recordRetryAttempt(correct, correct.active, false));
+  assert.equal(advanceRound(correct).cursor, 1);
+});
+
+test("legacy questions preserve their exact prefix and upgrade after the current question", () => {
+  for (const profile of [undefined, RESEARCH_PROFILE]) {
+    for (const task of ["forward", "locations", "sort-digits"]) {
+      const tasks = createTaskStates(profile);
+      tasks[task].span = 6;
+      tasks[task].attempts = 35;
+      tasks[task].correct = 30;
+      const original = createProgress("legacy-comfort-boundary", 8, { tasks, profile, focusedTask: task });
+      const answered = recordFirstAttempt(original, original.active, false);
+      // Historical progress can have a resolved/redemption marker outside this engine.
+      const upgraded = advanceRound(answered, { upgradeAdaptation: true });
+      assert.equal(upgraded.adaptation, COMFORT_ADAPTATION);
+      assert.equal(upgraded.comfortFrom, 1);
+      assert.equal(upgraded.active.span, 5);
+      assert.equal(upgraded.tasks[task].comfortSpan, 5);
+      assert.equal(upgraded.tasks[task].probeWait, 8);
+      assert.equal(upgraded.tasks[task].attempts, 36);
+      assert.equal(upgraded.tasks[task].correct, 30);
+      assert.deepEqual(upgraded.initialTasks, original.initialTasks);
+      assert.deepEqual(upgraded.history, answered.history);
+      assert.deepEqual(original.active, upgraded.history[0].round);
+      assert.equal(upgraded.active.profile, profile);
+      assert.equal(upgraded.tasks[task].balance, profile ? 0 : undefined);
+      assert.deepEqual(validateProgress(structuredClone(upgraded)), upgraded);
+      assert.equal(answered.adaptation, undefined);
+      // A new first miss requires its second answer, even with repeated upgrade options.
+      const newMiss = recordFirstAttempt(upgraded, upgraded.active, false);
+      assert.throws(() => advanceRound(newMiss, { upgradeAdaptation: true }));
+      const continued = advanceRound(recordRetryAttempt(newMiss, newMiss.active, false), { upgradeAdaptation: true });
+      assert.equal(continued.comfortFrom, 1);
+      assert.deepEqual(validateProgress(structuredClone(continued)), continued);
+    }
+  }
+});
+
+test("a later controller boundary and an upgrade after the final question replay exactly", () => {
+  let progress = createProgress("later-boundary", 8, { profile: RESEARCH_PROFILE, focusedTask: "forward" });
+  for (let index = 0; index < 8; index += 1) {
+    const answered = recordFirstAttempt(progress, progress.active, index % 2 === 0);
+    progress = advanceRound(answered, { upgradeAdaptation: index === 7 });
+    assert.deepEqual(validateProgress(structuredClone(progress)), progress);
+  }
+  assert.equal(progress.cursor, 8);
+  assert.equal(progress.comfortFrom, 8);
+  assert.equal(progress.active, null);
+  assert.equal(progress.tasks.forward.attempts, 8);
+  assert.equal(progress.tasks.forward.correct, 4);
+});
+
+test("comfortable sessions reject corrupt modes, boundaries, retry markers and partial controller banks", () => {
+  let progress = createProgress("comfort-integrity", 8, { adaptation: COMFORT_ADAPTATION, profile: RESEARCH_PROFILE, focusedTask: "forward" });
+  progress = recordFirstAttempt(progress, progress.active, false);
+  progress = recordRetryAttempt(progress, progress.active, false);
+  progress = advanceRound(progress);
+  progress = recordFirstAttempt(progress, progress.active, true);
+  for (const mutate of [
+    (value) => { value.adaptation = "unrecognized"; },
+    (value) => { delete value.adaptation; },
+    (value) => { delete value.comfortFrom; },
+    (value) => { value.comfortFrom = 2; },
+    (value) => { value.comfortFrom = -1; },
+    (value) => { value.comfortFrom = 0.5; },
+    (value) => { value.history[0].retryCorrect = "wrong"; },
+    (value) => { delete value.history[0].retryCorrect; },
+    (value) => { value.history[1].retryCorrect = false; },
+    (value) => { delete value.initialTasks.forward.probeWait; },
+    (value) => { value.tasks.forward.probeBackoff = 3; },
+    (value) => { value.tasks.forward.probeWait = 17; },
+    (value) => { value.tasks.forward.comfortSpan = 1; },
+    (value) => { value.tasks.forward.baseMisses = 2; },
+    (value) => { value.tasks.forward.balance = 1; },
+  ]) {
+    const invalid = structuredClone(progress);
+    mutate(invalid);
+    assert.equal(validateProgress(invalid), null);
+  }
+  const bank = structuredClone(progress.tasks);
+  assert.ok(validateTaskStates(bank, RESEARCH_PROFILE));
+  assert.throws(() => createProgress("missing-bank-mode", 8, { tasks: bank, profile: RESEARCH_PROFILE, focusedTask: "forward" }));
+  delete bank.forward.probeWins;
+  assert.ok(!validateTaskStates(bank, RESEARCH_PROFILE));
+  assert.throws(() => createProgress("partial-bank", 8, { tasks: bank, profile: RESEARCH_PROFILE, adaptation: COMFORT_ADAPTATION, focusedTask: "forward" }));
+});
+
+test("all comfortable task profiles retain their original starts, geometry and separate evidence", () => {
+  for (const profile of [undefined, RESEARCH_PROFILE]) {
+    for (const task of TASK_IDS) {
+      const progress = createProgress(`comfort-geometry-${task}`, 8, { profile, adaptation: COMFORT_ADAPTATION, focusedTask: task });
+      const historical = createProgress(`comfort-geometry-${task}`, 8, { profile, focusedTask: task });
+      assert.deepEqual(progress.active, historical.active);
+      const answered = recordFirstAttempt(progress, progress.active, false);
+      for (const other of TASK_IDS.filter((id) => id !== task)) assert.deepEqual(answered.tasks[other], progress.tasks[other]);
+      assert.deepEqual(validateProgress(structuredClone(answered)), answered);
+      assert.equal(answered.tasks[task].attempts, 1);
+      assert.equal(answered.tasks[task].correct, 0);
+      assert.equal(answered.tasks[task].successStreak, 0);
+    }
+  }
 });

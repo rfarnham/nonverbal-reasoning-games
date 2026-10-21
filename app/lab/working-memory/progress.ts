@@ -269,7 +269,7 @@ function redemptionValid(value: unknown, session: MemoryProgress | null): value 
   return Array.isArray(value) && value.length <= (session?.length ?? 0)
     && new Set(value).size === value.length
     && value.every((id: unknown) => typeof id === "string"
-      && session?.history.some((result) => result.round.id === id && !result.correct));
+      && session?.history.some((result) => result.round.id === id && !result.correct && result.retryCorrect !== false));
 }
 
 function conditionsValid(value: unknown, archived = false): value is Record<string, TaskState> {
@@ -286,12 +286,7 @@ function conditionsValid(value: unknown, archived = false): value is Record<stri
 }
 
 function sameTasks(first: TaskStates, second: TaskStates): boolean {
-  return TASK_IDS.every((task) => {
-    const a = first[task];
-    const b = second[task];
-    return a.span === b.span && a.successStreak === b.successStreak
-      && a.attempts === b.attempts && a.correct === b.correct && a.balance === b.balance;
-  });
+  return TASK_IDS.every((task) => sameState(first[task], second[task]));
 }
 
 function copyBank(bank: Record<string, TaskState>): Record<string, TaskState> {
@@ -309,7 +304,10 @@ function oldTaskStates(bank: Record<string, TaskState>, settings: SessionConditi
 
 function sameState(first: TaskState, second: TaskState): boolean {
   return first.span === second.span && first.successStreak === second.successStreak
-    && first.attempts === second.attempts && first.correct === second.correct && first.balance === second.balance;
+    && first.attempts === second.attempts && first.correct === second.correct && first.balance === second.balance
+    && first.comfortSpan === second.comfortSpan && first.probeWait === second.probeWait
+    && first.probeWins === second.probeWins && first.baseMisses === second.baseMisses
+    && first.probeBackoff === second.probeBackoff;
 }
 
 function contextMatchesSession(session: MemoryProgress, context: SessionCondition): boolean {

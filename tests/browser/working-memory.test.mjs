@@ -8,7 +8,7 @@ import { after, before, test } from 'node:test';
 import { chromium } from 'playwright';
 import { SOUND_PREFERENCE_KEY } from '../../lib/game-audio.ts';
 import { decryptSearchBytes, deriveSearchKey, encryptSearchBytes, sha256 } from '../../lib/question-search/crypto.ts';
-import { AUDIO_TASK_IDS, RESEARCH_PROFILE, TASK_IDS, VISUAL_TASK_IDS, advanceRound, createProgress, finalTrackingPositions, recordFirstAttempt } from '../../app/lab/working-memory/engine.ts';
+import { AUDIO_TASK_IDS, COMFORT_ADAPTATION, RESEARCH_PROFILE, TASK_IDS, VISUAL_TASK_IDS, advanceRound, createProgress, finalTrackingPositions, recordFirstAttempt } from '../../app/lab/working-memory/engine.ts';
 import { conditionKey, fresh, normalizeSaved, restore as restoreSaved, selectTaskStates, taskTotals } from '../../app/lab/working-memory/progress.ts';
 import { getMemoryRewards } from '../../app/lab/working-memory/rewards.ts';
 import { digitTaskForVariant, digitVariantKey, enumerateDigitVariants, normalizeDigitVariant } from '../../app/lab/working-memory/digit-options.ts';
@@ -145,6 +145,7 @@ async function installSpeechMock(context, options) {
       },
       releaseFinals() { heldFinals.splice(0).forEach(deliver => deliver()); },
       releaseMicrophones() { heldPermissions.splice(0).forEach(deliver => deliver()); },
+      repeatFinal: () => undefined,
       failWorker: () => undefined,
     };
     window.__speechTest = state;
@@ -237,6 +238,7 @@ async function installSpeechMock(context, options) {
         } else if (message.action === 'retrieveFinalResult') {
           const response = this.responses.get(message.recognizerId) ?? { digits: [], confidence: 0.99 };
           const deliver = () => this.emit({ event: 'finalresult', recognizerId: message.recognizerId, result: response.endpoint ? { text: '', result: [] } : segment(response) });
+          state.repeatFinal = deliver;
           if (state.holdFinal) heldFinals.push(deliver);
           else setTimeout(deliver, 0);
         } else if (message.action === 'remove') {
@@ -814,7 +816,7 @@ test('active earlier spoken aliases resume exactly while their histories count o
     await page.getByRole('status').filter({ hasText: /^Speech model ready$/ }).waitFor();
     await page.getByRole('button', { name: /^Continue session/ }).click();
     const resumed = await saved(page, value => value?.session?.cursor === 1);
-    assert.deepEqual(resumed.session, advanceRound(session), 'Migration preserves the old plan, IDs, answers, and adaptive state.');
+    assert.deepEqual(resumed.session, advanceRound(session, { upgradeAdaptation: true }), 'Migration preserves the old history and plan, then upgrades adaptation at the next-round boundary.');
     assert.equal(resumed.session.digitVariant, undefined);
     assert.deepEqual(digitTotals(resumed), { attempts: 2, correct: 2 });
     await assertAutoPresentation(page);
@@ -1147,7 +1149,7 @@ test('a confident spoken answer with the wrong length is a memory miss and displ
     assert.equal(result.session.history[0].correct, false);
     assert.equal(result.tasks['reverse-digits'].attempts, 1);
     assert.equal(result.tasks['reverse-digits'].correct, 0);
-    assert.equal(result.tasks['reverse-digits'].balance, -3);
+    assert.equal(result.tasks['reverse-digits'].baseMisses, 1);
     assert.equal(getMemoryRewards(restoreSaved(result)).xp, 10, 'A recognized wrong answer still receives the same practice XP.');
     await page.getByRole('button', { name: 'Replay sequence', exact: true }).click();
     await page.getByRole('status').filter({ hasText: /^Listen$/ }).waitFor();
@@ -1496,14 +1498,18 @@ test('Continue session advances a previously scored save and presents a differen
   try {
     const session = createProgress('browser-legacy-correct', 24, { modality: 'visual' });
     const answered = recordFirstAttempt(session, session.active, true);
-    const expected = advanceRound(answered);
+    const expected = advanceRound(answered, { upgradeAdaptation: true });
     assert.notEqual(expected.active.task, answered.active.task);
     const before = await seedSession(page, answered, { legacy: true });
     assert.equal(restoreSaved(await saved(page)).digitOrder, 'ascending', 'Older sorting preferences retain their original ascending default.');
     await page.getByRole('button', { name: /^Continue session/ }).click();
     const resumed = await saved(page, value => value?.session?.cursor === 1);
     assert.deepEqual(resumed.session, expected);
-    assert.deepEqual(resumed.tasks, before.tasks, 'Resuming a scored answer does not score it again.');
+    assert.deepEqual(resumed.tasks, expected.tasks);
+    for (const task of TASK_IDS) {
+      assert.equal(resumed.tasks[task].attempts, before.tasks[task].attempts, 'Upgrading adaptation does not score an already answered round again.');
+      assert.equal(resumed.tasks[task].correct, before.tasks[task].correct);
+    }
     assert.deepEqual(resumed.logs, []);
     await assertAutoPresentation(page);
     assert.equal(await page.getByRole('heading', { name: 'Example', exact: true }).count(), 0, 'A new exercise begins without another example or Start action.');
@@ -1703,8 +1709,8 @@ test('wrong response, replay, hard reload, history, and retry retain the first-t
     await page.screenshot({ path: resolve(shots, 'wrong-tablet.png'), fullPage: true });
     assert.equal(missed.session.history[0].correct, false);
     assert.equal(missed.session.profile, RESEARCH_PROFILE);
-    assert.equal(missed.tasks.forward.span, 3, 'The research profile does not lower load after a single miss.');
-    assert.equal(missed.tasks.forward.balance, -3);
+    assert.equal(missed.tasks.forward.span, 3, 'The comfortable-span controller does not lower the base after a single miss.');
+    assert.equal(missed.tasks.forward.baseMisses, 1);
     await assertNoPlaintext(page, missed);
     await page.reload();
     await page.getByLabel('Password', { exact: true }).waitFor();
@@ -1736,6 +1742,239 @@ test('wrong response, replay, hard reload, history, and retry retain the first-t
     await page.getByLabel('Password', { exact: true }).waitFor();
     assert.equal(await page.getByRole('button', { name: /^Practice / }).count(), 0);
     await assertNoPlaintext(page, beforeReview);
+    await assertClean(opened);
+  } finally { await context.close(); }
+});
+
+test('two manual misses move on once; Save & exit, Lock, and reload retain the remaining try and hidden history', { timeout: 75_000 }, async () => {
+  const opened = await open({ width: 390, touch: true });
+  const { context, page } = opened;
+  try {
+    await unlock(page);
+    const round = await startFocus(page, 'forward');
+    const wrong = [...round.expected]; wrong[0] = (wrong[0] + 1) % 16;
+    await present(page);
+    await enter(page, round, wrong, { touch: true });
+    await check(page, { correct: false });
+    await page.getByText('One more try, then we’ll move on.', { exact: true }).waitFor();
+    const missed = await saved(page, value => value?.session?.answered);
+    assert.equal(missed.session.adaptation, COMFORT_ADAPTATION);
+    assert.equal(missed.session.history[0].retryCorrect, undefined);
+    assert.equal(getMemoryRewards(restoreSaved(missed)).xp, 10);
+    await page.getByRole('button', { name: /Save & exit/ }).tap();
+    await assertMemoryXp(page, 10);
+    await page.getByRole('button', { name: 'Lock', exact: true }).tap();
+    await page.getByLabel('Password', { exact: true }).waitFor();
+    await page.reload();
+    await unlock(page);
+    await page.getByRole('button', { name: /^Continue session/ }).tap();
+    await page.getByRole('button', { name: 'Replay sequence', exact: true }).waitFor();
+    assert.deepEqual(await saved(page), missed, 'Leaving or reloading a missed round cannot replenish its scored attempts.');
+    await present(page, { replay: true });
+    await enter(page, round, wrong, { touch: true });
+    await page.getByRole('button', { name: 'Check sequence', exact: true }).dblclick({ delay: 25 });
+    const advanced = await saved(page, value => value?.session?.cursor === 1);
+    await page.getByRole('status').filter({ hasText: /^Round 1: moving on after two tries\.$/ }).waitFor();
+    await assertAutoPresentation(page);
+    assert.equal(advanced.session.history.length, 1);
+    assert.equal(advanced.session.history[0].round.id, round.id);
+    assert.equal(advanced.session.history[0].correct, false);
+    assert.equal(advanced.session.history[0].retryCorrect, false);
+    assert.equal(advanced.redeemed.includes(round.id), false);
+    assert.notEqual(advanced.session.active.id, round.id);
+    assert.equal(advanced.session.answered, false);
+    assert.deepEqual(advanced.tasks, missed.tasks, 'A second miss cannot add an adaptive observation or duplicate practice XP.');
+    assert.equal(advanced.tasks.forward.attempts, 1);
+    assert.equal(advanced.tasks.forward.correct, 0);
+    assert.equal(getMemoryRewards(restoreSaved(advanced)).xp, 10);
+    await page.getByRole('button', { name: 'Pause', exact: true }).tap();
+    await page.getByRole('heading', { name: 'Paused', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Review round 1: missed on first try', exact: true }).tap();
+    await page.getByText('Missed on the first attempt. The answer stays hidden.', { exact: true }).waitFor();
+    assert.equal(await page.getByText('Watch this order', { exact: true }).count(), 0, 'Moving on cannot make a missed sequence available as a solved example.');
+    assert.equal(await page.locator('svg[aria-label^="Row "]').count(), 0);
+    assert.equal(await page.getByRole('group', { name: /expected|correct|solution/i, includeHidden: true }).count(), 0);
+    await page.getByRole('button', { name: 'Close review', exact: true }).tap();
+    await page.getByRole('button', { name: 'Lock', exact: true }).tap();
+    await page.getByLabel('Password', { exact: true }).waitFor();
+    await page.reload();
+    await unlock(page);
+    await page.getByRole('button', { name: /^Continue session/ }).tap();
+    await assertAutoPresentation(page);
+    assert.deepEqual(await saved(page), advanced, 'An exhausted round remains exhausted after a second lock and reload.');
+    await assertNoPlaintext(page, advanced);
+    await assertFits(page, 'bounded retry on a phone');
+    await assertClean(opened);
+  } finally { await context.close(); }
+});
+
+test('spoken input failures preserve the final try, then a second recognized miss moves on and ignores a repeated final', { timeout: 75_000 }, async () => {
+  const opened = await open({ speech: {} });
+  const { context, page } = opened;
+  try {
+    await unlock(page);
+    await prepareSpeech(page);
+    const round = await startFocus(page, 'reverse-digits');
+    const wrong = round.expected.slice(0, -1);
+    await presentForSpeech(page);
+    await recordSpeech(page, wrong);
+    await check(page, { correct: false });
+    assert.deepEqual(await submittedSpeech(page), wrong);
+    await page.getByText('One more try, then we’ll move on.', { exact: true }).waitFor();
+    const missed = await saved(page, value => value?.session?.answered);
+    await page.getByRole('button', { name: 'Replay sequence', exact: true }).click();
+    await page.getByRole('status').filter({ hasText: /^Listen$/ }).waitFor();
+    await speechCapturing(page);
+    const stimulusPlays = await page.evaluate(() => window.__speechTest.stimulusPlays);
+    await recordSpeech(page, round.expected, { confidence: 0.2 });
+    await assertInputFailure(page, 'Input not recognized');
+    assert.deepEqual(await saved(page), missed, 'Uncertain recognition cannot consume the remaining memory attempt.');
+    await recordSpeech(page, [], { text: '[unk]' }, { again: true });
+    await assertInputFailure(page, 'Input not recognized');
+    assert.deepEqual(await saved(page), missed, 'Unknown speech cannot create a second scored miss.');
+    await recordSpeech(page, round.expected, { endpoint: false }, { again: true });
+    await page.evaluate(() => window.__speechTest.failWorker());
+    const recovery = page.getByRole('button', { name: 'Download speech model', exact: true });
+    await recovery.waitFor();
+    assert.equal(await page.evaluate(() => window.__speechTest.activeTracks), 0);
+    assert.equal(await page.getByRole('button', { name: 'Retry', exact: true }).isDisabled(), true);
+    await assertNoSpokenTranscript(page);
+    assert.deepEqual(await saved(page), missed, 'A technical capture failure also preserves the final scored attempt.');
+    await recovery.click();
+    await page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'Retry' && !button.disabled));
+    assert.equal(await page.evaluate(() => window.__speechTest.stimulusPlays), stimulusPlays, 'Input recovery listens again without replaying the remembered sequence.');
+    await recordSpeech(page, wrong, {}, { again: true });
+    const advanced = await saved(page, value => value?.session?.cursor === 1);
+    await page.getByRole('status').filter({ hasText: /^Round 1: moving on after two tries\.$/ }).waitFor();
+    await assertAutoPresentation(page);
+    assert.equal(advanced.session.history.length, 1);
+    assert.equal(advanced.session.history[0].correct, false);
+    assert.equal(advanced.session.history[0].retryCorrect, false);
+    assert.equal(advanced.redeemed.includes(round.id), false);
+    assert.deepEqual(advanced.tasks, missed.tasks);
+    assert.deepEqual(digitTotals(advanced), { attempts: 1, correct: 0 });
+    assert.equal(getMemoryRewards(restoreSaved(advanced)).xp, 10);
+    await assertNoSpokenTranscript(page);
+    await page.evaluate(() => window.__speechTest.repeatFinal());
+    assert.deepEqual(await saved(page), advanced, 'A late duplicate final cannot score the next challenge or replenish the failed one.');
+    assert.equal(await page.getByRole('button', { name: 'Replay sequence', exact: true }).count(), 0);
+    await assertNoPlaintext(page, advanced);
+    await assertLocalSpeech(opened);
+  } finally { await context.close(); }
+});
+
+test('a second miss on the final challenge completes the session with practice XP and trophies exactly once', { timeout: 60_000 }, async () => {
+  const opened = await open({ width: 320 });
+  const { context, page } = opened;
+  try {
+    let session = createProgress('browser-final-two-misses', 8, { focusedTask: 'forward', profile: RESEARCH_PROFILE, adaptation: COMFORT_ADAPTATION });
+    for (let index = 0; index < 7; index++) session = advanceRound(recordFirstAttempt(session, session.active, true));
+    const round = session.active;
+    const wrong = [...round.expected]; wrong[0] = (wrong[0] + 1) % 16;
+    await seedSession(page, session);
+    await page.getByRole('button', { name: /^Continue session/ }).click();
+    await assertAutoPresentation(page);
+    await page.getByRole('button', { name: 'Check sequence', exact: true }).waitFor();
+    await enter(page, round, wrong);
+    await check(page, { correct: false });
+    const missed = await saved(page, value => value?.session?.answered);
+    assert.equal(missed.logs.length, 0, 'The session remains active while its final memory attempt is available.');
+    assert.equal(getMemoryRewards(restoreSaved(missed)).xp, 80);
+    await present(page, { replay: true });
+    await enter(page, round, wrong);
+    await page.getByRole('button', { name: 'Check sequence', exact: true }).dblclick({ delay: 25 });
+    await page.getByRole('heading', { name: /^Session complete\.?$/ }).waitFor();
+    const completed = await saved(page, value => value?.session?.cursor === 8 && value?.logs.length === 1);
+    assert.equal(completed.session.active, null);
+    assert.equal(completed.session.answered, false);
+    assert.equal(completed.session.history.length, 8);
+    assert.equal(completed.session.history[7].correct, false);
+    assert.equal(completed.session.history[7].retryCorrect, false);
+    assert.equal(completed.redeemed.includes(round.id), false);
+    assert.equal(completed.tasks.forward.attempts, 8);
+    assert.equal(completed.tasks.forward.correct, 7);
+    assert.equal(completed.logs[0].rounds, 8);
+    assert.equal(completed.logs[0].correct, 7);
+    const rewards = getMemoryRewards(restoreSaved(completed));
+    assert.equal(rewards.xp, 80);
+    assert.equal(rewards.correct, 7);
+    assert.equal(rewards.trophies.find(trophy => trophy.id === 'first-footsteps').earned, true);
+    assert.equal(rewards.trophies.find(trophy => trophy.id === 'bright-eyes').earned, true, 'Trophies reward practice even when the final answer is missed.');
+    const celebration = page.getByRole('region', { name: 'Adventure celebration', exact: true });
+    await celebration.getByLabel('80 XP earned this session', { exact: true }).waitFor();
+    await celebration.getByText('First footsteps', { exact: true }).waitFor();
+    await celebration.getByText('Bright eyes', { exact: true }).waitFor();
+    assert.equal(await page.getByRole('button', { name: /^(Check sequence|Replay sequence|Next round|Finish session)/ }).count(), 0);
+    await assertFits(page, 'bounded final-round celebration');
+    await page.getByRole('button', { name: /^Back to trail/ }).click();
+    await assertMemoryXp(page, 80);
+    await page.getByRole('button', { name: 'Lock', exact: true }).click();
+    await page.getByLabel('Password', { exact: true }).waitFor();
+    await page.reload();
+    await unlock(page);
+    assert.deepEqual(await saved(page), completed, 'Reloading a session completed by two misses cannot duplicate its log, XP, or trophy credit.');
+    await assertMemoryXp(page, 80);
+    await assertNoPlaintext(page, completed);
+    await assertClean(opened);
+  } finally { await context.close(); }
+});
+
+test('an earlier hard span remains exact until two misses, then its easier comfort state survives reload independently of other digit variants', { timeout: 75_000 }, async () => {
+  const opened = await open();
+  const { context, page } = opened;
+  try {
+    const digitVariant = { order: 'ascending', inputMode: 'keypad', keypad: 'hidden' };
+    const tasks = selectTaskStates({ ...fresh(), digitVariant });
+    tasks['sort-digits'] = { ...tasks['sort-digits'], span: 6 };
+    const session = createProgress('browser-legacy-hard-digits', 8, { focusedTask: 'sort-digits', profile: RESEARCH_PROFILE, tasks, digitVariant });
+    const round = session.active;
+    const wrong = [...round.expected]; wrong[0] = wrong[0] % 9 + 1;
+    await seedSession(page, session);
+    assert.equal(session.adaptation, undefined);
+    await page.getByRole('button', { name: /^Continue session/ }).click();
+    const resumed = await saved(page);
+    assert.deepEqual(resumed.session, session, 'Opening a pre-change save preserves its current stimulus, plan, identity, and load.');
+    assert.equal(resumed.session.active.span, 6);
+    await page.getByRole('button', { name: 'Check sequence', exact: true }).waitFor();
+    await enter(page, round, wrong);
+    await check(page, { correct: false });
+    const missed = await saved(page, value => value?.session?.answered);
+    assert.equal(missed.session.active.span, 6, 'The one remaining attempt replays the same challenge.');
+    await present(page, { replay: true, audio: true });
+    await enter(page, round, wrong);
+    await page.getByRole('button', { name: 'Check sequence', exact: true }).click();
+    const advanced = await saved(page, value => value?.session?.cursor === 1);
+    await assertAutoPresentation(page);
+    assert.equal(advanced.session.adaptation, COMFORT_ADAPTATION);
+    assert.equal(advanced.session.comfortFrom, 1);
+    assert.equal(advanced.session.active.span, 5, 'An already-stuck earlier session tries a smaller load at the next boundary.');
+    assert.equal(advanced.tasks['sort-digits'].comfortSpan, 5);
+    assert.ok(advanced.tasks['sort-digits'].probeWait >= 8, 'The failed harder span receives a rest before another probe.');
+    assert.ok(advanced.tasks['sort-digits'].probeBackoff > 0);
+    const support = structuredClone(advanced.tasks['sort-digits']);
+    await page.getByRole('button', { name: /Save & exit/ }).click();
+    await page.getByRole('button', { name: 'End session', exact: true }).click();
+    const ended = await saved(page, value => value?.session === null);
+    assert.deepEqual(ended.conditions[conditionKey('sort-digits', ended)], support);
+    await page.reload();
+    await unlock(page);
+    const retained = await saved(page);
+    assert.deepEqual(selectTaskStates(retained)['sort-digits'], support, 'The comfort span and failed-probe rest survive encrypted reload.');
+    await page.getByLabel('Recall order', { exact: true }).selectOption('descending');
+    const otherRound = await startFocus(page, 'sort-digits');
+    const other = await saved(page, value => value?.session?.digitVariant?.order === 'descending');
+    assert.equal(otherRound.span, 2);
+    assert.equal(other.session.initialTasks['sort-digits'].attempts, 0);
+    assert.equal(other.session.initialTasks['sort-digits'].probeBackoff, 0, 'A failed ascending probe cannot make another variant wait.');
+    await page.getByRole('button', { name: /Save & exit/ }).click();
+    await page.getByRole('button', { name: 'End session', exact: true }).click();
+    await page.getByLabel('Recall order', { exact: true }).selectOption('ascending');
+    const restoredRound = await startFocus(page, 'sort-digits');
+    const restored = await saved(page, value => value?.session?.digitVariant?.order === 'ascending');
+    assert.equal(restoredRound.span, 5);
+    assert.deepEqual(restored.session.initialTasks['sort-digits'], support, 'Returning to the original variant retains its supported load and probe history.');
+    assert.equal(getMemoryRewards(restoreSaved(restored)).xp, 10);
+    await assertNoPlaintext(page, restored);
     await assertClean(opened);
   } finally { await context.close(); }
 });

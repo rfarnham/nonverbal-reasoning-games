@@ -8,7 +8,9 @@ import {
   createProgress,
   createTaskStates,
   recordFirstAttempt,
+  recordRetryAttempt,
 } from "../app/lab/working-memory/engine.ts";
+import { COMFORT_ADAPTATION } from "../app/lab/working-memory/comfort-adaptation.ts";
 import {
   digitTaskForVariant,
   enumerateDigitVariants,
@@ -32,11 +34,11 @@ function preferences(saved, digitVariant, slow = saved.slow) {
     digitOrder: digitVariant.order === "reverse" ? saved.digitOrder : digitVariant.order });
 }
 
-function begin(saved, focusedTask, seed = `${focusedTask}-session`) {
+function begin(saved, focusedTask, seed = `${focusedTask}-session`, options = {}) {
   if (AUDIO_TASK_IDS.includes(focusedTask)) focusedTask = digitTaskForVariant(saved.digitVariant);
   const session = createProgress(seed, 8, {
     focusedTask, tasks: selectTaskStates(saved), digitOrder: saved.digitOrder,
-    profile: RESEARCH_PROFILE, digitVariant: saved.digitVariant,
+    profile: RESEARCH_PROFILE, digitVariant: saved.digitVariant, ...options,
   });
   return normalizeSaved({ ...saved, session, sessionCondition: settings(saved), redeemed: [] });
 }
@@ -48,6 +50,10 @@ function score(saved, correct) {
 
 function advance(saved) {
   return normalizeSaved({ ...saved, session: advanceRound(saved.session) });
+}
+
+function retry(saved, correct) {
+  return normalizeSaved({ ...saved, session: recordRetryAttempt(saved.session, saved.session.active, correct) });
 }
 
 function finish(saved, results = Array(8).fill(true)) {
@@ -420,4 +426,163 @@ test("malformed optional buddy preference is ignored without losing valid earned
   }
   const bounded = restore({ ...json(original), buddy: "x".repeat(64) });
   assert.equal(bounded.buddy.length, 64);
+});
+
+test("both scored responses survive save and reload without changing first-attempt totals", () => {
+  let saved = begin(fresh(), "locations", "retained-second-attempt", { adaptation: COMFORT_ADAPTATION });
+  const round = structuredClone(saved.session.active);
+  saved = score(saved, false);
+  const first = structuredClone(saved);
+  assert.deepEqual(restore(json(first)), first, "a pause after the first miss retains one available response");
+  saved = retry(restore(json(first)), false);
+  const second = structuredClone(saved);
+  assert.deepEqual(saved.session.active, round);
+  assert.equal(saved.session.history[0].correct, false);
+  assert.equal(saved.session.history[0].retryCorrect, false);
+  assert.deepEqual(saved.session.tasks, first.session.tasks, "the second response cannot update adaptation or accuracy");
+  assert.deepEqual(taskTotals(saved), taskTotals(first));
+  saved = restore(json(saved));
+  assert.deepEqual(saved, second, "pause, lock, or reload cannot grant another scored response");
+  saved = advance(saved);
+  assert.equal(saved.session.cursor, 1);
+  assert.equal(saved.session.history[0].retryCorrect, false);
+  assert.deepEqual(saved.redeemed, []);
+  assert.deepEqual(taskTotals(saved).locations, { attempts: 1, correct: 0 });
+  assert.deepEqual(restore(json(saved)), saved);
+  assert.equal(restore({ ...second, redeemed: [round.id] }), null, "an exhausted miss is never a redeemed answer");
+
+  let redeemed = retry(restore(json(first)), true);
+  redeemed = normalizeSaved({ ...redeemed, redeemed: [round.id] });
+  assert.deepEqual(restore(json(redeemed)), redeemed);
+  assert.equal(redeemed.session.history[0].correct, false);
+  assert.equal(redeemed.session.history[0].retryCorrect, true);
+  assert.deepEqual(taskTotals(redeemed), taskTotals(first));
+});
+
+function retainedOldSession(version) {
+  const context = { slow: false, inputMode: "keypad", digitOrder: "ascending" };
+  const tasks = createTaskStates(version === 1 ? undefined : RESEARCH_PROFILE);
+  tasks.locations = { span: 6, successStreak: 0, attempts: 20, correct: 19,
+    ...(version === 1 ? {} : { balance: 0 }) };
+  let session = createProgress(`saved-${version}-old-prefix`, 8, {
+    focusedTask: "locations", tasks, ...(version === 1 ? {} : { profile: RESEARCH_PROFILE }),
+  });
+  session = advanceRound(recordFirstAttempt(session, session.active, true));
+  session = recordFirstAttempt(session, session.active, false);
+  if (version === 1) return legacy(session, { buddy: "fox" });
+  if (version === 2) {
+    const conditions = Object.fromEntries(TASK_IDS.map((task) => [conditionKey(task, context), session.tasks[task]]));
+    conditions[conditionKey("hidden-digits", { ...context, slow: true })] = learned(4, 7, 6);
+    return { ...previous(conditions, context, session), buddy: "fox" };
+  }
+  let saved = fresh();
+  saved.conditions[conditionKey("locations", saved)] = tasks.locations;
+  saved.archivedConditions[conditionKey("hidden-digits", { ...context, slow: true })] = learned(4, 7, 6);
+  saved.legacyTasks.forward = { span: 4, successStreak: 0, attempts: 3, correct: 2 };
+  saved = begin(saved, "locations", `saved-${version}-old-prefix`);
+  saved = advance(score(saved, true));
+  return { ...score(saved, false), buddy: "fox" };
+}
+
+test("old schema-one, two, and three active rounds upgrade only after the retained question", () => {
+  for (const version of [1, 2, 3]) {
+    const original = retainedOldSession(version);
+    let saved = restore(json(original));
+    assert.ok(saved, `schema ${version}`);
+    assert.deepEqual(saved.session, original.session, `schema ${version} must preserve the round and old prefix exactly`);
+    assert.equal(saved.session.adaptation, undefined);
+    assert.equal(saved.session.active.span, 6);
+    const before = taskTotals(saved);
+    const archived = structuredClone(saved.archivedConditions);
+    const legacyForward = structuredClone(saved.legacyTasks.forward);
+    saved = retry(saved, false);
+    assert.deepEqual(taskTotals(saved), before);
+    assert.deepEqual(restore(json(saved)), saved, "the exhausted retained question must survive an interrupted advance");
+    const prefix = structuredClone(saved.session.history);
+    saved = normalizeSaved({ ...saved, session: advanceRound(saved.session, { upgradeAdaptation: true }) });
+    assert.equal(saved.session.adaptation, COMFORT_ADAPTATION);
+    assert.equal(saved.session.comfortFrom, 2);
+    assert.equal(saved.session.cursor, 2);
+    assert.equal(saved.session.active.span, 5, "a missed old span gets a gentler next question");
+    assert.equal(saved.session.tasks.locations.comfortSpan, 5);
+    assert.deepEqual(saved.session.history, prefix, "upgrade must not reinterpret either old first-attempt record");
+    assert.equal(saved.buddy, "fox");
+    assert.deepEqual(saved.legacyTasks.forward, legacyForward);
+    assert.deepEqual(taskTotals(saved), before, "controller migration cannot create practice, correct answers, or XP");
+    for (const [key, state] of Object.entries(archived)) {
+      if (key !== conditionKey("locations", saved.sessionCondition)) assert.deepEqual(saved.archivedConditions[key], state);
+    }
+    assert.deepEqual(restore(json(saved)), saved, `schema ${version} must replay the original prefix and upgraded boundary`);
+    saved = score(saved, true);
+    assert.equal(taskTotals(saved).locations.attempts, before.locations.attempts + 1);
+    assert.equal(taskTotals(saved).locations.correct, before.locations.correct + 1);
+    assert.deepEqual(restore(json(saved)), saved);
+  }
+});
+
+test("legacy redemptions remain valid when the saved question has no second-response marker", () => {
+  for (const version of [1, 2, 3]) {
+    const original = retainedOldSession(version);
+    original.redeemed = [original.session.active.id];
+    const saved = restore(json(original));
+    assert.ok(saved);
+    assert.equal(saved.session.history.at(-1).retryCorrect, undefined);
+    assert.deepEqual(saved.redeemed, original.redeemed);
+    const upgraded = normalizeSaved({ ...saved, session: advanceRound(saved.session, { upgradeAdaptation: true }) });
+    assert.deepEqual(restore(json(upgraded)), upgraded);
+    assert.deepEqual(upgraded.redeemed, original.redeemed);
+  }
+});
+
+test("comfort controllers remain independent across digit conditions and reuse played state", () => {
+  let saved = begin(fresh(), "reverse-digits", "comfortable-keypad", { adaptation: COMFORT_ADAPTATION });
+  saved = advance(score(saved, true));
+  saved = retry(score(saved, false), false);
+  saved = advance(saved);
+  const keypad = { ...saved.conditions[conditionKey("reverse-digits", saved)] };
+  assert.equal(typeof keypad.comfortSpan, "number");
+  assert.equal(keypad.attempts, 2);
+  const keypadKey = conditionKey("reverse-digits", saved);
+  saved = normalizeSaved({ ...saved, session: null, redeemed: [] });
+  saved = preferences(saved, { order: "reverse", inputMode: "spoken", keypad: "none" });
+  assert.equal(selectTaskStates(saved)["reverse-digits"].comfortSpan, undefined, "unplayed conditions retain an independent starting point");
+  saved = begin(saved, "reverse-digits", "comfortable-spoken", { adaptation: COMFORT_ADAPTATION });
+  saved = advance(retry(score(saved, false), false));
+  const spoken = { ...saved.conditions[conditionKey("reverse-digits", saved)] };
+  assert.equal(spoken.attempts, 1);
+  assert.deepEqual(saved.conditions[keypadKey], keypad);
+  assert.deepEqual(digitTotals(saved), { attempts: 3, correct: 1 });
+  assert.deepEqual(restore(json(saved)), saved);
+  saved = normalizeSaved({ ...saved, session: null, redeemed: [] });
+  saved = preferences(saved, saved.digitVariant, true);
+  assert.equal(selectTaskStates(saved)["reverse-digits"].comfortSpan, undefined, "slow presentation has its own controller");
+  saved = preferences(saved, { order: "reverse", inputMode: "keypad", keypad: "visible" }, false);
+  saved = begin(saved, "reverse-digits", "return-to-comfort", { adaptation: COMFORT_ADAPTATION });
+  assert.deepEqual(saved.session.initialTasks["reverse-digits"], keypad, "starting again preserves the played controller and probe schedule");
+  assert.deepEqual(saved.conditions[keypadKey], keypad);
+  assert.deepEqual(restore(json(saved)), saved);
+});
+
+test("restoration compares complete comfort controllers and rejects malformed bank metadata", () => {
+  const original = score(begin(fresh(), "locations", "comfort-consistency", { adaptation: COMFORT_ADAPTATION }), true);
+  const key = conditionKey("locations", original);
+  const mismatchedBank = json(original);
+  mismatchedBank.conditions[key].baseMisses = 1;
+  assert.equal(restore(mismatchedBank), null, "a valid but different controller cannot replace the retained session's controller");
+  const mismatchedTasks = json(original);
+  mismatchedTasks.tasks.locations.baseMisses = 1;
+  assert.equal(restore(mismatchedTasks), null, "the exact saved snapshot includes controller metadata");
+  const idle = normalizeSaved({ ...original, session: null, redeemed: [] });
+  assert.deepEqual(restore(json(idle)), idle, "idle banks preserve valid comfort metadata");
+  for (const mutate of [
+    (state) => { delete state.comfortSpan; },
+    (state) => { state.probeWait = 17; },
+    (state) => { state.probeWins = 2; },
+    (state) => { state.baseMisses = 2; },
+    (state) => { state.probeBackoff = 3; },
+  ]) {
+    const corrupted = json(idle);
+    mutate(corrupted.conditions[key]);
+    assert.equal(restore(corrupted), null, mutate.toString());
+  }
 });

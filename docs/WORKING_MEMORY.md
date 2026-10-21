@@ -42,13 +42,20 @@ sessions balance all eight visual exercises. Audio-only sessions repeat the
 selected Digits variant, rather than treating its old aliases as different
 games. Focused practice contains eight trials of one game or Digits variant.
 New sessions use the
-`research-v1` difficulty profile: Light Path and Pattern Hold start at three
+`research-v1` stimulus profile: Light Path and Pattern Hold start at three
 items; other exercises start at two. Loads range from two to nine, except
 Hidden Homes, which displays and queries two to six distinct shape–location
 bindings. Hidden Homes allows at least five seconds to study those pairs.
-Difficulty adapts independently for each task using an app-defined weighted
-staircase inspired by the published Cogmed research edition's daily 60% target.
-This is not Cogmed's proprietary controller or empirically matched difficulty.
+The separate `comfort-v1` controller keeps practice at a comfortable span and
+occasionally tries one item more. Two successful comfortable-span answers allow
+an initial harder probe. A failed probe returns the next question for that
+condition to the comfortable span, with eight successful comfortable-span
+answers before another probe, then sixteen after repeated probe failures.
+Two successful probes, separated by two comfortable-span successes, establish
+the harder span. Two consecutive first-attempt misses at the comfortable span
+lower it by one, within the exercise's bounds. These are app design choices for
+comfortable practice, not Cogmed's proprietary controller, a fixed accuracy
+target, or empirically matched difficulty.
 See [the publication audit and exact practice rules](WORKING_MEMORY_EVIDENCE.md).
 
 There is one finite-pool exception to the repository's no-repeat rule. At a
@@ -61,17 +68,21 @@ presentation retains its semantic fingerprint but receives a distinct,
 deterministic occurrence ID, keeping first-attempt and redemption records
 separate. Older sessions without `digitVariant` retain their original behavior.
 
-Original-profile saved sessions retain their two-successes-up / one-miss-down
-staircase. Earlier research-profile sessions retain their weighted staircase.
-All existing active sessions finish with their original rounds, task mix,
-settings, and first-attempt history. Missing `digitVariant` fields keep the
-saved round identities and generator behavior unchanged.
+An existing active question keeps its exact round, task mix, settings, and
+first-attempt history. After that question resolves, the session switches to
+comfortable-span adaptation; its recorded upgrade boundary preserves strict
+replay of the original staircase before the switch. If that question was missed
+on the first attempt, the next question for the condition starts lower, where
+the minimum span allows it. Missing `digitVariant` fields still keep the saved
+round identities and generator behavior unchanged. Probe progress and failed
+target backoff persist across reloads, sessions, and comfortable-span changes.
 
 New sessions keep independent adaptive records for each distinct Digits
 variant and standard/slower pace. Visual records depend on pace, independent
 of the listening options. Digits settings sit inside its own section; pace
-applies to all games. Replay and review are learning aids, not additional
-scored attempts.
+applies to all games. Only the first answer to each question supplies accuracy,
+adaptive evidence, and practice credit. One replay is available after a miss;
+historical review supplies no additional scored evidence.
 
 Earlier research-condition records are archived with their counts. If exactly
 one attempted old record maps to a new canonical condition, its learned span
@@ -108,17 +119,24 @@ practice conditions rather than separate ability measures. Hiding the keypad
 during numerical sorting is an app extension, not a newly identified Cogmed
 task.
 
-Checking a correct keypad sequence records the result, advances, and presents
-the next challenge in the same action; a recognized spoken answer is checked
-automatically. There is no intermediate Next or Start screen. The last correct
-result remains in a compact status line. An incorrect
-answer shows a mismatch without revealing the expected answer, and retains a
-single Replay sequence action. Spoken feedback can also show the submitted
-recognized digits. Replay does not change the first-attempt record. Solved
+Each question accepts at most **two answers that can be graded**. A correct
+first answer records the result and presents the next challenge in the same
+action; a recognized spoken answer is checked automatically. A first miss
+shows a mismatch without revealing the expected answer and offers one
+**Replay sequence** action: "One more try, then we'll move on." The second
+answer moves straight to the next challenge, whether correct or incorrect.
+There is no intermediate Next or Start screen. A correct second answer redeems
+the miss without rewriting first-attempt accuracy or changing adaptation;
+an incorrect second answer remains unredeemed. The second result is saved, so
+Save & exit, pause, Lock, or reload cannot restore another replay. Recognition
+failures are unscored and do not consume either answer.
+
+Spoken mismatch feedback can show the submitted recognized digits. Solved
 examples use independent practice questions, never the active failed question;
 history does not expose the full stimulus or answer to an unredeemed miss.
 Actual-round solutions become available only after first-try success or
-redemption. The last successful submission completes the session directly.
+redemption. Resolving the last question, including a second miss, completes
+the session directly.
 This is a user-requested exception to the shared shell's explicit Next
 checkpoint. Saved sessions from the earlier flow remain valid.
 If sound is muted when a listening exercise is next, it waits for an explicit
@@ -145,8 +163,9 @@ the next exercise, its load, or its settings, and the trail does not lock games.
 
 Each recorded first attempt earns **10 XP**, whether correct or incorrect.
 Accuracy, span, presentation pace, and answering speed do not change that
-award. Replay, redemption, historical review, silence, and uncertain or failed
-speech recognition earn no extra XP. The reward total derives from
+award. Two answers to one question still earn only 10 XP. Replay, redemption,
+historical review, silence, and uncertain or failed speech recognition earn no
+extra XP. The reward total derives from
 `taskTotals(saved)`, which already counts canonical, archived, and original
 first-attempt records once. It does not add the retained session or its task
 snapshot again. Existing legitimate practice therefore receives credit without
@@ -252,7 +271,8 @@ unknown or uncertain speech, and capture or recognition errors produce a
 separate input failure. Feedback says **Input not recognized** or **Speech input
 unavailable**, explains that no attempt was scored, and offers **Retry**. Retry
 starts a fresh capture for the same heard sequence without replaying it.
-These failures do not change the first-attempt score or adaptive state. The
+These failures do not use either of the question's two answer opportunities or
+change the first-attempt score or adaptive state. The
 recording bounds prevent a microphone from remaining open indefinitely; they
 are not a punitive game timer and do not turn silence into an incorrect answer.
 
@@ -261,9 +281,10 @@ feedback show the submitted digits, so the player can inspect a possible
 recognition mistake. It does not show the expected answer. That first-attempt
 miss remains recorded: the app
 cannot reliably distinguish confidently misheard digits from incorrectly
-recalled digits. The normal Replay sequence action remains available as a
-learning retry. A correct spoken answer advances directly to the next
-challenge. Keypad remains available when the local speech setup or microphone
+recalled digits. After a first miss, Replay sequence gives one learning retry.
+A correct first answer or either result on the second answer advances directly
+to the next challenge. A second miss never exposes the expected answer.
+Keypad remains available when the local speech setup or microphone
 is unavailable. Speech is an additional practice condition, not an input method
 documented for the audited Cogmed training tasks. Existing saved sessions,
 condition records, and first-attempt histories retain their meaning.

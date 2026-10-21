@@ -6,6 +6,16 @@ import {
   normalizeDigitVariant,
   type DigitVariant,
 } from "./digit-options.ts";
+import {
+  COMFORT_ADAPTATION,
+  adaptComfortState,
+  hasAnyComfortState,
+  validateComfortState,
+  withComfortState,
+  type ComfortState,
+} from "./comfort-adaptation.ts";
+
+export { COMFORT_ADAPTATION } from "./comfort-adaptation.ts";
 
 export const VISUAL_TASK_IDS = [
   "forward", "backward", "rotation", "tracking", "symbols", "locations", "pattern", "split",
@@ -55,7 +65,7 @@ export interface MemoryRound {
   fingerprint: string;
 }
 
-export interface TaskState {
+export interface TaskState extends Partial<ComfortState> {
   span: number;
   successStreak: 0 | 1;
   attempts: number;
@@ -64,7 +74,12 @@ export interface TaskState {
   balance?: number;
 }
 export type TaskStates = Record<TaskId, TaskState>;
-export interface RoundResult { round: MemoryRound; correct: boolean }
+export interface RoundResult {
+  round: MemoryRound;
+  correct: boolean;
+  /** A second scored answer resolves a first miss without changing its original evidence. */
+  retryCorrect?: boolean;
+}
 
 export interface MemoryProgress {
   version: 1;
@@ -72,6 +87,10 @@ export interface MemoryProgress {
   length: SessionLength;
   modality: SessionModality;
   profile?: DifficultyProfile;
+  /** Independent of stimulus geometry; absent sessions retain their historical controller. */
+  adaptation?: typeof COMFORT_ADAPTATION;
+  /** First cursor governed by the comfortable-span controller; preserves an old session prefix. */
+  comfortFrom?: number;
   focusedTask?: TaskId;
   /** The sorting rule for Number Assembly; omitted means ascending. */
   digitOrder?: DigitOrder;
@@ -87,7 +106,7 @@ export interface MemoryProgress {
   answered: boolean;
 }
 
-export interface ProgressOptions { focusedTask?: TaskId; tasks?: TaskStates; modality?: SessionModality; digitOrder?: DigitOrder; profile?: DifficultyProfile; digitVariant?: DigitVariant }
+export interface ProgressOptions { focusedTask?: TaskId; tasks?: TaskStates; modality?: SessionModality; digitOrder?: DigitOrder; profile?: DifficultyProfile; digitVariant?: DigitVariant; adaptation?: typeof COMFORT_ADAPTATION }
 
 export interface TaskProfile { minSpan: number; initialSpan: number; maxSpan: number }
 
@@ -419,8 +438,18 @@ export function validateTaskStates(value: unknown, profile?: DifficultyProfile):
         : (state.successStreak === 0 || state.successStreak === 1) && state.balance === undefined)
       && Number.isInteger(state.attempts) && state.attempts >= 0 && state.attempts <= MAX_COUNT
       && Number.isInteger(state.correct) && state.correct >= 0 && state.correct <= state.attempts
-      && (state.successStreak === 0 || state.correct > 0);
+      && (state.successStreak === 0 || state.correct > 0)
+      && (!hasAnyComfortState(state) || (validateComfortState(state, minSpan, maxSpan)
+        && state.successStreak === 0 && (profile !== RESEARCH_PROFILE || state.balance === 0)));
   });
+}
+
+function comfortableTasks(tasks: TaskStates, profile?: DifficultyProfile, missedRound?: MemoryRound): TaskStates {
+  return Object.fromEntries(TASK_IDS.map((task) => {
+    const { minSpan, maxSpan } = getTaskProfile(task, profile);
+    const state = { ...tasks[task], successStreak: 0 as const, ...(profile ? { balance: 0 } : {}) };
+    return [task, withComfortState(state, minSpan, maxSpan, missedRound?.task === task ? missedRound.span : undefined)];
+  })) as TaskStates;
 }
 
 export function createProgress(seed: Seed, length: SessionLength = 24, options: ProgressOptions = {}): MemoryProgress {
@@ -428,10 +457,16 @@ export function createProgress(seed: Seed, length: SessionLength = 24, options: 
     throw new TypeError("Invalid session seed.");
   }
   if (options.profile !== undefined && !isProfile(options.profile)) throw new TypeError("Unknown difficulty profile.");
+  if (options.adaptation !== undefined && options.adaptation !== COMFORT_ADAPTATION) throw new TypeError("Unknown span adaptation.");
   if (options.tasks && !validateTaskStates(options.tasks, options.profile)) throw new TypeError("Invalid starting adaptive state.");
+  if (options.adaptation === undefined && options.tasks && TASK_IDS.some((task) => hasAnyComfortState(options.tasks![task]))) {
+    throw new TypeError("Comfortable-span banks require their adaptation mode.");
+  }
   if (options.digitOrder !== undefined && !isDigitOrder(options.digitOrder)) throw new TypeError("Unknown digit order.");
   const requestedVariant = options.digitVariant === undefined ? undefined : normalizeDigitVariant(options.digitVariant);
-  const tasks = cloneTasks(options.tasks ?? createTaskStates(options.profile));
+  const startingTasks = options.tasks ?? createTaskStates(options.profile);
+  const tasks = options.adaptation === COMFORT_ADAPTATION
+    ? comfortableTasks(startingTasks, options.profile) : cloneTasks(startingTasks);
   const modality = options.modality ?? "mixed";
   const plan = createSessionPlan(length, seed, options.focusedTask, modality, requestedVariant);
   const digitVariant = plan.some((task) => AUDIO_TASK_IDS.includes(task as (typeof AUDIO_TASK_IDS)[number])) ? requestedVariant : undefined;
@@ -442,6 +477,7 @@ export function createProgress(seed: Seed, length: SessionLength = 24, options: 
   return {
     version: 1, seed: normalizedSeed, length, modality,
     ...(options.profile ? { profile: options.profile } : {}),
+    ...(options.adaptation ? { adaptation: options.adaptation, comfortFrom: 0 } : {}),
     ...(options.focusedTask ? { focusedTask: options.focusedTask } : {}),
     ...(digitOrder === "descending" ? { digitOrder } : {}),
     ...(digitVariant ? { digitVariant } : {}),
@@ -458,6 +494,13 @@ export function recordFirstAttempt(progress: MemoryProgress, round: MemoryRound,
   if (typeof correct !== "boolean" || JSON.stringify(round) !== JSON.stringify(progress.active)) throw new TypeError("First attempt does not match the active round.");
   const tasks = cloneTasks(progress.tasks);
   const previous = tasks[round.task];
+  if (progress.adaptation === COMFORT_ADAPTATION) {
+    const { minSpan, maxSpan } = getTaskProfile(round.task, progress.profile);
+    tasks[round.task] = adaptComfortState({
+      ...previous, attempts: previous.attempts + 1, correct: previous.correct + (correct ? 1 : 0),
+    }, correct, minSpan, maxSpan);
+    return { ...progress, tasks, answered: true, history: [...progress.history, { round, correct }] };
+  }
   if (progress.profile === RESEARCH_PROFILE) {
     // Henshaw et al. (2022) report an average daily 60% target, but do not
     // disclose Cogmed's controller. This is our own weighted staircase:
@@ -484,12 +527,39 @@ export function recordFirstAttempt(progress: MemoryProgress, round: MemoryRound,
   return { ...progress, tasks, answered: true, history: [...progress.history, { round, correct }] };
 }
 
-export function advanceRound(progress: MemoryProgress): MemoryProgress {
+/** Recognition failures do not call either scoring function. */
+export function recordRetryAttempt(progress: MemoryProgress, round: MemoryRound, correct: boolean): MemoryProgress {
+  const result = progress.history[progress.cursor];
+  if (!progress.active || !progress.answered || progress.cursor >= progress.length
+    || !result || result.correct || result.retryCorrect !== undefined) {
+    throw new Error("This round cannot record another scored attempt.");
+  }
+  if (typeof correct !== "boolean" || JSON.stringify(round) !== JSON.stringify(progress.active)
+    || JSON.stringify(result.round) !== JSON.stringify(progress.active)) throw new TypeError("Retry does not match the active round.");
+  const history = [...progress.history];
+  history[progress.cursor] = { ...result, retryCorrect: correct };
+  return { ...progress, history };
+}
+
+export function scoredAttempts(progress: MemoryProgress): 0 | 1 | 2 {
+  if (!progress.active || !progress.answered) return 0;
+  return progress.history[progress.cursor]?.retryCorrect === undefined ? 1 : 2;
+}
+
+export function advanceRound(progress: MemoryProgress, options: { upgradeAdaptation?: boolean } = {}): MemoryProgress {
   if (!progress.active || !progress.answered) throw new Error("Commit the active round before continuing.");
+  const result = progress.history[progress.cursor];
+  if (progress.adaptation === COMFORT_ADAPTATION && !result.correct && result.retryCorrect === undefined) {
+    throw new Error("Resolve the second scored attempt before continuing.");
+  }
   const cursor = progress.cursor + 1;
+  const upgrade = options.upgradeAdaptation === true && progress.adaptation === undefined;
+  const tasks = upgrade
+    ? comfortableTasks(progress.tasks, progress.profile, result.correct ? undefined : progress.active)
+    : progress.tasks;
   const task = progress.plan[cursor];
   let seen = new Set(progress.history.map((result) => result.round.fingerprint));
-  if (task === "sort-digits" && progress.tasks[task].span === 2 && progress.digitVariant) {
+  if (task === "sort-digits" && tasks[task].span === 2 && progress.digitVariant) {
     const pool = new Set(finiteSortPool(progress.profile, progress.digitVariant).map((round) => round.fingerprint));
     seen = new Set();
     for (const result of progress.history) {
@@ -500,13 +570,16 @@ export function advanceRound(progress: MemoryProgress): MemoryProgress {
     }
   }
   const active = cursor >= progress.length ? null : generateRound(
-    task, progress.tasks[task].span, `${progress.seed}:round:${cursor}`,
+    task, tasks[task].span, `${progress.seed}:round:${cursor}`,
     seen,
     progress.digitOrder,
     progress.profile,
     progress.digitVariant,
   );
-  return { ...progress, cursor, active, answered: false };
+  return {
+    ...progress, ...(upgrade ? { adaptation: COMFORT_ADAPTATION, comfortFrom: cursor } : {}),
+    tasks, cursor, active, answered: false,
+  };
 }
 
 /** Reject corrupted, incompatible, truncated, or internally inconsistent stored sessions. */
@@ -519,6 +592,9 @@ export function validateProgress(value: unknown): MemoryProgress | null {
       || !Number.isInteger(saved.cursor) || saved.cursor < 0 || saved.cursor > saved.length
       || typeof saved.answered !== "boolean" || !Array.isArray(saved.history) || saved.history.length > saved.length
       || (saved.profile !== undefined && !isProfile(saved.profile))
+      || (saved.adaptation !== undefined && saved.adaptation !== COMFORT_ADAPTATION)
+      || (saved.adaptation === undefined ? saved.comfortFrom !== undefined
+        : !Number.isInteger(saved.comfortFrom) || saved.comfortFrom! < 0 || saved.comfortFrom! > saved.cursor)
       || !validateTaskStates(saved.initialTasks, saved.profile) || !validateTaskStates(saved.tasks, saved.profile)) return null;
     if ((saved.modality !== undefined && !isModality(saved.modality))
       || (saved.focusedTask !== undefined && !isTask(saved.focusedTask))
@@ -528,6 +604,7 @@ export function validateProgress(value: unknown): MemoryProgress | null {
       || (saved.cursor === saved.length && saved.answered)) return null;
     let replay = createProgress(saved.seed, saved.length, {
       focusedTask: saved.focusedTask, tasks: saved.initialTasks, modality: saved.modality, digitOrder: saved.digitOrder, profile: saved.profile, digitVariant: saved.digitVariant,
+      ...(saved.adaptation === COMFORT_ADAPTATION && saved.comfortFrom === 0 ? { adaptation: COMFORT_ADAPTATION } : {}),
     });
     if ((replay.digitVariant === undefined) !== (saved.digitVariant === undefined)
       || (replay.digitVariant && saved.digitVariant && digitVariantKey(replay.digitVariant) !== digitVariantKey(saved.digitVariant))
@@ -537,9 +614,13 @@ export function validateProgress(value: unknown): MemoryProgress | null {
       const result = saved.history[index];
       if (!result || typeof result.correct !== "boolean" || JSON.stringify(result.round) !== JSON.stringify(replay.active)) return null;
       replay = recordFirstAttempt(replay, replay.active!, result.correct);
-      if (index < saved.cursor) replay = advanceRound(replay);
+      if (result.retryCorrect !== undefined) replay = recordRetryAttempt(replay, replay.active!, result.retryCorrect);
+      if (index < saved.cursor) replay = advanceRound(replay, {
+        upgradeAdaptation: saved.adaptation === COMFORT_ADAPTATION && saved.comfortFrom === index + 1,
+      });
     }
     if (JSON.stringify(replay.tasks) !== JSON.stringify(saved.tasks)
+      || replay.adaptation !== saved.adaptation || replay.comfortFrom !== saved.comfortFrom
       || replay.cursor !== saved.cursor || replay.answered !== saved.answered
       || JSON.stringify(replay.active) !== JSON.stringify(saved.active)) return null;
     return replay;

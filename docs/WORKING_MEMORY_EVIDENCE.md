@@ -1,7 +1,8 @@
 # Memory Lab: publication audit and difficulty design
 
 Publication audit reviewed: 18 October 2026. Engagement design updated:
-20 October 2026.
+20 October 2026. Comfortable-span adaptation and two-answer policy updated:
+21 October 2026.
 
 Memory Lab uses published Cogmed task descriptions as references for mechanics.
 It is an independent implementation. Matching a description is not evidence of
@@ -15,7 +16,7 @@ players completing both products has yet been conducted.
 | --- | --- | --- | --- |
 | [Klingberg, Forssberg & Westerberg (2002), *Training of Working Memory in Children With ADHD*](https://doi.org/10.1076/jcen.24.6.781.8395), early research software. [Author-hosted full paper](https://www.klingberglab.se/pub/TrainingWMChildrenADHD.pdf), pp. 782–783. | Training used a near-capacity, trial-by-trial adaptive staircase. For all working-memory tasks, difficulty changed the **number of stimuli to remember**. Tasks included sequential positions on a 4×4 grid, reverse spoken digits entered on a displayed keypad, and letter span. | Adapt the actual amount to remember. In particular, lowering Hidden Homes must remove shape–location bindings, rather than only asking fewer questions about an unchanged six-shape display. | Exact staircase updates, universal starting spans, per-item presentation durations, and the current commercial product's implementation. This early program is not a complete current Cogmed inventory. |
 | [Dunning & Holmes (2014), *Does working memory training promote the use of strategies on untrained working memory tasks?*](https://pmc.ncbi.nlm.nih.gov/articles/PMC4110412/), **RM** training, Methods → Working memory training. | Trial-by-trial adaptation to current span; detailed descriptions of nine tasks. Visual Data Link uses a 4×4 grid. Rotating Data Link adds a **clockwise 90° turn before recall**. Both Input Module variants require manual reverse digit recall; the lid hides the keypad during presentation, then shows it for answering. Random Letters pairs spoken letters with illuminated locations. | Use clockwise quarter-turns in new research-informed sessions. Keep keypad and hidden-keypad mechanics distinguishable. Treat simultaneous shape binding and spoken responses as adaptations. | Numeric controller constants, per-task entry levels, task timing, or equal difficulty between this app and RM. The fixed span-two control condition is not a recommended adaptive starting level. |
-| [Henshaw & Ferguson (2013), trial protocol](https://pmc.ncbi.nlm.nih.gov/articles/PMC4235173/), **research edition of Cogmed RM**, Working memory training intervention. | Eleven sequence-based tasks; difficulty is the number of to-be-remembered items. Adaptive training aims for approximately **60% of trials correct on average per day**. The nonadaptive control remains at three items. | Use remembered item count as the primary adaptive variable. The 60% daily target can inform an independently specified practice controller. | A particular up/down rule, step size, integer rounding policy, timing table, or adaptive initial span. A control group's three items are not a normative starting load. |
+| [Henshaw & Ferguson (2013), trial protocol](https://pmc.ncbi.nlm.nih.gov/articles/PMC4235173/), **research edition of Cogmed RM**, Working memory training intervention. | Eleven sequence-based tasks; difficulty is the number of to-be-remembered items. Adaptive training aims for approximately **60% of trials correct on average per day**. The nonadaptive control remains at three items. | Use remembered item count as the primary adaptive variable. Retain 60% as published protocol context; the app's current comfortable-span policy does not target a fixed accuracy. | A particular up/down rule, step size, integer rounding policy, timing table, or adaptive initial span. A control group's three items are not a normative starting load. |
 | [Henshaw, Heinrich, Tittle & Ferguson (2022), randomized trial](https://pmc.ncbi.nlm.nih.gov/articles/PMC9007089/), **research edition of Cogmed RM**, Working Memory Training Intervention → Table 2 and Adaptive Training. | Repeats the daily 60% target and item-count adaptation. Task descriptions distinguish serial storage, reverse recall, numerical resequencing, and association. Input Module with Lid reveals the numbered buttons at recall. Backward Digit Span with a spoken response is assessed separately from the manually answered training exercises. | Maintain separate practice conditions for keypad and speech. Speech is a new response condition, not a faithful restoration of a documented Cogmed input method. | That speech is universally harder, that a particular browser recognizer is suitable, or that any proposed controller replicates Cogmed. |
 | [Gathercole, Dunning, Holmes & Norris (2019), *Working memory training involves learning new skills*](https://pmc.ncbi.nlm.nih.gov/articles/PMC6591133/), Appendix A, **Cogmed RM tasks**. | Lists stimulus domain, presentation, response, and session schedule. Distinguishes forward grid recall, rotating grid/dial, slowly moving Asteroids, reverse digits, letter–location associations, and spatial numerical sorting. Responses are manual. | Compare tasks by their complete mechanics and response supports, rather than their names. Preserve slower, legible target movement. Label the app's extra mechanics as extensions. | A millisecond movement speed, an optimal difficulty for an individual, or identical challenge across tasks with the same span. |
 
@@ -87,11 +88,13 @@ fingerprints stay stable across repeats, while deterministic occurrence IDs
 remain unique so first-attempt and redemption histories cannot collide. The
 exception does not change saved sessions without `digitVariant`.
 
-## New difficulty profile
+## Stimulus profile and comfortable-span adaptation
 
-The `research-v1` profile applies to new sessions. Previous saved sessions keep
-their original generator and staircase so that an update cannot silently change
-the answer to a saved round or rewrite its first-attempt history.
+New sessions use the `research-v1` stimulus profile and the separate
+`comfort-v1` adaptation policy. Keeping those versions separate allows difficulty
+scheduling to change without changing a saved question's stimuli or answer.
+Existing round identities, first-attempt history, and generator settings remain
+intact.
 
 The following values are **app design choices**, informed by the methods above
 and by the observed entry difficulty. They are not published Cogmed norms or a
@@ -116,21 +119,43 @@ are a legibility and entry-load choice; none of the audited Cogmed methods
 specifies this simultaneous-shape display or these timings. Other presentation
 and movement timings are likewise app parameters, not measured Cogmed timing.
 
-The new independent controller accumulates **+2 for a first-attempt success and
-−3 for a first-attempt miss**. At +5 it raises load by one and subtracts five
-from the balance; at −5 it lowers load by one and adds five. Load stays within
-the exercise's bounds. Retries, historical review, and technical recognition
-failures do not add scored evidence. A correct retry still preserves the
-original first-attempt miss.
+The current controller treats a comfortable span as the usual practice load,
+with occasional single questions one item harder. Only first-attempt answers
+supply evidence, separately for each task and practice condition:
 
-This weighting is inspired by the published daily target, not copied from
-Cogmed. Its expected evidence increment at success probability `p` is
-`2p − 3(1 − p) = 5p − 3`, which is zero at `p = 0.60`. That algebra does **not**
-guarantee 60% observed accuracy: integer loads, bounds, learning, small sessions,
-and differing task conditions all matter. The threshold of five and balance
-carry are independently selected implementation details. The old
-two-consecutive-successes / one-miss staircase remains only for old sessions;
-it must not be described as a 60% controller.
+| Event | Scheduling rule |
+| --- | --- |
+| Starting at a comfortable span | Two successful comfortable-span first attempts permit one probe at span + 1. |
+| First successful harder probe | Return to the comfortable span; require two successful first attempts there before the next probe. |
+| Second successful probe for the same comfortable span, without an intervening failed probe | Promote the comfortable span by one. |
+| Failed harder probe | The very next question for that condition returns to the comfortable span. Require eight successful comfortable-span first attempts before another probe of the failed target. |
+| Repeated failures at the same target span | Increase that wait to sixteen successful comfortable-span first attempts, capped at sixteen. |
+| Two consecutive first-attempt misses at the comfortable span | Lower the comfortable span by one, within the exercise's bounds. |
+
+Failed-target backoff survives comfortable-span changes, session boundaries,
+and reloads; briefly dropping a span cannot erase a failed harder target.
+Retries, historical review, and technical recognition failures neither change
+the controller nor count down a probe wait. A correct retry preserves the
+original first-attempt miss. For a player who usually succeeds at five items
+but cannot yet manage six, most questions therefore stay at five, with sparse
+six-item probes rather than repeated demands to complete one.
+
+This is an **app design target for comfortable practice**, not a clinically
+validated algorithm or an implementation of Cogmed's proprietary controller.
+The published daily 60% target describes the audited research protocols; it is
+not the target of `comfort-v1`. Earlier `research-v1` adaptation used weighted
+evidence (+2 for success, −3 for a miss; one-span changes at a balance of ±5),
+and the original profile used a two-consecutive-successes / one-miss staircase.
+Those historical rules remain available to replay already-recorded history.
+
+An older active question keeps its exact presentation and recorded result.
+Once that question resolves, the controller upgrades at an explicit saved
+boundary; validation replays the older prefix with its original rules and the
+later rounds with the comfortable-span rules. If the current question was
+missed on its first attempt, the new comfortable span is no higher than both
+the old next span and one item below the missed span, bounded by the minimum
+of two. This eases the next question for an already-stuck player without
+rewriting the old result or changing the active answer.
 
 ## Response conditions and remaining calibration
 
@@ -153,7 +178,8 @@ Silence, unknown or uncertain speech, and technical failures are input failures,
 distinct from recognized incorrect answers. **Input not recognized** or **Speech
 input unavailable** feedback offers **Retry** to record another answer to the
 same heard sequence without replaying it. No attempt or adaptive evidence is
-recorded. The ten-second no-speech and 45-second maximum-recording bounds stop
+recorded, and neither of the question's two answer opportunities is consumed.
+The ten-second no-speech and 45-second maximum-recording bounds stop
 capture safely; they do not impose a scored response deadline or make silence
 a memory error. These endpoint and confidence rules are app design choices,
 not published Cogmed parameters or validated diagnostic criteria.
@@ -162,9 +188,16 @@ After a wrong recognized spoken answer, **Answer did not match** feedback shows
 the submitted digits to help inspect a possible misrecognition. The
 first-attempt miss still stands.
 This display cannot reliably establish whether confidently recognized digits
-were misheard or incorrectly recalled. The ordinary Replay sequence learning
-retry remains available and cannot rewrite the original result. Wrong feedback
-in every game indicates a mismatch without displaying the expected answer.
+were misheard or incorrectly recalled. Each question accepts at most two
+answers that can be graded. A correct first answer advances automatically;
+after a first miss, one Replay sequence learning retry remains available.
+Either result on that second answer advances automatically, with no Next or
+Start checkpoint. Only the first answer changes accuracy, attempt counters,
+adaptive evidence, or XP. A correct second answer redeems the miss without
+rewriting it; a second miss remains unredeemed. The optional persisted
+`retryCorrect` result records either second outcome, so saving, pausing,
+locking, or reloading cannot reset the limit. Wrong feedback in every game
+indicates a mismatch without displaying the expected answer.
 Solved examples use independent practice questions, and historical review does
 not reveal the full stimulus or answer to an unredeemed miss: for several
 mechanics the stimulus itself exposes the solution. Actual-round solutions
@@ -189,14 +222,16 @@ the new record, but its counters start at zero so historical totals are not
 duplicated. If both former spoken reverse aliases were attempted, they represent
 independent adaptive trajectories: archive both and start the common condition
 at span two and balance zero, rather than choosing or averaging them. An
-unplayed predecessor does not force this reset. Older active sessions continue
-their original rules and mix before applying this migration; their existing
-answers and first-attempt histories are not rewritten.
+unplayed predecessor does not force this reset. This condition-history migration
+is distinct from adopting `comfort-v1`: an active session retains its original
+mix and round identities, and changes controller only after its current question
+resolves. Existing answers and first-attempt histories are not rewritten.
 
 Further calibration needs repeated first-attempt observations for each task and
 condition: entry-round success, recent accuracy, the load reached, and whether
 misses arise from memory, unclear cues, motion, or recognition. The immediate
-goal is an understandable entry round and adaptation of the actual memory load.
+goal is understandable entry, comfortable practice with occasional harder
+probes, and adaptation of the actual memory load.
 Equivalent Cogmed difficulty would additionally require a specified edition,
 observed timing and stimuli across levels, and comparative performance data.
 Published task methods alone cannot establish that equivalence.
@@ -211,7 +246,8 @@ outcomes, or establish equivalence with Cogmed's commercial rewards.
 
 The lab awards ten XP for each recorded first attempt, independent of whether
 it was correct, its memory load, its presentation pace, or the response time.
-Correct retries and historical review add no XP. Silence, uncertain recognition,
+Second answers, including correct retries, and historical review add no XP:
+two answers to one question still earn ten XP total. Silence, uncertain recognition,
 and technical input failures remain unscored and cannot advance the trail.
 Lifetime credit derives from the existing de-duplicated task totals, including
 archived practice; it does not count session snapshots or completion screens
@@ -222,8 +258,8 @@ Every eight first attempts mark a cosmetic trail stop. Five stops form a
 habitat, and five habitats form an expedition; later expeditions retain earned
 XP. These landmarks do not gate exercises or increase difficulty. In particular,
 Journey's greater-than-70% stop-clearing rule does not apply: requiring that
-accuracy would conflict with this lab's separately specified adaptive practice
-controller and its research-informed 60% reference target.
+accuracy is not part of this lab's separately specified comfortable-span
+practice policy.
 
 The home screen and completed-session splash carry the animal and reward
 presentation. Cue, study, hold, and recall retain their original stimuli,
