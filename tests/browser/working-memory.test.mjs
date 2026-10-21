@@ -1160,6 +1160,8 @@ test('a confident spoken answer with the wrong length is a memory miss and displ
     await check(page);
     const replayed = await saved(page, value => value?.session?.cursor === 1);
     assert.deepEqual(replayed.tasks, result.tasks, 'Correct replay preserves the original first-try miss.');
+    assert.equal(replayed.session.history[0].retryCorrect, true);
+    assert.equal(replayed.redeemed.includes(round.id), true);
     assert.equal(replayed.session.history.length, 1);
     assert.equal(getMemoryRewards(restoreSaved(replayed)).xp, 10, 'Replay cannot award the same challenge twice.');
     await assertLocalSpeech(opened);
@@ -1725,6 +1727,7 @@ test('wrong response, replay, hard reload, history, and retry retain the first-t
     const redeemed = await saved(page, value => value?.redeemed.includes(round.id));
     assert.equal(redeemed.session.history.length, 1);
     assert.equal(redeemed.session.history[0].correct, false);
+    assert.equal(redeemed.session.history[0].retryCorrect, true);
     assert.deepEqual(redeemed.tasks, missed.tasks, 'A successful retry never changes adaptive statistics.');
     assert.equal(await page.getByRole('button', { name: 'Review round 1: missed on first try', exact: true }).count(), 1);
     const beforeReview = await saved(page, value => value?.session?.cursor === 1);
@@ -1882,7 +1885,7 @@ test('a second miss on the final challenge completes the session with practice X
     assert.equal(getMemoryRewards(restoreSaved(missed)).xp, 80);
     await present(page, { replay: true });
     await enter(page, round, wrong);
-    await page.getByRole('button', { name: 'Check sequence', exact: true }).dblclick({ delay: 25 });
+    await page.getByRole('button', { name: 'Check sequence', exact: true }).click();
     await page.getByRole('heading', { name: /^Session complete\.?$/ }).waitFor();
     const completed = await saved(page, value => value?.session?.cursor === 8 && value?.logs.length === 1);
     assert.equal(completed.session.active, null);
