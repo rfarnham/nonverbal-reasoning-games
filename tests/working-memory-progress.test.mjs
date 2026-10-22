@@ -16,6 +16,7 @@ import {
   enumerateDigitVariants,
 } from "../app/lab/working-memory/digit-options.ts";
 import {
+  canResumePractice,
   conditionKey,
   fresh,
   normalizeSaved,
@@ -23,6 +24,7 @@ import {
   selectTaskStates,
   taskTotals,
 } from "../app/lab/working-memory/progress.ts";
+import { getMemoryRewards } from "../app/lab/working-memory/rewards.ts";
 
 function settings(saved, canonical = true) {
   return { slow: saved.slow, inputMode: saved.inputMode, digitOrder: saved.digitOrder,
@@ -357,7 +359,7 @@ test("restoration rejects noncanonical options, wrong schemas, corrupt banks and
     (saved) => { saved.digitVariant = { order: "reverse", inputMode: "spoken", keypad: "visible" }; saved.inputMode = "spoken"; },
     (saved) => { saved.sessionCondition = null; },
     (saved) => { delete saved.sessionCondition.digitVariant; },
-    (saved) => { saved.slow = true; },
+    (saved) => { saved.sessionCondition.slow = true; },
     (saved) => { saved.conditions[bank].correct = 2; },
     (saved) => { saved.conditions[bank].attempts = -1; },
     (saved) => { saved.conditions[bank].attempts = 1_000_001; },
@@ -585,4 +587,124 @@ test("restoration compares complete comfort controllers and rejects malformed ba
     mutate(corrupted.conditions[key]);
     assert.equal(restore(corrupted), null, mutate.toString());
   }
+});
+
+test("pending preferences preserve the active round and captured condition through reload and retry", () => {
+  const firstVariant = { order: "reverse", inputMode: "keypad", keypad: "hidden" };
+  let saved = preferences(fresh(), firstVariant);
+  saved = score(begin(saved, "hidden-digits", "pending-preferences", { adaptation: COMFORT_ADAPTATION }), false);
+  const before = structuredClone(saved);
+  const oldKey = conditionKey("hidden-digits", before.sessionCondition);
+  saved = preferences(saved, { order: "descending", inputMode: "spoken", keypad: "none" }, true);
+  assert.notDeepEqual(settings(saved), saved.sessionCondition);
+  assert.deepEqual(saved.session, before.session, "a preference choice cannot replace the saved question or restore a retry");
+  assert.deepEqual(saved.tasks, before.tasks);
+  assert.deepEqual(saved.sessionCondition, before.sessionCondition);
+  assert.deepEqual(saved.conditions, before.conditions, "the retained controller stays in its original bank");
+  assert.equal(saved.conditions[conditionKey("sort-digits", saved)], undefined);
+  assert.equal(selectTaskStates(saved)["sort-digits"].attempts, 0);
+  assert.deepEqual(restore(json(saved)), saved);
+  assert.equal(canResumePractice(saved, "sort-digits"), false);
+  saved = retry(restore(json(saved)), false);
+  assert.equal(saved.session.history[0].retryCorrect, false);
+  assert.deepEqual(saved.conditions[oldKey], before.conditions[oldKey]);
+  assert.deepEqual(taskTotals(saved), taskTotals(before));
+  saved = advance(restore(json(saved)));
+  assert.deepEqual(saved.session.active.digitVariant, firstVariant, "continuation follows the captured session, not pending options");
+  assert.deepEqual(saved.sessionCondition, before.sessionCondition);
+  assert.equal(saved.conditions[conditionKey("sort-digits", saved)], undefined);
+  assert.deepEqual(restore(json(saved)), saved);
+  const corrupted = json(saved);
+  corrupted.sessionCondition = settings(saved);
+  assert.equal(restore(corrupted), null, "pending preferences must not allow the retained session's context to be rewritten");
+});
+
+test("focused practice resumes only the same game and pace while visual practice ignores digit preferences", () => {
+  let saved = begin(fresh(), "forward", "matching-visual-practice", { adaptation: COMFORT_ADAPTATION });
+  assert.equal(canResumePractice(saved, "forward"), true);
+  assert.equal(canResumePractice(saved, "locations"), false);
+  assert.equal(canResumePractice(saved, "reverse-digits"), false);
+  saved = preferences(saved, { order: "ascending", inputMode: "spoken", keypad: "none" });
+  assert.equal(canResumePractice(saved, "forward"), true, "listening options do not define a visual condition");
+  saved = score(saved, false);
+  assert.equal(canResumePractice(saved, "forward"), true, "the one remaining try must resume rather than restart");
+  saved = retry(saved, false);
+  assert.equal(canResumePractice(saved, "forward"), true, "a resolved question resumes through the normal advance boundary");
+  saved = preferences(saved, saved.digitVariant, true);
+  assert.equal(canResumePractice(saved, "forward"), false);
+  const session = createProgress("unfocused-session", 24, { profile: RESEARCH_PROFILE, digitVariant: saved.digitVariant });
+  const mixed = normalizeSaved({ ...saved, session, sessionCondition: settings(saved), redeemed: [] });
+  assert.equal(canResumePractice(mixed, "forward"), false, "a focused game choice replaces a multi-game session");
+  assert.equal(canResumePractice(normalizeSaved({ ...saved, session: null, redeemed: [] }), "forward"), false);
+});
+
+test("matching digit practice uses its full canonical variant and retains legacy audio aliases", () => {
+  for (const variant of enumerateDigitVariants()) {
+    let saved = preferences(fresh(), variant, true);
+    saved = begin(saved, digitTaskForVariant(variant), `matching-${JSON.stringify(variant)}`, { adaptation: COMFORT_ADAPTATION });
+    for (const task of AUDIO_TASK_IDS) assert.equal(canResumePractice(saved, task), true, "audio aliases share the selected variant identity");
+    for (const other of enumerateDigitVariants()) {
+      const pending = preferences(saved, other);
+      assert.equal(canResumePractice(pending, digitTaskForVariant(other)), JSON.stringify(other) === JSON.stringify(variant));
+      assert.deepEqual(pending.session, saved.session);
+      assert.deepEqual(restore(json(pending)), pending);
+    }
+    assert.equal(canResumePractice(preferences(saved, variant, false), digitTaskForVariant(variant)), false);
+  }
+  for (const task of AUDIO_TASK_IDS) {
+    for (const inputMode of ["keypad", "spoken"]) {
+      const context = { slow: false, inputMode, digitOrder: "descending" };
+      const session = createProgress(`matching-old-${task}-${inputMode}`, 8, { focusedTask: task, profile: RESEARCH_PROFILE, digitOrder: "descending" });
+      const old = previous({}, context, session);
+      const saved = restore(old);
+      assert.ok(saved);
+      assert.equal(saved.session.digitVariant, undefined);
+      assert.equal(canResumePractice(saved, digitTaskForVariant(saved.digitVariant)), true);
+      const pending = preferences(saved, { order: "ascending", inputMode: "keypad", keypad: "visible" }, true);
+      assert.deepEqual(restore(json(pending)), pending, "a migrated schema-three save can keep pending preferences alongside an older session");
+      assert.equal(canResumePractice(pending, "sort-digits"), false);
+      const brokenOld = { ...json(old), slow: true };
+      assert.equal(restore(brokenOld), null, "schema-two migration still validates its historical condition contract");
+    }
+  }
+});
+
+test("switching away from a missed harder trial keeps counters, probe rest, rewards and buddy without completing the old session", () => {
+  let saved = fresh();
+  const oldKey = conditionKey("reverse-digits", saved);
+  saved.conditions[oldKey] = learned(5, 40, 38);
+  saved = normalizeSaved({ ...saved, buddy: "fox" });
+  saved = begin(saved, "reverse-digits", "switch-hard-probe", { adaptation: COMFORT_ADAPTATION });
+  saved = advance(score(saved, true));
+  saved = advance(score(saved, true));
+  assert.equal(saved.session.active.span, 6);
+  saved = score(saved, false);
+  const oldBank = structuredClone(saved.conditions[oldKey]);
+  assert.equal(oldBank.comfortSpan, 5);
+  assert.equal(oldBank.probeWait, 8);
+  assert.ok(oldBank.probeBackoff > 0);
+  const before = structuredClone(saved);
+  const beforeXp = getMemoryRewards(saved).xp;
+  saved = preferences(saved, { order: "descending", inputMode: "spoken", keypad: "none" }, true);
+  saved = begin(saved, "locations", "switch-to-new-game", { adaptation: COMFORT_ADAPTATION });
+  assert.equal(saved.session.focusedTask, "locations");
+  assert.equal(saved.session.cursor, 0);
+  assert.deepEqual(saved.session.history, []);
+  assert.deepEqual(saved.conditions[oldKey], oldBank);
+  assert.deepEqual(taskTotals(saved), taskTotals(before));
+  assert.equal(getMemoryRewards(saved).xp, beforeXp);
+  assert.equal(saved.buddy, "fox");
+  assert.deepEqual(saved.logs, before.logs, "replacing an unfinished run does not count it as completed");
+  assert.deepEqual(saved.redeemed, []);
+  assert.deepEqual(restore(json(saved)), saved);
+  saved = score(saved, false);
+  assert.equal(getMemoryRewards(saved).xp, beforeXp + 10);
+  saved = preferences(saved, before.digitVariant, false);
+  saved = begin(saved, "reverse-digits", "switch-back-to-original", { adaptation: COMFORT_ADAPTATION });
+  assert.equal(saved.session.active.span, 5);
+  assert.deepEqual(saved.session.initialTasks["reverse-digits"], oldBank, "switching back cannot reset the failed harder target's rest");
+  assert.deepEqual(saved.conditions[oldKey], oldBank);
+  assert.equal(getMemoryRewards(saved).xp, beforeXp + 10);
+  assert.deepEqual(saved.logs, []);
+  assert.deepEqual(restore(json(saved)), saved);
 });

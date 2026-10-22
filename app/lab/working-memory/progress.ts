@@ -152,6 +152,20 @@ export function selectTaskStates(saved: Saved, settings: SessionCondition = save
   return tasks;
 }
 
+/** Resume only the selected focused practice; other choices start their own run. */
+export function canResumePractice(saved: Saved, task: TaskId): boolean {
+  const session = saved.session;
+  const context = saved.sessionCondition;
+  if (!session?.active || !session.focusedTask || !context || context.slow !== saved.slow) return false;
+  const audio = AUDIO_TASK_IDS.includes(task as (typeof AUDIO_TASK_IDS)[number]);
+  if (!audio) return session.focusedTask === task;
+  if (!AUDIO_TASK_IDS.includes(session.focusedTask as (typeof AUDIO_TASK_IDS)[number])) return false;
+  const variant = session.digitVariant ?? digitVariantFromLegacy(
+    session.focusedTask, context.inputMode, session.digitOrder ?? context.digitOrder,
+  );
+  return variant !== null && digitVariantKey(variant) === digitVariantKey(saved.digitVariant);
+}
+
 /** Only one played predecessor may seed a canonical adaptive trajectory. */
 function seedCanonical(archived: Record<string, TaskState>, existing: Record<string, TaskState>): Record<string, TaskState> {
   const sources = new Map<string, { task: TaskId; states: TaskState[] }>();
@@ -183,7 +197,7 @@ function sameCondition(first: SessionCondition, second: SessionCondition, canoni
 
 /**
  * Call before persisting every mutation. A retained session always writes to its
- * own immutable settings, so changing settings after completion cannot copy its
+ * own immutable settings, so changing preferences cannot copy its
  * adaptive history into a different condition.
  */
 export function normalizeSaved(saved: Saved): Saved {
@@ -201,9 +215,6 @@ export function normalizeSaved(saved: Saved): Saved {
     || (canonical && (session.profile !== RESEARCH_PROFILE || (audio && session.digitVariant === undefined)
       || (session.digitVariant !== undefined && digitVariantKey(session.digitVariant) !== digitVariantKey(context.digitVariant!))))) {
     throw new TypeError("Session digit options do not match its play condition.");
-  }
-  if (session.active && !sameCondition(context, saved, canonical)) {
-    throw new TypeError("Finish the active session before changing its play conditions.");
   }
   if (session.plan.includes("sort-digits") && (session.digitOrder ?? "ascending") !== context.digitOrder) {
     throw new TypeError("Session sorting order does not match its play condition.");
@@ -384,7 +395,7 @@ export function restore(value: unknown): Saved | null {
     const profile = session?.profile ?? (session ? undefined : RESEARCH_PROFILE);
     if (!validateTaskStates(data.tasks, profile)) return null;
     if (session && (!sameTasks(session.tasks, data.tasks) || !contextMatchesSession(session, context!)
-      || (session.active && !sameCondition(context!, settings, context!.digitVariant !== undefined)))) return null;
+      || (data.version === 2 && session.active && !sameCondition(context!, settings, context!.digitVariant !== undefined)))) return null;
 
     if (data.version === 2) {
       if (data.digitVariant !== undefined || context?.digitVariant !== undefined || session?.digitVariant !== undefined

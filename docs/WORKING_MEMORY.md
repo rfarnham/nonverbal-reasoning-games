@@ -95,7 +95,22 @@ remain archived, and historical totals count archived and new attempts once.
 
 Save & exit retains an unfinished session. Ending it from the lab keeps
 completed-round totals and adaptive spans, but does not count it as a completed
-session. A presentation interrupted by pause or a hidden tab restarts. Paused
+session. Practice buttons remain available while a session is saved. Choosing
+the same focused game and settings resumes that run, including its remaining
+answer opportunity. Choosing another game or practice condition starts eight
+new questions and ends the old unfinished run; its recorded practice, XP,
+comfortable span, and harder-trial backoff are retained. Switching needs no
+separate End session action or confirmation.
+
+Preferences can be changed on the game shelf while a run is saved. The retained
+run keeps its original presentation pace, digit variant, question, and answer
+history; Continue session uses those captured settings. New practice uses the
+selected preferences and their independent difficulty bank. Games and saved
+runs can also be opened before audio or the speech model is ready: setup is
+offered inside the game, and listening and scoring stay blocked until the
+required audio/input is available.
+
+A presentation interrupted by pause or a hidden tab restarts. Paused
 manual recall retains the response entered so far; spoken recall stops the
 microphone and discards its recording and any pending recognition result.
 Continue starts a fresh capture automatically when resuming spoken recall.

@@ -51,7 +51,7 @@ import {
 import { createMemoryNarrator, type MemoryNarrator } from "./narration";
 import { MEMORY_MOTION } from "./motion";
 import OrderCue from "./OrderCue";
-import { fresh, restore, normalizeSaved, selectTaskStates, taskTotals, type Saved, type InputMode } from "./progress";
+import { fresh, restore, normalizeSaved, selectTaskStates, taskTotals, canResumePractice, type Saved, type InputMode } from "./progress";
 import { useLocalSpeech } from "./use-local-speech";
 import { LOCAL_SPEECH_DOWNLOAD_MB } from "./local-digit-recognition";
 import {
@@ -635,14 +635,14 @@ function UnlockedLab({
     : null;
   const spoken = currentDigitVariant?.inputMode === "spoken";
   const digitsTask = digitTaskForVariant(saved.digitVariant);
-  const legacyDigitRound = session?.active?.answerKind === "ordered-digits" && !saved.sessionCondition?.digitVariant ? session.active : null;
-  const displayedDigitsTask = legacyDigitRound?.task ?? digitsTask;
-  const displayedDigitVariant = legacyDigitRound
-    ? digitVariantFromLegacy(legacyDigitRound.task, saved.sessionCondition?.inputMode ?? "keypad", legacyDigitRound.digitOrder ?? "ascending")!
-    : saved.digitVariant;
+  const displayedDigitsTask = digitsTask;
+  const displayedDigitVariant = saved.digitVariant;
   const visualTasks = content.tasks.filter((item) => VISUAL_TASK_IDS.includes(item.id as (typeof VISUAL_TASK_IDS)[number]));
   const games = [...visualTasks.map((item) => ({ id: item.id, title: item.title, task: item.id as TaskId })), { id: "digits", title: "Digits", task: displayedDigitsTask }];
-  const selectedTasks = session?.active ? session.tasks : selectTaskStates(saved);
+  const selectedTasks = selectTaskStates(saved);
+  const practiceState = (id: TaskId) => canResumePractice(saved, id)
+    ? session!.tasks[session!.focusedTask!]
+    : selectedTasks[id];
   const totals = taskTotals(saved);
   const rewards = getMemoryRewards(saved);
   const listeningReady = audioReady && (saved.inputMode !== "spoken" || speech.ready);
@@ -954,7 +954,6 @@ function UnlockedLab({
   }
   function start(focusedTask?: TaskId, autoPresent = false) {
     const needsListening = focusedTask ? AUDIO_TASK_IDS.includes(focusedTask as (typeof AUDIO_TASK_IDS)[number]) : modality !== "visual";
-    if (needsListening && !listeningReady) return;
     cancelPlayback();
     setReview(null);
     setLastResult(null);
@@ -987,6 +986,10 @@ function UnlockedLab({
     } catch {
       setNotice("A new session could not be prepared. Please try again.");
     }
+  }
+  function practice(task: TaskId) {
+    if (canResumePractice(savedRef.current, task)) resume();
+    else start(task);
   }
   function startAdventure() {
     if (savedRef.current.session?.active) resume();
@@ -1271,8 +1274,6 @@ function UnlockedLab({
               onStart={startAdventure}
               nextGameTitle={adventureGame.title}
               hasActiveSession={!!session?.active}
-              startDisabled={!!session?.active && saved.sessionCondition?.inputMode === "spoken"
-                && session.plan.some((id) => AUDIO_TASK_IDS.includes(id as (typeof AUDIO_TASK_IDS)[number])) && !speech.ready}
               onBuddyChange={(buddy) => persist({ ...savedRef.current, buddy })}
             />
             <div className={styles.sectionHeading}>
@@ -1329,11 +1330,11 @@ function UnlockedLab({
                       {games.map((game) => (
                         <tr key={game.id}>
                           <th scope="row">{game.title}</th>
-                          <td>{selectedTasks[game.task].span}</td>
-                          <td>{selectedTasks[game.task].attempts}</td>
+                          <td>{practiceState(game.task).span}</td>
+                          <td>{practiceState(game.task).attempts}</td>
                           <td>
-                            {selectedTasks[game.task].attempts
-                              ? `${Math.round((selectedTasks[game.task].correct / selectedTasks[game.task].attempts) * 100)}%`
+                            {practiceState(game.task).attempts
+                              ? `${Math.round((practiceState(game.task).correct / practiceState(game.task).attempts) * 100)}%`
                               : "—"}
                           </td>
                         </tr>
@@ -1410,6 +1411,23 @@ function UnlockedLab({
                 )}
               </section>
             )}
+            {session?.active && (
+              <section className={styles.sessionCard} aria-label="Saved session">
+                <div className={styles.sessionCopy}>
+                  <h2 className={styles.sectionTitle}>Continue session</h2>
+                  <p>Round {session.cursor + 1} of {session.length}. Your original settings are saved.</p>
+                </div>
+                <div className={styles.sessionOptions}>
+                  <button className={styles.button} onClick={resume}>Continue session →</button>
+                  <button
+                    className={styles.secondaryButton}
+                    onClick={() => persist({ ...savedRef.current, session: null, redeemed: [] })}
+                  >
+                    End session
+                  </button>
+                </div>
+              </section>
+            )}
             <div
               className={styles.modalityTabs}
               role="group"
@@ -1419,7 +1437,6 @@ function UnlockedLab({
                 <button
                   key={mode}
                   className={styles.modalityTab}
-                  disabled={!!session?.active}
                   aria-pressed={modality === mode}
                   onClick={() => setModality(mode)}
                 >
@@ -1434,65 +1451,32 @@ function UnlockedLab({
             <section className={styles.sessionCard}>
               <div className={styles.sessionCopy}>
                 <h2 className={styles.sectionTitle}>
-                  {session?.active ? "Continue session" : "Start a session"}
+                  Start a session
                 </h2>
                 <p>
-                  {session?.active
-                    ? `Round ${session.cursor + 1} of ${session.length}.`
-                    : modality === "mixed"
-                      ? "Visual games alternate with your chosen Digits settings."
-                      : modality === "visual"
-                        ? "Eight visual exercises."
-                        : "Digits with the settings below."}
+                  {modality === "mixed"
+                    ? "Visual games alternate with your chosen Digits settings."
+                    : modality === "visual"
+                      ? "Eight visual exercises."
+                      : "Digits with the settings below."}
                 </p>
               </div>
               <div className={styles.sessionOptions}>
-                {session?.active ? (
-                  <>
-                    <button className={styles.button} onClick={resume} disabled={saved.sessionCondition?.inputMode === "spoken" && session.plan.some((id) => AUDIO_TASK_IDS.includes(id as (typeof AUDIO_TASK_IDS)[number])) && !speech.ready}>
-                      Continue session →
-                    </button>
-                    <button
-                      className={styles.quietButton}
-                      onClick={() =>
-                        persist({
-                          ...savedRef.current,
-                          session: null,
-                          redeemed: [],
-                        })
-                      }
-                    >
-                      End session
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <label
-                      htmlFor="session-length"
-                      className={styles.screenReader}
-                    >
-                      Session length
-                    </label>
-                    <select
-                      className={styles.select}
-                      id="session-length"
-                      value={length}
-                      onChange={(event) =>
-                        setLength(Number(event.target.value) as 24 | 48)
-                      }
-                    >
-                      <option value={24}>Short mix · 24 rounds</option>
-                      <option value={48}>Full mix · 48 rounds</option>
-                    </select>
-                    <button
-                      className={styles.button}
-                      disabled={modality !== "visual" && !listeningReady}
-                      onClick={() => start()}
-                    >
-                      Start a session →
-                    </button>
-                  </>
-                )}
+                <label htmlFor="session-length" className={styles.screenReader}>
+                  Session length
+                </label>
+                <select
+                  className={styles.select}
+                  id="session-length"
+                  value={length}
+                  onChange={(event) => setLength(Number(event.target.value) as 24 | 48)}
+                >
+                  <option value={24}>Short mix · 24 rounds</option>
+                  <option value={48}>Full mix · 48 rounds</option>
+                </select>
+                <button className={styles.button} onClick={() => start()}>
+                  Start a session →
+                </button>
               </div>
             </section>
             <div className={styles.settings}>
@@ -1508,7 +1492,6 @@ function UnlockedLab({
                 <input
                   type="checkbox"
                   checked={saved.slow}
-                  disabled={!!session?.active}
                   onChange={(event) =>
                     persist({ ...savedRef.current, slow: event.target.checked })
                   }
@@ -1526,23 +1509,24 @@ function UnlockedLab({
                 </div>
                 <p>Eight rounds of one exercise.</p>
               </div>
+              <p className={styles.privacy}>Switch games any time. Your XP and difficulty are saved.</p>
               <article className={styles.digitsCard} aria-labelledby="digits-game-title">
                 <div className={styles.digitsHeading}>
                   <div>
                     <h3 id="digits-game-title" className={styles.taskTitle}>Digits</h3>
-                    <span className={styles.taskMeta}>Span {selectedTasks[displayedDigitsTask].span} · {describeDigitVariant(displayedDigitVariant)}</span>
+                    <span className={styles.taskMeta}>Span {practiceState(displayedDigitsTask).span} · {describeDigitVariant(displayedDigitVariant)}</span>
                   </div>
-                  <button className={styles.linkButton} disabled={!!session?.active || !listeningReady} onClick={() => start(digitsTask)} aria-label="Practice Digits">
+                  <button className={styles.linkButton} onClick={() => practice(digitsTask)} aria-label="Practice Digits">
                     Practice <span aria-hidden="true">→</span>
                   </button>
                 </div>
                 {session?.active && !saved.sessionCondition?.digitVariant && (
-                  <p className={styles.privacy}>This saved session keeps its original settings. Choose new Digits settings after it ends.</p>
+                  <p className={styles.privacy}>Continue session keeps its original settings. These choices apply to new practice.</p>
                 )}
                 <div className={styles.digitOptions}>
                   <div>
                     <label htmlFor="digits-recall-order">Recall order</label>
-                    <select id="digits-recall-order" className={styles.select} value={saved.digitVariant.order} disabled={!!session?.active} onChange={(event) => changeDigitVariant({ order: event.target.value as DigitRecallOrder })}>
+                    <select id="digits-recall-order" className={styles.select} value={saved.digitVariant.order} onChange={(event) => changeDigitVariant({ order: event.target.value as DigitRecallOrder })}>
                       <option value="reverse">Reverse</option>
                       <option value="ascending">Small → large</option>
                       <option value="descending">Large → small</option>
@@ -1550,14 +1534,14 @@ function UnlockedLab({
                   </div>
                   <div>
                     <label htmlFor="digits-answer-with">Answer with</label>
-                    <select id="digits-answer-with" className={styles.select} value={saved.inputMode} disabled={!!session?.active} onChange={(event) => changeDigitVariant({ inputMode: event.target.value as InputMode })}>
+                    <select id="digits-answer-with" className={styles.select} value={saved.inputMode} onChange={(event) => changeDigitVariant({ inputMode: event.target.value as InputMode })}>
                       <option value="keypad">Keypad</option>
                       <option value="spoken">Spoken</option>
                     </select>
                   </div>
                   {saved.inputMode === "keypad" && <div>
                     <label htmlFor="digits-keypad-visibility">Keypad while listening</label>
-                    <select id="digits-keypad-visibility" className={styles.select} value={saved.digitVariant.keypad} disabled={!!session?.active} onChange={(event) => changeDigitVariant({ keypad: event.target.value as "visible" | "hidden" })}>
+                    <select id="digits-keypad-visibility" className={styles.select} value={saved.digitVariant.keypad} onChange={(event) => changeDigitVariant({ keypad: event.target.value as "visible" | "hidden" })}>
                       <option value="visible">Visible</option>
                       <option value="hidden">Hidden</option>
                     </select>
@@ -1593,18 +1577,11 @@ function UnlockedLab({
                   <article className={styles.taskCard} key={item.id}>
                     <h3 className={styles.taskTitle}>{item.title}</h3>
                     <span className={styles.taskMeta}>
-                      Span {selectedTasks[item.id as TaskId].span}
+                      Span {practiceState(item.id as TaskId).span}
                     </span>
                     <button
                       className={styles.linkButton}
-                      disabled={
-                        !!session?.active ||
-                        (AUDIO_TASK_IDS.includes(
-                          item.id as (typeof AUDIO_TASK_IDS)[number],
-                        ) &&
-                          !listeningReady)
-                      }
-                      onClick={() => start(item.id as TaskId)}
+                      onClick={() => practice(item.id as TaskId)}
                       aria-label={`Practice ${item.title}`}
                     >
                       Practice <span aria-hidden="true">→</span>
@@ -1612,12 +1589,6 @@ function UnlockedLab({
                   </article>
                 ))}
               </div>
-              {session?.active && (
-                <p className={styles.privacy}>
-                  Continue or end the saved session before starting another
-                  exercise.
-                </p>
-              )}
             </section>
             <section className={styles.evidenceNote}>
               <details>
@@ -1759,6 +1730,14 @@ function UnlockedLab({
                 <Example
                   round={generateRound(round.task, getTaskProfile(round.task, round.profile).initialSpan, "solved-example-v1", undefined, round.digitOrder, round.profile, round.digitVariant)}
                 />
+                {round.answerKind === "ordered-digits" && !audioReady && (
+                  <div className={styles.speechSetup}>
+                    <p>Audio must be ready before this round can begin.</p>
+                    <button className={styles.secondaryButton} onClick={() => setAudioLoadAttempt((value) => value + 1)}>
+                      Retry audio
+                    </button>
+                  </div>
+                )}
                 {spoken && !speech.ready && (
                   <div className={styles.speechSetup}>
                     <p>Set up spoken answers before listening to this round.</p>
@@ -1766,7 +1745,7 @@ function UnlockedLab({
                       <button className={styles.secondaryButton} ref={actionRef} disabled={speech.setup === "loading"} onClick={() => void speech.prepare()}>
                         {speech.setup === "loading" ? "Loading speech model…" : "Download speech model"}
                       </button>
-                    ) : <p>Local speech is unavailable in this browser. Save &amp; exit to end this session and choose Keypad.</p>}
+                    ) : <p>Local speech is unavailable in this browser. Save &amp; exit and choose Keypad for Digits.</p>}
                     {speech.message && <p role="status">{speech.message}</p>}
                   </div>
                 )}

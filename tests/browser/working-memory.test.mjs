@@ -653,6 +653,170 @@ test('Memory Trail credits earlier practice across expeditions and keeps all six
   } finally { await context.close(); }
 });
 
+for (const width of [320, 390]) {
+  test(`${width}px touch Practice resumes the current miss and switches games without ending a session`, { timeout: 75_000 }, async () => {
+    const opened = await open({ width, height: 844, touch: true });
+    const { context, page } = opened;
+    try {
+      await seedSaved(page, normalizeSaved({ ...fresh(), buddy: 'fox' }));
+      const round = await startFocus(page, 'forward');
+      await present(page);
+      const wrong = [...round.expected]; wrong[0] = (wrong[0] + 1) % 16;
+      await enter(page, round, wrong, { touch: true });
+      await check(page, { correct: false });
+      const missed = await saved(page, value => value?.session?.answered);
+      const learned = structuredClone(missed.tasks.forward);
+      assert.equal(missed.session.history[0].correct, false);
+      assert.equal(missed.session.history[0].retryCorrect, undefined);
+      assert.equal(getMemoryRewards(restoreSaved(missed)).xp, 10);
+      await page.getByRole('button', { name: /Save & exit/ }).tap();
+      await page.reload();
+      await unlock(page);
+      assert.equal(await page.getByRole('button', { name: /^Practice / }).count(), 9);
+      assert.deepEqual(await page.getByRole('button', { name: /^Practice / }).evaluateAll(buttons => buttons.map(button => button.disabled)), Array(9).fill(false), 'A retained session cannot make any game look tappable but inert.');
+      await assertFits(page, `switchable games ${width}px`);
+      await page.screenshot({ path: resolve(shots, `switchable-games-${width}.png`), fullPage: true });
+      await page.getByRole('button', { name: 'Practice Exercise forward', exact: true }).tap();
+      await page.getByRole('heading', { name: 'Try again', exact: true }).waitFor();
+      assert.deepEqual(await saved(page), missed, 'Tapping the current game resumes the exact saved miss without refreshing its remaining try.');
+      await assertNoMissSolution(page);
+      await page.getByRole('button', { name: /Save & exit/ }).tap();
+      await page.getByRole('button', { name: 'Practice Exercise symbols', exact: true }).tap();
+      await page.getByRole('heading', { name: 'Exercise symbols', exact: true }).waitFor();
+      const switched = await saved(page, value => value?.session?.focusedTask === 'symbols');
+      assert.equal(switched.session.length, 8);
+      assert.equal(switched.session.cursor, 0);
+      assert.equal(switched.session.answered, false);
+      assert.deepEqual(switched.session.history, []);
+      assert.notEqual(switched.session.seed, missed.session.seed);
+      assert.deepEqual(switched.conditions[conditionKey('forward', missed.sessionCondition)], learned);
+      assert.deepEqual(taskTotals(restoreSaved(switched)), taskTotals(restoreSaved(missed)), 'Changing games adds no answer, accuracy evidence, or practice credit.');
+      assert.deepEqual(switched.logs, missed.logs, 'An unfinished session is not reported as completed.');
+      assert.deepEqual(switched.legacyTasks, missed.legacyTasks);
+      assert.deepEqual(switched.archivedConditions, missed.archivedConditions);
+      assert.equal(switched.buddy, 'fox');
+      assert.equal(getMemoryRewards(restoreSaved(switched)).xp, 10);
+      assert.equal(await page.getByRole('dialog').count(), 0, 'Choosing another game opens it directly.');
+      await page.getByRole('button', { name: /Save & exit/ }).tap();
+      await page.getByRole('button', { name: 'Practice Exercise forward', exact: true }).tap();
+      await page.getByRole('heading', { name: 'Exercise forward', exact: true }).waitFor();
+      const returned = await saved(page, value => value?.session?.focusedTask === 'forward');
+      assert.notEqual(returned.session.seed, missed.session.seed);
+      assert.equal(returned.session.cursor, 0);
+      assert.equal(returned.session.active.span, learned.span);
+      assert.deepEqual(returned.session.initialTasks.forward, learned, 'Returning to a game keeps its comfortable span and probe schedule.');
+      assert.deepEqual(returned.redeemed, []);
+      assert.deepEqual(taskTotals(restoreSaved(returned)), taskTotals(restoreSaved(missed)));
+      assert.equal(getMemoryRewards(restoreSaved(returned)).xp, 10, 'Leaving the new unplayed game cannot create or duplicate an attempt.');
+      await page.getByRole('button', { name: /Save & exit/ }).tap();
+      await page.reload();
+      await unlock(page);
+      assert.deepEqual(await saved(page), returned, 'Encrypted reload preserves the selected game and all learned records.');
+      await assertMemoryXp(page, 10);
+      await assertNoPlaintext(page, returned);
+      await assertClean(opened);
+    } finally { await context.close(); }
+  });
+}
+
+test('pending Digits and pace choices leave the saved question intact and start independent practice without End session', { timeout: 75_000 }, async () => {
+  const opened = await open({ width: 390, touch: true, speech: {} });
+  const { context, page } = opened;
+  try {
+    await unlock(page);
+    const originalVariant = { order: 'ascending', inputMode: 'keypad', keypad: 'hidden' };
+    await selectDigits(page, originalVariant);
+    await page.getByRole('button', { name: 'Practice Digits', exact: true }).tap();
+    await page.getByRole('heading', { name: 'Digits', exact: true }).waitFor();
+    const original = await saved(page, value => value?.session?.digitVariant?.order === 'ascending');
+    const round = original.session.active;
+    await present(page, { audio: true });
+    const wrong = [...round.expected]; wrong[0] = wrong[0] % 9 + 1;
+    await enter(page, round, wrong, { touch: true });
+    await check(page, { correct: false });
+    const missed = await saved(page, value => value?.session?.answered);
+    const learned = structuredClone(missed.tasks['sort-digits']);
+    await page.getByRole('button', { name: /Save & exit/ }).tap();
+    const nextVariant = { order: 'descending', inputMode: 'keypad', keypad: 'visible' };
+    await selectDigits(page, nextVariant);
+    await page.getByLabel('Slower presentation', { exact: true }).check();
+    const pending = await saved(page, value => value?.slow && value?.digitVariant?.order === 'descending' && value?.digitVariant?.keypad === 'visible');
+    assert.deepEqual(pending.session, missed.session, 'Choosing the next practice conditions cannot mutate the retained round or its first-attempt result.');
+    assert.deepEqual(pending.sessionCondition, missed.sessionCondition, 'The old session retains its immutable pace and recall rule.');
+    assert.deepEqual(pending.conditions, missed.conditions);
+    assert.equal(getMemoryRewards(restoreSaved(pending)).xp, 10);
+    await page.reload();
+    await unlock(page);
+    assert.deepEqual(await saved(page), pending, 'Pending preferences and the separately captured saved question both survive reload.');
+    assert.equal(await page.getByLabel('Recall order', { exact: true }).inputValue(), 'descending');
+    assert.equal(await page.getByLabel('Slower presentation', { exact: true }).isChecked(), true);
+    await page.getByRole('button', { name: 'Practice Digits', exact: true }).tap();
+    await page.getByRole('heading', { name: 'Digits', exact: true }).waitFor();
+    const other = await saved(page, value => value?.session?.seed !== missed.session.seed && value?.session?.digitVariant?.order === 'descending');
+    assert.deepEqual(other.session.digitVariant, nextVariant);
+    assert.equal(other.sessionCondition.slow, true);
+    assert.equal(other.session.active.span, 2);
+    assert.equal(other.session.initialTasks['sort-digits'].attempts, 0);
+    assert.equal(other.session.initialTasks['sort-digits'].probeBackoff, 0);
+    assert.deepEqual(other.conditions[conditionKey('sort-digits', missed.sessionCondition)], learned);
+    assert.deepEqual(taskTotals(restoreSaved(other)), taskTotals(restoreSaved(missed)));
+    await page.getByRole('button', { name: /Save & exit/ }).tap();
+    await selectDigits(page, originalVariant);
+    await page.getByLabel('Slower presentation', { exact: true }).uncheck();
+    await page.getByRole('button', { name: 'Practice Digits', exact: true }).tap();
+    await page.getByRole('heading', { name: 'Digits', exact: true }).waitFor();
+    const returned = await saved(page, value => value?.session?.seed !== other.session.seed && value?.session?.digitVariant?.order === 'ascending');
+    assert.deepEqual(returned.session.digitVariant, originalVariant);
+    assert.equal(returned.sessionCondition.slow, false);
+    assert.deepEqual(returned.session.initialTasks['sort-digits'], learned);
+    assert.deepEqual(taskTotals(restoreSaved(returned)), taskTotals(restoreSaved(missed)));
+    assert.equal(getMemoryRewards(restoreSaved(returned)).xp, 10);
+    assert.deepEqual(await page.evaluate(() => ({ workers: window.__speechTest.workersCreated, microphones: window.__speechTest.microphoneRequests })), { workers: 0, microphones: 0 }, 'Choosing keypad conditions cannot download a speech model or request the microphone.');
+    await assertNoPlaintext(page, returned);
+    await assertClean(opened);
+  } finally { await context.close(); }
+});
+
+test('unprepared spoken practice and Continue actions open setup while visual games remain one-tap selectable', { timeout: 60_000 }, async () => {
+  const opened = await open({ width: 390, touch: true, speech: {} });
+  const { context, page } = opened;
+  try {
+    await unlock(page);
+    await page.getByLabel('Answer with', { exact: true }).selectOption('spoken');
+    await page.getByRole('button', { name: 'Practice Digits', exact: true }).tap();
+    await page.getByRole('heading', { name: 'Digits', exact: true }).waitFor();
+    const retained = await saved(page, value => value?.session?.digitVariant?.inputMode === 'spoken');
+    await page.getByRole('button', { name: 'Download speech model', exact: true }).waitFor();
+    assert.equal(await page.getByRole('button', { name: /^(Listen to the sequence|Turn sound on & listen|Loading audio)/ }).isDisabled(), true);
+    assert.equal(retained.session.cursor, 0);
+    assert.equal(retained.session.answered, false);
+    for (const action of ['Continue adventure', /^Continue session/, 'Practice Digits']) {
+      await page.getByRole('button', { name: /Save & exit/ }).tap();
+      const control = page.getByRole('button', { name: action, exact: typeof action === 'string' });
+      assert.equal(await control.isEnabled(), true, 'A missing model cannot strand the saved session behind a disabled navigation button.');
+      await control.tap();
+      await page.getByRole('button', { name: 'Download speech model', exact: true }).waitFor();
+      assert.deepEqual(await saved(page), retained, 'Opening setup cannot reset or score the saved spoken question.');
+    }
+    assert.deepEqual(await page.evaluate(() => ({ workers: window.__speechTest.workersCreated, microphones: window.__speechTest.microphoneRequests })), { workers: 0, microphones: 0 }, 'Opening or continuing a spoken game does not download its model or start recording.');
+    await page.getByRole('button', { name: /Save & exit/ }).tap();
+    await page.getByRole('button', { name: 'Practice Exercise forward', exact: true }).tap();
+    await page.getByRole('heading', { name: 'Exercise forward', exact: true }).waitFor();
+    const visual = await saved(page, value => value?.session?.focusedTask === 'forward');
+    assert.equal(visual.session.answered, false);
+    assert.equal(getMemoryRewards(restoreSaved(visual)).xp, 0, 'Abandoning an unplayed speech question adds no failed answer.');
+    await present(page);
+    await enter(page, visual.session.active, visual.session.active.expected, { touch: true });
+    await check(page);
+    const practiced = await saved(page, value => value?.session?.cursor === 1);
+    assert.equal(getMemoryRewards(restoreSaved(practiced)).xp, 10);
+    assert.deepEqual(await page.evaluate(() => ({ workers: window.__speechTest.workersCreated, microphones: window.__speechTest.microphoneRequests })), { workers: 0, microphones: 0 });
+    await assertFits(page, 'visual practice after unprepared spoken game');
+    await assertNoPlaintext(page, practiced);
+    await assertLocalSpeech(opened);
+  } finally { await context.close(); }
+});
+
 test('one Digits game exposes nine unique saved variants and omits keypad options for spoken answers', { timeout: 60_000 }, async () => {
   const opened = await open({ width: 390, speech: {} });
   const { context, page } = opened;
@@ -1036,7 +1200,7 @@ test('Large to small selection keeps a descending order cue and accepts only des
     await page.getByRole('button', { name: /Save & exit/ }).click();
     const numberOrder = page.getByLabel('Recall order', { exact: true });
     assert.equal(await numberOrder.inputValue(), 'descending');
-    assert.equal(await numberOrder.isDisabled(), true, 'A saved session retains its direction until it ends.');
+    assert.equal(await numberOrder.isEnabled(), true, 'New-practice preferences remain available while the saved round retains its captured direction.');
     await page.reload();
     await unlock(page);
     assert.equal(await page.getByLabel('Recall order', { exact: true }).inputValue(), 'descending');
@@ -1053,7 +1217,7 @@ test('spoken recall automatically starts, stops, and commits once without exposi
     await unlock(page);
     assert.deepEqual(await page.evaluate(() => ({ workers: window.__speechTest.workersCreated, microphones: window.__speechTest.microphoneRequests })), { workers: 0, microphones: 0 });
     await page.getByLabel('Answer with', { exact: true }).selectOption('spoken');
-    assert.equal(await page.getByRole('button', { name: 'Practice Digits', exact: true }).isDisabled(), true);
+    assert.equal(await page.getByRole('button', { name: 'Practice Digits', exact: true }).isEnabled(), true, 'Digits can open its setup screen before its speech model is ready.');
     assert.equal(await page.getByRole('button', { name: 'Practice Exercise forward', exact: true }).isEnabled(), true, 'Visual exercises remain available without the speech model.');
     assert.deepEqual(await page.evaluate(() => ({ workers: window.__speechTest.workersCreated, microphones: window.__speechTest.microphoneRequests })), { workers: 0, microphones: 0 }, 'Selecting Spoken alone does not load a model or open the microphone.');
     await page.getByRole('button', { name: 'Download speech model', exact: true }).click();
@@ -1378,7 +1542,7 @@ test('a failed local model download does not request microphone access', { timeo
     await page.getByRole('status').filter({ hasText: /^Could not load local speech/ }).waitFor();
     assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 0);
     assert.equal(await page.evaluate(() => window.__speechTest.workersTerminated), 1);
-    assert.equal(await page.getByRole('button', { name: 'Practice Digits', exact: true }).isDisabled(), true);
+    assert.equal(await page.getByRole('button', { name: 'Practice Digits', exact: true }).isEnabled(), true, 'A failed model download does not lock game navigation.');
     const progress = await saved(page);
     assert.equal(progress.session, null);
     assert.equal(selectTaskStates(progress)['reverse-digits'].attempts, 0);
@@ -1388,7 +1552,7 @@ test('a failed local model download does not request microphone access', { timeo
   } finally { await context.close(); }
 });
 
-test('a failed local worker disables spoken starts and recovers in an unscored active round', { timeout: 45_000 }, async () => {
+test('a failed local worker leaves spoken practice selectable and recovers in an unscored active round', { timeout: 45_000 }, async () => {
   const opened = await open({ speech: {} });
   const { context, page } = opened;
   try {
@@ -1396,7 +1560,7 @@ test('a failed local worker disables spoken starts and recovers in an unscored a
     await prepareSpeech(page);
     await page.evaluate(() => window.__speechTest.failWorker());
     await page.getByRole('button', { name: 'Download speech model', exact: true }).waitFor();
-    assert.equal(await page.getByRole('button', { name: 'Practice Digits', exact: true }).isDisabled(), true, 'An idle worker failure invalidates the ready state.');
+    assert.equal(await page.getByRole('button', { name: 'Practice Digits', exact: true }).isEnabled(), true, 'An idle worker failure gates listening rather than game navigation.');
     assert.equal(await page.evaluate(() => window.__speechTest.microphoneRequests), 0);
     await page.getByRole('button', { name: 'Download speech model', exact: true }).click();
     await page.getByRole('status').filter({ hasText: /^Speech model ready$/ }).waitFor();
@@ -2171,7 +2335,7 @@ test('ending an unfinished session preserves adaptive records and enables anothe
     await check(page);
     const before = await saved(page, value => value?.session?.cursor === 1);
     await page.getByRole('button', { name: /Save & exit/ }).click();
-    assert.equal(await page.getByRole('button', { name: 'Practice Exercise symbols', exact: true }).isDisabled(), true);
+    assert.equal(await page.getByRole('button', { name: 'Practice Exercise symbols', exact: true }).isEnabled(), true, 'Ending a session is optional when choosing another exercise.');
     await page.getByRole('button', { name: 'End session', exact: true }).click();
     const ended = await saved(page, value => value?.session === null);
     assert.deepEqual(ended.tasks, selectTaskStates(before), 'Ending a session retains played banks; untouched games remain independent defaults.');
